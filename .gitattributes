@@ -1,0 +1,14 @@
+# Line endings and binary files
+
+* text=auto
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.exe binary
+*.msi binary
