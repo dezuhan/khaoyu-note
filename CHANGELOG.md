@@ -3,6 +3,15 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.14.0] - 2026-11-07
+
+### Added
+
+- Opt-in presence per account, with an account endpoint and presence counts that exclude opted-out
+  connections.
+- `@email` mentions in share comments notify current project members through in-app notifications and
+  the opt-in email path.
+
 ## [0.13.0] - 2026-11-07
 
 ### Added
