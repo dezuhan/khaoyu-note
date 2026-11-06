@@ -40,8 +40,17 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
   const dataDir = path.resolve(cwd, env.KHAOYU_SERVICE_DATA_DIR || ".khaoyu-service-data");
   const publicUrl = (env.KHAOYU_SERVICE_PUBLIC_URL || `http://${host}:${port}`).replace(/\/+$/, "");
 
-  const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";
-  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
+  const adminToken = env.KHAOYU_SERVICE_ADMIN_TOKEN || "";
+  if (adminToken) {
+    if (Buffer.byteLength(adminToken, "utf8") < 32) {
+      throw new Error("KHAOYU_SERVICE_ADMIN_TOKEN must be at least 32 characters");
+    }
+    if (/^(change|replace|secret|password|example|test)/i.test(adminToken)) {
+      throw new Error("KHAOYU_SERVICE_ADMIN_TOKEN still uses a placeholder value");
+    }
+  }
+
+  const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
   const smtpPass = env.KHAOYU_SERVICE_SMTP_PASSWORD || "";
   const smtpFrom = env.KHAOYU_SERVICE_SMTP_FROM || "";
   if (smtpHost && !smtpFrom) {
@@ -69,6 +78,7 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     cookieSecure: boolean(env.KHAOYU_SERVICE_COOKIE_SECURE, publicUrl.startsWith("https://")),
     trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
+    adminToken,
     corsOrigins: (env.KHAOYU_SERVICE_CORS_ORIGINS || "tauri://localhost,http://tauri.localhost")
       .split(",")
       .map((origin) => origin.trim())

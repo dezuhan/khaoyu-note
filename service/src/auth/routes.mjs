@@ -228,6 +228,7 @@ async function verifyShareForWrite(db, config, { token, body, ip, minimum }) {
 export function createApiRouter({ db, config, logger, mailer }) {
   const objects = new ObjectStore(db, config.objectsDir);
   const events = createEventHub();
+  const adminRate = new Map();
   const blockedExtensions = new Set([
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
   ]);
@@ -238,6 +239,24 @@ export function createApiRouter({ db, config, logger, mailer }) {
         emailNotification(db, config, mailer, logger, accountId, payload)
       )
     );
+  }
+
+  function requireAdmin(request, ipHash) {
+    if (!config.adminToken) throw new HttpError(404, "not found", "not_found");
+    const hits = adminRate.get(ipHash) || { count: 0, resetAt: Date.now() + 60_000 };
+    if (Date.now() >= hits.resetAt) {
+      hits.count = 0;
+      hits.resetAt = Date.now() + 60_000;
+    }
+    hits.count += 1;
+    adminRate.set(ipHash, hits);
+    if (hits.count > 60) throw new HttpError(429, "too many admin requests", "rate_limited");
+    const token = bearerToken(request);
+    const expected = Buffer.from(config.adminToken);
+    const actual = Buffer.from(String(token || ""));
+    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
+      throw new HttpError(401, "admin authentication required", "authentication_required");
+    }
   }
 
   function saveSharedDoc(projectId, doc, revision, actorId) {    const serialized = JSON.stringify(doc);
@@ -288,6 +307,63 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
       if (!["GET", "HEAD"].includes(method)) assertSameOrigin(request, config);
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/audit") {
+        requireAdmin(request, ipHash);
+        const limit = Math.max(1, Math.min(500, Number(url.searchParams.get("limit")) || 100));
+        const entries = db
+          .prepare(
+            `SELECT id, actor_account_id, action, resource_type, resource_id, ip_hash, metadata, created_at
+             FROM audit_log ORDER BY created_at DESC LIMIT ?`
+          )
+          .all(limit)
+          .map((entry) => ({
+            ...entry,
+            metadata: entry.metadata ? JSON.parse(entry.metadata) : null,
+          }));
+        writeAudit(db, {
+          action: "admin.audit_exported",
+          resourceType: "admin",
+          metadata: { count: entries.length },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { entries }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/abuse-reports") {
+        requireAdmin(request, ipHash);
+        const reports = db
+          .prepare(
+            `SELECT r.id, r.share_id, r.reason, r.reporter_ip_hash, r.created_at, r.status,
+                    s.project_id, s.scope, s.target_id
+             FROM abuse_reports r JOIN share_links s ON s.id = r.share_id
+             ORDER BY r.created_at DESC LIMIT 200`
+          )
+          .all();
+        sendJson(response, 200, { reports }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/stats") {
+        requireAdmin(request, ipHash);
+        const count = (table) => Number(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count);
+        sendJson(
+          response,
+          200,
+          {
+            accounts: count("accounts"),
+            projects: count("projects"),
+            shareLinks: count("share_links"),
+            abuseReports: count("abuse_reports"),
+            notifications: count("notifications"),
+            auditEntries: count("audit_log"),
+          },
+          config
+        );
+        return true;
+      }
 
       const publicReportMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/report$/);
       if (method === "POST" && publicReportMatch) {
