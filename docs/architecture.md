@@ -358,6 +358,13 @@ a card inside the link scope, never to a sibling card, and edits are limited to 
 with an optional revision check. Each write creates a revision, emits a snapshot event, audits the
 link and notifies owners.
 
+## Operator admin
+
+When `KHAOYU_SERVICE_ADMIN_TOKEN` is set, `/api/v1/admin/audit`, `/admin/abuse-reports` and
+`/admin/stats` use a separate bearer token, a 60 requests per minute per-IP limit and audited export.
+The admin token is independent from user sessions and API tokens. Unset means the routes do not
+exist.
+
 ## Desktop sync
 
 `app/web/js/sync.js` keeps the local board authoritative until the user enables sync for that board.

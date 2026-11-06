@@ -62,6 +62,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
 | `KHAOYU_SERVICE_CORS_ORIGINS` | Tauri origins | Comma-separated origins allowed to call bearer-token APIs from the desktop client. |
+| `KHAOYU_SERVICE_ADMIN_TOKEN` | empty | Optional operator token for admin audit, abuse and stats endpoints. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
 | `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
@@ -80,6 +81,14 @@ a migration is pending.
 
 Startup fails closed when the secret is missing, shorter than 32 characters, too repetitive or still
 looks like a placeholder.
+
+## Operator admin
+
+Set `KHAOYU_SERVICE_ADMIN_TOKEN` to enable `/api/v1/admin/*`. These endpoints require
+`Authorization: Bearer <token>`, are limited to 60 requests per minute per IP and return 404 when no
+admin token is configured. Audit export records its own `admin.audit_exported` event; abuse review
+returns the reported share, project, scope, reason and hashed reporter IP. Keep the token in the
+operator secret store and rotate it with the incident runbook.
 
 ## Health
 
@@ -127,6 +136,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects/:id/versions` | List recent project revisions. |
 | `POST` | `/api/v1/projects/:id/versions/:revision/restore` | Restore a revision as editor or owner. |
 | `GET` | `/api/v1/projects/:id/events` | SSE room for snapshot and presence events. |
+| `GET` | `/api/v1/admin/audit` | Operator audit export, latest 500. |
+| `GET` | `/api/v1/admin/abuse-reports` | Operator abuse report review. |
+| `GET` | `/api/v1/admin/stats` | Operator counts for accounts, projects, shares, reports and audit. |
 | `GET` | `/api/v1/notifications` | List scoped notifications and the unread count. |
 | `PATCH` | `/api/v1/notifications/:id/read` | Mark one owned notification as read. |
 | `POST` | `/api/v1/notifications/read-all` | Mark all owned notifications as read. |

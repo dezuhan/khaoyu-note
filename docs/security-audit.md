@@ -54,17 +54,18 @@ authorization.
 - Project shares expose the current snapshot only. Nested board content is not included by policy.
 - Share passphrase attempts use the same fixed window as login and return a neutral 404; external
   alert routing is still pending.
-- Audit rows are pruned by retention but have no export API or tamper-evident chain.
+- Audit rows are pruned by retention and can be exported through the admin API; there is no
+  tamper-evident chain or signed export.
 
 ### Low
 
 - SQLite is a single-node store. It fits a small self-hosted team but does not scale horizontally.
-- Dependency and container scanning are not in CI yet.
+- Dependency scanning is in CI, but there is no automated runtime SBOM or external review.
 - The local desktop app still uses a whole-document save model. The service project snapshot uses a
   revision check, but there is no delta sync.
 - External media iframes are sandboxed, but the desktop app and service deploy separately, so their
   CSP and proxy policies must remain aligned.
-- There is no documented incident-response runbook beyond the upgrade and backup notes.
+- The incident response runbook exists but has not been exercised in a live drill.
 
 ## Controls present
 
@@ -77,6 +78,8 @@ authorization.
 - Environment-only secrets, fail-closed startup, explicit reversible migrations, non-root container,
   read-only root filesystem, dropped capabilities and loopback-only Compose port.
 - Backup integrity verification, safety copy on restore and worker retention.
+- Separate operator admin token, per-IP admin rate limit, audited export and abuse review.
+- Threat model, security policy, incident runbook, release checklist and data residency docs.
 
 ## Recommended next work
 

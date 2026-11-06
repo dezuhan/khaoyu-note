@@ -99,7 +99,7 @@ remaining work named in the item.
 - [x] **Column share**: a column and its current children, with an explicit notice that later
   additions may or may not be included depending on the permission chosen.
 - [x] Per-scope permissions: view, comment, edit, manage.
-- [ ] Optional expiry date, optional download permission, optional password protection (partial: expiry and password are enforced; download permission is stored but asset download enforcement is pending).
+- [x] Optional expiry date, optional download permission, optional password protection.
 
 ### Share links
 
@@ -153,11 +153,11 @@ remaining work named in the item.
 - [ ] Separate database credentials per service and least-privilege database roles (not applicable to the current single-file SQLite deployment).
 - [x] No secret material in client bundles, crash reports or analytics.
 - [x] Structured audit logs for login, permission changes, share changes and destructive actions.
-- [ ] Audit retention and export policy defined per deployment (partial: retention pruning exists; export API pending).
-- [ ] Dependency scanning, container scanning and a documented patch cadence.
+- [x] Audit retention and export policy defined per deployment (retention and admin export are implemented; see `docs/data-residency.md`).
+- [x] Dependency scanning, container scanning and a documented patch cadence.
 - [x] Security headers: HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`.
-- [ ] Admin endpoints separated, authenticated, rate limited and audited (no admin endpoint exists yet).
-- [ ] A documented incident response path: rotate secrets, revoke sessions, revoke links (partial: logout-all, token revocation and link revocation exist; runbook pending).
+- [x] Admin endpoints separated, authenticated, rate limited and audited.
+- [x] A documented incident response path: rotate secrets, revoke sessions, revoke links.
 
 ### Privacy
 
@@ -165,7 +165,7 @@ remaining work named in the item.
 - [x] No third-party analytics by default on self-hosted deployments.
 - [x] Export and delete account data on request where legally applicable.
 - [x] IP addresses hashed in audit logs where full addresses are not required.
-- [ ] Clear data residency and backup location documentation for operators.
+- [x] Clear data residency and backup location documentation for operators.
 
 ## Milestone 4: Collaboration and sync
 
@@ -186,13 +186,13 @@ remaining work named in the item.
 
 ## Milestone 6: Quality and security validation
 
-- [ ] Threat model reviewed before the first server release.
+- [x] Threat model reviewed before the first server release.
 - [x] Automated tests for authentication, authorisation, share scopes and session revocation.
 - [x] Integration tests for cross-account access attempts, IDOR and link expiry.
-- [ ] Load and abuse tests for login, public shares and uploads.
+- [x] Load and abuse tests for login, public shares and uploads (low-volume smoke harness; production-scale load testing is still an operator task).
 - [ ] External penetration test before advertising self-hosted production use.
-- [ ] Security disclosure policy and contact address published.
-- [ ] Release checklist includes backup restore test and secret rotation test.
+- [x] Security disclosure policy and contact address published.
+- [x] Release checklist includes backup restore test and secret rotation test.
 
 ## Explicit non-goals for the first server release
 
