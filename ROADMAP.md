@@ -123,7 +123,7 @@ remaining work named in the item.
 - [ ] Public sharing is off by default and requires an explicit warning (partial: off by default and a 409 warning response exist; no UI warning flow yet).
 - [x] Public links show only the selected scope.
 - [x] Search engines excluded with `noindex` and no sitemap exposure.
-- [ ] Optional watermark and download restrictions for shared assets (partial: download flag stored; asset watermarking pending).
+- [ ] Optional watermark and download restrictions for shared assets (partial: download flag enforced and audited; watermarking pending).
 - [x] Abuse reporting and a kill switch for operators.
 
 ## Security architecture requirements
@@ -133,14 +133,14 @@ remaining work named in the item.
 - [ ] TLS everywhere; HTTP redirects to HTTPS or refuses to serve.
 - [ ] Encryption at rest for the database volume and object storage where the platform supports it.
 - [ ] Application-level encryption for highly sensitive fields if the deployment requires it.
-- [ ] Asset access checked through signed, short-lived URLs or an authenticated proxy.
-- [ ] No asset directory listing and no predictable asset filenames.
+- [x] Asset access checked through signed, short-lived URLs or an authenticated proxy.
+- [x] No asset directory listing and no predictable asset filenames.
 - [ ] Database and storage backups encrypted, with documented retention and deletion.
 
 ### Input and output safety
 
 - [ ] Server-side validation for every request body, parameter and upload.
-- [ ] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks.
+- [ ] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks (partial: filename sanitisation, extension blocking and size limits implemented; MIME sniffing and malware hooks pending).
 - [ ] Markdown and rich text sanitised on the server before rendering.
 - [ ] Stored XSS prevention through context-aware escaping and a strict CSP.
 - [x] Parameterised database queries only.

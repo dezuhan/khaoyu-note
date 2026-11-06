@@ -111,6 +111,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. |
 | `GET` | `/api/v1/projects/:id/members` | List project members. |
+| `GET` | `/api/v1/projects/:id/assets` | List project asset metadata. |
+| `POST` | `/api/v1/projects/:id/assets` | Upload an asset as raw bytes; editor role. |
+| `GET` | `/api/v1/projects/:id/assets/:assetId` | Download an asset as a project member. |
 | `PATCH` | `/api/v1/projects/:id/members/:accountId` | Change a member role; owner only. |
 | `DELETE` | `/api/v1/projects/:id/members/:accountId` | Remove a member; owner only. |
 | `POST` | `/api/v1/projects/:id/transfer` | Transfer ownership to an existing member; owner only. |
@@ -124,6 +127,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `DELETE` | `/api/v1/projects/:id/shares/:shareId` | Revoke a share link. |
 | `POST` | `/api/v1/projects/:id/shares/:shareId/rotate` | Rotate the share token. |
 | `POST` | `/api/v1/share/:token/access` | Public scoped access, optional passphrase. |
+| `POST` | `/api/v1/share/:token/assets/:assetId` | Download a shared asset when download is allowed. |
 | `POST` | `/api/v1/share/:token/report` | Report an abusive or unwanted shared link. |
 
 Passwords use Argon2id with 64 MiB memory, 3 iterations and a 16-byte per-user salt. Access tokens live
@@ -171,6 +175,18 @@ enforcement are still pending.
 public access returns 404. Anyone holding a link can file an abuse report at
 `/api/v1/share/:token/report`; reports are stored with a hashed reporter IP and remain available to
 the operator in the database.
+
+## Project assets
+
+Assets are uploaded as raw bytes with `x-file-name` and a content type, limited to 100 MB. The bytes
+are content-addressed and deduplicated in the object store; the project asset row keeps an opaque id,
+display name, content type and size. Executable and script extensions are rejected. List and download
+require project membership, while upload requires the editor role and the `projects:write` scope.
+
+A share can download an asset only when `downloadAllowed` is true, the link is valid and its
+passphrase matches. Project shares can download any project asset; item and column shares only when
+the asset id appears in the scoped payload. Downloads are audited per share link. MIME sniffing,
+malware scanning, watermarking and signed short-lived asset URLs are still pending.
 
 ## Migrations
 
@@ -257,8 +273,8 @@ with deduplication, audit IP hashing, backup/restore round-trip, worker cleanup 
 endpoints. The auth suite covers verification, generic login errors and throttling, CSRF, project
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
-isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance and ownership
-transfer.
+isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
+transfer, asset authorization and share download permission.
 
 ## Milestone boundaries
 
@@ -276,11 +292,11 @@ implemented.
 Implemented from Milestone 3: project, item and column share scopes; hashed revocable and rotating
 links; expiry; optional passphrase with rate limiting; neutral 404 responses; noindex headers; audit
 per access; project roles; email-bound invitations; member removal; ownership transfer safeguards;
-public sharing off by default; scoped payload isolation; a global operator kill switch; and abuse
-reports.
+public sharing off by default; scoped payload isolation; a global operator kill switch; abuse
+reports; and authenticated project asset upload/download with share download enforcement.
 
-Still pending: share-token write permissions, asset download and watermark enforcement, nested-board
-policy for project shares, SMTP delivery, passkeys, SSO, team membership UI, a browser login UI and
-desktop client sync. The Milestone 1 sync boundary remains open: desktop opt-in, explicit sync state,
-offline queue with conflict handling, and protection against a local database delete removing server
-data.
+Still pending: share-token write permissions, watermarking, MIME sniffing and malware scanning,
+signed short-lived asset URLs, nested-board policy for project shares, SMTP delivery, passkeys, SSO,
+team membership UI, a browser login UI and desktop client sync. The Milestone 1 sync boundary remains
+open: desktop opt-in, explicit sync state, offline queue with conflict handling, and protection
+against a local database delete removing server data.

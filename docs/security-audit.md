@@ -21,6 +21,8 @@ authorization.
 - Editors could create invitations. Invitation creation and revocation are now owner-only.
 - Share access, password attempts, expiry, rotation and revocation now have regression tests.
 - Account deletion export now includes accessible project snapshots.
+- Project assets now have authenticated upload and member-only download, and shares enforce the
+  download flag with per-link audit.
 
 ## Findings
 
@@ -29,21 +31,20 @@ authorization.
 | Finding | Status |
 | --- | --- |
 | Desktop sync, explicit sync state and offline queue are not implemented. | Open. Milestone 1 boundary remains partial. |
-| The service has no asset upload/download API. Share links can reference cards whose local assets are unavailable, and download permission is not enforced. | Open. Payload paths are stripped instead of leaking. |
-| Email verification, reset and invitations are written to a filesystem outbox, not delivered by SMTP. | Open. The outbox is mode `0600` and documented as sensitive. |
-| There is no TLS in the service itself. Operators must terminate TLS in Caddy, Nginx or another proxy. | Open by design. The Compose port binds loopback only. |
 | Share-token write permissions are stored but no write endpoint enforces them. | Open. Public access is read-only today. |
+| Email verification, reset, invitations and OTP are written to a filesystem outbox, not delivered by SMTP. | Open. The outbox is mode `0600` and documented as sensitive. |
+| There is no TLS in the service itself. Operators must terminate TLS in Caddy, Nginx or another proxy. | Open by design. The Compose port binds loopback only. |
 
 ### Medium
 
-- No global sharing kill switch. Operators can revoke individual links, and disabling project sharing
-  revokes that project's links.
+- Asset MIME sniffing, malware scanning, watermarking and signed short-lived URLs are not implemented.
+  Uploads are size-limited, filename-sanitised, extension-blocked and access-controlled.
 - No backup encryption or documented key rotation. Backups are local snapshots with a checksum only.
 - Registration, reset requests and invitations have no dedicated rate limit.
 - Logout is state-changing but does not require the CSRF header. It clears cookies and is bounded to
   the caller's session.
-- Session rows survive a service upgrade. Password reset and logout-all revoke sessions, but the
-  upgrade procedure does not invalidate every session automatically.
+- The upgrade path can revoke sessions with `invalidate-sessions`, but it is an operator step rather
+  than an automatic migration action.
 - Project shares expose the current snapshot only. Nested board content is not included by policy.
 - Share passphrase attempts use the same fixed window as login and return a neutral 404; external
   alert routing is still pending.
@@ -73,9 +74,10 @@ authorization.
 
 ## Recommended next work
 
-1. Implement service asset upload, signed download and per-share download enforcement.
+1. Add MIME sniffing, malware scanning, signed short-lived asset URLs and watermarking.
 2. Add SMTP delivery and outbox retry.
 3. Complete desktop sync with opt-in per project, explicit state, offline queue and conflict flow.
-4. Add signup/reset/invite rate limits and a global sharing kill switch.
+4. Add signup/reset/invite rate limits and a global sharing kill switch (the kill switch is now in
+   place; the dedicated rate limits are not).
 5. Add encrypted offsite backups and a documented restore drill.
 6. Add dependency and container scanning to CI, then an external penetration test before production.
