@@ -5,6 +5,7 @@ import { loadConfig } from "./config.mjs";
 import { openDatabase, migrate, rollback, migrationStatus, MIGRATIONS_DIR } from "./db.mjs";
 import { createBackup, restoreBackup } from "./backup.mjs";
 import { writeAudit } from "./audit.mjs";
+import { hashPassword } from "./auth/passwords.mjs";
 
 function usage() {
   console.log(`Khaoyu Note service
@@ -30,7 +31,7 @@ function open(config) {
   return openDatabase(config.databasePath);
 }
 
-function bootstrap(config, db) {
+function bootstrap(config, db, password) {
   const email = (process.env.KHAOYU_BOOTSTRAP_EMAIL || "owner@localhost").trim().toLowerCase();
   const name = (process.env.KHAOYU_BOOTSTRAP_NAME || "Owner").trim();
   const projectName = (process.env.KHAOYU_BOOTSTRAP_PROJECT || "Khaoyu Note").trim();
@@ -40,9 +41,13 @@ function bootstrap(config, db) {
     account = { id: crypto.randomUUID(), email };
     const now = Date.now();
     db.prepare(
-      "INSERT INTO accounts (id, email, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
-    ).run(account.id, email, name, now, now);
+      "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(account.id, email, name, password.hash, now, now, now);
     createdAccount = true;
+  } else {
+    db.prepare(
+      "UPDATE accounts SET password_hash = COALESCE(password_hash, ?), email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?"
+    ).run(password.hash, Date.now(), Date.now(), account.id);
   }
   let project = db.prepare("SELECT id, name FROM projects WHERE owner_account_id = ? AND name = ?").get(
     account.id,
@@ -93,6 +98,10 @@ function main() {
     return;
   }
   const config = loadConfig();
+  return run(command, args, config);
+}
+
+async function run(command, args, config) {
   if (command === "migrate") {
     const db = open(config);
     const ran = migrate(db, { directory: MIGRATIONS_DIR });
@@ -136,8 +145,12 @@ function main() {
     return;
   }
   if (command === "bootstrap") {
+    const raw = process.env.KHAOYU_BOOTSTRAP_PASSWORD || "";
+    if (raw.length < 12 || raw.length > 200) {
+      throw new Error("KHAOYU_BOOTSTRAP_PASSWORD must be between 12 and 200 characters");
+    }
     const db = open(config);
-    const result = bootstrap(config, db);
+    const result = bootstrap(config, db, { hash: await hashPassword(raw) });
     db.close();
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -147,7 +160,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

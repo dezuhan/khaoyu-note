@@ -1,5 +1,7 @@
 import http from "node:http";
+import { createApiRouter } from "./auth/routes.mjs";
 import { migrationStatus } from "./db.mjs";
+import { sendJson } from "./http.mjs";
 
 export function assertSchemaCurrent(db) {
   const pending = migrationStatus(db).filter((migration) => !migration.applied);
@@ -10,20 +12,9 @@ export function assertSchemaCurrent(db) {
   }
 }
 
-function sendJson(response, status, payload) {
-  const body = JSON.stringify(payload);
-  response.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body),
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-  });
-  response.end(body);
-}
-
-export function createService({ config, db, logger }) {
-  return http.createServer((request, response) => {
+export function createService({ config, db, logger, mailer }) {
+  const api = createApiRouter({ db, config, logger, mailer });
+  return http.createServer(async (request, response) => {
     const started = Date.now();
     const url = new URL(request.url || "/", config.publicUrl);
     response.on("finish", () => {
@@ -37,20 +28,30 @@ export function createService({ config, db, logger }) {
       }
     });
 
-    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/healthz") {
-      sendJson(response, 200, { status: "ok" });
-      return;
-    }
-    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/readyz") {
-      try {
-        db.prepare("SELECT 1").get();
-        sendJson(response, 200, { status: "ready" });
-      } catch {
-        sendJson(response, 503, { status: "not_ready" });
+    try {
+      if (await api(request, response)) return;
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/healthz") {
+        sendJson(response, 200, { status: "ok" }, config);
+        return;
       }
-      return;
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/readyz") {
+        try {
+          db.prepare("SELECT 1").get();
+          sendJson(response, 200, { status: "ready" }, config);
+        } catch {
+          sendJson(response, 503, { status: "not_ready" }, config);
+        }
+        return;
+      }
+      sendJson(response, 404, { error: "not found" }, config);
+    } catch (error) {
+      logger.error("http.failed", { message: error.message });
+      if (!response.headersSent) {
+        sendJson(response, 500, { error: "internal server error" }, config);
+      } else {
+        response.end();
+      }
     }
-    sendJson(response, 404, { error: "not found" });
   });
 }
 

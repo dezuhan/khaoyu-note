@@ -15,6 +15,9 @@
     "bootstrap": "node src/cli.mjs bootstrap",
     "backup": "node src/cli.mjs backup",
     "restore": "node src/cli.mjs restore",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/service.test.mjs test/auth.test.mjs"
+  },
+  "dependencies": {
+    "hash-wasm": "4.12.0"
   }
 }

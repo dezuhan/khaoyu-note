@@ -1,6 +1,8 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createBackup, pruneBackups } from "./backup.mjs";
+import { pruneLoginAttempts } from "./auth/throttle.mjs";
 
 function removeOldEntries(directory, maxAgeMs) {
   if (!fs.existsSync(directory)) return 0;
@@ -21,11 +23,56 @@ function removeOldEntries(directory, maxAgeMs) {
   return removed;
 }
 
+export function purgeDeletedAccounts(db, logger) {
+  const due = db
+    .prepare("SELECT id, email FROM accounts WHERE deletion_due_at IS NOT NULL AND deletion_due_at <= ? AND deleted_at IS NULL")
+    .all(Date.now());
+  let purged = 0;
+  for (const account of due) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare(
+        "DELETE FROM projects WHERE owner_account_id = ?"
+      ).run(account.id);
+      db.prepare("DELETE FROM accounts WHERE id = ?").run(account.id);
+      db.exec("COMMIT");
+      db.prepare(
+        "INSERT INTO audit_log (id, actor_account_id, action, resource_type, resource_id, created_at) VALUES (?, NULL, 'account.purged', 'account', ?, ?)"
+      ).run(crypto.randomUUID(), account.id, Date.now());
+      purged += 1;
+    } catch (error) {
+      db.exec("ROLLBACK");
+      logger.error("account.purge_failed", { message: error.message });
+    }
+  }
+  return purged;
+}
+
+function pruneTokens(db) {
+  const now = Date.now();
+  const access = db
+    .prepare("DELETE FROM access_tokens WHERE expires_at < ? OR revoked_at < ?")
+    .run(now - 86_400_000, now - 86_400_000).changes;
+  const email = db
+    .prepare("DELETE FROM email_tokens WHERE expires_at < ? OR used_at < ?")
+    .run(now - 86_400_000, now - 86_400_000).changes;
+  const refresh = db
+    .prepare(
+      `DELETE FROM refresh_tokens WHERE session_id IN
+       (SELECT id FROM sessions WHERE revoked_at < ? OR expires_at < ?) AND created_at < ?`
+    )
+    .run(now - 86_400_000, now - 86_400_000, now - 86_400_000).changes;
+  return { access: Number(access), email: Number(email), refresh: Number(refresh) };
+}
+
 export function runMaintenance(db, config, logger) {
   const tempRemoved = removeOldEntries(config.tempDir, config.tempMaxAgeHours * 3600_000);
   const audit = db
     .prepare("DELETE FROM audit_log WHERE created_at < ?")
     .run(Date.now() - config.auditRetentionDays * 86_400_000);
+  const purged = purgeDeletedAccounts(db, logger);
+  const tokens = pruneTokens(db);
+  pruneLoginAttempts(db, 30);
 
   const last = db.prepare("SELECT value FROM service_meta WHERE key = 'last_backup_at'").get();
   const due =

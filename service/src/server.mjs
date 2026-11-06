@@ -3,18 +3,26 @@ import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { openDatabase } from "./db.mjs";
 import { assertSchemaCurrent, createService, listen } from "./app.mjs";
+import { createFileMailer } from "./auth/mailer.mjs";
 import { startWorker } from "./worker.mjs";
 
 const logger = createLogger();
 
 async function main() {
   const config = loadConfig();
-  for (const directory of [config.dataDir, config.objectsDir, config.tempDir, config.backupsDir]) {
+  for (const directory of [
+    config.dataDir,
+    config.objectsDir,
+    config.tempDir,
+    config.backupsDir,
+    config.outboxDir,
+  ]) {
     fs.mkdirSync(directory, { recursive: true });
   }
   const db = openDatabase(config.databasePath);
   assertSchemaCurrent(db);
-  const server = createService({ config, db, logger });
+  const mailer = createFileMailer(config, logger);
+  const server = createService({ config, db, logger, mailer });
   await listen(server, config);
   const worker = startWorker(db, config, logger);
   logger.info("service.started", {
