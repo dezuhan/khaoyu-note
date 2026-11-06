@@ -3,6 +3,16 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.4.0] - 2026-11-07
+
+### Added
+
+- Email one-time login codes with a 10 minute lifetime, five attempt limit and TOTP compatibility.
+- Global public-sharing kill switch through `KHAOYU_SERVICE_PUBLIC_SHARING`.
+- Abuse reports for share links, stored with a hashed reporter IP.
+- `invalidate-sessions` operator command for safe authentication upgrades.
+- Worker cleanup for expired one-time codes and old share attempts.
+
 ## [0.3.0] - 2026-11-07
 
 ### Added
