@@ -3,6 +3,21 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.10.0] - 2026-11-07
+
+### Added
+
+- Opt-in per-board desktop sync with explicit status, scoped API token configuration and a sync
+  dialog.
+- Push, pull, visible conflict choices and local-only disable. Deleting a local board never deletes
+  server data.
+- Offline sync queue with automatic retry when the client comes online.
+- Scoped API token helper and bearer-token CORS preflight limited to configured desktop origins.
+
+### Fixed
+
+- The local web host reports the package version instead of a hardcoded `0.1.0`.
+
 ## [0.9.0] - 2026-11-07
 
 ### Added
