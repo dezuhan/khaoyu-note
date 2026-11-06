@@ -101,6 +101,16 @@ async function start() {
     return { status: response.status, body, response };
   }
 
+  async function raw(pathname, { method = "GET", jar, headers = {}, body } = {}) {
+    const requestHeaders = { ...headers };
+    if (jar && Object.keys(jar).length) requestHeaders.Cookie = cookieHeader(jar);
+    if (jar?.khaoyu_csrf) requestHeaders["x-csrf-token"] = jar.khaoyu_csrf;
+    const response = await fetch(base + pathname, { method, headers: requestHeaders, body });
+    if (jar) absorbCookies(jar, response);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return { status: response.status, headers: response.headers, buffer, text: buffer.toString("utf8"), response };
+  }
+
   function latestMail(kind, to) {
     const files = fs
       .readdirSync(config.outboxDir)
@@ -154,6 +164,7 @@ async function start() {
     db,
     server,
     call,
+    raw,
     register,
     verify,
     login,
@@ -580,6 +591,72 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { accountId: guestId },
     });
     assert.equal(forbiddenTransfer.status, 403);
+  });
+
+  await t.test("project assets require authorization and share download permission", async () => {
+    const owner = await api.account(`asset-owner-${crypto.randomUUID()}@example.com`);
+    const stranger = await api.account(`asset-stranger-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Assets");
+    const body = Buffer.from("hello service asset");
+    const upload = await api.raw(`/api/v1/projects/${projectId}/assets`, {
+      method: "POST",
+      jar: owner.jar,
+      headers: {
+        "content-type": "application/octet-stream",
+        "x-file-name": "note.txt",
+      },
+      body,
+    });
+    assert.equal(upload.status, 201, upload.text);
+    const assetId = JSON.parse(upload.text).id;
+
+    const ownDownload = await api.raw(`/api/v1/projects/${projectId}/assets/${assetId}`, {
+      jar: owner.jar,
+    });
+    assert.equal(ownDownload.status, 200);
+    assert.equal(ownDownload.buffer.toString(), body.toString());
+    assert.equal(
+      (await api.raw(`/api/v1/projects/${projectId}/assets/${assetId}`, { jar: stranger.jar })).status,
+      404
+    );
+
+    api.db
+      .prepare("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'viewer', ?)")
+      .run(projectId, stranger.account.id, Date.now());
+    assert.equal(
+      (await api.raw(`/api/v1/projects/${projectId}/assets/${assetId}`, { jar: stranger.jar })).status,
+      200
+    );
+
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    const allowed = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view", downloadAllowed: true },
+    });
+    const allowedDownload = await api.raw(`/api/v1/share/${allowed.body.token}/assets/${assetId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(allowedDownload.status, 200);
+    assert.equal(allowedDownload.buffer.toString(), body.toString());
+
+    const denied = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view", downloadAllowed: false },
+    });
+    const deniedDownload = await api.raw(`/api/v1/share/${denied.body.token}/assets/${assetId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(deniedDownload.status, 403);
   });
 
   await t.test("scoped API tokens authorize project access without a password", async () => {

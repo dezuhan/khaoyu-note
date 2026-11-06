@@ -71,12 +71,12 @@ test("migrations are reversible and recreate the schema", () => {
   const db = openDatabase(config.databasePath);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [false, false, false, false]
+    [false, false, false, false, false]
   );
-  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4]);
+  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5]);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [true, true, true, true]
+    [true, true, true, true, true]
   );
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -96,7 +96,7 @@ test("migrations are reversible and recreate the schema", () => {
   ]) {
     assert.ok(tables.includes(table), `${table} missing`);
   }
-  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 4 }), [4, 3, 2, 1]);
+  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 5 }), [5, 4, 3, 2, 1]);
   assert.equal(
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get(),
     undefined
