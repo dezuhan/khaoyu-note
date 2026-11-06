@@ -1,0 +1,41 @@
+name: khaoyu-note-service
+
+services:
+  khaoyu-note-service:
+    build: .
+    image: khaoyu-note-service:0.1.0
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      KHAOYU_SERVICE_HOST: 0.0.0.0
+      KHAOYU_SERVICE_PORT: 8080
+      KHAOYU_SERVICE_DATA_DIR: /data
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - khaoyu-service-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    stop_grace_period: 20s
+
+volumes:
+  khaoyu-service-data:
