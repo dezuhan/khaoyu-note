@@ -61,6 +61,30 @@ export async function readJson(request) {
   }
 }
 
+export async function readBinary(request, maximum = 100 * 1024 * 1024) {
+  const declared = Number(request.headers["content-length"] || 0);
+  if (declared > maximum) throw new HttpError(413, "asset is too large", "payload_too_large");
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maximum) throw new HttpError(413, "asset is too large", "payload_too_large");
+    chunks.push(chunk);
+  }
+  if (!size) throw new HttpError(400, "asset is empty", "empty_asset");
+  return Buffer.concat(chunks);
+}
+
+export function sendBinary(response, config, buffer, { contentType, filename, download = false }) {
+  applySecurityHeaders(response, config);
+  response.writeHead(200, {
+    "Content-Type": contentType || "application/octet-stream",
+    "Content-Length": buffer.length,
+    "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${String(filename || "asset").replace(/["\\]/g, "")}"`,
+  });
+  response.end(buffer);
+}
+
 export function appendCookie(response, cookie) {
   const existing = response.getHeader("Set-Cookie");
   const values = Array.isArray(existing) ? existing : existing ? [existing] : [];

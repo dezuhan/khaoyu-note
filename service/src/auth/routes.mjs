@@ -24,12 +24,15 @@ import {
   clientIp,
   HttpError,
   normalizeEmail,
+  readBinary,
   readJson,
   requirePassword,
   requireString,
+  sendBinary,
   sendJson,
   sendNoContent,
 } from "../http.mjs";
+import { ObjectStore } from "../objects.mjs";
 
 function now() {
   return Date.now();
@@ -189,6 +192,11 @@ function issueOtp(db, account, secret) {
 }
 
 export function createApiRouter({ db, config, logger, mailer }) {
+  const objects = new ObjectStore(db, config.objectsDir);
+  const blockedExtensions = new Set([
+    "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
+  ]);
+
   return async function route(request, response) {
     const url = new URL(request.url || "/", config.publicUrl);
     if (!url.pathname.startsWith("/api/v1/")) return false;
@@ -269,6 +277,57 @@ export function createApiRouter({ db, config, logger, mailer }) {
           config,
           { "X-Robots-Tag": "noindex, nofollow" }
         );
+        return true;
+      }
+
+      const publicAssetMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/assets\/([^/]+)$/);
+      if (method === "POST" && publicAssetMatch) {
+        if (!config.publicSharingEnabled) throw new HttpError(404, "not found", "not_found");
+        const share = findShare(db, decodeURIComponent(publicAssetMatch[1]));
+        if (
+          !share ||
+          share.revoked_at ||
+          (share.expires_at !== null && Number(share.expires_at) <= now())
+        ) {
+          throw new HttpError(404, "not found", "not_found");
+        }
+        if (!share.download_allowed) throw new HttpError(403, "download not allowed", "download_denied");
+        if (shareBlocked(db, { shareId: share.id, ip, config })) {
+          throw new HttpError(429, "too many attempts", "rate_limited", { "Retry-After": "300" });
+        }
+        const body = await readJson(request);
+        if (share.password_hash && !(await verifyPassword(body.password, share.password_hash))) {
+          recordShareAttempt(db, { shareId: share.id, ip, success: false, config });
+          throw new HttpError(404, "not found", "not_found");
+        }
+        const assetId = decodeURIComponent(publicAssetMatch[2]);
+        const asset = db
+          .prepare("SELECT * FROM project_assets WHERE id = ? AND project_id = ?")
+          .get(assetId, share.project_id);
+        if (!asset) throw new HttpError(404, "not found", "not_found");
+        if (share.scope !== "project") {
+          const scoped = sharedPayload(db, share);
+          if (!scoped || !JSON.stringify(scoped).includes(assetId)) {
+            throw new HttpError(404, "not found", "not_found");
+          }
+        }
+        const object = objects.get(asset.object_id);
+        if (!object) throw new HttpError(404, "not found", "not_found");
+        recordShareAttempt(db, { shareId: share.id, ip, success: true, config });
+        db.prepare("UPDATE share_links SET last_accessed_at = ? WHERE id = ?").run(now(), share.id);
+        writeAudit(db, {
+          action: "share.asset_downloaded",
+          resourceType: "share_link",
+          resourceId: share.id,
+          metadata: { assetId },
+          ip,
+          secret: config.secret,
+        });
+        sendBinary(response, config, object.body, {
+          contentType: asset.content_type,
+          filename: asset.name,
+          download: true,
+        });
         return true;
       }
 
@@ -1216,6 +1275,86 @@ export function createApiRouter({ db, config, logger, mailer }) {
           secret: config.secret,
         });
         sendJson(response, 201, { id: projectId, title, revision: 1, role: "owner" }, config);
+        return true;
+      }
+
+      const assetCollectionMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/assets$/);
+      if (assetCollectionMatch && (method === "GET" || method === "POST")) {
+        const auth = requireAuth(request, response, db, config);
+        const projectId = assetCollectionMatch[1];
+        const role = projectRole(db, projectId, auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        if (method === "GET") {
+          requireScope(auth, "projects:read");
+          const assets = db
+            .prepare(
+              "SELECT id, name, content_type, bytes, created_at FROM project_assets WHERE project_id = ? ORDER BY created_at DESC"
+            )
+            .all(projectId)
+            .map((asset) => ({
+              id: asset.id,
+              name: asset.name,
+              contentType: asset.content_type,
+              bytes: asset.bytes,
+              createdAt: asset.created_at,
+            }));
+          sendJson(response, 200, { assets }, config);
+          return true;
+        }
+        requireScope(auth, "projects:write");
+        if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
+        const filename = String(request.headers["x-file-name"] || "asset")
+          .split(/[\\/]/)
+          .pop()
+          .slice(0, 200);
+        const extension = filename.split(".").pop().toLowerCase();
+        if (blockedExtensions.has(extension)) {
+          throw new HttpError(400, "file type is not allowed", "blocked_file_type");
+        }
+        const contentType = String(request.headers["content-type"] || "application/octet-stream")
+          .split(";")[0]
+          .trim();
+        const data = await readBinary(request);
+        const object = objects.store(data, contentType);
+        const assetId = crypto.randomUUID();
+        db.prepare(
+          "INSERT INTO project_assets (id, project_id, object_id, name, content_type, bytes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(assetId, projectId, object.id, filename, contentType, data.length, auth.account.id, now());
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "asset.uploaded",
+          resourceType: "project_asset",
+          resourceId: assetId,
+          metadata: { projectId, bytes: data.length, contentType },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          201,
+          { id: assetId, name: filename, contentType, bytes: data.length },
+          config
+        );
+        return true;
+      }
+
+      const assetItemMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/assets\/([^/]+)$/);
+      if (method === "GET" && assetItemMatch) {
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, "projects:read");
+        const role = projectRole(db, assetItemMatch[1], auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        const asset = db
+          .prepare("SELECT * FROM project_assets WHERE id = ? AND project_id = ?")
+          .get(assetItemMatch[2], assetItemMatch[1]);
+        if (!asset) throw new HttpError(404, "asset not found", "not_found");
+        const object = objects.get(asset.object_id);
+        if (!object) throw new HttpError(404, "asset not found", "not_found");
+        sendBinary(response, config, object.body, {
+          contentType: asset.content_type,
+          filename: asset.name,
+          download: false,
+        });
         return true;
       }
 
