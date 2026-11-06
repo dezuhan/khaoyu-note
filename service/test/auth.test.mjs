@@ -36,6 +36,7 @@ function configFor(dataDir) {
     trustProxy: false,
     publicSharingEnabled: true,
     corsOrigins: ["tauri://localhost"],
+    adminToken: "Admin-5f3c9a7e2b8d4c1f6a0e9d3b7c2f8a4e",
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
@@ -325,6 +326,27 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { doc: "{}", revision: 1 },
     });
     assert.equal(stale.status, 409);
+  });
+
+  await t.test("admin audit, abuse and stats endpoints require an operator token", async () => {
+    const token = "Admin-5f3c9a7e2b8d4c1f6a0e9d3b7c2f8a4e";
+    const denied = await api.raw("/api/v1/admin/stats");
+    assert.equal(denied.status, 401);
+    const stats = await api.raw("/api/v1/admin/stats", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(stats.status, 200);
+    assert.ok(JSON.parse(stats.text).accounts >= 1);
+    const audit = await api.raw("/api/v1/admin/audit?limit=5", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(audit.status, 200);
+    assert.ok(Array.isArray(JSON.parse(audit.text).entries));
+    const abuse = await api.raw("/api/v1/admin/abuse-reports", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(abuse.status, 200);
+    assert.ok(Array.isArray(JSON.parse(abuse.text).reports));
   });
 
   await t.test("CORS preflight is limited to configured desktop origins", async () => {
