@@ -336,6 +336,23 @@ a grace period, can be cancelled, exports account, project metadata and accessib
 is purged by the worker when due. Verification and reset mail is written to a mode `0600` outbox because an SMTP
 adapter is still pending.
 
+## Sharing and membership
+
+`service/src/sharing.mjs` implements Milestone 3. A project keeps `public_sharing_enabled` off by
+default. Share links are scoped to a project, one item, or one column and store only a SHA-256 token
+hash; the raw token is returned once. Links support expiry, optional Argon2id passphrases,
+revocation, rotation and per-link/IP attempt limits. Public access returns a neutral 404 for
+invalid, expired, revoked, rotated or wrong-passphrase tokens, sets `X-Robots-Tag: noindex`, audits
+the link id and IP hash, strips local asset paths and omits the trash. Item shares contain one card and
+no project title; column shares contain the column and its current children with a notice about later
+additions.
+
+Project invitations are email-bound, single use, expiring and revocable; only an owner can create or
+revoke one. Accepting an invitation adds the account with the invited role. Members are listed with
+roles, roles can be changed by the owner, the owner cannot be removed directly, and ownership
+transfer swaps both roles in one transaction. Share-token write permissions, asset download
+watermarking and a global sharing kill switch remain pending.
+
 ## MCP server
 
 `app/src-tauri/src/bin/khaoyu-note-mcp.rs` is a second binary in the same crate. It links the same

@@ -107,6 +107,20 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. |
+| `GET` | `/api/v1/projects/:id/members` | List project members. |
+| `PATCH` | `/api/v1/projects/:id/members/:accountId` | Change a member role; owner only. |
+| `DELETE` | `/api/v1/projects/:id/members/:accountId` | Remove a member; owner only. |
+| `POST` | `/api/v1/projects/:id/transfer` | Transfer ownership to an existing member; owner only. |
+| `GET` | `/api/v1/projects/:id/invitations` | List invitations; editor or owner. |
+| `POST` | `/api/v1/projects/:id/invitations` | Invite an email; owner only. |
+| `DELETE` | `/api/v1/projects/:id/invitations/:id` | Revoke an invitation; owner only. |
+| `POST` | `/api/v1/invitations/accept` | Accept an email-bound invitation. |
+| `POST` | `/api/v1/projects/:id/public-sharing` | Enable or disable public sharing; owner only. |
+| `GET` | `/api/v1/projects/:id/shares` | List share metadata; editor or owner. |
+| `POST` | `/api/v1/projects/:id/shares` | Create a project, item or column share link. |
+| `DELETE` | `/api/v1/projects/:id/shares/:shareId` | Revoke a share link. |
+| `POST` | `/api/v1/projects/:id/shares/:shareId/rotate` | Rotate the share token. |
+| `POST` | `/api/v1/share/:token/access` | Public scoped access, optional passphrase. |
 
 Passwords use Argon2id with 64 MiB memory, 3 iterations and a 16-byte per-user salt. Access tokens live
 15 minutes. Refresh tokens live 7 days, rotate on every use and are stored as SHA-256 hashes. Reusing
@@ -124,6 +138,28 @@ tokens cannot manage sessions, TOTP or account deletion; those require a user se
 Email verification and password reset tokens are single use, short lived and stored as hashes. The
 development mailer writes messages to the outbox instead of sending SMTP; treat that directory as
 sensitive and add an SMTP adapter before production use.
+
+## Sharing and membership
+
+Public sharing is disabled per project until the owner enables it. Share links are bearer tokens
+with high entropy, stored only as hashes, returned once at creation, and revocable or rotatable.
+Expired, revoked, rotated and wrong-passphrase links all return a neutral 404. Passphrase attempts
+are rate limited per link and IP. Share responses carry `X-Robots-Tag: noindex, nofollow`.
+
+Scopes:
+
+- `project`: current project snapshot.
+- `item`: one card only, without sibling cards or the project title.
+- `column`: a column and its current children, with a notice about later additions.
+
+Shared payloads omit the trash, strip local filesystem asset paths, and never include tokens or
+member data. Project roles are owner, editor, commenter and viewer. Invitations are email-bound,
+single use, expiring and revocable; accepting one adds the account as a member. Ownership transfer
+keeps an owner role on both sides during the swap, and the owner cannot be removed directly.
+
+Stored share permissions include view, comment, edit and manage. Public access currently returns the
+scoped read payload plus its permission; share-token write endpoints and asset download/watermark
+enforcement are still pending.
 
 ## Migrations
 
@@ -205,7 +241,8 @@ The service suite covers fail-closed configuration, reversible migrations, opaqu
 with deduplication, audit IP hashing, backup/restore round-trip, worker cleanup and the health
 endpoints. The auth suite covers verification, generic login errors and throttling, CSRF, project
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
-deletion grace and purge, and scoped API tokens.
+deletion grace and purge, scoped API tokens, project/item/column share isolation, passphrase and
+expiry enforcement, invitation acceptance and ownership transfer.
 
 ## Milestone boundaries
 
@@ -219,7 +256,13 @@ detection, session list and revocation, logout everywhere, login throttling, gen
 hashed single-use reset tokens, TOTP, account export, deletion grace and purge, cookie and CSRF
 hardening, project role checks and scoped API tokens.
 
-Still pending: SMTP delivery, passkeys, SSO, email one-time codes, team membership management, a
-browser login UI and desktop client sync. The Milestone 1 sync boundary remains open: desktop opt-in,
-explicit sync state, offline queue with conflict handling, and protection against a local database
-delete removing server data.
+Implemented from Milestone 3: project, item and column share scopes; hashed revocable and rotating
+links; expiry; optional passphrase with rate limiting; neutral 404 responses; noindex headers; audit
+per access; project roles; email-bound invitations; member removal; ownership transfer safeguards;
+public sharing off by default; and scoped payload isolation.
+
+Still pending: share-token write permissions, asset download and watermark enforcement, global
+sharing kill switch, nested-board policy for project shares, SMTP delivery, passkeys, SSO, email
+one-time codes, team membership UI, a browser login UI and desktop client sync. The Milestone 1 sync
+boundary remains open: desktop opt-in, explicit sync state, offline queue with conflict handling, and
+protection against a local database delete removing server data.

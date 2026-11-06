@@ -1,0 +1,81 @@
+# Security and architecture audit
+
+Snapshot date: 2026-11-07. Scope: Milestones 1 to 3 in `service/`, the desktop local-first boundary,
+and the new share links.
+
+## Summary
+
+The service foundation and account core are usable for a single-tenant self-hosted deployment behind
+TLS. Authentication, session rotation, CSRF, share-token isolation and project authorization are
+covered by 23 automated service checks. The largest remaining risks are the absent desktop sync
+client, the file-based mail outbox instead of SMTP, and missing asset upload and download
+authorization.
+
+## Fixed during the audit
+
+- Share tokens were written to request logs. Paths under `/api/v1/share/<token>/access` are now
+  redacted before logging.
+- Project shares included the trash and local filesystem asset paths. Shared payloads now omit the
+  trash and null local paths, including `file:` and absolute paths.
+- Disabling public sharing did not revoke existing links. It now revokes every link for the project.
+- Editors could create invitations. Invitation creation and revocation are now owner-only.
+- Share access, password attempts, expiry, rotation and revocation now have regression tests.
+- Account deletion export now includes accessible project snapshots.
+
+## Findings
+
+### High
+
+| Finding | Status |
+| --- | --- |
+| Desktop sync, explicit sync state and offline queue are not implemented. | Open. Milestone 1 boundary remains partial. |
+| The service has no asset upload/download API. Share links can reference cards whose local assets are unavailable, and download permission is not enforced. | Open. Payload paths are stripped instead of leaking. |
+| Email verification, reset and invitations are written to a filesystem outbox, not delivered by SMTP. | Open. The outbox is mode `0600` and documented as sensitive. |
+| There is no TLS in the service itself. Operators must terminate TLS in Caddy, Nginx or another proxy. | Open by design. The Compose port binds loopback only. |
+| Share-token write permissions are stored but no write endpoint enforces them. | Open. Public access is read-only today. |
+
+### Medium
+
+- No global sharing kill switch. Operators can revoke individual links, and disabling project sharing
+  revokes that project's links.
+- No backup encryption or documented key rotation. Backups are local snapshots with a checksum only.
+- Registration, reset requests and invitations have no dedicated rate limit.
+- Logout is state-changing but does not require the CSRF header. It clears cookies and is bounded to
+  the caller's session.
+- Session rows survive a service upgrade. Password reset and logout-all revoke sessions, but the
+  upgrade procedure does not invalidate every session automatically.
+- Project shares expose the current snapshot only. Nested board content is not included by policy.
+- Share passphrase attempts use the same fixed window as login and return a neutral 404; external
+  alert routing is still pending.
+- Audit rows are pruned by retention but have no export API or tamper-evident chain.
+
+### Low
+
+- SQLite is a single-node store. It fits a small self-hosted team but does not scale horizontally.
+- Dependency and container scanning are not in CI yet.
+- The local desktop app still uses a whole-document save model. The service project snapshot uses a
+  revision check, but there is no delta sync.
+- External media iframes are sandboxed, but the desktop app and service deploy separately, so their
+  CSP and proxy policies must remain aligned.
+- There is no documented incident-response runbook beyond the upgrade and backup notes.
+
+## Controls present
+
+- Argon2id password hashing, hashed access/refresh tokens, rotating refresh tokens and family-wide
+  reuse revocation.
+- `Secure`, `HttpOnly`, `SameSite=Lax` cookies, double-submit CSRF and strict origin checks.
+- Server-side project membership and role checks, deny-by-default routes, scoped API tokens.
+- Hashed share tokens, expiry, revocation, rotation, passphrase rate limiting and `noindex`.
+- HMAC-hashed audit IPs, structured JSON logs, secret redaction and redacted share paths.
+- Environment-only secrets, fail-closed startup, explicit reversible migrations, non-root container,
+  read-only root filesystem, dropped capabilities and loopback-only Compose port.
+- Backup integrity verification, safety copy on restore and worker retention.
+
+## Recommended next work
+
+1. Implement service asset upload, signed download and per-share download enforcement.
+2. Add SMTP delivery and outbox retry.
+3. Complete desktop sync with opt-in per project, explicit state, offline queue and conflict flow.
+4. Add signup/reset/invite rate limits and a global sharing kill switch.
+5. Add encrypted offsite backups and a documented restore drill.
+6. Add dependency and container scanning to CI, then an external penetration test before production.

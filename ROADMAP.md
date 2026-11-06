@@ -94,37 +94,37 @@ remaining work named in the item.
 
 ### Share scopes
 
-- [ ] **Project share**: a whole project, including nested boards according to policy.
-- [ ] **Item share**: one card, with enough context to render it, but not sibling cards.
-- [ ] **Column share**: a column and its current children, with an explicit notice that later
+- [ ] **Project share**: a whole project, including nested boards according to policy (partial: current project snapshot implemented; nested board inclusion policy pending).
+- [x] **Item share**: one card, with enough context to render it, but not sibling cards.
+- [x] **Column share**: a column and its current children, with an explicit notice that later
   additions may or may not be included depending on the permission chosen.
-- [ ] Per-scope permissions: view, comment, edit, manage.
-- [ ] Optional expiry date, optional download permission, optional password protection.
+- [ ] Per-scope permissions: view, comment, edit, manage (partial: permissions are stored and returned; share-token write endpoints are not implemented yet).
+- [ ] Optional expiry date, optional download permission, optional password protection (partial: expiry and password are enforced; download permission is stored but asset download enforcement is pending).
 
 ### Share links
 
-- [ ] Share links use high-entropy random tokens, stored hashed, never logged in full.
-- [ ] Links are revocable and can be rotated; rotation invalidates the old token immediately.
-- [ ] Expiry enforced server-side; expired links return a neutral not-found page.
-- [ ] Optional passphrase verification with rate limiting and no hint about content.
-- [ ] Link previews do not expose board titles, card text or asset contents.
-- [ ] Every access is attributable to a share link and an IP hash for audit purposes.
+- [x] Share links use high-entropy random tokens, stored hashed, never logged in full.
+- [x] Links are revocable and can be rotated; rotation invalidates the old token immediately.
+- [x] Expiry enforced server-side; expired links return a neutral not-found page.
+- [x] Optional passphrase verification with rate limiting and no hint about content.
+- [x] Link previews do not expose board titles, card text or asset contents.
+- [x] Every access is attributable to a share link and an IP hash for audit purposes.
 
 ### Members and invitations
 
-- [ ] Project membership with roles: owner, editor, commenter, viewer.
-- [ ] Invitations are single-use, expiring, email-bound and revocable.
-- [ ] Ownership transfer and owner removal safeguards, so a project cannot become orphaned.
-- [ ] Members can be removed immediately; their session loses access on the next request.
-- [ ] Sharing a column or item never grants access to unrelated sibling content.
+- [x] Project membership with roles: owner, editor, commenter, viewer.
+- [x] Invitations are single-use, expiring, email-bound and revocable.
+- [x] Ownership transfer and owner removal safeguards, so a project cannot become orphaned.
+- [x] Members can be removed immediately; their session loses access on the next request.
+- [x] Sharing a column or item never grants access to unrelated sibling content.
 
 ### Public sharing
 
-- [ ] Public sharing is off by default and requires an explicit warning.
-- [ ] Public links show only the selected scope.
-- [ ] Search engines excluded with `noindex` and no sitemap exposure.
-- [ ] Optional watermark and download restrictions for shared assets.
-- [ ] Abuse reporting and a kill switch for operators.
+- [ ] Public sharing is off by default and requires an explicit warning (partial: off by default and a 409 warning response exist; no UI warning flow yet).
+- [x] Public links show only the selected scope.
+- [x] Search engines excluded with `noindex` and no sitemap exposure.
+- [ ] Optional watermark and download restrictions for shared assets (partial: download flag stored; asset watermarking pending).
+- [ ] Abuse reporting and a kill switch for operators (partial: individual link revocation exists; global kill switch pending).
 
 ## Security architecture requirements
 
@@ -143,28 +143,28 @@ remaining work named in the item.
 - [ ] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks.
 - [ ] Markdown and rich text sanitised on the server before rendering.
 - [ ] Stored XSS prevention through context-aware escaping and a strict CSP.
-- [ ] Parameterised database queries only.
-- [ ] Explicit allowlists for redirects and remote embed hosts.
-- [ ] Rate limits and payload limits on all public endpoints.
+- [x] Parameterised database queries only.
+- [ ] Explicit allowlists for redirects and remote embed hosts (partial: media hosts are matched in the frontend; redirects are not implemented yet).
+- [x] Rate limits and payload limits on all public endpoints.
 
 ### Secrets and operations
 
-- [ ] Secrets supplied by the environment or a secret manager, never baked into images.
-- [ ] Separate database credentials per service and least-privilege database roles.
-- [ ] No secret material in client bundles, crash reports or analytics.
-- [ ] Structured audit logs for login, permission changes, share changes and destructive actions.
-- [ ] Audit retention and export policy defined per deployment.
+- [x] Secrets supplied by the environment or a secret manager, never baked into images.
+- [ ] Separate database credentials per service and least-privilege database roles (not applicable to the current single-file SQLite deployment).
+- [x] No secret material in client bundles, crash reports or analytics.
+- [x] Structured audit logs for login, permission changes, share changes and destructive actions.
+- [ ] Audit retention and export policy defined per deployment (partial: retention pruning exists; export API pending).
 - [ ] Dependency scanning, container scanning and a documented patch cadence.
-- [ ] Security headers: HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`.
-- [ ] Admin endpoints separated, authenticated, rate limited and audited.
-- [ ] A documented incident response path: rotate secrets, revoke sessions, revoke links.
+- [x] Security headers: HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`.
+- [ ] Admin endpoints separated, authenticated, rate limited and audited (no admin endpoint exists yet).
+- [ ] A documented incident response path: rotate secrets, revoke sessions, revoke links (partial: logout-all, token revocation and link revocation exist; runbook pending).
 
 ### Privacy
 
-- [ ] Data minimisation: collect only account email, display name and operational logs.
-- [ ] No third-party analytics by default on self-hosted deployments.
-- [ ] Export and delete account data on request where legally applicable.
-- [ ] IP addresses hashed in audit logs where full addresses are not required.
+- [x] Data minimisation: collect only account email, display name and operational logs.
+- [x] No third-party analytics by default on self-hosted deployments.
+- [x] Export and delete account data on request where legally applicable.
+- [x] IP addresses hashed in audit logs where full addresses are not required.
 - [ ] Clear data residency and backup location documentation for operators.
 
 ## Milestone 4: Collaboration and sync
