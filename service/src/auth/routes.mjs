@@ -466,6 +466,28 @@ export function createApiRouter({ db, config, logger, mailer }) {
              WHERE m.account_id = ? AND p.deleted_at IS NULL`
           )
           .all(auth.account.id);
+        const exportedProjects = projects.map((project) => {
+          const snapshot = db
+            .prepare("SELECT revision, doc, updated_at FROM project_snapshots WHERE project_id = ?")
+            .get(project.id);
+          let doc = null;
+          if (snapshot) {
+            try {
+              doc = JSON.parse(snapshot.doc);
+            } catch {
+              doc = null;
+            }
+          }
+          return {
+            id: project.id,
+            name: project.name,
+            role: project.role,
+            revision: project.revision,
+            snapshot: snapshot
+              ? { revision: snapshot.revision, updatedAt: snapshot.updated_at, doc }
+              : null,
+          };
+        });
         writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "account.exported",
@@ -483,12 +505,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
               displayName: account.display_name,
               createdAt: account.created_at,
             },
-            projects: projects.map((project) => ({
-              id: project.id,
-              name: project.name,
-              role: project.role,
-              revision: project.revision,
-            })),
+            projects: exportedProjects,
           },
           config
         );

@@ -97,7 +97,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/totp/setup` | Create a TOTP secret and `otpauth` URI. |
 | `POST` | `/api/v1/auth/totp/enable` | Confirm a TOTP code and enable it. |
 | `POST` | `/api/v1/auth/totp/disable` | Disable TOTP with password and code. |
-| `GET` | `/api/v1/account/export` | Export account and project metadata. |
+| `GET` | `/api/v1/account/export` | Export the account, accessible projects and their snapshots. |
 | `GET` | `/api/v1/account/tokens` | List scoped API tokens. |
 | `POST` | `/api/v1/account/tokens` | Create a scoped API token; the raw token is returned once. |
 | `DELETE` | `/api/v1/account/tokens/:id` | Revoke an API token. |

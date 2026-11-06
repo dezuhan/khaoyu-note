@@ -332,8 +332,8 @@ and IP with a fixed window and a generic 401 response.
 TOTP uses a base32 secret, SHA-1 HMAC, six digits and a 30 second period with one step of clock
 skew. Scoped API tokens use the `khn_` prefix, are stored hashed, grant `projects:read` or
 `projects:write`, and cannot manage sessions or account settings. Account deletion is scheduled with
-a grace period, can be cancelled, exports account and project metadata first, and is purged by the
-worker when due. Verification and reset mail is written to a mode `0600` outbox because an SMTP
+a grace period, can be cancelled, exports account, project metadata and accessible snapshots first, and
+is purged by the worker when due. Verification and reset mail is written to a mode `0600` outbox because an SMTP
 adapter is still pending.
 
 ## MCP server
