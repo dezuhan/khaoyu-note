@@ -33,10 +33,15 @@ function configFor(dataDir) {
     backupsDir: path.join(dataDir, "backups"),
     outboxDir: path.join(dataDir, "outbox"),
     cookieSecure: false,
-    trustProxy: false,
     publicSharingEnabled: true,
     corsOrigins: ["tauri://localhost"],
     adminToken: "Admin-5f3c9a7e2b8d4c1f6a0e9d3b7c2f8a4e",
+    ssoEnabled: true,
+    ssoSecret: "Sso-1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+    ssoHeader: "x-auth-request-email",
+    ssoNameHeader: "x-auth-request-name",
+    ssoAutoCreate: true,
+    trustProxy: true,
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
@@ -228,6 +233,56 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     const projects = await api.call("/api/v1/projects", { jar: after.jar });
     assert.equal(projects.status, 200);
     assert.deepEqual(projects.body.projects, []);
+  });
+
+  await t.test("trusted-proxy SSO requires a signed email and can auto-create", async () => {
+    const email = `sso-${crypto.randomUUID()}@example.com`;
+    const signature = crypto
+      .createHmac("sha256", api.config.ssoSecret)
+      .update(email)
+      .digest("hex");
+    const created = await api.raw("/api/v1/auth/sso/login", {
+      method: "POST",
+      headers: {
+        "x-auth-request-email": email,
+        "x-auth-request-name": "SSO User",
+        "x-khaoyu-sso-signature": signature,
+      },
+    });
+    assert.equal(created.status, 200, created.text);
+    const body = JSON.parse(created.text);
+    assert.equal(body.account.email, email);
+    assert.equal(body.account.displayName, "SSO User");
+    const jar = {};
+    for (const cookie of created.response.headers.getSetCookie()) {
+      const pair = cookie.split(";")[0];
+      const index = pair.indexOf("=");
+      jar[pair.slice(0, index)] = pair.slice(index + 1);
+    }
+    assert.equal((await api.call("/api/v1/projects", { jar })).status, 200);
+    assert.equal((await api.login(email)).status, 401);
+
+    const wrong = await api.raw("/api/v1/auth/sso/login", {
+      method: "POST",
+      headers: {
+        "x-auth-request-email": email,
+        "x-khaoyu-sso-signature": "0".repeat(64),
+      },
+    });
+    assert.equal(wrong.status, 401);
+
+    api.config.ssoEnabled = false;
+    assert.equal(
+      (await api.raw("/api/v1/auth/sso/login", {
+        method: "POST",
+        headers: {
+          "x-auth-request-email": email,
+          "x-khaoyu-sso-signature": signature,
+        },
+      })).status,
+      404
+    );
+    api.config.ssoEnabled = true;
   });
 
   await t.test("email one-time codes can log in and are single use", async () => {
