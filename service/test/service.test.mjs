@@ -18,6 +18,7 @@ import { logPath } from "../src/app.mjs";
 import { createSmtpMailer } from "../src/auth/mailer.mjs";
 import http from "node:http";
 import { sendAlert } from "../src/alerts.mjs";
+import { createEventHub } from "../src/events.mjs";
 
 const SECRET = "Kx9-vQ2m-Rt7-pL4s-Wb8-nC3d-Hf6-jZ1a";
 
@@ -76,12 +77,12 @@ test("migrations are reversible and recreate the schema", () => {
   const db = openDatabase(config.databasePath);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [false, false, false, false, false, false, false, false]
+    [false, false, false, false, false, false, false, false, false]
   );
-  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [true, true, true, true, true, true, true, true]
+    [true, true, true, true, true, true, true, true, true]
   );
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -101,7 +102,7 @@ test("migrations are reversible and recreate the schema", () => {
   ]) {
     assert.ok(tables.includes(table), `${table} missing`);
   }
-  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 8 }), [8, 7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 9 }), [9, 8, 7, 6, 5, 4, 3, 2, 1]);
   assert.equal(
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get(),
     undefined
@@ -164,6 +165,20 @@ test("audit entries hash IP addresses and keep JSON metadata", () => {
   assert.notEqual(row.ip_hash, "203.0.113.5");
   assert.equal(JSON.parse(row.metadata).note, "hello");
   db.close();
+});
+
+test("event room presence excludes opted-out accounts", () => {
+  const hub = createEventHub();
+  const response = () => ({ write() {}, end() {} });
+  const visible = hub.subscribe("project-1", "account-a", response());
+  const hidden = hub.subscribe("project-1", "account-b", response(), { presence: false });
+  assert.deepEqual(
+    { accounts: hub.presence("project-1").accounts, connections: hub.presence("project-1").connections },
+    { accounts: 1, connections: 1 }
+  );
+  hub.unsubscribe(visible);
+  hub.unsubscribe(hidden);
+  hub.closeAll();
 });
 
 test("alert webhook posts structured security events", async () => {

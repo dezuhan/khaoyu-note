@@ -577,6 +577,48 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.ok(notifications.body.notifications.some((entry) => entry.kind === "share.edit"));
   });
 
+  await t.test("presence can be opted out and share comments notify mentions", async () => {
+    const owner = await api.account(`mention-owner-${crypto.randomUUID()}@example.com`);
+    const guestEmail = `mention-guest-${crypto.randomUUID()}@example.com`;
+    const guest = await api.account(guestEmail);
+    const projectId = await createProject(owner, "Mentions");
+    api.db
+      .prepare("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'commenter', ?)")
+      .run(projectId, guest.account.id, Date.now());
+    const preference = await api.call("/api/v1/account/presence", {
+      method: "PATCH",
+      jar: guest.jar,
+      body: { presence: false },
+    });
+    assert.equal(preference.status, 200);
+    assert.equal((await api.call("/api/v1/account/presence", { jar: guest.jar })).body.presence, false);
+
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    await putSnapshot(owner, projectId, {
+      id: projectId,
+      title: "Mentions",
+      cards: [{ id: "mention-card", type: "note", x: 0, y: 0, w: 200, h: 70, z: 1, text: "Mention target" }],
+      connections: [],
+      trash: [],
+    });
+    const share = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "comment" },
+    });
+    const comment = await api.call(`/api/v1/share/${share.body.token}/comments`, {
+      method: "POST",
+      body: { cardId: "mention-card", text: `Hello @${guestEmail}` },
+    });
+    assert.equal(comment.status, 201);
+    const notifications = await api.call("/api/v1/notifications", { jar: guest.jar });
+    assert.ok(notifications.body.notifications.some((entry) => entry.kind === "comment.mention"));
+  });
+
   await t.test("public sharing is off until the owner enables it", async () => {
     const owner = await api.account(`share-off-${crypto.randomUUID()}@example.com`);
     const projectId = await createProject(owner, "Private sharing");
