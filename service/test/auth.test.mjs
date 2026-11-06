@@ -317,6 +317,73 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(stale.status, 409);
   });
 
+  await t.test("revision history restores snapshots and SSE emits project changes", async () => {
+    const user = await api.account(`history-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(user, "History");
+    let revision = await putSnapshot(user, projectId, {
+      id: projectId,
+      title: "First",
+      cards: [],
+      connections: [],
+      trash: [],
+    }, 1);
+    revision = await putSnapshot(user, projectId, {
+      id: projectId,
+      title: "Second",
+      cards: [],
+      connections: [],
+      trash: [],
+    }, revision);
+
+    const versions = await api.call(`/api/v1/projects/${projectId}/versions`, { jar: user.jar });
+    assert.equal(versions.status, 200);
+    assert.ok(versions.body.versions.some((entry) => entry.revision === revision));
+    const restored = await api.call(
+      `/api/v1/projects/${projectId}/versions/${revision - 1}/restore`,
+      { method: "POST", jar: user.jar }
+    );
+    assert.equal(restored.status, 200);
+    assert.equal(restored.body.revision, revision + 1);
+    const snapshot = await api.call(`/api/v1/projects/${projectId}`, { jar: user.jar });
+    assert.equal(JSON.parse(snapshot.body.snapshot.doc).title, "First");
+
+    const controller = new AbortController();
+    const response = await fetch(`${api.base}/api/v1/projects/${projectId}/events`, {
+      headers: { cookie: cookieHeader(user.jar) },
+      signal: controller.signal,
+    });
+    assert.equal(response.status, 200);
+    const reader = response.body.getReader();
+    let streamed = "";
+    const readUntil = async (pattern) => {
+      const deadline = Date.now() + 3000;
+      while (Date.now() < deadline) {
+        const remaining = deadline - Date.now();
+        const result = await Promise.race([
+          reader.read(),
+          new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), remaining)),
+        ]);
+        if (result.timeout) break;
+        if (result.done) break;
+        streamed += Buffer.from(result.value).toString("utf8");
+        if (streamed.includes(pattern)) return true;
+      }
+      return false;
+    };
+    assert.equal(await readUntil("event: presence"), true);
+    const nextRevision = await putSnapshot(user, projectId, {
+      id: projectId,
+      title: "Third",
+      cards: [],
+      connections: [],
+      trash: [],
+    }, restored.body.revision);
+    assert.equal(await readUntil("event: snapshot"), true);
+    assert.ok(streamed.includes(`"revision":${nextRevision}`));
+    controller.abort();
+    await reader.cancel().catch(() => {});
+  });
+
   await t.test("public sharing is off until the owner enables it", async () => {
     const owner = await api.account(`share-off-${crypto.randomUUID()}@example.com`);
     const projectId = await createProject(owner, "Private sharing");
