@@ -3,6 +3,18 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.11.0] - 2026-11-07
+
+### Added
+
+- Operator admin endpoints for audit export, abuse report review and service statistics, protected by
+  a separate bearer token and per-IP rate limit.
+- Dependency audit, Trivy image scanning and Dependabot configuration in CI.
+- Low-volume load and abuse smoke harness for health, invalid share tokens, oversized bodies and
+  optional login checks.
+- Threat model, security disclosure policy, incident response runbook, release checklist and data
+  residency documentation.
+
 ## [0.10.0] - 2026-11-07
 
 ### Added
