@@ -115,7 +115,7 @@ jobs:
           node-version: 24
 
       - name: Service tests
-        run: node --test service/test/service.test.mjs
+        run: node --test service/test/service.test.mjs service/test/auth.test.mjs
 
       - name: Build service image
         run: docker build --tag khaoyu-note-service:ci service
