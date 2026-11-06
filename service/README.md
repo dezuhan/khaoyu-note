@@ -117,6 +117,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects/:id/versions` | List recent project revisions. |
 | `POST` | `/api/v1/projects/:id/versions/:revision/restore` | Restore a revision as editor or owner. |
 | `GET` | `/api/v1/projects/:id/events` | SSE room for snapshot and presence events. |
+| `GET` | `/api/v1/notifications` | List scoped notifications and the unread count. |
+| `PATCH` | `/api/v1/notifications/:id/read` | Mark one owned notification as read. |
+| `POST` | `/api/v1/notifications/read-all` | Mark all owned notifications as read. |
 | `PATCH` | `/api/v1/projects/:id/members/:accountId` | Change a member role; owner only. |
 | `DELETE` | `/api/v1/projects/:id/members/:accountId` | Remove a member; owner only. |
 | `POST` | `/api/v1/projects/:id/transfer` | Transfer ownership to an existing member; owner only. |
@@ -178,6 +181,16 @@ enforcement are still pending.
 public access returns 404. Anyone holding a link can file an abuse report at
 `/api/v1/share/:token/report`; reports are stored with a hashed reporter IP and remain available to
 the operator in the database.
+
+## Notifications
+
+In-app notifications are stored per account for invitation acceptance, role changes, revision
+restores and share reports. Listing filters every notification through current resource access, so a
+removed member stops seeing project notifications immediately even though the rows remain. Read state
+is per account; only the owner can mark a notification read. Revoking a share link, or disabling
+project sharing, deletes its pending notifications. Read notifications older than 90 days are pruned.
+
+Email notifications, unsubscribe links and per-event rate limits are still pending.
 
 ## Revision history and events
 
@@ -289,8 +302,8 @@ endpoints. The auth suite covers verification, generic login errors and throttli
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
-transfer, asset authorization, share download permission, revision restore and authenticated SSE
-rooms.
+transfer, asset authorization, share download permission, revision restore, authenticated SSE rooms
+and scoped notifications.
 
 ## Milestone boundaries
 
@@ -314,6 +327,10 @@ reports; and authenticated project asset upload/download with share download enf
 Implemented from Milestone 4: authenticated per-project SSE rooms, presence counts, revision history,
 editor-only restore and audit. Offline queues, cursor and lock awareness, scoped comments and
 notifications remain pending.
+
+Implemented from Milestone 5: scoped in-app notifications for invitations, role changes, revision
+restores and share reports; per-account read state; cleanup when a share is revoked. Email
+notifications, unsubscribe links and event rate limits remain pending.
 
 Still pending: share-token write permissions, watermarking, MIME sniffing and malware scanning,
 signed short-lived asset URLs, nested-board policy for project shares, SMTP delivery, passkeys, SSO,

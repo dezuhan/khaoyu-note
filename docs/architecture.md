@@ -353,6 +353,15 @@ roles, roles can be changed by the owner, the owner cannot be removed directly, 
 transfer swaps both roles in one transaction. Share-token write permissions, asset download
 watermarking and a global sharing kill switch remain pending.
 
+## Notifications
+
+`service/src/notifications.mjs` stores per-account notifications with a resource type and id.
+Creation happens on invitation acceptance, role changes, revision restores and share reports.
+Listing joins current project membership, so access changes hide old notifications immediately.
+Share revocation and disabling project sharing remove their pending notifications. Read state is
+filtered by account id on every update. Email delivery and unsubscribe preferences are not
+implemented yet.
+
 ## Revision history and realtime events
 
 Every accepted project snapshot writes a row to `project_versions`. Members can list the latest 100

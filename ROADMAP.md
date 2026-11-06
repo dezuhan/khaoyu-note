@@ -178,11 +178,11 @@ remaining work named in the item.
 
 ## Milestone 5: Notifications and activity (server side)
 
-- [ ] Server notifications for invitations, role changes, comments on shared scopes and mention events.
+- [ ] Server notifications for invitations, role changes, comments on shared scopes and mention events (partial: invitations, role changes, restores and share reports are implemented; comments and mentions pending).
 - [ ] Email notifications opt-in with unsubscribe links and rate limiting.
-- [ ] In-app notifications scoped to the resources the user can currently access.
-- [ ] Deleting or revoking a share removes its pending notifications.
-- [ ] Notification read state stored per user, never shared between accounts.
+- [x] In-app notifications scoped to the resources the user can currently access.
+- [x] Deleting or revoking a share removes its pending notifications.
+- [x] Notification read state stored per user, never shared between accounts.
 
 ## Milestone 6: Quality and security validation
 
