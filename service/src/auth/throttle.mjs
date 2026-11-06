@@ -20,24 +20,23 @@ export function loginBlocked(db, { email, ip, config }) {
   const since = Date.now() - config.loginWindowMinutes * 60_000;
   const emailCount = db
     .prepare(
-      "SELECT COUNT(*) AS count, MIN(created_at) AS oldest FROM login_attempts WHERE email_hash = ? AND success = 0 AND created_at >= ?"
+      "SELECT COUNT(*) AS count FROM login_attempts WHERE email_hash = ? AND success = 0 AND created_at >= ?"
     )
     .get(emailHash(email), since);
   const ipHash = hashIp(ip, config.secret) || "unknown";
   const ipCount = db
     .prepare(
-      "SELECT COUNT(*) AS count, MIN(created_at) AS oldest FROM login_attempts WHERE ip_hash = ? AND success = 0 AND created_at >= ?"
+      "SELECT COUNT(*) AS count FROM login_attempts WHERE ip_hash = ? AND success = 0 AND created_at >= ?"
     )
     .get(ipHash, since);
   const count = Math.max(Number(emailCount.count), Number(ipCount.count));
-  const oldest = Math.min(
-    Number(emailCount.oldest || Date.now()),
-    Number(ipCount.oldest || Date.now())
-  );
   if (count < config.loginMaxAttempts) return { blocked: false };
+  const extra = Math.max(0, count - config.loginMaxAttempts);
+  const progressive = Math.min(900, 30 * 2 ** Math.min(extra, 5));
   return {
     blocked: true,
-    retryAfter: Math.max(1, Math.ceil((oldest + config.loginWindowMinutes * 60_000 - Date.now()) / 1000)),
+    retryAfter: progressive,
+    attempts: count,
   };
 }
 

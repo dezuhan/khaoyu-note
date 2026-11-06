@@ -203,7 +203,11 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     }
     const blocked = await api.login(email);
     assert.equal(blocked.status, 429);
-    assert.ok(Number(blocked.response.headers.get("retry-after")) >= 1);
+    const firstRetry = Number(blocked.response.headers.get("retry-after"));
+    assert.ok(firstRetry >= 1);
+    const blockedAgain = await api.login(email);
+    const secondRetry = Number(blockedAgain.response.headers.get("retry-after"));
+    assert.ok(secondRetry > firstRetry, `${secondRetry} should exceed ${firstRetry}`);
     api.db.exec("DELETE FROM login_attempts");
   });
 

@@ -227,6 +227,11 @@ export function createApiRouter({ db, config, logger, mailer }) {
         const email = normalizeEmail(body.email);
         const throttle = loginBlocked(db, { email, ip, config });
         if (throttle.blocked) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          logger.warn("auth.login_blocked", {
+            attempts: throttle.attempts,
+            retryAfter: throttle.retryAfter,
+          });
           sendJson(response, 429, { error: "Too many attempts" }, config, {
             "Retry-After": String(throttle.retryAfter),
           });
