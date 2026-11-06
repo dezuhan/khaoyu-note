@@ -32,13 +32,17 @@ authorization.
 
 | Finding | Status |
 | --- | --- |
-| Desktop sync, explicit sync state and offline queue are not implemented. | Open. Milestone 1 boundary remains partial. |
+| Desktop sync, explicit sync state and offline queue are not implemented. | Closed. Opt-in sync, explicit state, conflicts, offline queue and no-delete behavior are implemented; mobile and multi-device conflict UX remain limited. |
 | Share-token write permissions are stored but no write endpoint enforces them. | Closed. Comment and edit writes now enforce the permission rank and scope. |
 | Email delivery without SMTP falls back to the filesystem outbox. | Accepted for small deployments. The outbox is mode `0600`; SMTP is configured by environment when required. |
 | There is no TLS in the service itself. Operators must terminate TLS in Caddy, Nginx or another proxy. | Open by design. The Compose port binds loopback only. |
 
 ### Medium
 
+- The desktop sync API token is stored in webview local storage, not the operating system keychain.
+  A compromised webview or XSS could read it. Use a scoped, expiring token and revoke it after use.
+- Bearer-token CORS is limited to configured desktop origins. Any origin added to
+  `KHAOYU_SERVICE_CORS_ORIGINS` can call the API if it obtains a token; keep the list minimal.
 - Asset MIME sniffing, malware scanning, watermarking and signed short-lived URLs are not implemented.
   Uploads are size-limited, filename-sanitised, extension-blocked and access-controlled.
 - No backup encryption or documented key rotation. Backups are local snapshots with a checksum only.

@@ -358,6 +358,19 @@ a card inside the link scope, never to a sibling card, and edits are limited to 
 with an optional revision check. Each write creates a revision, emits a snapshot event, audits the
 link and notifies owners.
 
+## Desktop sync
+
+`app/web/js/sync.js` keeps the local board authoritative until the user enables sync for that board.
+The sync control stores a service URL and scoped API token, creates a server project on first enable,
+pushes snapshots with the server revision and pulls when the server is ahead. Both local and remote
+changes produce an explicit conflict with Use server and Keep local choices. Failed pushes enter a
+local queue and retry when online. Deleting or disabling a local board never deletes server data;
+there is no server project delete call in the sync client.
+
+`service/src/http.mjs` and the API router accept bearer-token CORS preflight only from
+`KHAOYU_SERVICE_CORS_ORIGINS`, with no credentials. The desktop token is stored in webview local
+storage, which is documented as a residual risk in the security audit.
+
 ## Email delivery
 
 `service/src/auth/mailer.mjs` selects SMTP when `KHAOYU_SERVICE_SMTP_HOST` is set and otherwise writes

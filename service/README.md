@@ -61,6 +61,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
+| `KHAOYU_SERVICE_CORS_ORIGINS` | Tauri origins | Comma-separated origins allowed to call bearer-token APIs from the desktop client. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
 | `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
@@ -165,6 +166,11 @@ tokens cannot manage sessions, TOTP or account deletion; those require a user se
 Email verification and password reset tokens are single use, short lived and stored as hashes. The
 development mailer writes messages to the outbox instead of sending SMTP; treat that directory as
 sensitive and add an SMTP adapter before production use.
+
+Desktop sync uses a scoped API token with `projects:read` and `projects:write`. The service allows
+bearer-token CORS preflight only from `KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are
+never allowed from those origins. Add the local web host origin manually if the browser build should
+sync directly.
 
 ## Sharing and membership
 
@@ -320,7 +326,7 @@ authorization, refresh rotation and reuse, session revocation, password reset, T
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
-authenticated SSE rooms, scoped notifications, SMTP delivery and email preferences.
+authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences and CORS preflight.
 
 ## Milestone boundaries
 

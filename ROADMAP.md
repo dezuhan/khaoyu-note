@@ -48,9 +48,9 @@ remaining work named in the item.
 ### Local-first boundary
 
 - [x] The desktop app remains authoritative for local boards.
-- [ ] Server sync is opt-in per project and shown with an explicit sync state.
-- [ ] Offline edits queue locally, sync later and surface conflicts instead of silently overwriting.
-- [ ] A deleted local database never deletes server data without an explicit confirmation.
+- [x] Server sync is opt-in per project and shown with an explicit sync state.
+- [x] Offline edits queue locally, sync later and surface conflicts instead of silently overwriting.
+- [x] A deleted local database never deletes server data without an explicit confirmation.
 
 ## Milestone 2: Accounts and login
 
@@ -172,7 +172,7 @@ remaining work named in the item.
 - [x] Realtime collaboration only after authentication, authorisation and audit are complete.
 - [x] Per-project rooms with membership checks on connect and on every message.
 - [ ] Presence is opt-in and does not reveal board contents to non-members (partial: presence count is member-only; opt-in and cursor awareness pending).
-- [ ] Conflict handling for offline edits with a visible resolution flow (partial: server revision conflicts are enforced; offline queue and resolution UI pending).
+- [x] Conflict handling for offline edits with a visible resolution flow.
 - [x] Revision history for shared projects, with restore limited to editors and above.
 - [x] Comments and notifications respect scope: a column share cannot leak board-wide activity.
 
