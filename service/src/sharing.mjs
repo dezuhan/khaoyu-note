@@ -131,6 +131,24 @@ export function acceptInvitation(db, { token, account }) {
   return { projectId: row.project_id, role: row.role, invitationId: row.id };
 }
 
+const SHARE_RANK = { view: 1, comment: 2, edit: 3, manage: 4 };
+
+export function shareAllows(permission, minimum) {
+  return Boolean(permission) && SHARE_RANK[permission] >= SHARE_RANK[minimum];
+}
+
+export function cardInShareScope(doc, share, cardId) {
+  if (share.scope === "project") {
+    return (doc.cards || []).some((card) => card.id === cardId);
+  }
+  if (share.scope === "item") return cardId === share.target_id;
+  if (share.scope === "column") {
+    if (cardId === share.target_id) return true;
+    return descendants(doc, share.target_id).has(cardId);
+  }
+  return false;
+}
+
 export function createShareLink(db, { projectId, scope, targetId, permission, passwordHash, expiresAt, downloadAllowed, createdBy }) {
   const token = `khn_share_${randomToken(32)}`;
   const id = crypto.randomUUID();

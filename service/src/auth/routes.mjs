@@ -7,6 +7,7 @@ import { createTotpSecret, generateTotp, totpUri, verifyTotp } from "./totp.mjs"
 import { clearLoginFailures, loginBlocked, recordLoginAttempt } from "./throttle.mjs";
 import {
   acceptInvitation,
+  cardInShareScope,
   createInvitation,
   createShareLink,
   findShare,
@@ -15,6 +16,7 @@ import {
   recordShareAttempt,
   revokeShare,
   rotateShare,
+  shareAllows,
   shareBlocked,
   sharedPayload,
 } from "../sharing.mjs";
@@ -200,12 +202,55 @@ function issueOtp(db, account, secret) {
   return code;
 }
 
+async function verifyShareForWrite(db, config, { token, body, ip, minimum }) {
+  if (!config.publicSharingEnabled) throw new HttpError(404, "not found", "not_found");
+  const share = findShare(db, token);
+  if (!share || share.revoked_at || (share.expires_at !== null && Number(share.expires_at) <= now())) {
+    throw new HttpError(404, "not found", "not_found");
+  }
+  if (!shareAllows(share.permission, minimum)) {
+    throw new HttpError(403, "share permission denied", "forbidden");
+  }
+  if (shareBlocked(db, { shareId: share.id, ip, config })) {
+    throw new HttpError(429, "too many attempts", "rate_limited", { "Retry-After": "300" });
+  }
+  if (share.password_hash && !(await verifyPassword(body.password, share.password_hash))) {
+    recordShareAttempt(db, { shareId: share.id, ip, success: false, config });
+    throw new HttpError(404, "not found", "not_found");
+  }
+  recordShareAttempt(db, { shareId: share.id, ip, success: true, config });
+  db.prepare("UPDATE share_links SET last_accessed_at = ? WHERE id = ?").run(now(), share.id);
+  return share;
+}
+
 export function createApiRouter({ db, config, logger, mailer }) {
   const objects = new ObjectStore(db, config.objectsDir);
   const events = createEventHub();
   const blockedExtensions = new Set([
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
   ]);
+
+  function saveSharedDoc(projectId, doc, revision, actorId) {
+    const serialized = JSON.stringify(doc);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare("UPDATE projects SET revision = ?, updated_at = ? WHERE id = ?").run(
+        revision,
+        now(),
+        projectId
+      );
+      db.prepare(
+        "UPDATE project_snapshots SET revision = ?, doc = ?, updated_by = ?, updated_at = ? WHERE project_id = ?"
+      ).run(revision, serialized, actorId, now(), projectId);
+      db.prepare(
+        "INSERT INTO project_versions (id, project_id, revision, doc, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run(crypto.randomUUID(), projectId, revision, serialized, actorId, now());
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
 
   const route = async function route(request, response) {
     const url = new URL(request.url || "/", config.publicUrl);
@@ -294,6 +339,128 @@ export function createApiRouter({ db, config, logger, mailer }) {
           config,
           { "X-Robots-Tag": "noindex, nofollow" }
         );
+        return true;
+      }
+
+      const shareCommentMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/comments$/);
+      if (method === "POST" && shareCommentMatch) {
+        assertSameOrigin(request, config);
+        const body = await readJson(request);
+        const share = await verifyShareForWrite(db, config, {
+          token: decodeURIComponent(shareCommentMatch[1]),
+          body,
+          ip,
+          minimum: "comment",
+        });
+        const snapshot = projectSnapshot(db, share.project_id);
+        if (!snapshot) throw new HttpError(404, "not found", "not_found");
+        const cardId = requireString(body.cardId, "cardId", 200);
+        if (!cardInShareScope(snapshot.doc, share, cardId)) {
+          throw new HttpError(404, "card not found in this share", "not_found");
+        }
+        const card = snapshot.doc.cards.find((entry) => entry.id === cardId);
+        const text = requireString(body.text, "text", 2000);
+        if (body.revision !== undefined && Number(body.revision) !== snapshot.project.revision) {
+          throw new HttpError(409, "revision conflict", "revision_conflict");
+        }
+        card.shareComments = Array.isArray(card.shareComments) ? card.shareComments : [];
+        if (card.shareComments.length >= 500) {
+          throw new HttpError(409, "comment limit reached", "comment_limit");
+        }
+        const comment = {
+          id: crypto.randomUUID(),
+          author: "Shared guest",
+          text,
+          ts: now(),
+        };
+        card.shareComments.push(comment);
+        const revision = snapshot.project.revision + 1;
+        saveSharedDoc(share.project_id, snapshot.doc, revision, null);
+        events.publish(share.project_id, {
+          type: "snapshot",
+          projectId: share.project_id,
+          revision,
+        });
+        writeAudit(db, {
+          action: "share.comment_added",
+          resourceType: "share_link",
+          resourceId: share.id,
+          metadata: { cardId, revision },
+          ip,
+          secret: config.secret,
+        });
+        notifyProjectOwners(db, share.project_id, {
+          kind: "share.comment",
+          title: "New comment on a shared link",
+          body: "A shared link received a new comment.",
+          resourceType: "share_link",
+          resourceId: share.id,
+        });
+        sendJson(response, 201, { revision, comment }, config);
+        return true;
+      }
+
+      const shareCardMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/cards\/([^/]+)$/);
+      if (method === "PATCH" && shareCardMatch) {
+        assertSameOrigin(request, config);
+        const body = await readJson(request);
+        const share = await verifyShareForWrite(db, config, {
+          token: decodeURIComponent(shareCardMatch[1]),
+          body,
+          ip,
+          minimum: "edit",
+        });
+        const snapshot = projectSnapshot(db, share.project_id);
+        if (!snapshot) throw new HttpError(404, "not found", "not_found");
+        const cardId = decodeURIComponent(shareCardMatch[2]);
+        if (!cardInShareScope(snapshot.doc, share, cardId)) {
+          throw new HttpError(404, "card not found in this share", "not_found");
+        }
+        const card = snapshot.doc.cards.find((entry) => entry.id === cardId);
+        if (!body.fields || typeof body.fields !== "object" || Array.isArray(body.fields)) {
+          throw new HttpError(400, "fields are required", "invalid_input");
+        }
+        if (body.revision !== undefined && Number(body.revision) !== snapshot.project.revision) {
+          throw new HttpError(409, "revision conflict", "revision_conflict");
+        }
+        const limits = { text: 20_000, title: 2_000, caption: 2_000, description: 2_000, url: 2_000 };
+        let changed = 0;
+        for (const [key, limit] of Object.entries(limits)) {
+          if (body.fields[key] === undefined) continue;
+          if (typeof body.fields[key] !== "string" || body.fields[key].length > limit) {
+            throw new HttpError(400, `invalid field: ${key}`, "invalid_input");
+          }
+          card[key] = body.fields[key];
+          changed += 1;
+        }
+        if (typeof body.fields.checked === "boolean") {
+          card.checked = body.fields.checked;
+          changed += 1;
+        }
+        if (!changed) throw new HttpError(400, "no editable fields", "invalid_input");
+        const revision = snapshot.project.revision + 1;
+        saveSharedDoc(share.project_id, snapshot.doc, revision, null);
+        events.publish(share.project_id, {
+          type: "snapshot",
+          projectId: share.project_id,
+          revision,
+        });
+        writeAudit(db, {
+          action: "share.card_edited",
+          resourceType: "share_link",
+          resourceId: share.id,
+          metadata: { cardId, revision },
+          ip,
+          secret: config.secret,
+        });
+        notifyProjectOwners(db, share.project_id, {
+          kind: "share.edit",
+          title: "A shared link edited a card",
+          body: "A shared link edited a card in the project.",
+          resourceType: "share_link",
+          resourceId: share.id,
+        });
+        sendJson(response, 200, { revision }, config);
         return true;
       }
 
