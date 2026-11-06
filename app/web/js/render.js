@@ -393,7 +393,9 @@ function contentFor(card) {
       if (card.url && !card.__editEmbed) {
         const embed = embedUrl(card.url);
         const media = embed
-          ? `<iframe src="${escapeHtml(embed)}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`
+          ? `<iframe src="${escapeHtml(
+              embed
+            )}" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`
           : `<video controls src="${escapeHtml(imgSrc(card.url))}"></video>`;
         return `<div class="mn-video">${media}<button type="button" class="mn-embed-edit" data-action="edit-embed" title="Change video link">${icon(
           "edit",
@@ -410,7 +412,7 @@ function contentFor(card) {
       if (embed && !card.__editEmbed) {
         return `<div class="mn-map"><iframe src="${escapeHtml(
           embed
-        )}" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe><button type="button" class="mn-embed-edit" data-action="edit-embed" title="Change map location">${icon(
+        )}" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe><button type="button" class="mn-embed-edit" data-action="edit-embed" title="Change map location">${icon(
           "edit",
           12
         )}</button></div>`;

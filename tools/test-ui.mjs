@@ -984,6 +984,13 @@ check(
     (await videoCard.locator("iframe").getAttribute("src")).includes("youtube.com/embed/")
 );
 check(
+  "Video embed is sandboxed and sends a strict referrer policy",
+  (await videoCard.locator("iframe").getAttribute("sandbox")).includes("allow-scripts") &&
+    (await videoCard.locator("iframe").getAttribute("sandbox")).includes("allow-same-origin") &&
+    (await videoCard.locator("iframe").getAttribute("referrerpolicy")) ===
+      "strict-origin-when-cross-origin"
+);
+check(
   "Loaded video iframe leaves the card draggable",
   (await videoCard.locator("iframe").evaluate((el) => getComputedStyle(el).pointerEvents)) === "none"
 );
@@ -1027,6 +1034,11 @@ check(
   "Google Maps link renders a map preview",
   (await mapCard.locator("iframe").count()) === 1 &&
     (await mapCard.locator("iframe").getAttribute("src")).includes("maps.google.com/maps?q=40.758")
+);
+check(
+  "Map embed is sandboxed",
+  (await mapCard.locator("iframe").getAttribute("sandbox")).includes("allow-scripts") &&
+    (await mapCard.locator("iframe").getAttribute("sandbox")).includes("allow-same-origin")
 );
 check(
   "Loaded map iframe leaves the card draggable",
