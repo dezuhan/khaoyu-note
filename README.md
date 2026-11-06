@@ -25,7 +25,7 @@ Document page editor and drawing page editor:
 ![Drawing editor](shots/drawing-editor.png)
 
 Status: working MVP. Every behavior below is covered by an automated Playwright suite
-(213/213 UI checks) and the MCP server has its own smoke suite (16/16 checks).
+(215/215 UI checks) and the MCP server has its own smoke suite (16/16 checks).
 
 ## What is here
 
@@ -366,7 +366,7 @@ dispatch. The separate `desktop-release.yml` stays tag-only.
 The UI suite exercises: boot, tool rail, card creation, text editing, drag, resize, undo/redo,
 to-do items, comments, table cells, column drop, zoom, settings modal and custom select, theme
 switching, the disabled Home state, nested board breadcrumbs, document editor, drawing editor, context
-menu, and persistence (213 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
+menu, and persistence (215 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
 checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
 boards, connections and tree deletion (16 checks).
 

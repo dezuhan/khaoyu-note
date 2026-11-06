@@ -69,7 +69,7 @@ remaining work named in the item.
 - [x] Refresh token reuse detection revokes the whole session family.
 - [x] Session list with device label, creation time, last seen time and a revoke action.
 - [x] Logout everywhere action.
-- [ ] Login throttling per account and per IP, with progressive delays and alerting (partial: fixed window and 429 implemented; progressive delay and alerting pending).
+- [ ] Login throttling per account and per IP, with progressive delays and alerting (partial: fixed window, progressive Retry-After and a structured warning event implemented; external alert routing pending).
 - [x] Generic login errors that do not reveal whether an email exists.
 - [x] Password reset tokens single use, short lived, hashed at rest and bound to the account.
 - [ ] Optional email one-time codes as an alternative login method.
@@ -80,7 +80,7 @@ remaining work named in the item.
 - [x] State-changing requests require CSRF tokens or a strict origin check.
 - [x] Content Security Policy on every server-rendered response.
 - [x] No secrets, tokens or personal data in URLs or logs.
-- [ ] Third-party iframe embeds isolated and documented, since media cards load external content.
+- [x] Third-party iframe embeds isolated and documented, since media cards load external content.
 
 ### Authorisation
 

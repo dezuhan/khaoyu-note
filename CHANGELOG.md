@@ -13,6 +13,7 @@ project uses Semantic Versioning.
   session management, password reset, TOTP, account deletion grace, project role checks and scoped
   API tokens.
 - Service health endpoints and a file-based verification and reset mail outbox.
+- Media iframes are sandboxed with a restrictive referrer policy.
 
 ## [0.1.0] - 2026-11-07
 

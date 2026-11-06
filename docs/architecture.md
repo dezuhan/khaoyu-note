@@ -327,7 +327,7 @@ Every refresh marks the old token used and writes a replacement. Replaying an al
 revoked refresh token revokes the whole family. Session rows carry device, IP hash and user agent;
 access and refresh tokens are hashed at rest. Cookie authentication requires the double-submit CSRF
 header for writes, while bearer access tokens skip that check. Login failures are counted per email
-and IP with a fixed window and a generic 401 response.
+and IP with a fixed window, a progressive `Retry-After` and a structured warning event.
 
 TOTP uses a base32 secret, SHA-1 HMAC, six digits and a 30 second period with one step of clock
 skew. Scoped API tokens use the `khn_` prefix, are stored hashed, grant `projects:read` or

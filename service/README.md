@@ -111,7 +111,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 Passwords use Argon2id with 64 MiB memory, 3 iterations and a 16-byte per-user salt. Access tokens live
 15 minutes. Refresh tokens live 7 days, rotate on every use and are stored as SHA-256 hashes. Reusing
 an old refresh token revokes the whole session family. Login failures are generic and limited per
-email and per IP.
+email and per IP with a progressive `Retry-After`; each block emits a structured warning event.
 
 Cookies are `HttpOnly`, `SameSite=Lax` and `Secure` when the public URL is HTTPS. Write requests made
 with cookie authentication must send the CSRF token in `X-CSRF-Token`; the same value is in the
