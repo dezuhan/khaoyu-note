@@ -11,6 +11,13 @@ function integer(value, fallback, minimum, maximum, name) {
   return parsed;
 }
 
+function boolean(value, fallback) {
+  if (value === undefined || value === "") return fallback;
+  if (value === "1" || value === "true") return true;
+  if (value === "0" || value === "false") return false;
+  throw new Error("boolean environment values must be true or false");
+}
+
 export function loadConfig(env = process.env, cwd = process.cwd()) {
   const secret = env.KHAOYU_SERVICE_SECRET || "";
   if (Buffer.byteLength(secret, "utf8") < 32) {
@@ -44,6 +51,14 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     objectsDir: path.join(dataDir, "objects"),
     tempDir: path.join(dataDir, "tmp"),
     backupsDir: path.join(dataDir, "backups"),
+    outboxDir: path.join(dataDir, "outbox"),
+    cookieSecure: boolean(env.KHAOYU_SERVICE_COOKIE_SECURE, publicUrl.startsWith("https://")),
+    trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
+    accessTtlMinutes: integer(env.KHAOYU_SERVICE_ACCESS_TTL_MINUTES, 15, 1, 1440, "KHAOYU_SERVICE_ACCESS_TTL_MINUTES"),
+    refreshTtlDays: integer(env.KHAOYU_SERVICE_REFRESH_TTL_DAYS, 7, 1, 90, "KHAOYU_SERVICE_REFRESH_TTL_DAYS"),
+    deletionGraceDays: integer(env.KHAOYU_SERVICE_DELETION_GRACE_DAYS, 30, 1, 365, "KHAOYU_SERVICE_DELETION_GRACE_DAYS"),
+    loginWindowMinutes: integer(env.KHAOYU_SERVICE_LOGIN_WINDOW_MINUTES, 15, 1, 1440, "KHAOYU_SERVICE_LOGIN_WINDOW_MINUTES"),
+    loginMaxAttempts: integer(env.KHAOYU_SERVICE_LOGIN_MAX_ATTEMPTS, 5, 1, 100, "KHAOYU_SERVICE_LOGIN_MAX_ATTEMPTS"),
     backupIntervalHours: integer(
       env.KHAOYU_SERVICE_BACKUP_INTERVAL_HOURS,
       24,
