@@ -358,6 +358,14 @@ a card inside the link scope, never to a sibling card, and edits are limited to 
 with an optional revision check. Each write creates a revision, emits a snapshot event, audits the
 link and notifies owners.
 
+## Email delivery
+
+`service/src/auth/mailer.mjs` selects SMTP when `KHAOYU_SERVICE_SMTP_HOST` is set and otherwise writes
+mode `0600` JSON files to the outbox. SMTP uses `nodemailer`, optional username and password and
+implicit TLS. Notification email is opt-in per account, includes a signed unsubscribe link, and is
+rate limited to one per account per five minutes. Verification, reset and invitation mail remain
+transactional.
+
 ## Notifications
 
 `service/src/notifications.mjs` stores per-account notifications with a resource type and id.

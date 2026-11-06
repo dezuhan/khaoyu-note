@@ -61,6 +61,12 @@ a migration is pending.
 | `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
+| `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
+| `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
+| `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
+| `KHAOYU_SERVICE_SMTP_USER` | empty | SMTP username, paired with the password. |
+| `KHAOYU_SERVICE_SMTP_PASSWORD` | empty | SMTP password. |
+| `KHAOYU_SERVICE_SMTP_FROM` | empty | Required sender address when SMTP is enabled. |
 | `KHAOYU_SERVICE_ACCESS_TTL_MINUTES` | `15` | Access token lifetime. |
 | `KHAOYU_SERVICE_REFRESH_TTL_DAYS` | `7` | Refresh token and session lifetime. |
 | `KHAOYU_SERVICE_DELETION_GRACE_DAYS` | `30` | Days before a requested account deletion is purged. |
@@ -110,6 +116,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. |
+| `GET` | `/api/v1/account/email-preferences` | Read the email notification preference. |
+| `PATCH` | `/api/v1/account/email-preferences` | Opt in or out of notification email. |
+| `GET` | `/api/v1/email/unsubscribe` | One-click unsubscribe using a signed token. |
 | `GET` | `/api/v1/projects/:id/members` | List project members. |
 | `GET` | `/api/v1/projects/:id/assets` | List project asset metadata. |
 | `POST` | `/api/v1/projects/:id/assets` | Upload an asset as raw bytes; editor role. |
@@ -195,7 +204,10 @@ removed member stops seeing project notifications immediately even though the ro
 is per account; only the owner can mark a notification read. Revoking a share link, or disabling
 project sharing, deletes its pending notifications. Read notifications older than 90 days are pruned.
 
-Email notifications, unsubscribe links and per-event rate limits are still pending.
+Notification email is opt-in per account. When SMTP is configured, messages are delivered through
+`nodemailer`; otherwise they remain in the mode `0600` outbox. Each message has a signed one-click
+unsubscribe link, and at most one notification email is sent per account per five minutes. Invitation,
+verification and reset mail remain transactional and are not governed by the notification preference.
 
 ## Revision history and events
 
@@ -308,7 +320,7 @@ authorization, refresh rotation and reuse, session revocation, password reset, T
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
-authenticated SSE rooms and scoped notifications.
+authenticated SSE rooms, scoped notifications, SMTP delivery and email preferences.
 
 ## Milestone boundaries
 
@@ -334,11 +346,12 @@ editor-only restore and audit. Offline queues, cursor and lock awareness, scoped
 notifications remain pending.
 
 Implemented from Milestone 5: scoped in-app notifications for invitations, role changes, revision
-restores and share reports; per-account read state; cleanup when a share is revoked. Email
-notifications, unsubscribe links and event rate limits remain pending.
+restores and share reports; per-account read state; cleanup when a share is revoked; SMTP delivery
+with outbox fallback; opt-in notification email with signed unsubscribe links and a five minute rate
+limit.
 
 Still pending: a manage-specific share surface, watermarking, MIME sniffing and malware scanning,
-signed short-lived asset URLs, nested-board policy for project shares, SMTP delivery, passkeys, SSO,
-team membership UI, a browser login UI and desktop client sync. The Milestone 1 sync boundary remains
+signed short-lived asset URLs, nested-board policy for project shares, passkeys, SSO, team membership
+UI, a browser login UI and desktop client sync. The Milestone 1 sync boundary remains
 open: desktop opt-in, explicit sync state, offline queue with conflict handling, and protection
 against a local database delete removing server data.

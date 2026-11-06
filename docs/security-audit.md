@@ -23,6 +23,8 @@ authorization.
 - Account deletion export now includes accessible project snapshots.
 - Project assets now have authenticated upload and member-only download, and shares enforce the
   download flag with per-link audit.
+- SMTP delivery is implemented with an outbox fallback, opt-in notification email, signed unsubscribe
+  links and a notification email rate limit.
 
 ## Findings
 
@@ -31,8 +33,8 @@ authorization.
 | Finding | Status |
 | --- | --- |
 | Desktop sync, explicit sync state and offline queue are not implemented. | Open. Milestone 1 boundary remains partial. |
-| Share-token write permissions are stored but no write endpoint enforces them. | Open. Public access is read-only today. |
-| Email verification, reset, invitations and OTP are written to a filesystem outbox, not delivered by SMTP. | Open. The outbox is mode `0600` and documented as sensitive. |
+| Share-token write permissions are stored but no write endpoint enforces them. | Closed. Comment and edit writes now enforce the permission rank and scope. |
+| Email delivery without SMTP falls back to the filesystem outbox. | Accepted for small deployments. The outbox is mode `0600`; SMTP is configured by environment when required. |
 | There is no TLS in the service itself. Operators must terminate TLS in Caddy, Nginx or another proxy. | Open by design. The Compose port binds loopback only. |
 
 ### Medium
@@ -75,9 +77,8 @@ authorization.
 ## Recommended next work
 
 1. Add MIME sniffing, malware scanning, signed short-lived asset URLs and watermarking.
-2. Add SMTP delivery and outbox retry.
-3. Complete desktop sync with opt-in per project, explicit state, offline queue and conflict flow.
-4. Add signup/reset/invite rate limits and a global sharing kill switch (the kill switch is now in
-   place; the dedicated rate limits are not).
-5. Add encrypted offsite backups and a documented restore drill.
-6. Add dependency and container scanning to CI, then an external penetration test before production.
+2. Complete desktop sync with opt-in per project, explicit state, offline queue and conflict flow.
+3. Add signup/reset/invite rate limits (the sharing kill switch and notification email rate limit are
+   now in place).
+4. Add encrypted offsite backups and a documented restore drill.
+5. Add dependency and container scanning to CI, then an external penetration test before production.
