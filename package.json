@@ -18,6 +18,7 @@
     "service:backup": "node service/src/cli.mjs backup",
     "service:restore": "node service/src/cli.mjs restore",
     "test:service": "node --test service/test/service.test.mjs service/test/auth.test.mjs",
-    "test:sync": "node --no-warnings tools/test-sync.mjs"
+    "test:sync": "node --no-warnings tools/test-sync.mjs",
+    "dist:checksums": "node tools/checksums.mjs --dir dist"
   }
 }

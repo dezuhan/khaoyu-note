@@ -48,6 +48,7 @@ khaoyu-note/
     incident-response.md     containment, rotation, recovery and communication
     release-checklist.md     verification, security and external release gates
     data-residency.md        storage locations, retention and deletion
+    blockers.md              remaining work and external release blockers
   scripts/                   static checks, window capture
   tools/                     Playwright preview, UI test suite, screenshots
   shots/                     screenshots used by this README

@@ -3,6 +3,15 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- Native desktop build matrix for Windows, Ubuntu and macOS that uploads unsigned bundles and
+  checksums.
+- `tools/checksums.mjs` and `npm run dist:checksums`.
+- Explicit remaining-work and external-blocker document.
+
 ## [0.15.0] - 2026-11-07
 
 ### Added

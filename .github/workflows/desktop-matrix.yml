@@ -1,0 +1,61 @@
+name: Desktop matrix
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-latest
+          - platform: linux-x64
+            os: ubuntu-22.04
+          - platform: macos-arm64
+            os: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install app dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Build desktop bundles
+        working-directory: app
+        run: npx tauri build
+
+      - name: Generate checksums
+        run: node tools/checksums.mjs --dir app/src-tauri/target/release/bundle
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: khaoyu-note-${{ matrix.platform }}-unsigned
+          path: app/src-tauri/target/release/bundle
+          if-no-files-found: error
+          retention-days: 14
