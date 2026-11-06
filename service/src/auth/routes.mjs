@@ -652,6 +652,71 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      if (method === "POST" && url.pathname === "/api/v1/auth/sso/login") {
+        if (!config.ssoEnabled) throw new HttpError(404, "not found", "not_found");
+        const headerEmail = request.headers[config.ssoHeader];
+        const signature = request.headers["x-khaoyu-sso-signature"];
+        if (typeof headerEmail !== "string" || typeof signature !== "string") {
+          throw new HttpError(401, "SSO authentication required", "authentication_required");
+        }
+        let email;
+        try {
+          email = normalizeEmail(headerEmail);
+        } catch {
+          throw new HttpError(401, "SSO authentication required", "authentication_required");
+        }
+        const expected = crypto.createHmac("sha256", config.ssoSecret).update(email).digest("hex");
+        const expectedBuffer = Buffer.from(expected);
+        const actualBuffer = Buffer.from(signature.toLowerCase());
+        if (
+          expectedBuffer.length !== actualBuffer.length ||
+          !crypto.timingSafeEqual(expectedBuffer, actualBuffer)
+        ) {
+          throw new HttpError(401, "SSO authentication required", "authentication_required");
+        }
+        let account = db.prepare("SELECT * FROM accounts WHERE email = ?").get(email);
+        if (!account) {
+          if (!config.ssoAutoCreate) {
+            throw new HttpError(403, "SSO account does not exist", "sso_account_missing");
+          }
+          const displayName = String(
+            request.headers[config.ssoNameHeader] || email.split("@")[0]
+          ).slice(0, 120);
+          const id = crypto.randomUUID();
+          db.prepare(
+            "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)"
+          ).run(id, email, displayName, now(), now(), now());
+          account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(id);
+        }
+        if (account.deleted_at) {
+          throw new HttpError(403, "account is pending deletion", "account_deleted");
+        }
+        const session = createSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.login_sso",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          200,
+          {
+            account: publicAccount(account),
+            csrfToken: session.csrfToken,
+            accessExpiresAt: session.accessExpiresAt,
+          },
+          config
+        );
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/auth/register") {
         const body = await readJson(request);
         const email = normalizeEmail(body.email);

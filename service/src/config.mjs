@@ -60,6 +60,21 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     throw new Error("KHAOYU_SERVICE_ALERT_WEBHOOK must be an http or https URL");
   }
 
+  const trustProxy = boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false);
+  const ssoEnabled = boolean(env.KHAOYU_SERVICE_SSO_ENABLED, false);
+  const ssoSecret = env.KHAOYU_SERVICE_SSO_SECRET || "";
+  const ssoHeader = (env.KHAOYU_SERVICE_SSO_HEADER || "x-auth-request-email").toLowerCase();
+  const ssoNameHeader = (env.KHAOYU_SERVICE_SSO_NAME_HEADER || "x-auth-request-name").toLowerCase();
+  if (!/^x-[a-z0-9-]+$/.test(ssoHeader) || !/^x-[a-z0-9-]+$/.test(ssoNameHeader)) {
+    throw new Error("SSO headers must be non-standard x-* header names");
+  }
+  if (ssoEnabled) {
+    if (!trustProxy) throw new Error("SSO requires KHAOYU_SERVICE_TRUST_PROXY=true");
+    if (Buffer.byteLength(ssoSecret, "utf8") < 32) {
+      throw new Error("KHAOYU_SERVICE_SSO_SECRET must be at least 32 characters when SSO is enabled");
+    }
+  }
+
   const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
   const smtpPass = env.KHAOYU_SERVICE_SMTP_PASSWORD || "";
   const smtpFrom = env.KHAOYU_SERVICE_SMTP_FROM || "";
@@ -86,7 +101,12 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     backupsDir: path.join(dataDir, "backups"),
     outboxDir: path.join(dataDir, "outbox"),
     cookieSecure: boolean(env.KHAOYU_SERVICE_COOKIE_SECURE, publicUrl.startsWith("https://")),
-    trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
+    trustProxy,
+    ssoEnabled,
+    ssoSecret,
+    ssoHeader,
+    ssoNameHeader,
+    ssoAutoCreate: boolean(env.KHAOYU_SERVICE_SSO_AUTO_CREATE, false),
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
     adminToken,
     backupPassphrase,
