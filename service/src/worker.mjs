@@ -68,13 +68,30 @@ function pruneTokens(db) {
   const otp = db
     .prepare("DELETE FROM email_otps WHERE expires_at < ? OR used_at < ?")
     .run(now - 86_400_000, now - 86_400_000).changes;
+  const versions = pruneVersions(db);
   return {
     access: Number(access),
     email: Number(email),
     refresh: Number(refresh),
     shares: Number(shares),
     otp: Number(otp),
+    versions,
   };
+}
+
+function pruneVersions(db) {
+  let removed = 0;
+  const projects = db.prepare("SELECT id FROM projects").all();
+  for (const project of projects) {
+    const result = db
+      .prepare(
+        `DELETE FROM project_versions WHERE project_id = ? AND revision NOT IN
+         (SELECT revision FROM project_versions WHERE project_id = ? ORDER BY revision DESC LIMIT 100)`
+      )
+      .run(project.id, project.id);
+    removed += Number(result.changes);
+  }
+  return removed;
 }
 
 export function runMaintenance(db, config, logger) {

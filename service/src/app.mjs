@@ -21,7 +21,7 @@ export function logPath(pathname) {
 
 export function createService({ config, db, logger, mailer }) {
   const api = createApiRouter({ db, config, logger, mailer });
-  return http.createServer(async (request, response) => {
+  const server = http.createServer(async (request, response) => {
     const started = Date.now();
     const url = new URL(request.url || "/", config.publicUrl);
     response.on("finish", () => {
@@ -60,6 +60,8 @@ export function createService({ config, db, logger, mailer }) {
       }
     }
   });
+  server.closeStreams = () => api.closeAll?.();
+  return server;
 }
 
 export function listen(server, config) {

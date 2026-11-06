@@ -20,6 +20,7 @@ import {
 } from "../sharing.mjs";
 import {
   appendCookie,
+  applySecurityHeaders,
   assertSameOrigin,
   clientIp,
   HttpError,
@@ -33,6 +34,7 @@ import {
   sendNoContent,
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
+import { createEventHub } from "../events.mjs";
 
 function now() {
   return Date.now();
@@ -193,11 +195,12 @@ function issueOtp(db, account, secret) {
 
 export function createApiRouter({ db, config, logger, mailer }) {
   const objects = new ObjectStore(db, config.objectsDir);
+  const events = createEventHub();
   const blockedExtensions = new Set([
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
   ]);
 
-  return async function route(request, response) {
+  const route = async function route(request, response) {
     const url = new URL(request.url || "/", config.publicUrl);
     if (!url.pathname.startsWith("/api/v1/")) return false;
     const method = request.method;
@@ -1278,6 +1281,94 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      const eventsMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/events$/);
+      if (method === "GET" && eventsMatch) {
+        const auth = requireAuth(request, response, db, config);
+        const role = projectRole(db, eventsMatch[1], auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        applySecurityHeaders(response, config);
+        response.writeHead(200, {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        });
+        response.flushHeaders();
+        const client = events.subscribe(eventsMatch[1], auth.account.id, response);
+        request.on("close", () => events.unsubscribe(client));
+        return true;
+      }
+
+      const versionsMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/versions$/);
+      if (method === "GET" && versionsMatch) {
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, "projects:read");
+        const role = projectRole(db, versionsMatch[1], auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        const versions = db
+          .prepare(
+            `SELECT revision, created_by, created_at, length(doc) AS bytes
+             FROM project_versions WHERE project_id = ? ORDER BY revision DESC LIMIT 100`
+          )
+          .all(versionsMatch[1]);
+        sendJson(response, 200, { versions }, config);
+        return true;
+      }
+
+      const restoreMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/versions\/(\d+)\/restore$/);
+      if (method === "POST" && restoreMatch) {
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
+        const role = projectRole(db, restoreMatch[1], auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
+        const version = db
+          .prepare("SELECT doc FROM project_versions WHERE project_id = ? AND revision = ?")
+          .get(restoreMatch[1], Number(restoreMatch[2]));
+        if (!version) throw new HttpError(404, "version not found", "not_found");
+        const current = db
+          .prepare("SELECT revision FROM projects WHERE id = ? AND deleted_at IS NULL")
+          .get(restoreMatch[1]);
+        if (!current) throw new HttpError(404, "project not found", "not_found");
+        const revision = current.revision + 1;
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          db.prepare("UPDATE projects SET revision = ?, updated_at = ? WHERE id = ?").run(
+            revision,
+            now(),
+            restoreMatch[1]
+          );
+          db.prepare(
+            "UPDATE project_snapshots SET revision = ?, doc = ?, updated_by = ?, updated_at = ? WHERE project_id = ?"
+          ).run(revision, version.doc, auth.account.id, now(), restoreMatch[1]);
+          db.prepare(
+            "INSERT INTO project_versions (id, project_id, revision, doc, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+          ).run(crypto.randomUUID(), restoreMatch[1], revision, version.doc, auth.account.id, now());
+          db.exec("COMMIT");
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
+        }
+        events.publish(restoreMatch[1], {
+          type: "snapshot",
+          projectId: restoreMatch[1],
+          revision,
+          restoredFrom: Number(restoreMatch[2]),
+          actor: auth.account.id,
+        });
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "project.version_restored",
+          resourceType: "project",
+          resourceId: restoreMatch[1],
+          metadata: { fromRevision: Number(restoreMatch[2]), revision },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { revision, restoredFrom: Number(restoreMatch[2]) }, config);
+        return true;
+      }
+
       const assetCollectionMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/assets$/);
       if (assetCollectionMatch && (method === "GET" || method === "POST")) {
         const auth = requireAuth(request, response, db, config);
@@ -1404,11 +1495,20 @@ export function createApiRouter({ db, config, logger, mailer }) {
           db.prepare(
             "UPDATE project_snapshots SET revision = ?, doc = ?, updated_by = ?, updated_at = ? WHERE project_id = ?"
           ).run(revision, doc, auth.account.id, now(), snapshotMatch[1]);
+          db.prepare(
+            "INSERT INTO project_versions (id, project_id, revision, doc, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+          ).run(crypto.randomUUID(), snapshotMatch[1], revision, doc, auth.account.id, now());
           db.exec("COMMIT");
         } catch (error) {
           db.exec("ROLLBACK");
           throw error;
         }
+        events.publish(snapshotMatch[1], {
+          type: "snapshot",
+          projectId: snapshotMatch[1],
+          revision,
+          actor: auth.account.id,
+        });
         writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "project.snapshot_updated",
@@ -1435,4 +1535,6 @@ export function createApiRouter({ db, config, logger, mailer }) {
       return true;
     }
   };
+  route.closeAll = events.closeAll;
+  return route;
 }

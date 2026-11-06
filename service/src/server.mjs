@@ -37,6 +37,7 @@ async function main() {
     closing = true;
     logger.info("service.stopping", { signal });
     worker.stop();
+    server.closeStreams?.();
     server.close(() => {
       db.close();
       logger.info("service.stopped");
