@@ -68,16 +68,20 @@ they are generated locally.
 
 ## Versioning
 
-The project uses Semantic Versioning:
+The project uses Semantic Versioning. Update the version for every user-visible feature or bug fix,
+not only when a milestone or release is finished.
 
-- `fix` or internal-only change: patch, for example `0.1.1`.
-- New capability: minor, for example `0.2.0`.
+- `fix`, `perf` or security fix: patch, for example `0.2.1`.
+- New capability: minor, for example `0.3.0`.
 - Breaking data or workflow change: major, for example `1.0.0`.
+- Documentation, tests and CI-only changes do not need a version bump.
 
-Every release gets a changelog entry and an annotated tag:
+Bump all version fields together: root `package.json`, `service/package.json`, `app/package.json`,
+`app/src-tauri/tauri.conf.json`, `app/src-tauri/Cargo.toml`, `Cargo.lock` and the Compose image tag.
+Add the changelog entry in the same change, then tag the verified release:
 
 ```powershell
-git tag -a v0.1.0 -m "Khaoyu Note 0.1.0"
+git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 ```
 
 ## Release checklist
@@ -85,7 +89,8 @@ git tag -a v0.1.0 -m "Khaoyu Note 0.1.0"
 1. All matching test suites pass.
 2. Installer is rebuilt when the release includes desktop changes.
 3. `CHANGELOG.md` describes user-visible changes.
-4. Version in `package.json`, `service/package.json`, `app/package.json` and
-   `app/src-tauri/tauri.conf.json` agrees.
+4. Version in `package.json`, `service/package.json`, `app/package.json`,
+   `app/src-tauri/tauri.conf.json`, `app/src-tauri/Cargo.toml` and `service/docker-compose.yml`
+   agrees.
 5. Working tree is clean before tagging.
 6. Tag points at the release commit.

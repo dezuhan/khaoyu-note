@@ -3,7 +3,7 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-07
 
 ### Added
 
@@ -14,6 +14,11 @@ project uses Semantic Versioning.
   API tokens.
 - Service health endpoints and a file-based verification and reset mail outbox.
 - Media iframes are sandboxed with a restrictive referrer policy.
+
+### Fixed
+
+- Account export now includes accessible project snapshots before deletion.
+- Login throttling now uses progressive retry delays with a structured warning event.
 
 ## [0.1.0] - 2026-11-07
 

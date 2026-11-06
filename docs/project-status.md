@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.1.0.
+Snapshot date: 2026-11-07. Version: 0.2.0.
 
 ## Technology
 
