@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Khaoyu Note MCP",
+    "description": "Connects the local Khaoyu Note boards (SQLite, stdio MCP server) so the agent can read and edit boards, cards and comments."
+  }
+}

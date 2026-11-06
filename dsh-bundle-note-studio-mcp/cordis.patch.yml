@@ -1,0 +1,8 @@
+- insert:
+    - id: mcp-khaoyu-note
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: khaoyu-note
+        transport: stdio
+        command: 'C:\Program Files\Khaoyu Note\khaoyu-note-mcp.exe'
+        failOnStartupError: true

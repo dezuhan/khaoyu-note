@@ -1,0 +1,14 @@
+{
+  "name": "khaoyu-note-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local web host for Khaoyu Note, backed by the same SQLite database as the desktop app",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "web": "node server.mjs",
+    "web:status": "node -e \"fetch('http://127.0.0.1:1430/status').then(r=>r.text()).then(console.log)\""
+  }
+}

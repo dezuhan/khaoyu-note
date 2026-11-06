@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web checks and Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: tools
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: tools
+        run: npx playwright install --with-deps chromium
+
+      - name: Static module check
+        run: node --experimental-vm-modules scripts/check-web.cjs
+
+      - name: Start preview server
+        run: |
+          node tools/serve.mjs 1430 > /tmp/khaoyu-serve.log 2>&1 &
+          for attempt in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:1430/ >/dev/null; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "preview server did not start"
+          cat /tmp/khaoyu-serve.log
+          exit 1
+
+      - name: UI suite
+        run: node tools/test-ui.mjs http://127.0.0.1:1430/
+
+      - name: Save conflict suite
+        run: node tools/test-save-conflict.mjs http://127.0.0.1:1430/
+
+      - name: Save retry suite
+        run: node tools/test-save-retry.mjs http://127.0.0.1:1430/
+
+      - name: Board selection suite
+        run: node tools/test-board-selection.mjs http://127.0.0.1:1430/
+
+      - name: Rename suite
+        run: node tools/test-rename.mjs http://127.0.0.1:1430/
+
+      - name: Board card title suite
+        run: node tools/test-board-card-title.mjs http://127.0.0.1:1430/
+
+      - name: Column layout suite
+        run: node tools/test-column-layout.mjs http://127.0.0.1:1430/
+
+      - name: Column title suite
+        run: node tools/test-column-title.mjs http://127.0.0.1:1430/
+
+      - name: Kanban scroll suite
+        run: node tools/test-kanban-scroll.mjs http://127.0.0.1:1430/
+
+      - name: Tool drop suite
+        run: node tools/test-tool-drop-column.mjs http://127.0.0.1:1430/
+
+      - name: Wrap selection suite
+        run: node tools/test-wrap-selection.mjs http://127.0.0.1:1430/
+
+      - name: Tooltip suite
+        run: node tools/test-tooltips.mjs http://127.0.0.1:1430/
+
+      - name: Line area suite
+        run: node tools/test-line-area.mjs http://127.0.0.1:1430/
+
+      - name: Card features suite
+        run: node tools/test-card-features.mjs http://127.0.0.1:1430/
+
+      - name: Web mode suite
+        run: node tools/test-web-mode.mjs
+
+      - name: Font suite
+        run: node tools/test-fonts.mjs http://127.0.0.1:1430/
+
+      - name: Show preview server log on failure
+        if: failure()
+        run: cat /tmp/khaoyu-serve.log || true
+
+  rust:
+    name: Rust checks and MCP suite
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: tools
+        run: npm ci
+
+      - name: Rust format
+        working-directory: app/src-tauri
+        run: cargo fmt --all --check
+
+      - name: Rust lint
+        working-directory: app/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        working-directory: app/src-tauri
+        run: cargo test --lib --bins
+
+      - name: Build MCP binary
+        working-directory: app/src-tauri
+        run: cargo build --bin khaoyu-note-mcp
+
+      - name: MCP smoke suite
+        run: node tools/test-mcp.mjs app/src-tauri/target/debug/khaoyu-note-mcp.exe

@@ -1,0 +1,28 @@
+{
+  "name": "mn-tools",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "serve": "node serve.mjs 1430",
+    "test:ui": "node test-ui.mjs",
+    "test:mcp": "node test-mcp.mjs",
+    "test:conflict": "node test-save-conflict.mjs",
+    "test:retry": "node test-save-retry.mjs",
+    "test:selection": "node test-board-selection.mjs",
+    "test:rename": "node test-rename.mjs",
+    "test:board-card-title": "node test-board-card-title.mjs",
+    "test:columns": "node test-column-layout.mjs",
+    "test:column-title": "node test-column-title.mjs",
+    "test:kanban-scroll": "node test-kanban-scroll.mjs",
+    "test:tool-drop": "node test-tool-drop-column.mjs",
+    "test:wrap": "node test-wrap-selection.mjs",
+    "test:tooltips": "node test-tooltips.mjs",
+    "test:line": "node test-line-area.mjs",
+    "test:card-features": "node test-card-features.mjs",
+    "test:web-mode": "node test-web-mode.mjs",
+    "test:fonts": "node test-fonts.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.65.0"
+  }
+}

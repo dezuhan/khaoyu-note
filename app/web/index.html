@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-ky-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Khaoyu Note</title>
+    <link rel="stylesheet" href="./css/fonts.css" />
+    <link rel="stylesheet" href="./vendor/ky.css" />
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body class="ky-scope">
+    <div id="app" class="mn-app" hidden>
+      <nav class="mn-menubar" id="menubar" aria-label="Application menu">
+        <div class="mn-menubar-left">
+          <button type="button" class="mn-logo" id="home-btn" title="Template library" aria-label="Khaoyu Note">
+            <span class="mn-logo-mark">N</span>
+          </button>
+        </div>
+        <div class="mn-menubar-center">
+          <button
+            type="button"
+            class="mn-topbar-search"
+            id="command-search-btn"
+            title="Search commands (Ctrl+K)"
+            aria-label="Search commands"
+          ></button>
+        </div>
+        <div class="mn-menubar-right">
+          <button type="button" class="mn-icon-btn" id="undo-btn" title="Undo (Ctrl+Z)" disabled></button>
+          <button type="button" class="mn-icon-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled></button>
+          <span class="mn-topbar-sep"></span>
+          <span class="mn-comment-count" id="comment-count" title="Comment cards"></span>
+          <button type="button" class="mn-icon-btn" id="notification-btn" title="Notifications"></button>
+          <button type="button" class="mn-icon-btn" id="help-btn" title="Keyboard shortcuts"></button>
+          <button type="button" class="mn-icon-btn" id="theme-btn" title="Toggle theme"></button>
+          <button type="button" class="mn-icon-btn" id="language-btn" title="Language: English. More languages coming soon" aria-label="Language, English only" disabled></button>
+          <button type="button" class="mn-icon-btn" id="settings-btn" title="Settings"></button>
+        </div>
+      </nav>
+      <header class="mn-topbar">
+        <div class="mn-topbar-left">
+          <button type="button" class="mn-template-btn" id="template-btn" title="Template library"></button>
+          <nav class="mn-breadcrumb" id="breadcrumb" aria-label="Board path"></nav>
+          <span class="mn-save-state" id="save-state">Saved</span>
+        </div>
+      </header>
+
+      <div class="mn-main">
+        <nav class="mn-toolrail" id="toolrail" aria-label="Card tools"></nav>
+
+        <div class="mn-viewport" id="viewport">
+          <div class="mn-world" id="world">
+            <svg
+              class="mn-connections"
+              id="connections"
+              xmlns="http://www.w3.org/2000/svg"
+            ></svg>
+            <div class="mn-cards" id="cards"></div>
+          </div>
+
+          <div class="mn-zoom" role="group" aria-label="Zoom">
+            <button type="button" class="mn-zoom-btn" data-zoom="out" title="Zoom out">-</button>
+            <span class="mn-zoom-label" id="zoom-label">100%</span>
+            <button type="button" class="mn-zoom-btn" data-zoom="in" title="Zoom in">+</button>
+            <button type="button" class="mn-zoom-btn" data-zoom="reset" title="Reset zoom">1:1</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mn-menu-layer" id="menu-layer"></div>
+    <div id="modal-layer"></div>
+    <div class="mn-home" id="home-page" hidden></div>
+    <div class="mn-toast" id="toast" hidden></div>
+    <div id="boot">Loading board...</div>
+
+    <script src="./vendor/ky.js"></script>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
+

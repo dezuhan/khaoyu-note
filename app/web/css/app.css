@@ -1,0 +1,5345 @@
+/* App shell on top of the vendored token stylesheet (vendor/ky.css).
+ * Only --ky-* / --ph-* tokens are used for colour; raw hex appears only as var() fallbacks. */
+
+:root {
+  --mn-font-body: "Plus Jakarta Sans", Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --mn-font-heading: Georgia, "Times New Roman", serif;
+  --mn-font-code: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* The menu bar is two thirds of the header row below it. */
+  --mn-header-height: 45px;
+  --mn-menubar-height: 30px;
+}
+
+body.ky-scope {
+  --ky-font: var(--mn-font-body);
+  --ky-mono: var(--mn-font-code);
+  font-family: var(--mn-font-body);
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body.ky-scope {
+  background: var(--ky-bg);
+}
+
+.mn-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--ky-bg);
+  user-select: none;
+}
+
+/* ------------------------------------------------------------------ top bar */
+
+.mn-topbar {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 var(--mn-header-height);
+  height: var(--mn-header-height);
+  padding: 0 8px 0 10px;
+  background: var(--ky-bg);
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.mn-topbar-left,
+.mn-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mn-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mn-logo:hover {
+  background: var(--ky-control-hover);
+}
+
+.mn-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.mn-board-title {
+  min-width: 0;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-muted);
+  font-size: 12px;
+}
+
+.mn-board-title.is-editing {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-glow-input-focus);
+  color: var(--ky-text);
+  user-select: text;
+  cursor: text;
+}
+
+.mn-save-state {
+  color: var(--ky-soft);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mn-save-state.is-error {
+  color: var(--ky-danger);
+}
+
+.mn-topbar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--ky-stroke);
+}
+
+.mn-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+  color: var(--ky-muted);
+  cursor: pointer;
+}
+
+.mn-icon-btn:hover:not(:disabled) {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-icon-btn:active:not(:disabled) {
+  background: var(--ky-control-active);
+}
+
+.mn-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mn-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mn-comment-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--ky-radius-control);
+  color: var(--ky-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mn-comment-count:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-comment-count svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ------------------------------------------------------------------ main */
+
+.mn-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ tool rail */
+
+.mn-toolrail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 68px;
+  width: 68px;
+  padding: 8px 0 6px;
+  gap: 1px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--ky-bg);
+  border-right: 1px solid var(--ky-stroke);
+  scrollbar-width: none;
+}
+
+.mn-toolrail::-webkit-scrollbar {
+  display: none;
+}
+
+.mn-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 140ms var(--ky-ease-standard), color 140ms var(--ky-ease-standard);
+}
+
+.mn-tool:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-tool.is-active {
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+}
+
+.mn-tool.is-selected-tool {
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+}
+
+.mn-tool.is-dragging-tool {
+  opacity: 0.45;
+}
+
+.mn-tool.is-drop-target {
+  box-shadow: inset 0 2px 0 var(--ky-accent);
+}
+
+.mn-tool-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.mn-tool-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mn-tool-label {
+  font-size: 9px;
+  line-height: 10px;
+  letter-spacing: 0.01em;
+}
+
+.mn-rail-spacer {
+  flex: 1 1 auto;
+  min-height: 6px;
+}
+
+.mn-rail-sep {
+  width: 28px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ky-stroke);
+}
+
+.mn-trash {
+  color: var(--ky-muted);
+}
+
+.mn-trash.is-armed {
+  color: var(--ky-danger);
+}
+
+/* ------------------------------------------------------------------ viewport */
+
+.mn-viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  /* clip (not hidden) so programmatic scrollIntoView or wheel cannot shift the canvas origin */
+  overflow: clip;
+  cursor: default;
+  background-color: var(--ph-black-2, #f0f0f0);
+  background-image: radial-gradient(circle, var(--ph-stroke-strong, rgba(0, 0, 0, 0.14)) 1px, transparent 1.2px);
+  background-size: 24px 24px;
+  background-position: 0 0;
+}
+
+.mn-viewport.is-panning {
+  cursor: grabbing;
+}
+
+.mn-viewport.is-space {
+  cursor: grab;
+}
+
+.mn-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  /* No will-change here: promoting this layer rasterises the zoomed content once, which made text
+     soft at high zoom. The CSS zoom property re-lays out text instead. */
+}
+
+.mn-connections {
+  position: absolute;
+  left: -100000px;
+  top: -100000px;
+  width: 200000px;
+  height: 200000px;
+  overflow: visible;
+  pointer-events: none;
+  color: var(--ky-muted);
+}
+
+.mn-connection {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.mn-cards {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+.mn-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--ph-black-7, #ffffff);
+  border-radius: var(--ky-radius-control);
+  box-shadow: var(--ky-hairline), 0 1px 2px var(--ph-stroke);
+  overflow: hidden;
+  cursor: default;
+}
+
+.mn-card.is-selected {
+  box-shadow:
+    inset 0 0 0 1.5px var(--ky-accent),
+    0 0 0 3px color-mix(in srgb, var(--ky-accent) 16%, transparent);
+}
+
+.mn-card.is-editing {
+  cursor: text;
+}
+
+.mn-card.is-child {
+  box-shadow: inset 0 0 0 1px var(--ky-stroke);
+  /* Nested radius: column radius (7) minus column padding (14) clamps to 0, lifted to 4 so the
+     inner sheet corners stay soft instead of sharp. */
+  border-radius: max(4px, calc(var(--ky-radius-control) - 14px));
+}
+
+.mn-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--ky-muted) 45%, var(--ky-muted) 55%, transparent 55%) bottom right / 10px 10px no-repeat;
+}
+
+.mn-card:hover .mn-resize,
+.mn-card.is-selected .mn-resize {
+  opacity: 0.55;
+}
+
+.mn-note-text,
+.mn-heading-text,
+.mn-doc-text {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  outline: none;
+  user-select: text;
+  color: var(--ky-text);
+}
+
+.mn-note-text {
+  padding: 12px 13px;
+  font-size: 13px;
+  line-height: 19px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mn-note-text:empty::before,
+.mn-doc-text:empty::before,
+[contenteditable="true"]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ky-soft);
+}
+
+.mn-card-note[data-empty="1"] .mn-note-text:empty::before {
+  content: "Note";
+}
+
+.mn-heading-text {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  font-family: var(--mn-font-heading);
+  font-size: 21px;
+  line-height: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mn-heading-text[contenteditable="true"] {
+  cursor: text;
+}
+
+/* link */
+
+.mn-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 6px 0 12px;
+}
+
+.mn-link-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  color: var(--ky-muted);
+}
+
+.mn-link-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mn-link-domain {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-link-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 12px;
+}
+
+.mn-field-input {
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.mn-field-input::placeholder {
+  color: var(--ky-soft);
+}
+
+.mn-link-title {
+  height: 18px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-link-open {
+  flex: none;
+}
+
+/* to-do */
+
+.mn-todo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px 8px 6px;
+  gap: 4px;
+}
+
+.mn-todo-title {
+  height: 20px;
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.mn-todo-items {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.mn-todo-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 4px;
+  border-radius: 5px;
+}
+
+.mn-todo-item:hover {
+  background: var(--ky-control);
+}
+
+.mn-check {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: none;
+  border-radius: 4px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.mn-check:checked {
+  background: var(--ky-accent);
+  box-shadow: none;
+}
+
+.mn-check:checked::before {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-left: 1.6px solid var(--ky-on-accent);
+  border-bottom: 1.6px solid var(--ky-on-accent);
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.mn-todo-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  outline: none;
+  color: var(--ky-text);
+  font-size: 12px;
+  line-height: 17px;
+  user-select: text;
+}
+
+.mn-todo-item.is-done .mn-todo-text {
+  color: var(--ky-soft);
+  text-decoration: line-through;
+}
+
+.mn-item-remove {
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+}
+
+.mn-todo-item:hover .mn-item-remove {
+  opacity: 1;
+}
+
+.mn-item-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+.mn-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-soft);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mn-ghost-btn:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-ghost-btn:active {
+  background: var(--ky-control-active);
+}
+
+.mn-ghost-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* document */
+
+.mn-doc {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px 10px 6px;
+  gap: 2px;
+}
+
+.mn-doc-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+
+.mn-doc-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+}
+
+.mn-doc-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.mn-doc-title {
+  font-weight: 600;
+}
+
+.mn-doc-text {
+  flex: 1 1 auto;
+  padding: 4px 2px;
+  font-size: 12px;
+  line-height: 17px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mn-doc-count {
+  flex: none;
+  padding: 0 2px;
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+/* comment */
+
+.mn-comment {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px 10px;
+  gap: 6px;
+}
+
+.mn-comment-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mn-comment-empty {
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+
+.mn-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 3px 4px;
+  border-radius: 5px;
+}
+
+.mn-msg:hover {
+  background: var(--ky-control);
+}
+
+.mn-msg-check {
+  margin-top: 2px;
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.mn-msg-check:checked::before {
+  width: 6px;
+  height: 3.5px;
+}
+
+.mn-msg-menu {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ky-soft);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.mn-msg:hover .mn-msg-menu,
+.mn-msg-menu:focus-visible {
+  opacity: 1;
+}
+
+.mn-msg-menu:hover {
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+}
+
+.mn-msg.is-done .mn-msg-author,
+.mn-msg.is-done .mn-msg-text {
+  color: var(--ky-soft);
+}
+
+.mn-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.mn-msg-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mn-msg-author {
+  color: var(--ky-text);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mn-msg-text {
+  color: var(--ky-muted);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.mn-comment-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 3px 0 4px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+}
+
+.mn-comment-input {
+  flex: 1 1 auto;
+}
+
+.mn-primary-btn {
+  flex: none;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* table */
+
+.mn-table {
+  height: 100%;
+  overflow: auto;
+  padding: 2px;
+}
+
+.mn-table table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.mn-table td {
+  min-width: 40px;
+  height: 28px;
+  padding: 3px 7px;
+  border: 1px solid var(--ky-stroke);
+  color: var(--ky-text);
+  font-size: 12px;
+  line-height: 16px;
+  overflow: hidden;
+  outline: none;
+  user-select: text;
+}
+
+.mn-table td.mn-th {
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-weight: 600;
+}
+
+.mn-table td[contenteditable="true"] {
+  background: var(--ky-control);
+}
+
+/* color */
+
+.mn-color {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px;
+  gap: 6px;
+}
+
+.mn-color-swatch {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.mn-color-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: none;
+  padding: 0 2px;
+}
+
+.mn-color-codes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  color: var(--ky-soft);
+  font-family: var(--ky-mono);
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.mn-color-code-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mn-color-code-label {
+  flex: none;
+  width: 30px;
+  color: var(--ky-soft);
+}
+
+.mn-color-code-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ky-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.mn-color-copy {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ky-soft);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.mn-color-code-row:hover .mn-color-copy,
+.mn-color-copy:focus-visible {
+  opacity: 1;
+}
+
+.mn-color-copy:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-color-hex {
+  color: var(--ky-muted);
+  font-family: var(--ky-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mn-color-name {
+  height: 18px;
+  font-size: 11px;
+}
+
+/* sketch */
+
+.mn-sketch {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mn-sketch canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.mn-sketch-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.mn-sketch-hint[hidden] {
+  display: none;
+}
+
+.mn-sketch-hint svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+}
+
+/* image */
+
+.mn-image {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mn-image img {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+
+.mn-image-caption {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.mn-image-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  color: var(--ky-soft);
+  font-size: 11px;
+  cursor: pointer;
+  background: var(--ky-control);
+}
+
+.mn-image-empty:hover {
+  color: var(--ky-text);
+}
+
+/* media placeholders */
+
+.mn-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 100%;
+  padding: 10px 14px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  text-align: center;
+}
+
+.mn-placeholder .mn-field-input {
+  height: 24px;
+  padding: 0 7px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  font-size: 11px;
+}
+
+.mn-audio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+
+.mn-audio audio {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+}
+
+.mn-video iframe,
+.mn-video video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--ky-bg);
+}
+
+.mn-file {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 100%;
+  padding: 0 12px;
+  color: var(--ky-muted);
+}
+
+.mn-file-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mn-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-file-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-board-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-board-preview {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 96px;
+  margin: 6px 6px 0;
+  overflow: hidden;
+  border-radius: max(0px, calc(var(--ky-radius-control) - 6px));
+  background-color: var(--ph-black-5, #fafafa);
+  background-image: radial-gradient(circle, var(--ph-stroke, rgba(0, 0, 0, 0.1)) 1px, transparent 1.1px);
+  background-size: 10px 10px;
+}
+
+.mn-board-preview.is-empty {
+  display: grid;
+  place-items: center;
+}
+
+.mn-board-card:hover .mn-board-preview {
+  background-color: var(--ky-control);
+}
+
+.mn-board-preview .mn-project-shape {
+  pointer-events: none;
+}
+
+.mn-board-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 9px;
+}
+
+.mn-board-meta-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+}
+
+.mn-board-card-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mn-board-count {
+  flex: none;
+  color: var(--ky-soft);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* column */
+
+.mn-card-column {
+  background: var(--ph-black-6, #fdfdfd);
+  box-shadow: inset 0 0 0 1px var(--ky-stroke);
+  overflow: visible;
+}
+
+.mn-column-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 20px 14px 12px;
+  pointer-events: none;
+}
+
+.mn-column-title {
+  color: var(--ky-text);
+  font-family: var(--mn-font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  max-width: 100%;
+  pointer-events: auto;
+  cursor: text;
+  user-select: text;
+}
+
+.mn-column-title.is-editing {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-glow-input-focus);
+  outline: none;
+}
+
+.mn-column-summary {
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+
+/* ------------------------------------------------------------------ zoom */
+
+.mn-zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 3px;
+  border-radius: var(--ky-radius-control);
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  backdrop-filter: blur(30px) saturate(180%);
+  color: var(--ky-text);
+}
+
+.mn-zoom-btn {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mn-zoom-btn:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-zoom-label {
+  min-width: 42px;
+  text-align: center;
+  color: var(--ky-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ marquee */
+
+.mn-marquee {
+  position: absolute;
+  z-index: 50;
+  border: 1px solid var(--ky-accent);
+  background: color-mix(in srgb, var(--ky-accent) 8%, transparent);
+  pointer-events: none;
+}
+
+.mn-marquee[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ menus */
+
+.mn-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+}
+
+.mn-menu-layer.is-open {
+  display: block;
+}
+
+.mn-menu {
+  position: fixed;
+  min-width: 184px;
+  max-width: 260px;
+  padding: 5px;
+  border-radius: var(--ky-radius-card);
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  backdrop-filter: blur(30px) saturate(180%);
+  color: var(--ky-text);
+  font-size: 12px;
+}
+
+.mn-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-menu-item:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-menu-item.is-danger:hover {
+  color: var(--ky-danger);
+}
+
+.mn-menu-kbd {
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-menu-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--ky-stroke);
+}
+
+.mn-menu-label {
+  padding: 4px 8px 2px;
+  color: var(--ky-soft);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------ modal */
+
+.mn-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  background: var(--ph-black-0, rgba(0, 0, 0, 0.4));
+  background: color-mix(in srgb, var(--ph-black-0, #000) 34%, transparent);
+  backdrop-filter: blur(1px);
+}
+
+.mn-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 64px));
+  max-height: min(640px, calc(100vh - 80px));
+  overflow: hidden;
+  border-radius: var(--ky-radius-card);
+  background: var(--ph-black-5, #fafafa);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+}
+
+.mn-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.mn-modal-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mn-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mn-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: none;
+  padding: 10px 12px;
+  border-top: 1px solid var(--ky-stroke);
+}
+
+.mn-modal-close {
+  flex: none;
+}
+
+.mn-btn {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mn-btn:hover:not(:disabled) {
+  background: var(--ky-control-active);
+}
+
+.mn-btn:active:not(:disabled) {
+  background: var(--ky-control-hover);
+}
+
+.mn-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mn-btn-primary {
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+}
+
+.mn-btn-primary:hover:not(:disabled) {
+  background: var(--ky-accent-bright);
+}
+
+.mn-btn-quiet {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ky-muted);
+}
+
+.mn-btn-quiet:hover:not(:disabled) {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.mn-board-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  cursor: pointer;
+}
+
+.mn-board-row:hover {
+  background: var(--ky-control-hover);
+}
+
+.mn-board-row.is-current {
+  box-shadow: inset 0 0 0 1px var(--ky-accent);
+}
+
+.mn-board-row-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mn-board-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-board-row-meta {
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-row-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+
+.mn-board-row:hover .mn-row-actions {
+  opacity: 1;
+}
+
+.mn-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mn-settings-label {
+  color: var(--ky-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mn-settings-value {
+  color: var(--ky-soft);
+  font-family: var(--ky-mono);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.mn-kbd-table {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 18px;
+  font-size: 12px;
+}
+
+.mn-kbd-table span:nth-child(even) {
+  color: var(--ky-soft);
+  font-family: var(--ky-mono);
+  font-size: 10px;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------------ toast */
+
+.mn-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 200;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: var(--ky-radius-card);
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  backdrop-filter: blur(30px) saturate(180%);
+  color: var(--ky-text);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.mn-toast[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ boot */
+
+#boot {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  color: var(--ky-muted);
+  font-size: 12px;
+}
+
+#boot.is-error {
+  color: var(--ky-danger);
+  white-space: pre-wrap;
+  padding: 24px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ input focus */
+
+.mn-app :is(input, textarea, select):focus,
+.mn-app :is(input, textarea, select):focus-visible,
+.mn-app [contenteditable="true"]:focus,
+.mn-app [contenteditable="true"]:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+.mn-app :is(button, [role="button"], a[href], summary):focus-visible {
+  outline: 2px solid var(--ky-accent);
+  outline-offset: 1px;
+}
+
+.mn-app button:active:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+/* ==========================================================================
+   Revision: vertical auto height, horizontal-only resize, breadcrumbs,
+   home gallery, document editor, drawing editor, drag and drop feedback.
+   ========================================================================== */
+
+.mn-card {
+  min-height: 70px;
+}
+
+.mn-card-column {
+  min-height: 160px;
+}
+
+.mn-note-text,
+.mn-heading-text {
+  flex: 0 0 auto;
+  height: auto;
+}
+
+.mn-note-text {
+  min-height: 70px;
+}
+
+.mn-heading-text {
+  min-height: 70px;
+}
+
+.mn-doc-text {
+  flex: 0 0 auto;
+  max-height: 220px;
+  overflow: hidden;
+}
+
+.mn-todo-items {
+  flex: 0 0 auto;
+  max-height: 200px;
+}
+
+.mn-comment-rows {
+  flex: 0 0 auto;
+  max-height: 160px;
+}
+
+.mn-link {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 70px;
+}
+
+.mn-image img {
+  flex: 1 1 auto;
+}
+
+.mn-table {
+  overflow: auto;
+}
+
+/* Horizontal-only resize grip, drawn as the familiar bottom-right diagonal (like the reference
+   cards). Only the width changes on drag; the column keeps both axes. */
+.mn-resize {
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border-radius: 0 0 6px 0;
+  cursor: ew-resize;
+  opacity: 0;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--ky-muted) 45%, var(--ky-muted) 55%, transparent 55%) bottom right / 9px 9px no-repeat;
+}
+
+.mn-card:hover .mn-resize,
+.mn-card.is-selected .mn-resize {
+  opacity: 0.6;
+}
+
+.mn-card-column .mn-resize {
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 0 0 7px 0;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--ky-muted) 45%, var(--ky-muted) 55%, transparent 55%) bottom right / 10px 10px no-repeat;
+}
+
+.mn-viewport.is-resizing {
+  cursor: ew-resize;
+}
+
+/* rich text preview inside document cards */
+.mn-rich {
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.mn-rich p {
+  margin: 0 0 4px;
+}
+
+.mn-rich h1,
+.mn-rich h2,
+.mn-rich h3 {
+  margin: 2px 0 4px;
+  font-family: var(--mn-font-heading);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.mn-rich h1 { font-size: 18px; }
+.mn-rich h2 { font-size: 15px; }
+.mn-rich h3 { font-size: 13px; }
+
+.mn-rich ul,
+.mn-rich ol {
+  margin: 2px 0 4px;
+  padding-left: 18px;
+}
+
+.mn-rich blockquote {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--ky-stroke);
+  color: var(--ky-muted);
+}
+
+.mn-rich pre {
+  margin: 4px 0;
+  padding: 6px;
+  border-radius: 5px;
+  background: var(--ky-control);
+  font-family: var(--ky-mono);
+  font-size: 10px;
+  line-height: 14px;
+  overflow: auto;
+}
+
+.mn-rich a {
+  color: var(--ky-accent);
+}
+
+.mn-rich hr {
+  border: 0;
+  border-top: 1px solid var(--ky-stroke);
+  margin: 8px 0;
+}
+
+/* breadcrumbs */
+.mn-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mn-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.mn-crumb:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-crumb.is-current {
+  color: var(--ky-text);
+  font-weight: 600;
+  cursor: default;
+}
+
+.mn-crumb-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mn-crumb-edit-input {
+  width: 170px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 5px;
+  background: var(--ky-control);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.mn-crumb-edit-input:focus {
+  border-color: transparent;
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+.mn-crumb-edit-btn {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--ky-control);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mn-crumb-edit-btn:hover {
+  background: var(--ky-control-hover);
+}
+
+.mn-crumb-edit-btn.is-primary {
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+}
+
+.mn-crumb-edit-btn.is-primary:hover {
+  background: var(--ky-accent-bright);
+}
+
+.mn-crumb-home {
+  color: var(--ky-muted);
+}
+
+.mn-crumb-sep {
+  color: var(--ky-soft);
+  font-size: 11px;
+  user-select: none;
+}
+
+/* drag and drop feedback */
+.mn-drag-ui {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 90000;
+  pointer-events: none;
+}
+
+.mn-drop-line {
+  position: absolute;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ky-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ky-accent) 18%, transparent);
+  transition:
+    top 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mn-drop-ghost {
+  position: absolute;
+  border-radius: 7px;
+  border: 1.5px dashed color-mix(in srgb, var(--ky-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ky-accent) 8%, transparent);
+  transition:
+    top 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mn-origin-ghost {
+  position: absolute;
+  border-radius: 7px;
+  border: 1.5px dashed var(--ky-line-strong);
+  background: var(--ky-control);
+  opacity: 0.55;
+}
+
+.mn-card.is-dragging {
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--ph-black-0, #000) 22%, transparent),
+    inset 0 0 0 1px var(--ky-accent);
+}
+
+.mn-card.is-drop-target {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ky-accent) 50%, transparent);
+}
+
+/* home screen */
+.mn-home {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: auto;
+  background: var(--ph-black-3, #f3f3f3);
+  color: var(--ky-text);
+}
+
+.mn-home-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 30px 34px 60px;
+}
+
+.mn-home-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.mn-home-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mn-home-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mn-home-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.mn-home-sub {
+  margin: 4px 0 0;
+  color: var(--ky-muted);
+  font-size: 12px;
+}
+
+.mn-home-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mn-home-new {
+  margin-top: 28px;
+}
+
+.mn-home-new-row {
+  display: flex;
+  gap: 8px;
+  max-width: 520px;
+  margin-top: 6px;
+}
+
+.mn-home-new-row .mn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  white-space: nowrap;
+}
+
+.mn-home-new-row .ky-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mn-home-recent {
+  margin-top: 30px;
+}
+
+.mn-home-recent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.mn-home-h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mn-home-count {
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+
+.mn-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.mn-home-empty {
+  padding: 24px;
+  border-radius: var(--ky-radius-card);
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 12px;
+}
+
+.mn-project-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ky-radius-card);
+  background: var(--ph-black-6, #fdfdfd);
+  box-shadow: 0 0 0 1px var(--ky-stroke), var(--ky-hairline);
+  overflow: hidden;
+  color: var(--ky-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 140ms var(--ky-ease-standard), box-shadow 140ms var(--ky-ease-standard);
+}
+
+.mn-project-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px var(--ky-stroke),
+    var(--ky-hairline),
+    0 8px 22px color-mix(in srgb, var(--ph-black-0, #000) 12%, transparent);
+}
+
+.mn-project-preview {
+  position: relative;
+  display: block;
+  height: 132px;
+  overflow: hidden;
+  background: var(--ph-black-2, #f0f0f0);
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.mn-project-preview.is-empty {
+  display: grid;
+  place-items: center;
+}
+
+.mn-project-preview-empty {
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-project-shape {
+  position: absolute;
+  border-radius: 2px;
+}
+
+.mn-project-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px 10px;
+}
+
+.mn-project-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-project-time {
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-project-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.mn-project-card:hover .mn-project-actions,
+.mn-project-card:focus-within .mn-project-actions {
+  opacity: 1;
+}
+
+.mn-project-delete {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ph-black-7, #fff) 78%, transparent);
+  color: var(--ky-muted);
+  cursor: pointer;
+}
+
+.mn-project-delete:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-project-delete.is-armed {
+  color: var(--ky-danger);
+  opacity: 1;
+}
+
+/* document editor */
+.mn-doc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 28px 22px;
+  background: color-mix(in srgb, var(--ph-black-0, #000) 52%, transparent);
+}
+
+.mn-doc-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  height: min(94vh, 1040px);
+  border-radius: var(--ky-radius-card);
+  background: var(--ph-black-5, #fafafa);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  overflow: hidden;
+}
+
+.mn-doc-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 48px;
+  height: 48px;
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.mn-doc-heading {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-doc-top-actions {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mn-doc-export {
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mn-doc-export:hover {
+  background: var(--ky-control-active);
+}
+
+.mn-doc-close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ky-muted);
+  cursor: pointer;
+}
+
+.mn-doc-close:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-doc-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.mn-doc-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 48px;
+  width: 48px;
+  padding: 12px 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--ky-stroke);
+  scrollbar-width: none;
+}
+
+.mn-doc-tools::-webkit-scrollbar {
+  display: none;
+}
+
+.mn-doc-tool {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mn-doc-tool:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-doc-tool-sep {
+  width: 18px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ky-stroke);
+}
+
+.mn-doc-page-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 26px 30px 80px;
+  background: var(--ph-black-3, #f3f3f3);
+}
+
+.mn-doc-page {
+  max-width: 720px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 40px 48px;
+  background: var(--ph-black-7, #ffffff);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: 14px;
+  line-height: 24px;
+  outline: none;
+  user-select: text;
+}
+
+.mn-doc-page:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ky-soft);
+}
+
+.mn-doc-page h1,
+.mn-doc-page h2,
+.mn-doc-page h3 {
+  margin: 0.5em 0 0.3em;
+  font-family: var(--mn-font-heading);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.mn-doc-page h1 { font-size: 30px; }
+.mn-doc-page h2 { font-size: 22px; }
+.mn-doc-page h3 { font-size: 17px; }
+
+.mn-doc-page p {
+  margin: 0 0 10px;
+}
+
+.mn-doc-page blockquote {
+  margin: 12px 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--ky-stroke);
+  color: var(--ky-muted);
+}
+
+.mn-doc-page pre {
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: var(--ky-control);
+  font-family: var(--ky-mono);
+  font-size: 12px;
+  line-height: 18px;
+  overflow: auto;
+}
+
+.mn-doc-page a {
+  color: var(--ky-accent);
+}
+
+.mn-doc-page hr {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--ky-stroke);
+}
+
+.mn-doc-menu {
+  position: fixed;
+  z-index: 180;
+}
+
+.mn-doc-link-pop {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  z-index: 180;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 9px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup);
+  transform: translateX(-50%);
+}
+
+.mn-doc-link-pop .ky-input {
+  width: 260px;
+  height: 24px;
+}
+
+/* drawing editor */
+.mn-draw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 26px;
+  background: color-mix(in srgb, var(--ph-black-0, #000) 55%, transparent);
+}
+
+.mn-draw-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  height: min(90vh, 920px);
+  border-radius: var(--ky-radius-card);
+  background: var(--ph-black-5, #fafafa);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  overflow: hidden;
+}
+
+.mn-draw-stage {
+  flex: 1;
+  min-height: 0;
+  background: var(--ph-black-7, #ffffff);
+}
+
+.mn-draw-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.mn-draw-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ky-stroke);
+  background: var(--ph-black-6, #fdfdfd);
+}
+
+.mn-draw-tools,
+.mn-draw-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mn-draw-tool {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ky-muted);
+  cursor: pointer;
+}
+
+.mn-draw-tool:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-draw-tool.is-active {
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+}
+
+/* ==========================================================================
+   Settings dialog (Photon style preferences) + preference effects.
+   ========================================================================== */
+
+html[data-image-rendering="nearest"] .mn-card-image img {
+  image-rendering: pixelated;
+}
+
+html[data-reduce-motion="true"] .mn-scope *,
+html[data-reduce-motion="true"] .mn-scope *::before,
+html[data-reduce-motion="true"] .mn-scope *::after,
+html[data-reduce-motion="true"] .mn-cards * {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+}
+
+.mn-prefs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--ph-black-0, #000) 40%, transparent);
+}
+
+.mn-prefs-dialog {
+  --prefs-outer-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  width: min(856px, 100%);
+  height: min(84vh, 640px);
+  overflow: hidden;
+  border-radius: var(--prefs-outer-radius);
+  background: var(--ky-surface);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+}
+
+.mn-prefs-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--prefs-outer-radius);
+  background: var(--ky-surface);
+}
+
+.mn-prefs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0 8px 0 16px;
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  box-shadow: inset 0 -1px 0 var(--ky-stroke);
+}
+
+.mn-prefs-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mn-prefs-close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.mn-prefs-close:hover {
+  background: var(--ky-control-active);
+  opacity: 1;
+}
+
+.mn-prefs-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 12px 16px 10px;
+}
+
+.mn-prefs-search-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: -30px;
+  margin-left: 9px;
+  color: var(--ky-soft);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.mn-prefs-search-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 10px 0 34px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.mn-prefs-search-input::placeholder {
+  color: var(--ky-soft);
+}
+
+.mn-prefs-search-input:focus {
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+.mn-prefs-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.mn-prefs-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 0 0 160px;
+  width: 160px;
+  padding: 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--ky-stroke);
+  background: var(--ky-surface);
+}
+
+.mn-prefs-nav-item {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-prefs-nav-item:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-prefs-nav-item.is-active {
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+  font-weight: 600;
+}
+
+.mn-prefs-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.mn-prefs-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 8px;
+}
+
+.mn-prefs-heading {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mn-prefs-group-label {
+  margin: 12px 0 4px;
+  color: var(--ky-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mn-prefs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 30px;
+  padding: 2px 0;
+}
+
+.mn-prefs-label {
+  color: var(--ky-text);
+  font-size: 12px;
+}
+
+.mn-prefs-value {
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-muted);
+  font-size: 11px;
+  user-select: text;
+}
+
+.mn-prefs-note {
+  margin: 8px 0;
+  color: var(--ky-soft);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.mn-prefs-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ky-text);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mn-prefs-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.mn-prefs-check-box {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+}
+
+.mn-prefs-check input:checked + .mn-prefs-check-box {
+  background: var(--ky-accent);
+}
+
+.mn-prefs-check input:checked + .mn-prefs-check-box::after {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-left: 1.6px solid var(--ky-on-accent);
+  border-bottom: 1.6px solid var(--ky-on-accent);
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.mn-prefs-check input:focus-visible + .mn-prefs-check-box {
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+.mn-prefs-select {
+  flex: 0 0 250px;
+  width: 250px;
+}
+
+.mn-prefs-select .ky-select-trigger,
+.mn-prefs-select select {
+  height: 26px;
+}
+
+.mn-prefs-resetbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 8px 20px;
+}
+
+.mn-prefs-status {
+  color: var(--ky-soft);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mn-prefs-inline-status {
+  min-height: 12px;
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-prefs-hint {
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 11px;
+}
+
+.mn-prefs-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  background: var(--ky-surface);
+  border-top: 1px solid var(--ky-stroke);
+}
+
+/* ==========================================================================
+   Vertical centering for short card content + square tool rail hover.
+   ========================================================================== */
+
+.mn-note-text {
+  padding: 14px 16px;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.mn-link.has-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.mn-link-header {
+  width: 100%;
+  flex: none;
+  overflow: hidden;
+  background: var(--ky-control);
+}
+
+.mn-link-header img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.mn-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 58px;
+  padding: 6px 6px 6px 12px;
+}
+
+.mn-card.is-locked {
+  cursor: default;
+}
+
+.mn-card.is-locked .mn-resize {
+  display: none;
+}
+
+.mn-card.is-locked input,
+.mn-card.is-locked textarea,
+.mn-card.is-locked button,
+.mn-card.is-locked a,
+.mn-card.is-locked [contenteditable="true"],
+.mn-card.is-locked [role="button"],
+.mn-card.is-locked [data-action],
+.mn-card.is-locked [data-field],
+.mn-card.is-locked [data-role="resize"],
+.mn-card.is-locked [data-col-resize],
+.mn-card.is-locked [data-sheet-add-column],
+.mn-card.is-locked [data-sheet-add-row] {
+  pointer-events: none !important;
+}
+
+.mn-lock-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ky-popup-bg) 88%, transparent);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-muted);
+  pointer-events: none;
+}
+
+.mn-link,
+.mn-link-empty {
+  flex: 1 1 auto;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.mn-doc,
+.mn-file {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.mn-placeholder {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.mn-toolrail {
+  padding-top: 6px;
+  gap: 2px;
+}
+
+/* keep the scaled-down label readable inside the square hover */
+.mn-tool-label {
+  font-size: 9px;
+  line-height: 10px;
+}
+
+.mn-tool-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* Compact square rail so all 18 tools fit at 900 px height without scrolling. */
+.mn-tool {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 2px 0;
+  gap: 1px;
+  border-radius: 8px;
+}
+
+.mn-tool-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.mn-tool-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mn-toolrail {
+  gap: 0;
+  padding-top: 6px;
+}
+
+.mn-tool-label {
+  font-size: 9px;
+  line-height: 10px;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.mn-tool[data-tool="image"] .mn-tool-label,
+.mn-tool[data-tool="document"] .mn-tool-label {
+  font-size: 8.5px;
+}
+
+/* ==========================================================================
+   Comments popup and link card polish.
+   ========================================================================== */
+
+.mn-link-domain {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.mn-link-domain:hover {
+  color: var(--ky-text);
+}
+
+.mn-comments-pop {
+  position: fixed;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  width: 344px;
+  max-height: min(58vh, 460px);
+  overflow: hidden;
+  border-radius: var(--ky-radius-card);
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  backdrop-filter: blur(30px) saturate(180%);
+  color: var(--ky-text);
+}
+
+.mn-comments-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 9px 8px 9px 12px;
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.mn-comments-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-comments-total {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--ky-control-active);
+  color: var(--ky-muted);
+  font-size: 10px;
+}
+
+.mn-comments-close {
+  margin-left: auto;
+}
+
+.mn-comments-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.mn-comments-empty {
+  padding: 14px 10px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.mn-comments-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  /* Nested radius: popup radius (12) minus body padding (6). */
+  border-radius: calc(var(--ky-radius-card) - 6px);
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-comments-item:hover {
+  background: var(--ky-control-hover);
+}
+
+.mn-comments-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mn-comments-text {
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.mn-comments-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-soft);
+  font-size: 9px;
+}
+
+.mn-comments-dot {
+  margin: 0 4px;
+}
+
+/* ==========================================================================
+   Drag a rail tool onto the canvas.
+   ========================================================================== */
+
+.mn-tool-drag-ghost {
+  position: fixed;
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.mn-tool-drag-ghost svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mn-tool-drop-preview {
+  position: absolute;
+  z-index: 85000;
+  border-radius: var(--ky-radius-control);
+  border: 1.5px dashed color-mix(in srgb, var(--ky-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--ky-accent) 7%, transparent);
+  pointer-events: none;
+}
+
+.mn-tool-drop-preview[hidden] {
+  display: none;
+}
+
+/* ==========================================================================
+   Table hover toolbar: plus button with add row / add column menu.
+   ========================================================================== */
+
+.mn-card-table {
+  overflow: visible;
+}
+
+.mn-table-tools {
+  position: absolute;
+  left: -30px;
+  right: auto;
+  top: -28px;
+  z-index: 6;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none;
+}
+
+
+.mn-card-table:hover .mn-table-tools,
+.mn-card-table.is-selected .mn-table-tools,
+.mn-card-table:focus-within .mn-table-tools,
+.mn-table-tools:has(.mn-table-menu:not([hidden])) {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+
+.mn-table-add {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-hairline), 0 1px 2px color-mix(in srgb, var(--ky-stroke) 60%, transparent);
+  color: var(--ky-muted);
+  cursor: pointer;
+}
+
+.mn-table-add:hover {
+  color: var(--ky-text);
+  background: var(--ky-control);
+}
+
+.mn-table-menu {
+  position: absolute;
+  left: 0;
+  right: auto;
+  bottom: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 148px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+}
+
+.mn-table-menu[hidden] {
+  display: none;
+}
+
+.mn-table-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-text);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-table-menu button:hover {
+  background: var(--ky-control);
+}
+
+/* ==========================================================================
+   Drawing editor: pen and highlighter options (colour + size).
+   ========================================================================== */
+
+.mn-draw-options {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--ky-stroke);
+}
+
+.mn-draw-options[hidden] {
+  display: none;
+}
+
+.mn-draw-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ky-control);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ky-stroke) 80%, transparent);
+  cursor: pointer;
+}
+
+.mn-draw-swatch.is-auto {
+  background: linear-gradient(135deg, var(--ky-text) 0 55%, var(--ky-accent) 55% 100%);
+}
+
+.mn-draw-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--ky-accent);
+}
+
+.mn-draw-sizes {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 3px;
+}
+
+.mn-draw-size {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mn-draw-size span {
+  display: block;
+  border-radius: 50%;
+  background: var(--ky-text);
+}
+
+.mn-draw-size:hover {
+  background: var(--ky-control);
+}
+
+.mn-draw-size.is-active {
+  background: var(--ky-control);
+  box-shadow: inset 0 0 0 1px var(--ky-stroke);
+}
+
+
+/* ==========================================================================
+   MCP settings pane: read-only client config block.
+   ========================================================================== */
+
+.mn-prefs-code {
+  margin: 0;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ky-control);
+  box-shadow: inset 0 0 0 1px var(--ky-stroke);
+  color: var(--ky-muted);
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+  line-height: 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+/* ==========================================================================
+   Column collapse toggle.
+   ========================================================================== */
+
+.mn-column-head {
+  position: relative;
+}
+
+.mn-column-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-soft);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.mn-card-column:hover .mn-column-toggle,
+.mn-card-column.is-collapsed .mn-column-toggle,
+.mn-column-toggle:focus-visible {
+  opacity: 1;
+}
+
+.mn-column-toggle:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-card-column.is-collapsed {
+  min-height: 96px;
+}
+
+.mn-card-column.is-collapsed .mn-resize {
+  display: none;
+}
+
+.mn-card-column.is-collapsed .mn-column-head {
+  flex: 1;
+  justify-content: center;
+  padding: 14px;
+}
+
+/* ==========================================================================
+   Home archive/trash tabs and disabled context-menu items.
+   ========================================================================== */
+
+.mn-home-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 18px;
+}
+
+.mn-home-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mn-home-tab span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--ky-control);
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-home-tab:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-home-tab.is-active {
+  background: var(--ky-control);
+  color: var(--ky-text);
+  font-weight: 600;
+}
+
+.mn-menu-item.is-disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.mn-menu-item.is-disabled:hover {
+  background: transparent;
+  color: var(--ky-muted);
+}
+
+/* ==========================================================================
+   Kanban card: columns and cards that can be added and removed.
+   ========================================================================== */
+
+.mn-kanban {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 500px;
+  gap: 8px;
+  padding: 10px;
+}
+
+.mn-card-kanban {
+  min-height: 500px;
+}
+
+.mn-kanban-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.mn-kanban-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+}
+
+.mn-kanban-add-col {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.mn-kanban-add-col:hover {
+  color: var(--ky-text);
+}
+
+.mn-kanban-cols {
+  display: flex;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.mn-kanban-col {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 168px;
+  min-height: 0;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--ky-control);
+}
+
+.mn-kanban-col-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.mn-kanban-col-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+}
+
+.mn-kanban-col-remove,
+.mn-kanban-item-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ky-soft);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.mn-kanban-col:hover .mn-kanban-col-remove,
+.mn-kanban-item:hover .mn-kanban-item-remove {
+  opacity: 1;
+}
+
+.mn-kanban-items {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.mn-kanban-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--ph-black-7, #ffffff);
+  box-shadow: var(--ky-hairline);
+}
+
+.mn-kanban-item-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.mn-kanban-add-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-kanban-add-item:hover {
+  color: var(--ky-text);
+}
+
+.mn-kanban-empty {
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+
+/* ==========================================================================
+   Instant tool-rail tooltip (slides in from the left).
+   ========================================================================== */
+
+.mn-tool-tip {
+  position: fixed;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-8px, -50%);
+  transition: opacity 90ms ease, transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mn-tool-tip.is-visible {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.mn-tool-tip-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.mn-design-tip {
+  position: fixed;
+  z-index: 40000;
+  max-width: 240px;
+  padding: 5px 8px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: var(--mn-font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.mn-design-tip[hidden] {
+  display: none;
+}
+
+
+/* Keep the external add controls above neighbouring cards while the table is hovered. */
+.mn-card-table:hover,
+.mn-card-table:focus-within {
+  z-index: 900000 !important;
+}
+
+/* ==========================================================================
+   Kanban card drag between columns.
+   ========================================================================== */
+
+.mn-kanban-item {
+  cursor: grab;
+}
+
+.mn-kanban-item.is-dragging-kanban {
+  opacity: 0.4;
+}
+
+.mn-kanban-col.is-kanban-target {
+  background: color-mix(in srgb, var(--ky-accent) 10%, var(--ky-control));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ky-accent) 60%, transparent);
+}
+
+.mn-kanban-grip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 14px;
+  height: 18px;
+  color: var(--ky-soft);
+  cursor: grab;
+  opacity: 0.55;
+}
+
+.mn-kanban-grip:hover {
+  opacity: 1;
+  color: var(--ky-text);
+}
+
+.mn-kanban-grip.is-dragging-kanban {
+  opacity: 0.3;
+}
+
+/* ==========================================================================
+   Editable line connections: hit area, endpoint handles and curve midpoint.
+   ========================================================================== */
+
+.mn-connections {
+  z-index: 900000;
+}
+
+.mn-connection-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.mn-connection {
+  pointer-events: none;
+}
+
+.mn-connection.is-selected {
+  stroke: color-mix(in srgb, var(--ky-accent) 70%, var(--ky-text));
+  stroke-width: 1.8;
+}
+
+.mn-connection.is-draft {
+  stroke-dasharray: 5 4;
+  opacity: 0.75;
+}
+
+.mn-line-handle {
+  fill: var(--ph-black-7, #fff);
+  stroke: var(--ky-muted);
+  stroke-width: 1.2;
+  pointer-events: all;
+  cursor: grab;
+}
+
+.mn-line-handle:hover,
+.mn-line-mid {
+  stroke: var(--ky-accent);
+}
+
+.mn-line-mid {
+  cursor: move;
+}
+
+/* Pointer-dragged kanban cards: ghost, drop line and target highlight. */
+.mn-kanban-drag-ghost {
+  position: fixed;
+  z-index: 500;
+  max-width: 220px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.mn-kanban-drop-line {
+  height: 2px;
+  margin: 2px 0;
+  border-radius: 2px;
+  background: var(--ky-accent);
+  flex: none;
+}
+
+.mn-kanban-item.is-dragging-kanban {
+  opacity: 0.35;
+}
+
+.is-kanban-dragging {
+  cursor: grabbing;
+}
+
+/* Embedded media previews (YouTube/Vimeo, map, audio) and file open affordance. */
+.mn-video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mn-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mn-map iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--ky-control);
+}
+
+.mn-audio {
+  position: relative;
+  padding-right: 32px;
+}
+
+.mn-embed-edit {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ph-black-7, #fff) 86%, transparent);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.mn-card:hover .mn-embed-edit,
+.mn-embed-edit:focus-visible {
+  opacity: 1;
+}
+
+.mn-embed-edit:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-file[data-action="open-file"] {
+  cursor: pointer;
+}
+
+.mn-file[data-action="open-file"]:hover {
+  background: var(--ky-control);
+}
+
+/* Spreadsheet-style A/B/C column letters and 1/2/3 row numbers, shown while the table is active. */
+.mn-sheet-headers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.mn-card-table.is-selected .mn-sheet-headers,
+.mn-card-table:focus-within .mn-sheet-headers {
+  opacity: 1;
+}
+
+.mn-sheet-cols-clip {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: -26px;
+  height: 24px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mn-sheet-cols {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  height: 24px;
+  will-change: transform;
+}
+
+.mn-sheet-cols > span {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border: 1px solid var(--ky-stroke);
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mn-sheet-rows-clip {
+  position: absolute;
+  left: -30px;
+  top: 2px;
+  bottom: 2px;
+  width: 26px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mn-sheet-rows {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  width: 26px;
+  will-change: transform;
+}
+
+.mn-sheet-rows span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  border: 1px solid var(--ky-stroke);
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Dedicated sheet width handle: drag the right edge while the sheet is active. */
+/* Sheet growth handles: drag right to add columns, drag down to add rows. */
+.mn-sheet-add-column,
+.mn-sheet-add-row {
+  position: absolute;
+  z-index: 7;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ky-accent) 45%, transparent);
+  box-shadow: var(--ky-hairline);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.mn-sheet-add-column {
+  right: -6px;
+  top: 50%;
+  width: 9px;
+  height: 64px;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.mn-sheet-add-row {
+  left: 50%;
+  bottom: -6px;
+  width: 64px;
+  height: 9px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.mn-card-table.is-selected .mn-sheet-add-column,
+.mn-card-table:focus-within .mn-sheet-add-column,
+.mn-card-table.is-selected .mn-sheet-add-row,
+.mn-card-table:focus-within .mn-sheet-add-row {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mn-sheet-add-column:hover,
+.mn-sheet-add-row:hover {
+  background: var(--ky-accent);
+}
+
+/* Custom HSV colour picker for the Color card. */
+.mn-color-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 299;
+  background: transparent;
+}
+
+.mn-color-pop {
+  position: fixed;
+  z-index: 300;
+  width: 252px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+}
+
+.mn-color-main {
+  display: flex;
+  gap: 8px;
+}
+
+.mn-color-sv {
+  position: relative;
+  flex: 1 1 auto;
+  height: 132px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--picker-hue, #ff0000);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.mn-color-sv-white {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #fff, transparent);
+}
+
+.mn-color-sv-black {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent, #000);
+}
+
+.mn-color-sv-marker {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #000 45%, transparent);
+  pointer-events: none;
+}
+
+.mn-color-hue {
+  position: relative;
+  flex: none;
+  width: 14px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.mn-color-hue-marker {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 6px;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #000 35%, transparent);
+  pointer-events: none;
+}
+
+.mn-color-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mn-color-hex {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.mn-color-hex:focus {
+  box-shadow: 0 0 0 1px var(--ky-accent);
+}
+
+/* Empty audio card: symmetric breathing room and a centered upload action. */
+.mn-audio-empty {
+  gap: 8px;
+  padding: 20px 14px;
+}
+
+.mn-audio-empty .mn-field-input {
+  width: 100%;
+  max-width: 220px;
+}
+
+.mn-audio-empty .mn-ghost-btn {
+  align-self: center;
+}
+
+/* Per-column resize grip in the sheet header strip. */
+.mn-sheet-cols > span {
+  position: relative;
+}
+
+.mn-sheet-col-grip {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  right: -4px;
+  width: 9px;
+  height: auto;
+  background: transparent;
+  cursor: col-resize;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.mn-card-table.is-selected .mn-sheet-col-grip,
+.mn-card-table:focus-within .mn-sheet-col-grip {
+  pointer-events: auto;
+}
+
+.mn-sheet-col-grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: transparent;
+}
+
+.mn-sheet-col-grip:hover::after {
+  background: var(--ky-accent);
+}
+
+/* The sheet scrolls inside its card. Keep a thin scrollbar so overflow is discoverable. */
+.mn-table {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ky-muted) transparent;
+}
+
+.mn-table::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mn-table::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mn-table::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--ky-muted);
+  background-clip: content-box;
+}
+
+/* To-do item burger handle for reordering. */
+.mn-todo-grip {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  opacity: 0;
+  cursor: grab;
+}
+
+.mn-todo-item:hover .mn-todo-grip {
+  opacity: 1;
+}
+
+.mn-todo-grip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mn-todo-item.is-dragging-todo {
+  opacity: 0.4;
+}
+
+.mn-todo-drag-ghost {
+  position: fixed;
+  z-index: 500;
+  max-width: 220px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.mn-todo-drop-line {
+  height: 2px;
+  margin: 1px 4px;
+  border-radius: 2px;
+  background: var(--ky-accent);
+  list-style: none;
+}
+
+/* Cards inside a column are laid out by the column and cannot be resized. */
+.mn-card.is-child .mn-resize {
+  display: none;
+}
+
+/* Embedded media placeholders: compact, full-width soft primary action. */
+.mn-embed-empty {
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+.mn-embed-empty .mn-field-input {
+  height: 26px;
+}
+
+.mn-primary-soft {
+  width: 100%;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ky-control);
+  box-shadow: inset 0 0 0 1px var(--ky-stroke);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mn-primary-soft:hover {
+  background: var(--ky-control-hover, var(--ky-control));
+}
+
+.mn-primary-soft:active {
+  background: var(--ky-control-active, var(--ky-control));
+}
+
+/* Uploaded image keeps its own ratio; the caption keeps a fixed strip below. */
+.mn-image img {
+  object-fit: contain;
+  background: var(--ky-control);
+}
+
+.mn-audio {
+  padding: 10px 12px;
+}
+
+.mn-audio .mn-embed-edit {
+  position: static;
+  flex: none;
+  opacity: 0;
+}
+
+.mn-card:hover .mn-audio .mn-embed-edit,
+.mn-audio .mn-embed-edit:focus-visible {
+  opacity: 1;
+}
+
+/* Home multi-select, bulk actions and project dialogs. */
+.mn-project-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+}
+
+.mn-project-card:hover .mn-project-check,
+.mn-project-card.is-multi-selected .mn-project-check,
+.mn-project-check:checked {
+  opacity: 1;
+}
+
+.mn-project-card.is-multi-selected {
+  box-shadow:
+    0 0 0 2px var(--ky-accent),
+    var(--ky-hairline),
+    0 8px 22px color-mix(in srgb, var(--ph-black-0, #000) 12%, transparent);
+}
+
+.mn-home-bulk {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+}
+
+.mn-home-bulk strong {
+  margin-right: auto;
+  font-size: 12px;
+}
+
+.mn-home-bulk .mn-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.mn-home-bulk [data-bulk="delete"] {
+  color: var(--ky-danger);
+}
+
+.mn-home-recent-head {
+  align-items: center;
+  gap: 8px;
+}
+
+.mn-home-count {
+  margin-left: auto;
+}
+
+.mn-home-delete-all {
+  margin-left: 4px;
+  color: var(--ky-danger);
+}
+
+.mn-home-dialog {
+  width: min(420px, 92vw);
+}
+
+.mn-home-dialog .mn-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mn-confirm-text {
+  margin: 0;
+  color: var(--ky-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.mn-btn-danger {
+  background: var(--ky-danger);
+  color: #fff;
+}
+
+.mn-btn-danger:hover {
+  filter: brightness(0.95);
+}
+
+/* Board-level card trash panel. */
+.mn-trash-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(420px, 78vw);
+}
+
+.mn-trash-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: var(--ky-control);
+}
+
+.mn-trash-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--ky-text);
+  font-size: 12px;
+}
+
+.mn-trash-label svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--ky-soft);
+}
+
+.mn-trash-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mn-trash-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.mn-trash-actions .mn-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/* Custom audio player, themed rather than native controls. */
+.mn-audio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  height: 100%;
+  padding: 0 10px;
+}
+
+.mn-audio audio {
+  display: none;
+}
+
+.mn-audio-glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--ky-soft);
+}
+
+.mn-audio-control {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-text);
+  cursor: pointer;
+}
+
+.mn-audio-control:hover {
+  background: var(--ky-control);
+}
+
+.mn-audio-play {
+  width: 26px;
+  height: 26px;
+}
+
+.mn-audio-play-icon,
+.mn-audio-pause-icon,
+.mn-audio-volume-icon,
+.mn-audio-muted-icon {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.mn-audio-pause-icon,
+.mn-audio-muted-icon {
+  display: none;
+}
+
+.mn-audio.is-playing .mn-audio-play-icon {
+  display: none;
+}
+
+.mn-audio.is-playing .mn-audio-pause-icon {
+  display: grid;
+}
+
+.mn-audio.is-muted .mn-audio-volume-icon {
+  display: none;
+}
+
+.mn-audio.is-muted .mn-audio-muted-icon {
+  display: grid;
+}
+
+.mn-audio-time {
+  flex: none;
+  color: var(--ky-soft);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mn-audio-seek {
+  flex: 1 1 auto;
+  min-width: 24px;
+  height: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--ky-text) 0 var(--audio-progress, 0%),
+    var(--ky-control) var(--audio-progress, 0%) 100%
+  );
+  cursor: pointer;
+  appearance: none;
+}
+
+.mn-audio-seek::-webkit-slider-thumb {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ky-text);
+  appearance: none;
+}
+
+.mn-audio-seek:focus-visible {
+  outline: 1px solid var(--ky-accent);
+  outline-offset: 3px;
+}
+
+/* Audio cards hug the custom player instead of the global 70 px card minimum. */
+.mn-card-audio {
+  min-height: 44px;
+}
+
+.mn-prefs-select select:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Kanban columns share the full card width instead of leaving an empty strip. */
+.mn-kanban-col {
+  flex: 1 1 168px;
+  min-width: 168px;
+}
+
+/* File cards: inset hover row and a direct download action. */
+.mn-file {
+  height: calc(100% - 12px);
+  margin: 6px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.mn-file[data-action="open-file"]:hover {
+  background: var(--ky-control);
+}
+
+.mn-file-download {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-soft);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.mn-file:hover .mn-file-download,
+.mn-file-download:focus-visible {
+  opacity: 1;
+}
+
+.mn-file-download:hover {
+  background: var(--ky-control-hover, var(--ky-control));
+  color: var(--ky-text);
+}
+
+.mn-card-file .mn-file {
+  position: absolute;
+  inset: 6px;
+  height: auto;
+  margin: 0;
+}
+
+/* Notification bell, unread badge and notification panel. */
+.mn-notify-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--ky-danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mn-notify-pop {
+  position: fixed;
+  z-index: 298;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, 92vw);
+  max-height: min(520px, 78vh);
+  border-radius: 12px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  overflow: hidden;
+}
+
+.mn-notify-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 12px;
+  box-shadow: inset 0 -1px var(--ky-hairline);
+}
+
+.mn-notify-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mn-notify-unread {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mn-notify-close {
+  margin-left: auto;
+}
+
+.mn-notify-actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  padding: 7px 10px;
+  box-shadow: inset 0 -1px var(--ky-hairline);
+}
+
+.mn-notify-actions .mn-btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.mn-notify-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.mn-notify-item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.mn-notify-open {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-notify-open:hover {
+  background: var(--ky-control);
+}
+
+.mn-notify-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.mn-notify-item.is-unread .mn-notify-dot {
+  background: var(--ky-accent);
+}
+
+.mn-notify-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mn-notify-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.mn-notify-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-soft);
+  font-size: 10px;
+}
+
+.mn-notify-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.mn-notify-action {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-muted);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  padding: 3px 5px;
+}
+
+.mn-notify-action:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-notify-remove {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-soft);
+  cursor: pointer;
+}
+
+.mn-notify-remove:hover {
+  background: var(--ky-control);
+  color: var(--ky-danger);
+}
+
+.mn-notify-empty {
+  padding: 18px 14px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+#notification-btn {
+  position: relative;
+}
+
+/* Media cards share one width and hug their content until an embed is loaded. */
+.mn-video,
+.mn-map {
+  height: auto;
+}
+
+.mn-video iframe {
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
+.mn-video video {
+  height: auto;
+  display: block;
+}
+
+.mn-map iframe {
+  height: 170px;
+}
+
+.mn-audio-empty .mn-field-input {
+  max-width: none;
+}
+
+/* Freehand drawing cards and contextual bottom toolbar. */
+.mn-card-drawing {
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.mn-card-drawing .mn-resize {
+  display: none;
+}
+
+.mn-card-drawing.is-selected {
+  box-shadow: 0 0 0 1.5px var(--ky-accent);
+}
+
+.mn-drawing {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--ky-text);
+}
+
+.mn-draw-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 900001;
+  color: var(--ky-text);
+}
+
+.mn-draw-preview path {
+  fill: none;
+  stroke: currentColor;
+}
+
+.mn-context-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 260;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 11px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  transform: translateX(-50%);
+}
+
+.mn-context-bar[hidden] {
+  display: none;
+}
+
+.mn-context-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mn-context-btn {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mn-context-btn:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-context-btn.is-active {
+  background: var(--ky-accent);
+  color: var(--ky-accent-ink, #fff);
+}
+
+.mn-context-format[data-format="italic"] {
+  font-style: italic;
+}
+
+.mn-context-format[data-format="underline"] {
+  text-decoration: underline;
+}
+
+.mn-context-format[data-format="strikeThrough"] {
+  text-decoration: line-through;
+}
+
+/* Single-file header: template menu and current board title. */
+.mn-template-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ky-control);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mn-template-btn:hover {
+  background: var(--ky-control-hover, var(--ky-control));
+}
+
+.mn-topbar-left .mn-board-title {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ky-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-template-modal {
+  width: min(760px, 92vw);
+  border-radius: 14px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  overflow: hidden;
+}
+
+.mn-template-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  box-shadow: inset 0 -1px var(--ky-hairline);
+}
+
+.mn-template-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mn-template-head p {
+  margin: 4px 0 0;
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+
+.mn-template-close {
+  margin-left: auto;
+}
+
+.mn-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px;
+  max-height: min(520px, 65vh);
+  overflow-y: auto;
+}
+
+.mn-template-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ky-control);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-template-card:hover {
+  background: var(--ky-control-hover, var(--ky-control));
+}
+
+.mn-template-preview {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: var(--ky-popup-bg);
+  color: var(--ky-muted);
+}
+
+.mn-template-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mn-template-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mn-template-desc {
+  color: var(--ky-soft);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+/* Native OS file drop affordance. */
+.mn-file-drop-overlay {
+  position: fixed;
+  inset: 10px;
+  z-index: 400;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--ky-accent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ky-popup-bg) 78%, transparent);
+  pointer-events: none;
+}
+
+.mn-file-drop-overlay[hidden] {
+  display: none;
+}
+
+.mn-file-drop-message {
+  padding: 9px 14px;
+  border-radius: 9px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Comment upload timestamp beside the author. */
+.mn-msg-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mn-msg-time {
+  color: var(--ky-soft);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mn-menu {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+.mn-template-confirm {
+  width: min(420px, 92vw);
+}
+
+/* Loaded embeds are visual content on the board: the whole card stays draggable. */
+.mn-video iframe,
+.mn-map iframe {
+  pointer-events: none;
+}
+
+.mn-video,
+.mn-map {
+  cursor: grab;
+}
+
+/* Application menu bar. Three fixed grid columns keep the search centred. */
+.mn-menubar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  flex: 0 0 var(--mn-menubar-height);
+  height: var(--mn-menubar-height);
+  padding: 0 8px;
+  background: var(--ky-bg);
+  border-bottom: 1px solid var(--ky-stroke);
+  z-index: 25;
+}
+
+.mn-menubar-left,
+.mn-menubar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mn-menubar-right {
+  justify-content: flex-end;
+}
+
+.mn-menubar-center {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.mn-menubar .mn-logo {
+  height: 22px;
+  padding: 0 6px 0 4px;
+  margin-right: 4px;
+}
+
+.mn-web-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-family: var(--mn-font-code);
+  font-size: 9px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mn-web-badge:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+@media (max-width: 1100px) {
+  .mn-web-badge {
+    width: 8px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--ky-accent);
+    color: transparent;
+    font-size: 0;
+  }
+}
+
+.mn-menubar-btn {
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mn-menubar-btn:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.mn-menubar-btn:active {
+  background: var(--ky-control-active);
+}
+
+.mn-menubar-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ky-glow-input-focus);
+}
+
+.mn-topbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: min(320px, 32vw);
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  color: var(--ky-soft);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition:
+    background var(--ky-duration-popover) var(--ky-ease-standard),
+    border-color var(--ky-duration-popover) var(--ky-ease-standard);
+}
+
+.mn-topbar-search:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-topbar-search:active {
+  background: var(--ky-control-active);
+}
+
+.mn-topbar-search:focus-visible {
+  outline: none;
+  border-color: var(--ky-accent);
+  box-shadow: 0 0 0 2px var(--ky-glow-input-focus);
+}
+
+.mn-topbar-search kbd {
+  margin-left: auto;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ky-text) 8%, transparent);
+  color: var(--ky-soft);
+  font-family: inherit;
+  font-size: 9px;
+}
+
+/* Command palette. */
+.mn-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, var(--ky-bg) 55%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.mn-palette {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 92vw);
+  max-height: 68vh;
+  border-radius: 12px;
+  background: var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  color: var(--ky-text);
+  overflow: hidden;
+}
+
+.mn-palette-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 14px;
+  box-shadow: inset 0 -1px var(--ky-hairline);
+}
+
+.mn-palette-search-icon {
+  display: inline-flex;
+  color: var(--ky-soft);
+}
+
+.mn-palette-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.mn-palette-input::placeholder {
+  color: var(--ky-soft);
+}
+
+.mn-palette-search kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--ky-control);
+  color: var(--ky-soft);
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.mn-palette-list {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 5px;
+}
+
+.mn-palette-group {
+  padding: 8px 9px 4px;
+  color: var(--ky-soft);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mn-palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-palette-item.is-active {
+  background: var(--ky-control-hover, var(--ky-control));
+}
+
+.mn-palette-item-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.mn-palette-item-name svg {
+  flex: none;
+  color: var(--ky-soft);
+}
+
+.mn-palette-kbd {
+  flex: none;
+  margin-left: 12px;
+  color: var(--ky-soft);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.mn-palette-foot {
+  flex: none;
+  padding: 7px 12px;
+  border-top: 1px solid var(--ky-stroke);
+  color: var(--ky-soft);
+  font-size: 9px;
+}
+
+.mn-palette-empty {
+  padding: 18px 12px;
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+
+/* Large-board performance mode. */
+html[data-performance="true"] * {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
+html[data-performance="true"] .mn-viewport {
+  background-image: none;
+}
+
+html[data-performance="true"] .mn-card {
+  box-shadow: var(--ky-hairline);
+}
+
+/* Pressed feedback for compact controls that do not define their own active state. */
+.mn-app :is(
+  .mn-tool,
+  .mn-zoom-btn,
+  .mn-kanban-add-item,
+  .mn-kanban-add-col,
+  .mn-table-add,
+  .mn-logo,
+  .mn-template-btn,
+  .mn-primary-btn,
+  .mn-trash,
+  .mn-link-open,
+  .mn-color-swatch
+):active:not(:disabled) {
+  background: var(--ky-control-active);
+}
+
+.mn-app .mn-color-swatch:active:not(:disabled) {
+  transform: scale(0.96);
+}
