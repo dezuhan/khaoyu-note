@@ -63,6 +63,8 @@ a migration is pending.
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
 | `KHAOYU_SERVICE_CORS_ORIGINS` | Tauri origins | Comma-separated origins allowed to call bearer-token APIs from the desktop client. |
 | `KHAOYU_SERVICE_ADMIN_TOKEN` | empty | Optional operator token for admin audit, abuse and stats endpoints. |
+| `KHAOYU_SERVICE_BACKUP_PASSPHRASE` | empty | Encrypt backups with scrypt-derived AES-256-GCM. Required to restore them. |
+| `KHAOYU_SERVICE_ALERT_WEBHOOK` | empty | Optional HTTP(S) endpoint for login-block security alerts. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
 | `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
@@ -261,6 +263,16 @@ node src/cli.mjs rollback --steps 1
 
 Migration files live in `src/migrations` as paired `*.up.sql` and `*.down.sql`. Every migration is
 applied in a transaction and recorded in `schema_migrations`.
+
+Set `KHAOYU_SERVICE_BACKUP_PASSPHRASE` to encrypt new backups. The database and every object file are
+encrypted with AES-256-GCM using a scrypt-derived key; the manifest keeps plaintext checksums and the
+salt, never the passphrase. Restore requires the same passphrase and rejects a wrong key before
+touching current data. Without a passphrase backups remain in the local backup directory and the
+operator must protect that directory.
+
+`KHAOYU_SERVICE_ALERT_WEBHOOK` receives a JSON POST on a login block with the event name, method,
+attempt count, retry delay and hashed IP. It is best-effort with a three second timeout and never
+blocks the login response.
 
 ## Backup and restore
 

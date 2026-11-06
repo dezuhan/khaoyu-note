@@ -25,6 +25,8 @@ authorization.
   download flag with per-link audit.
 - SMTP delivery is implemented with an outbox fallback, opt-in notification email, signed unsubscribe
   links and a notification email rate limit.
+- Backups can be encrypted with scrypt and AES-256-GCM; login blocks can post a structured alert to
+  an operator webhook.
 
 ## Findings
 
@@ -45,15 +47,16 @@ authorization.
   `KHAOYU_SERVICE_CORS_ORIGINS` can call the API if it obtains a token; keep the list minimal.
 - Asset MIME sniffing, malware scanning, watermarking and signed short-lived URLs are not implemented.
   Uploads are size-limited, filename-sanitised, extension-blocked and access-controlled.
-- No backup encryption or documented key rotation. Backups are local snapshots with a checksum only.
+- Backup encryption is optional. When no passphrase is configured, backups remain plaintext in the
+  backup directory and depend on host and volume controls.
 - Registration, reset requests and invitations have no dedicated rate limit.
 - Logout is state-changing but does not require the CSRF header. It clears cookies and is bounded to
   the caller's session.
 - The upgrade path can revoke sessions with `invalidate-sessions`, but it is an operator step rather
   than an automatic migration action.
 - Project shares expose the current snapshot only. Nested board content is not included by policy.
-- Share passphrase attempts use the same fixed window as login and return a neutral 404; external
-  alert routing is still pending.
+- Share passphrase attempts use the same fixed window as login and return a neutral 404. Login blocks
+  can post to an operator webhook; sharing blocks have no separate paging integration.
 - Audit rows are pruned by retention and can be exported through the admin API; there is no
   tamper-evident chain or signed export.
 

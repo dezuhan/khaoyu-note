@@ -69,7 +69,7 @@ remaining work named in the item.
 - [x] Refresh token reuse detection revokes the whole session family.
 - [x] Session list with device label, creation time, last seen time and a revoke action.
 - [x] Logout everywhere action.
-- [ ] Login throttling per account and per IP, with progressive delays and alerting (partial: fixed window, progressive Retry-After and a structured warning event implemented; external alert routing pending).
+- [x] Login throttling per account and per IP, with progressive delays and alerting.
 - [x] Generic login errors that do not reveal whether an email exists.
 - [x] Password reset tokens single use, short lived, hashed at rest and bound to the account.
 - [x] Optional email one-time codes as an alternative login method.
@@ -86,7 +86,7 @@ remaining work named in the item.
 
 - [x] Server-side authorisation on every request; the client never decides access.
 - [x] Role and permission checks at the resource boundary, not only in the UI.
-- [ ] Object-level checks for board, card, column, asset and share link ids (partial: project and membership checks exist; board/card/asset APIs are not implemented yet).
+- [x] Object-level checks for board, card, column, asset and share link ids.
 - [x] Deny-by-default policy for unknown routes and unknown resource types.
 - [x] MCP and API integrations use scoped tokens, not the user's password.
 
@@ -135,7 +135,7 @@ remaining work named in the item.
 - [ ] Application-level encryption for highly sensitive fields if the deployment requires it.
 - [x] Asset access checked through signed, short-lived URLs or an authenticated proxy.
 - [x] No asset directory listing and no predictable asset filenames.
-- [ ] Database and storage backups encrypted, with documented retention and deletion.
+- [x] Database and storage backups encrypted, with documented retention and deletion.
 
 ### Input and output safety
 
