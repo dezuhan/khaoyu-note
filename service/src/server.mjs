@@ -3,7 +3,7 @@ import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { openDatabase } from "./db.mjs";
 import { assertSchemaCurrent, createService, listen } from "./app.mjs";
-import { createFileMailer } from "./auth/mailer.mjs";
+import { createMailer } from "./auth/mailer.mjs";
 import { startWorker } from "./worker.mjs";
 
 const logger = createLogger();
@@ -21,7 +21,7 @@ async function main() {
   }
   const db = openDatabase(config.databasePath);
   assertSchemaCurrent(db);
-  const mailer = createFileMailer(config, logger);
+  const mailer = createMailer(config, logger);
   const server = createService({ config, db, logger, mailer });
   await listen(server, config);
   const worker = startWorker(db, config, logger);
@@ -40,6 +40,7 @@ async function main() {
     server.closeStreams?.();
     server.close(() => {
       db.close();
+      mailer.close?.();
       logger.info("service.stopped");
       process.exit(0);
     });

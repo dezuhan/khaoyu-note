@@ -1,5 +1,19 @@
 import crypto from "node:crypto";
 
+export function unsubscribeToken(accountId, secret) {
+  const signature = crypto.createHmac("sha256", secret).update(`unsubscribe:${accountId}`).digest("hex");
+  return `${accountId}.${signature}`;
+}
+
+export function verifyUnsubscribeToken(token, secret) {
+  if (typeof token !== "string" || !token.includes(".")) return null;
+  const index = token.lastIndexOf(".");
+  const accountId = token.slice(0, index);
+  const expected = unsubscribeToken(accountId, secret);
+  if (token.length !== expected.length) return null;
+  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected)) ? accountId : null;
+}
+
 export function createNotification(db, { accountId, kind, title, body, resourceType, resourceId }) {
   const id = crypto.randomUUID();
   db.prepare(
@@ -12,6 +26,7 @@ export function notifyProjectMembers(db, projectId, { except, kind, title, body,
   const members = db
     .prepare("SELECT account_id FROM project_members WHERE project_id = ?")
     .all(projectId);
+  const recipients = [];
   for (const member of members) {
     if (member.account_id === except) continue;
     createNotification(db, {
@@ -22,13 +37,16 @@ export function notifyProjectMembers(db, projectId, { except, kind, title, body,
       resourceType,
       resourceId,
     });
+    recipients.push(member.account_id);
   }
+  return recipients;
 }
 
 export function notifyProjectOwners(db, projectId, { except, kind, title, body, resourceType = "project", resourceId = projectId }) {
   const owners = db
     .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND role = 'owner'")
     .all(projectId);
+  const recipients = [];
   for (const owner of owners) {
     if (owner.account_id === except) continue;
     createNotification(db, {
@@ -39,13 +57,48 @@ export function notifyProjectOwners(db, projectId, { except, kind, title, body, 
       resourceType,
       resourceId,
     });
+    recipients.push(owner.account_id);
   }
+  return recipients;
 }
 
 export function removeResourceNotifications(db, resourceType, resourceId) {
   return db
     .prepare("DELETE FROM notifications WHERE resource_type = ? AND resource_id = ?")
     .run(resourceType, resourceId).changes;
+}
+
+export async function emailNotification(db, config, mailer, logger, accountId, { kind, title, body }) {
+  const account = db
+    .prepare("SELECT email FROM accounts WHERE id = ? AND deleted_at IS NULL")
+    .get(accountId);
+  const preference = db
+    .prepare("SELECT * FROM email_preferences WHERE account_id = ?")
+    .get(accountId);
+  if (!account || !preference?.notifications) return false;
+  if (preference.last_notified_at && Date.now() - Number(preference.last_notified_at) < 5 * 60_000) {
+    return false;
+  }
+  const link = `${config.publicUrl}/api/v1/email/unsubscribe?token=${encodeURIComponent(
+    unsubscribeToken(accountId, config.secret)
+  )}`;
+  try {
+    await mailer.send({
+      to: account.email,
+      kind: "notification",
+      subject: title,
+      text: `${body || title}\n\nUnsubscribe from email notifications: ${link}`,
+    });
+  } catch (error) {
+    logger?.error("mail.notification_failed", { message: error.message });
+    return false;
+  }
+  db.prepare("UPDATE email_preferences SET last_notified_at = ?, updated_at = ? WHERE account_id = ?").run(
+    Date.now(),
+    Date.now(),
+    accountId
+  );
+  return true;
 }
 
 export function listNotifications(db, { accountId, limit = 100 }) {

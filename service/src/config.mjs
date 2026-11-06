@@ -40,6 +40,20 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
   const dataDir = path.resolve(cwd, env.KHAOYU_SERVICE_DATA_DIR || ".khaoyu-service-data");
   const publicUrl = (env.KHAOYU_SERVICE_PUBLIC_URL || `http://${host}:${port}`).replace(/\/+$/, "");
 
+  const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";
+  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
+  const smtpPass = env.KHAOYU_SERVICE_SMTP_PASSWORD || "";
+  const smtpFrom = env.KHAOYU_SERVICE_SMTP_FROM || "";
+  if (smtpHost && !smtpFrom) {
+    throw new Error("KHAOYU_SERVICE_SMTP_FROM is required when SMTP is enabled");
+  }
+  if (Boolean(smtpUser) !== Boolean(smtpPass)) {
+    throw new Error("SMTP user and password must be provided together");
+  }
+  if (smtpFrom && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(smtpFrom)) {
+    throw new Error("KHAOYU_SERVICE_SMTP_FROM must be an email address");
+  }
+
   return Object.freeze({
     profile,
     host,
@@ -55,6 +69,14 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     cookieSecure: boolean(env.KHAOYU_SERVICE_COOKIE_SECURE, publicUrl.startsWith("https://")),
     trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
+    smtp: Object.freeze({
+      host: smtpHost,
+      port: integer(env.KHAOYU_SERVICE_SMTP_PORT, 587, 1, 65535, "KHAOYU_SERVICE_SMTP_PORT"),
+      secure: boolean(env.KHAOYU_SERVICE_SMTP_SECURE, false),
+      user: smtpUser,
+      pass: smtpPass,
+      from: smtpFrom,
+    }),
     accessTtlMinutes: integer(env.KHAOYU_SERVICE_ACCESS_TTL_MINUTES, 15, 1, 1440, "KHAOYU_SERVICE_ACCESS_TTL_MINUTES"),
     refreshTtlDays: integer(env.KHAOYU_SERVICE_REFRESH_TTL_DAYS, 7, 1, 90, "KHAOYU_SERVICE_REFRESH_TTL_DAYS"),
     deletionGraceDays: integer(env.KHAOYU_SERVICE_DELETION_GRACE_DAYS, 30, 1, 365, "KHAOYU_SERVICE_DELETION_GRACE_DAYS"),

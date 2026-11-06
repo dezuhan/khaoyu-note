@@ -39,10 +39,12 @@ import { ObjectStore } from "../objects.mjs";
 import { createEventHub } from "../events.mjs";
 import {
   createNotification,
+  emailNotification,
   listNotifications,
   notifyProjectMembers,
   notifyProjectOwners,
   removeResourceNotifications,
+  verifyUnsubscribeToken,
 } from "../notifications.mjs";
 
 function now() {
@@ -230,8 +232,15 @@ export function createApiRouter({ db, config, logger, mailer }) {
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
   ]);
 
-  function saveSharedDoc(projectId, doc, revision, actorId) {
-    const serialized = JSON.stringify(doc);
+  async function emailRecipients(accountIds, payload) {
+    await Promise.all(
+      accountIds.map((accountId) =>
+        emailNotification(db, config, mailer, logger, accountId, payload)
+      )
+    );
+  }
+
+  function saveSharedDoc(projectId, doc, revision, actorId) {    const serialized = JSON.stringify(doc);
     db.exec("BEGIN IMMEDIATE");
     try {
       db.prepare("UPDATE projects SET revision = ?, updated_at = ? WHERE id = ?").run(
@@ -287,6 +296,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
           resourceType: "share_link",
           resourceId: share.id,
         });
+        await emailRecipients(
+          db
+            .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND role = 'owner'")
+            .all(share.project_id)
+            .map((row) => row.account_id),
+          {
+            kind: "share.reported",
+            title: "A shared link was reported",
+            body: "A shared link in your project was reported.",
+          }
+        );
         sendJson(response, 202, { status: "reported" }, config);
         return true;
       }
@@ -396,6 +416,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
           resourceType: "share_link",
           resourceId: share.id,
         });
+        await emailRecipients(
+          db
+            .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND role = 'owner'")
+            .all(share.project_id)
+            .map((row) => row.account_id),
+          {
+            kind: "share.comment",
+            title: "New comment on a shared link",
+            body: "A shared link in your project received a new comment.",
+          }
+        );
         sendJson(response, 201, { revision, comment }, config);
         return true;
       }
@@ -460,6 +491,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
           resourceType: "share_link",
           resourceId: share.id,
         });
+        await emailRecipients(
+          db
+            .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND role = 'owner'")
+            .all(share.project_id)
+            .map((row) => row.account_id),
+          {
+            kind: "share.edit",
+            title: "A shared link edited a card",
+            body: "A shared link in your project edited a card.",
+          }
+        );
         sendJson(response, 200, { revision }, config);
         return true;
       }
@@ -1302,6 +1344,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
           title: "Invitation accepted",
           body: `${auth.account.email} joined as ${result.role}.`,
         });
+        await emailRecipients(
+          db
+            .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND role = 'owner' AND account_id != ?")
+            .all(result.projectId, auth.account.id)
+            .map((row) => row.account_id),
+          {
+            kind: "invitation.accepted",
+            title: "Invitation accepted",
+            body: `${auth.account.email} joined a project as ${result.role}.`,
+          }
+        );
         writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "invitation.accepted",
@@ -1359,6 +1412,11 @@ export function createApiRouter({ db, config, logger, mailer }) {
             body: `Your role is now ${body.role}.`,
             resourceType: "project",
             resourceId: memberMatch[1],
+          });
+          await emailNotification(db, config, mailer, logger, memberMatch[2], {
+            kind: "member.role_changed",
+            title: "Project role changed",
+            body: `Your role is now ${body.role}.`,
           });
           writeAudit(db, {
             actorAccountId: auth.account.id,
@@ -1477,6 +1535,47 @@ export function createApiRouter({ db, config, logger, mailer }) {
           secret: config.secret,
         });
         sendJson(response, 201, { id: projectId, title, revision: 1, role: "owner" }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/account/email-preferences") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const preference = db
+          .prepare("SELECT notifications FROM email_preferences WHERE account_id = ?")
+          .get(auth.account.id);
+        sendJson(response, 200, { notifications: Boolean(preference?.notifications) }, config);
+        return true;
+      }
+
+      if (method === "PATCH" && url.pathname === "/api/v1/account/email-preferences") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const body = await readJson(request);
+        if (typeof body.notifications !== "boolean") {
+          throw new HttpError(400, "notifications must be a boolean", "invalid_input");
+        }
+        db.prepare(
+          `INSERT INTO email_preferences (account_id, notifications, updated_at) VALUES (?, ?, ?)
+           ON CONFLICT(account_id) DO UPDATE SET notifications = excluded.notifications, updated_at = excluded.updated_at`
+        ).run(auth.account.id, body.notifications ? 1 : 0, now());
+        sendJson(response, 200, { notifications: body.notifications }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/email/unsubscribe") {
+        const token = url.searchParams.get("token") || "";
+        const accountId = verifyUnsubscribeToken(token, config.secret);
+        if (!accountId) throw new HttpError(400, "invalid unsubscribe token", "invalid_token");
+        db.prepare(
+          `INSERT INTO email_preferences (account_id, notifications, updated_at) VALUES (?, 0, ?)
+           ON CONFLICT(account_id) DO UPDATE SET notifications = 0, updated_at = excluded.updated_at`
+        ).run(accountId, now());
+        writeAudit(db, {
+          action: "account.email_unsubscribed",
+          resourceType: "account",
+          resourceId: accountId,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { unsubscribed: true }, config);
         return true;
       }
 
@@ -1614,6 +1713,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
           title: "Project restored to an earlier revision",
           body: `Revision ${revision} was restored from revision ${restoreMatch[2]}.`,
         });
+        await emailRecipients(
+          db
+            .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND account_id != ?")
+            .all(restoreMatch[1], auth.account.id)
+            .map((row) => row.account_id),
+          {
+            kind: "project.version_restored",
+            title: "Project restored to an earlier revision",
+            body: `Revision ${revision} was restored from revision ${restoreMatch[2]}.`,
+          }
+        );
         sendJson(response, 200, { revision, restoredFrom: Number(restoreMatch[2]) }, config);
         return true;
       }
