@@ -3,6 +3,15 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.6.0] - 2026-11-07
+
+### Added
+
+- Project revision history; every accepted snapshot is stored and members can list the latest 100.
+- Editor-only revision restore that creates a new revision instead of rewriting history.
+- Authenticated per-project SSE rooms with presence counts, snapshot events and heartbeats.
+- Audit entries for revision restores and worker pruning of old revisions.
+
 ## [0.5.0] - 2026-11-07
 
 ### Added
