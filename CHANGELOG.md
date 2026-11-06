@@ -3,6 +3,15 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.13.0] - 2026-11-07
+
+### Added
+
+- Optional trusted-proxy SSO behind an operator flag, with an HMAC-signed proxy email, optional
+  verified account auto-creation and `auth.login_sso` audit.
+- SSO configuration validation: trust proxy is required and the signing secret must be at least 32
+  characters.
+
 ## [0.12.0] - 2026-11-07
 
 ### Added
