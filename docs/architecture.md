@@ -353,6 +353,11 @@ roles, roles can be changed by the owner, the owner cannot be removed directly, 
 transfer swaps both roles in one transaction. Share-token write permissions, asset download
 watermarking and a global sharing kill switch remain pending.
 
+Share links enforce view, comment, edit and manage by rank. Comment writes append `shareComments` to
+a card inside the link scope, never to a sibling card, and edits are limited to a field allowlist
+with an optional revision check. Each write creates a revision, emits a snapshot event, audits the
+link and notifies owners.
+
 ## Notifications
 
 `service/src/notifications.mjs` stores per-account notifications with a resource type and id.

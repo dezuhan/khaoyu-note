@@ -133,6 +133,8 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `DELETE` | `/api/v1/projects/:id/shares/:shareId` | Revoke a share link. |
 | `POST` | `/api/v1/projects/:id/shares/:shareId/rotate` | Rotate the share token. |
 | `POST` | `/api/v1/share/:token/access` | Public scoped access, optional passphrase. |
+| `POST` | `/api/v1/share/:token/comments` | Add a scoped comment with the comment permission. |
+| `PATCH` | `/api/v1/share/:token/cards/:cardId` | Edit allowed card fields with the edit permission. |
 | `POST` | `/api/v1/share/:token/assets/:assetId` | Download a shared asset when download is allowed. |
 | `POST` | `/api/v1/share/:token/report` | Report an abusive or unwanted shared link. |
 
@@ -173,9 +175,12 @@ member data. Project roles are owner, editor, commenter and viewer. Invitations 
 single use, expiring and revocable; accepting one adds the account as a member. Ownership transfer
 keeps an owner role on both sides during the swap, and the owner cannot be removed directly.
 
-Stored share permissions include view, comment, edit and manage. Public access currently returns the
-scoped read payload plus its permission; share-token write endpoints and asset download/watermark
-enforcement are still pending.
+Stored share permissions are enforced by rank: view, comment, edit, manage. A comment share can add
+comments only to cards inside its project, item or column scope; comments are stored on the scoped
+card as `shareComments` and never create sibling cards. An edit share can update `text`, `title`,
+`caption`, `description`, `url` and `checked` only, with an optional revision check. Writes require
+the passphrase when set, are rate limited, create a new project revision, emit an SSE snapshot and
+notify project owners. Manage currently has the same write surface as edit.
 
 `KHAOYU_SERVICE_PUBLIC_SHARING=false` is the operator kill switch: share creation returns 409 and all
 public access returns 404. Anyone holding a link can file an abuse report at
@@ -302,8 +307,8 @@ endpoints. The auth suite covers verification, generic login errors and throttli
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
-transfer, asset authorization, share download permission, revision restore, authenticated SSE rooms
-and scoped notifications.
+transfer, asset authorization, share download permission, share comments and edits, revision restore,
+authenticated SSE rooms and scoped notifications.
 
 ## Milestone boundaries
 
@@ -332,7 +337,7 @@ Implemented from Milestone 5: scoped in-app notifications for invitations, role 
 restores and share reports; per-account read state; cleanup when a share is revoked. Email
 notifications, unsubscribe links and event rate limits remain pending.
 
-Still pending: share-token write permissions, watermarking, MIME sniffing and malware scanning,
+Still pending: a manage-specific share surface, watermarking, MIME sniffing and malware scanning,
 signed short-lived asset URLs, nested-board policy for project shares, SMTP delivery, passkeys, SSO,
 team membership UI, a browser login UI and desktop client sync. The Milestone 1 sync boundary remains
 open: desktop opt-in, explicit sync state, offline queue with conflict handling, and protection

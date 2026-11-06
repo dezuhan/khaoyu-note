@@ -98,7 +98,7 @@ remaining work named in the item.
 - [x] **Item share**: one card, with enough context to render it, but not sibling cards.
 - [x] **Column share**: a column and its current children, with an explicit notice that later
   additions may or may not be included depending on the permission chosen.
-- [ ] Per-scope permissions: view, comment, edit, manage (partial: permissions are stored and returned; share-token write endpoints are not implemented yet).
+- [x] Per-scope permissions: view, comment, edit, manage.
 - [ ] Optional expiry date, optional download permission, optional password protection (partial: expiry and password are enforced; download permission is stored but asset download enforcement is pending).
 
 ### Share links
@@ -174,11 +174,11 @@ remaining work named in the item.
 - [ ] Presence is opt-in and does not reveal board contents to non-members (partial: presence count is member-only; opt-in and cursor awareness pending).
 - [ ] Conflict handling for offline edits with a visible resolution flow (partial: server revision conflicts are enforced; offline queue and resolution UI pending).
 - [x] Revision history for shared projects, with restore limited to editors and above.
-- [ ] Comments and notifications respect scope: a column share cannot leak board-wide activity.
+- [x] Comments and notifications respect scope: a column share cannot leak board-wide activity.
 
 ## Milestone 5: Notifications and activity (server side)
 
-- [ ] Server notifications for invitations, role changes, comments on shared scopes and mention events (partial: invitations, role changes, restores and share reports are implemented; comments and mentions pending).
+- [ ] Server notifications for invitations, role changes, comments on shared scopes and mention events (partial: invitations, role changes, restores, share reports and scoped share comments are implemented; mentions pending).
 - [ ] Email notifications opt-in with unsubscribe links and rate limiting.
 - [x] In-app notifications scoped to the resources the user can currently access.
 - [x] Deleting or revoking a share removes its pending notifications.
