@@ -660,6 +660,77 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(forbiddenTransfer.status, 403);
   });
 
+  await t.test("notifications are scoped, readable and removed with revoked shares", async () => {
+    const owner = await api.account(`notify-owner-${crypto.randomUUID()}@example.com`);
+    const guestEmail = `notify-guest-${crypto.randomUUID()}@example.com`;
+    const guest = await api.account(guestEmail);
+    const projectId = await createProject(owner, "Notifications");
+    const invitation = await api.call(`/api/v1/projects/${projectId}/invitations`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { email: guestEmail, role: "editor" },
+    });
+    const token = api.latestMail("invite", guestEmail).text.match(/token: (\S+)/)[1];
+    await api.call("/api/v1/invitations/accept", {
+      method: "POST",
+      jar: guest.jar,
+      body: { token },
+    });
+    const ownerList = await api.call("/api/v1/notifications", { jar: owner.jar });
+    assert.equal(ownerList.status, 200);
+    assert.ok(ownerList.body.notifications.some((entry) => entry.kind === "invitation.accepted"));
+    assert.ok(ownerList.body.unread >= 1);
+
+    const unread = ownerList.body.notifications.find((entry) => !entry.readAt);
+    const read = await api.call(`/api/v1/notifications/${unread.id}/read`, {
+      method: "PATCH",
+      jar: owner.jar,
+    });
+    assert.equal(read.status, 204);
+    const afterRead = await api.call("/api/v1/notifications", { jar: owner.jar });
+    assert.equal(afterRead.body.notifications.find((entry) => entry.id === unread.id).readAt > 0, true);
+
+    const changed = await api.call(`/api/v1/projects/${projectId}/members/${guest.account.id}`, {
+      method: "PATCH",
+      jar: owner.jar,
+      body: { role: "viewer" },
+    });
+    assert.equal(changed.status, 204);
+    const guestList = await api.call("/api/v1/notifications", { jar: guest.jar });
+    assert.ok(guestList.body.notifications.some((entry) => entry.kind === "member.role_changed"));
+
+    await api.call(`/api/v1/projects/${projectId}/members/${guest.account.id}`, {
+      method: "DELETE",
+      jar: owner.jar,
+    });
+    const removedGuest = await api.call("/api/v1/notifications", { jar: guest.jar });
+    assert.equal(removedGuest.body.notifications.length, 0);
+
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    const share = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view" },
+    });
+    await api.call(`/api/v1/share/${share.body.token}/report`, {
+      method: "POST",
+      body: { reason: "Reported notification cleanup test" },
+    });
+    const reported = await api.call("/api/v1/notifications", { jar: owner.jar });
+    assert.ok(reported.body.notifications.some((entry) => entry.kind === "share.reported"));
+    await api.call(`/api/v1/projects/${projectId}/shares/${share.body.id}`, {
+      method: "DELETE",
+      jar: owner.jar,
+    });
+    const cleaned = await api.call("/api/v1/notifications", { jar: owner.jar });
+    assert.equal(cleaned.body.notifications.some((entry) => entry.resourceType === "share_link"), false);
+    assert.equal(invitation.status, 201);
+  });
+
   await t.test("project assets require authorization and share download permission", async () => {
     const owner = await api.account(`asset-owner-${crypto.randomUUID()}@example.com`);
     const stranger = await api.account(`asset-stranger-${crypto.randomUUID()}@example.com`);
