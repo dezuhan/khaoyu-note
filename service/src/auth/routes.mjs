@@ -37,6 +37,7 @@ import {
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
 import { createEventHub } from "../events.mjs";
+import { sendAlert } from "../alerts.mjs";
 import {
   createNotification,
   emailNotification,
@@ -746,6 +747,13 @@ export function createApiRouter({ db, config, logger, mailer }) {
         const throttle = loginBlocked(db, { email, ip, config });
         if (throttle.blocked) {
           recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          void sendAlert(config, logger, {
+            event: "auth.login_blocked",
+            method: "otp",
+            attempts: throttle.attempts,
+            retryAfter: throttle.retryAfter,
+            ipHash,
+          });
           sendJson(response, 429, { error: "Too many attempts" }, config, {
             "Retry-After": String(throttle.retryAfter),
           });
@@ -817,6 +825,13 @@ export function createApiRouter({ db, config, logger, mailer }) {
           logger.warn("auth.login_blocked", {
             attempts: throttle.attempts,
             retryAfter: throttle.retryAfter,
+          });
+          void sendAlert(config, logger, {
+            event: "auth.login_blocked",
+            method: "password",
+            attempts: throttle.attempts,
+            retryAfter: throttle.retryAfter,
+            ipHash,
           });
           sendJson(response, 429, { error: "Too many attempts" }, config, {
             "Retry-After": String(throttle.retryAfter),

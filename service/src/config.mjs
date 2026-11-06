@@ -50,6 +50,16 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     }
   }
 
+  const backupPassphrase = env.KHAOYU_SERVICE_BACKUP_PASSPHRASE || "";
+  if (backupPassphrase && Buffer.byteLength(backupPassphrase, "utf8") < 12) {
+    throw new Error("KHAOYU_SERVICE_BACKUP_PASSPHRASE must be at least 12 characters");
+  }
+
+  const alertWebhook = env.KHAOYU_SERVICE_ALERT_WEBHOOK || "";
+  if (alertWebhook && !/^https?:\/\//.test(alertWebhook)) {
+    throw new Error("KHAOYU_SERVICE_ALERT_WEBHOOK must be an http or https URL");
+  }
+
   const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
   const smtpPass = env.KHAOYU_SERVICE_SMTP_PASSWORD || "";
   const smtpFrom = env.KHAOYU_SERVICE_SMTP_FROM || "";
@@ -79,6 +89,8 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
     adminToken,
+    backupPassphrase,
+    alertWebhook,
     corsOrigins: (env.KHAOYU_SERVICE_CORS_ORIGINS || "tauri://localhost,http://tauri.localhost")
       .split(",")
       .map((origin) => origin.trim())

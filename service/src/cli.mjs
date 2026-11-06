@@ -141,6 +141,7 @@ async function run(command, args, config) {
       backupDirectory: path.resolve(directory),
       dataDir: config.dataDir,
       force: args.includes("--force"),
+      passphrase: config.backupPassphrase || null,
     });
     console.log(JSON.stringify({ restored: true, safety: result.safety }, null, 2));
     return;
