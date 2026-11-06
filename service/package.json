@@ -1,0 +1,20 @@
+{
+  "name": "@khaoyu-note/service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted service foundation for Khaoyu Note",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "migrate": "node src/cli.mjs migrate",
+    "rollback": "node src/cli.mjs rollback",
+    "status": "node src/cli.mjs status",
+    "bootstrap": "node src/cli.mjs bootstrap",
+    "backup": "node src/cli.mjs backup",
+    "restore": "node src/cli.mjs restore",
+    "test": "node --test test/*.test.mjs"
+  }
+}

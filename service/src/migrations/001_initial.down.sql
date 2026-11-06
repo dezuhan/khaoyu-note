@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS service_meta;
+DROP TABLE IF EXISTS objects;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS project_snapshots;
+DROP TABLE IF EXISTS project_members;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS accounts;
