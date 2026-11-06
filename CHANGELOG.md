@@ -3,6 +3,19 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.12.0] - 2026-11-07
+
+### Added
+
+- Encrypted backups with scrypt-derived AES-256-GCM keys, per-file checksums, passphrase validation
+  before restore and plaintext-free manifests.
+- Optional login-block alert webhook with structured event payload, hashed IP and a three second
+  timeout.
+
+### Changed
+
+- Backup format 2 stores object checksums and restores both encrypted and legacy backups.
+
 ## [0.11.0] - 2026-11-07
 
 ### Added
