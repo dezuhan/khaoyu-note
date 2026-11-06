@@ -65,6 +65,11 @@ a migration is pending.
 | `KHAOYU_SERVICE_ADMIN_TOKEN` | empty | Optional operator token for admin audit, abuse and stats endpoints. |
 | `KHAOYU_SERVICE_BACKUP_PASSPHRASE` | empty | Encrypt backups with scrypt-derived AES-256-GCM. Required to restore them. |
 | `KHAOYU_SERVICE_ALERT_WEBHOOK` | empty | Optional HTTP(S) endpoint for login-block security alerts. |
+| `KHAOYU_SERVICE_SSO_ENABLED` | `false` | Enable trusted-proxy header SSO. |
+| `KHAOYU_SERVICE_SSO_SECRET` | empty | HMAC key the reverse proxy uses to sign the SSO email. |
+| `KHAOYU_SERVICE_SSO_HEADER` | `x-auth-request-email` | Header containing the authenticated email. |
+| `KHAOYU_SERVICE_SSO_NAME_HEADER` | `x-auth-request-name` | Optional display-name header. |
+| `KHAOYU_SERVICE_SSO_AUTO_CREATE` | `false` | Create a verified account for an unknown SSO email. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
 | `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
@@ -185,6 +190,20 @@ Desktop sync uses a scoped API token with `projects:read` and `projects:write`. 
 bearer-token CORS preflight only from `KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are
 never allowed from those origins. Add the local web host origin manually if the browser build should
 sync directly.
+
+## Trusted-proxy SSO
+
+SSO is disabled by default. When enabled, `POST /api/v1/auth/sso/login` trusts the configured email
+header only if the reverse proxy also sends
+`x-khaoyu-sso-signature: HMAC-SHA256(secret, lowercase-email)`. The proxy must strip any client
+supplied copies of both headers, and the service must not be reachable around the proxy. SSO requires
+`KHAOYU_SERVICE_TRUST_PROXY=true` and a 32 character `KHAOYU_SERVICE_SSO_SECRET`; missing or weak
+values fail startup.
+
+An existing account is matched by email. With auto-create disabled an unknown email is rejected;
+with auto-create enabled a verified account is created without a local password. SSO sessions are
+audited as `auth.login_sso` and TOTP is not required because the external IdP is the second factor.
+This is forward-auth integration, not OIDC discovery.
 
 ## Sharing and membership
 
@@ -350,7 +369,8 @@ authorization, refresh rotation and reuse, session revocation, password reset, T
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
-authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences and CORS preflight.
+authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences, CORS preflight,
+encrypted backups, alert webhooks and trusted-proxy SSO.
 
 ## Milestone boundaries
 

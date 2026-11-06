@@ -60,7 +60,7 @@ remaining work named in the item.
 - [x] Unique, case-normalised email addresses; display name separate from email.
 - [x] Account deletion request with a grace period, export before deletion.
 - [x] Optional second factor: TOTP first, passkeys later (TOTP implemented; passkeys pending).
-- [ ] Optional SSO for self-hosted enterprise deployments, behind an operator flag.
+- [x] Optional SSO for self-hosted enterprise deployments, behind an operator flag (trusted-proxy header SSO with HMAC; OIDC discovery is not included).
 
 ### Authentication
 

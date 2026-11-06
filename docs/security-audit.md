@@ -82,6 +82,7 @@ authorization.
   read-only root filesystem, dropped capabilities and loopback-only Compose port.
 - Backup integrity verification, safety copy on restore and worker retention.
 - Separate operator admin token, per-IP admin rate limit, audited export and abuse review.
+- Optional SSO only behind trust-proxy, HMAC-signed email headers and a fail-closed secret.
 - Threat model, security policy, incident runbook, release checklist and data residency docs.
 
 ## Recommended next work
