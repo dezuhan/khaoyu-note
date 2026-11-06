@@ -16,6 +16,8 @@ import { createService } from "../src/app.mjs";
 import { assertSchemaCurrent } from "../src/app.mjs";
 import { logPath } from "../src/app.mjs";
 import { createSmtpMailer } from "../src/auth/mailer.mjs";
+import http from "node:http";
+import { sendAlert } from "../src/alerts.mjs";
 
 const SECRET = "Kx9-vQ2m-Rt7-pL4s-Wb8-nC3d-Hf6-jZ1a";
 
@@ -164,6 +166,33 @@ test("audit entries hash IP addresses and keep JSON metadata", () => {
   db.close();
 });
 
+test("alert webhook posts structured security events", async () => {
+  const received = [];
+  const server = http.createServer((request, response) => {
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      received.push(JSON.parse(body));
+      response.writeHead(204);
+      response.end();
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const sent = await sendAlert(
+    { alertWebhook: `http://127.0.0.1:${port}/alerts` },
+    quietLogger,
+    { event: "auth.login_blocked", attempts: 5, retryAfter: 30 }
+  );
+  assert.equal(sent, true);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].event, "auth.login_blocked");
+  assert.equal(received[0].attempts, 5);
+  await new Promise((resolve) => server.close(resolve));
+});
+
 test("backup and restore round-trip the database and objects", () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
@@ -187,6 +216,48 @@ test("backup and restore round-trip the database and objects", () => {
   assert.equal(restored.value, "before");
   const restoredStore = new ObjectStore(db, config.objectsDir);
   assert.deepEqual(restoredStore.get(object.id).body, Buffer.from("asset"));
+  db.close();
+});
+
+test("encrypted backups require the passphrase and restore object bytes", () => {
+  const dataDir = tempDir();
+  const config = configFor(dataDir);
+  config.backupPassphrase = "backup-passphrase-123";
+  let db = openDatabase(config.databasePath);
+  migrate(db, { directory: MIGRATIONS_DIR });
+  db.prepare("INSERT INTO service_meta (key, value) VALUES ('secret-check', 'encrypted')").run();
+  const store = new ObjectStore(db, config.objectsDir);
+  const object = store.store(Buffer.from("encrypted asset"), "text/plain");
+  const backup = createBackup(db, config);
+  assert.equal(backup.manifest.encryption.algorithm, "aes-256-gcm");
+  const encryptedDatabase = fs.readFileSync(path.join(backup.directory, "database.db"));
+  assert.notEqual(encryptedDatabase.subarray(0, 16).toString(), "SQLite format 3\u0000");
+  db.close();
+
+  assert.throws(
+    () => restoreBackup({ backupDirectory: backup.directory, dataDir, force: true }),
+    /passphrase is required/
+  );
+  assert.throws(
+    () =>
+      restoreBackup({
+        backupDirectory: backup.directory,
+        dataDir,
+        force: true,
+        passphrase: "wrong-backup-passphrase",
+      }),
+    /invalid or the backup is corrupted/
+  );
+  const result = restoreBackup({
+    backupDirectory: backup.directory,
+    dataDir,
+    force: true,
+    passphrase: "backup-passphrase-123",
+  });
+  assert.ok(result.manifest.encryption);
+  db = openDatabase(config.databasePath);
+  assert.equal(db.prepare("SELECT value FROM service_meta WHERE key = 'secret-check'").get().value, "encrypted");
+  assert.deepEqual(new ObjectStore(db, config.objectsDir).get(object.id).body, Buffer.from("encrypted asset"));
   db.close();
 });
 
