@@ -5,3 +5,5 @@ tools/node_modules/
 *.log
 dist/
 *.bak-*
+service/.env
+.khaoyu-service-data/

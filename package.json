@@ -9,6 +9,14 @@
   },
   "scripts": {
     "web": "node server.mjs",
-    "web:status": "node -e \"fetch('http://127.0.0.1:1430/status').then(r=>r.text()).then(console.log)\""
+    "web:status": "node -e \"fetch('http://127.0.0.1:1430/status').then(r=>r.text()).then(console.log)\"",
+    "service": "node service/src/server.mjs",
+    "service:migrate": "node service/src/cli.mjs migrate",
+    "service:rollback": "node service/src/cli.mjs rollback",
+    "service:status": "node service/src/cli.mjs status",
+    "service:bootstrap": "node service/src/cli.mjs bootstrap",
+    "service:backup": "node service/src/cli.mjs backup",
+    "service:restore": "node service/src/cli.mjs restore",
+    "test:service": "node --test service/test/service.test.mjs"
   }
 }
