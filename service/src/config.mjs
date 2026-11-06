@@ -55,6 +55,11 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     throw new Error("KHAOYU_SERVICE_BACKUP_PASSPHRASE must be at least 12 characters");
   }
 
+  const requireHttps = boolean(env.KHAOYU_SERVICE_REQUIRE_HTTPS, false);
+  if (requireHttps && !publicUrl.startsWith("https://")) {
+    throw new Error("KHAOYU_SERVICE_PUBLIC_URL must use https when HTTPS is required");
+  }
+
   const alertWebhook = env.KHAOYU_SERVICE_ALERT_WEBHOOK || "";
   if (alertWebhook && !/^https?:\/\//.test(alertWebhook)) {
     throw new Error("KHAOYU_SERVICE_ALERT_WEBHOOK must be an http or https URL");
@@ -110,6 +115,8 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
     adminToken,
     backupPassphrase,
+    requireHttps,
+    uploadScanCommand: env.KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND || "",
     alertWebhook,
     corsOrigins: (env.KHAOYU_SERVICE_CORS_ORIGINS || "tauri://localhost,http://tauri.localhost")
       .split(",")

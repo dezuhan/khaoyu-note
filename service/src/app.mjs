@@ -24,6 +24,12 @@ export function createService({ config, db, logger, mailer }) {
   const server = http.createServer(async (request, response) => {
     const started = Date.now();
     const url = new URL(request.url || "/", config.publicUrl);
+    const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+    const secure = request.socket.encrypted || (config.trustProxy && forwardedProto === "https");
+    if (config.requireHttps && !secure) {
+      sendJson(response, 426, { error: "HTTPS required", code: "https_required" }, config);
+      return;
+    }
     response.on("finish", () => {
       if (url.pathname !== "/healthz" && url.pathname !== "/readyz") {
         logger.info("http.request", {

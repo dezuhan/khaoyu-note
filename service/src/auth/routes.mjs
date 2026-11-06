@@ -37,6 +37,7 @@ import {
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
 import { createEventHub } from "../events.mjs";
+import { scanUpload, validateUpload } from "../uploads.mjs";
 import { sendAlert } from "../alerts.mjs";
 import {
   createNotification,
@@ -2004,6 +2005,10 @@ export function createApiRouter({ db, config, logger, mailer }) {
           .split(";")[0]
           .trim();
         const data = await readBinary(request);
+        validateUpload(contentType, data);
+        if (!(await scanUpload(config, data, logger))) {
+          throw new HttpError(422, "asset was rejected by the upload scanner", "upload_rejected");
+        }
         const object = objects.store(data, contentType);
         const assetId = crypto.randomUUID();
         db.prepare(
