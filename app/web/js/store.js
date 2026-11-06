@@ -212,6 +212,9 @@ export async function saveNow() {
     clearRetry();
     state.viewDirty = false;
     state.saveState = state.dirty ? "saving" : "saved";
+    window.dispatchEvent(
+      new CustomEvent("mn:board-saved", { detail: { boardId, board: state.board } })
+    );
   } catch (error) {
     console.error("[store] save failed", error);
     if (isConflict(error)) {
@@ -470,4 +473,37 @@ export async function exportCurrentBoard() {
   if (!state.board) return null;
   const json = JSON.stringify(state.board, null, 2);
   return bridge.exportBoard(json);
+}
+
+/// Adopt a server document after an explicit pull or conflict choice.
+export async function adoptRemoteBoard(doc) {
+  if (!doc || !state.board || doc.id !== state.board.id) return;
+  const previousBase = state.baseUpdatedAt;
+  state.board = doc;
+  layoutColumns(doc);
+  state.view = doc.view || state.view;
+  state.selection = new Set();
+  state.editing = null;
+  state.conflict = null;
+  state.dirty = false;
+  state.baseUpdatedAt = previousBase;
+  const updatedAt = await bridge.saveBoard(doc.id, JSON.stringify(doc), previousBase);
+  state.baseUpdatedAt = typeof updatedAt === "number" && Number.isFinite(updatedAt) ? updatedAt : Date.now();
+  notify("board");
+  notify("view");
+  notify("history");
+}
+
+/// Persist sync metadata without marking the document dirty.
+export async function persistBoardSnapshot() {
+  if (!state.board) return false;
+  const snapshot = JSON.stringify(state.board);
+  try {
+    const updatedAt = await bridge.saveBoard(state.board.id, snapshot, state.baseUpdatedAt);
+    if (typeof updatedAt === "number" && Number.isFinite(updatedAt)) state.baseUpdatedAt = updatedAt;
+    return true;
+  } catch (error) {
+    console.error("[store] could not persist sync metadata", error);
+    return false;
+  }
 }

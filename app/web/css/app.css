@@ -5343,3 +5343,89 @@ html[data-performance="true"] .mn-card {
 .mn-app .mn-color-swatch:active:not(:disabled) {
   transform: scale(0.96);
 }
+
+/* Server sync */
+.mn-sync-state {
+  border: 0;
+  background: transparent;
+  color: var(--ky-soft);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.mn-sync-state:hover {
+  color: var(--ky-text);
+  background: color-mix(in srgb, var(--ky-text) 6%, transparent);
+}
+.mn-sync-state[data-status="synced"] {
+  color: var(--ky-accent);
+}
+.mn-sync-state[data-status="conflict"] {
+  color: var(--ky-danger);
+}
+.mn-sync-state[data-status="offline"] {
+  color: var(--ky-danger);
+}
+.mn-sync-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 42%, transparent);
+}
+.mn-sync-panel {
+  width: min(500px, calc(100vw - 48px));
+}
+.mn-sync-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mn-sync-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+.mn-sync-field .ky-input {
+  width: 100%;
+}
+.mn-sync-status {
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+.mn-sync-status[data-status="synced"] {
+  color: var(--ky-accent);
+}
+.mn-sync-status[data-status="conflict"] {
+  color: var(--ky-danger);
+}
+.mn-sync-meta {
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+}
+.mn-sync-conflict {
+  border: 1px solid var(--ky-border);
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 11px;
+}
+.mn-sync-conflict p {
+  margin: 0 0 8px;
+  color: var(--ky-soft);
+}
+.mn-sync-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.mn-sync-foot {
+  flex-wrap: wrap;
+}

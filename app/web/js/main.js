@@ -2,6 +2,7 @@ import * as bridge from "./bridge.js";
 import { initInteractions } from "./interact.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
+import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
 import {
   createBoard,
   firstOpenableBoard,
@@ -29,6 +30,8 @@ const uiRefs = {
   menubar: document.getElementById("menubar"),
   commandSearchBtn: document.getElementById("command-search-btn"),
   saveState: document.getElementById("save-state"),
+  syncButton: document.getElementById("sync-state"),
+  syncState: document.getElementById("sync-state"),
   undoBtn: document.getElementById("undo-btn"),
   redoBtn: document.getElementById("redo-btn"),
   commentCount: document.getElementById("comment-count"),
@@ -50,12 +53,14 @@ async function boot() {
   initRender(refs);
   initInteractions(refs);
   initUI(uiRefs);
+  initSyncUI(uiRefs);
   initContextMenu();
 
   subscribe((kind) => {
     if (kind === "board" || kind === "geometry") render(kind);
     else if (kind === "view") renderView();
     else if (kind === "selection") renderSelection();
+    if (kind === "board" || kind === "save" || kind === "history") refreshSync();
   });
 
   await refreshBoards();
@@ -72,6 +77,7 @@ async function boot() {
   }
   render("board");
   renderView();
+  refreshSync();
   document.getElementById("boot")?.remove();
   document.fonts?.ready.then(() => {
     if (state.board) render("geometry");
