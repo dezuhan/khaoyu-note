@@ -511,6 +511,37 @@ export function createApiRouter({ db, config, logger, mailer }) {
           resourceType: "share_link",
           resourceId: share.id,
         });
+        const mentionEmails = [
+          ...new Set(
+            (text.match(/@([^\s@]+@[^\s@]+\.[^\s@]+)/g) || [])
+              .map((mention) => mention.slice(1).toLowerCase())
+              .slice(0, 10)
+          ),
+        ];
+        if (mentionEmails.length) {
+          const members = db
+            .prepare(
+              "SELECT a.id, a.email FROM project_members m JOIN accounts a ON a.id = m.account_id WHERE m.project_id = ?"
+            )
+            .all(share.project_id);
+          for (const email of mentionEmails) {
+            const member = members.find((entry) => entry.email.toLowerCase() === email);
+            if (!member) continue;
+            createNotification(db, {
+              accountId: member.id,
+              kind: "comment.mention",
+              title: "You were mentioned in a shared comment",
+              body: "A shared link mentioned you in a comment.",
+              resourceType: "share_link",
+              resourceId: share.id,
+            });
+            await emailNotification(db, config, mailer, logger, member.id, {
+              kind: "comment.mention",
+              title: "You were mentioned in a shared comment",
+              body: "A shared link in one of your projects mentioned you in a comment.",
+            });
+          }
+        }
         await emailRecipients(
           db
             .prepare("SELECT account_id FROM project_members WHERE project_id = ? AND role = 'owner'")
@@ -1712,6 +1743,34 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/account/presence") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const preference = db
+          .prepare("SELECT presence_enabled FROM email_preferences WHERE account_id = ?")
+          .get(auth.account.id);
+        sendJson(
+          response,
+          200,
+          { presence: preference ? Boolean(preference.presence_enabled) : true },
+          config
+        );
+        return true;
+      }
+
+      if (method === "PATCH" && url.pathname === "/api/v1/account/presence") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const body = await readJson(request);
+        if (typeof body.presence !== "boolean") {
+          throw new HttpError(400, "presence must be a boolean", "invalid_input");
+        }
+        db.prepare(
+          `INSERT INTO email_preferences (account_id, presence_enabled, updated_at) VALUES (?, ?, ?)
+           ON CONFLICT(account_id) DO UPDATE SET presence_enabled = excluded.presence_enabled, updated_at = excluded.updated_at`
+        ).run(auth.account.id, body.presence ? 1 : 0, now());
+        sendJson(response, 200, { presence: body.presence }, config);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/account/email-preferences") {
         const auth = requireSessionAuth(request, response, db, config);
         const preference = db
@@ -1810,7 +1869,13 @@ export function createApiRouter({ db, config, logger, mailer }) {
           "X-Accel-Buffering": "no",
         });
         response.flushHeaders();
-        const client = events.subscribe(eventsMatch[1], auth.account.id, response);
+        const preference = db
+          .prepare("SELECT presence_enabled FROM email_preferences WHERE account_id = ?")
+          .get(auth.account.id);
+        const presenceEnabled = preference ? Boolean(preference.presence_enabled) : true;
+        const client = events.subscribe(eventsMatch[1], auth.account.id, response, {
+          presence: presenceEnabled,
+        });
         request.on("close", () => events.unsubscribe(client));
         return true;
       }

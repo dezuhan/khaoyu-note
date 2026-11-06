@@ -7,12 +7,12 @@ export function createEventHub({ heartbeatMs = 25_000 } = {}) {
   }
 
   function presence(projectId) {
-    const clients = room(projectId);
+    const clients = [...room(projectId)].filter((client) => client.presence !== false);
     return {
       type: "presence",
       projectId,
-      accounts: new Set([...clients].map((client) => client.accountId)).size,
-      connections: clients.size,
+      accounts: new Set(clients.map((client) => client.accountId)).size,
+      connections: clients.length,
     };
   }
 
@@ -28,10 +28,11 @@ export function createEventHub({ heartbeatMs = 25_000 } = {}) {
     for (const client of room(projectId)) write(client, event);
   }
 
-  function subscribe(projectId, accountId, response) {
+  function subscribe(projectId, accountId, response, { presence: visible = true } = {}) {
     const client = {
       projectId,
       accountId,
+      presence: visible,
       response,
       heartbeat: null,
     };
