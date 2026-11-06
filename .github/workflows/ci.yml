@@ -21,7 +21,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: tools/package-lock.json
 
@@ -101,6 +101,25 @@ jobs:
         if: failure()
         run: cat /tmp/khaoyu-serve.log || true
 
+  service:
+    name: Self-hosted service foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Service tests
+        run: node --test service/test/service.test.mjs
+
+      - name: Build service image
+        run: docker build --tag khaoyu-note-service:ci service
+
   rust:
     name: Rust checks and MCP suite
     runs-on: windows-latest
@@ -117,7 +136,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: tools/package-lock.json
 
