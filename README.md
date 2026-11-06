@@ -202,8 +202,9 @@ The `service/` directory contains the self-hosted service: one Node 24 HTTP proc
 SQLite schema for accounts, sessions, projects, memberships, snapshots and audit rows, opaque object
 storage, a maintenance worker, reversible migrations, backup and restore, and a minimal health
 endpoint. The account core includes email verification, Argon2id passwords, rotating refresh tokens
-with reuse detection, session management, password reset, TOTP, account deletion grace, project role
-checks and scoped API tokens.
+with reuse detection, session management, password reset, TOTP, email one-time codes, account
+deletion grace, project role checks and scoped API tokens. Project assets have authenticated upload,
+member-only download and share download enforcement.
 
 ```powershell
 cd service
@@ -382,8 +383,8 @@ Built artifacts are copied to `dist/`:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.4.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
-| `Khaoyu Note_0.4.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.5.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.5.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
 | `KhaoyuNote.exe` | 10.79 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.38 MiB | standalone MCP server for AI agents |
 
