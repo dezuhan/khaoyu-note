@@ -356,6 +356,9 @@ node tools/test-mcp.mjs
 # self-hosted service and account tests (Node 24, temp databases)
 node --test service/test/service.test.mjs service/test/auth.test.mjs
 
+# live security smoke check against a running service
+node tools/check-service-security.mjs --base http://127.0.0.1:8080 --credentials target/service-dev-credentials.json
+
 # screenshot of the native window
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/screenshot.ps1
 

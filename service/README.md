@@ -235,6 +235,9 @@ Set `KHAOYU_SERVICE_PUBLIC_URL` to the public HTTPS origin after the proxy is ac
 
 ```powershell
 node --test test/service.test.mjs test/auth.test.mjs
+
+# against a running instance with a verified account
+node ../tools/check-service-security.mjs --base http://127.0.0.1:8080 --credentials ../target/service-dev-credentials.json
 ```
 
 The service suite covers fail-closed configuration, reversible migrations, opaque object storage
