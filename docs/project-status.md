@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.14.0.
+Snapshot date: 2026-11-07. Version: 0.15.0.
 
 ## Technology
 
@@ -191,7 +191,7 @@ Still blocked by the environment or missing credentials:
 - Backup, export and pre-restore names are collision-free within the same millisecond.
 - A failed legacy JSON import keeps the folder and retries on the next launch.
 - MCP search snippets preserve Unicode, `create_card` cannot override id/type through `fields`, and deleting a card removes its full descendant subtree.
-- Verification: 218/218 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 37/37 service foundation, auth, SSO, sharing, assets, collaboration, notifications, email, admin and backup, sync engine checks, 10 Rust library tests and 2 MCP unit tests.
+- Verification: 218/218 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 39/39 service foundation, auth, SSO, sharing, assets, collaboration, notifications, email, admin, backup and transport hardening, sync engine checks, 10 Rust library tests and 2 MCP unit tests.
 - A localhost web host (`server.mjs`) now serves the same frontend against the same SQLite database and assets, with `/status`, a menu-bar host badge and Settings > About details.
 - A self-hosted service foundation (`service/`) now provides fail-closed configuration, explicit reversible migrations, account/project/membership/audit/object tables, content-addressed object storage, a maintenance worker, health endpoints, backup/restore and Docker Compose deployment.
 - The service account core now adds Argon2id registration, email verification, rotating refresh tokens with reuse detection, session revocation, password reset, TOTP, account deletion grace, CSRF/cookie hardening, project role checks and scoped API tokens.
@@ -208,6 +208,7 @@ Still blocked by the environment or missing credentials:
 - Backups can be encrypted with a scrypt-derived AES-256-GCM key, and login blocks can post a structured alert to an operator webhook.
 - Optional trusted-proxy SSO signs the proxy email with HMAC, can auto-create verified accounts and audits SSO sessions.
 - Presence is opt-in per account, and share comments mention project members by email with scoped notifications.
+- Optional HTTPS enforcement rejects plain requests behind a trusted proxy, and uploads validate image signatures with optional scanner hooks.
 - External video and map iframes now run in a sandbox with a strict referrer policy.
 - The Milestones 1 to 3 audit is recorded in `docs/security-audit.md`; the largest open risks are desktop sync, SMTP delivery, service asset authorization and a global sharing kill switch.
 - Sharing, SMTP delivery, SSO, passkeys, scoped API tokens, a browser login UI and desktop sync remain pending.

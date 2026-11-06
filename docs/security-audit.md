@@ -45,8 +45,8 @@ authorization.
   A compromised webview or XSS could read it. Use a scoped, expiring token and revoke it after use.
 - Bearer-token CORS is limited to configured desktop origins. Any origin added to
   `KHAOYU_SERVICE_CORS_ORIGINS` can call the API if it obtains a token; keep the list minimal.
-- Asset MIME sniffing, malware scanning, watermarking and signed short-lived URLs are not implemented.
-  Uploads are size-limited, filename-sanitised, extension-blocked and access-controlled.
+- Asset MIME sniffing and an optional scanner hook are implemented; watermarking and signed
+  short-lived URLs are not.
 - Backup encryption is optional. When no passphrase is configured, backups remain plaintext in the
   backup directory and depend on host and volume controls.
 - Registration, reset requests and invitations have no dedicated rate limit.

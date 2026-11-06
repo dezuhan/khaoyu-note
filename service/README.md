@@ -71,6 +71,8 @@ a migration is pending.
 | `KHAOYU_SERVICE_SSO_HEADER` | `x-auth-request-email` | Header containing the authenticated email. |
 | `KHAOYU_SERVICE_SSO_NAME_HEADER` | `x-auth-request-name` | Optional display-name header. |
 | `KHAOYU_SERVICE_SSO_AUTO_CREATE` | `false` | Create a verified account for an unknown SSO email. |
+| `KHAOYU_SERVICE_REQUIRE_HTTPS` | `false` | Reject plain HTTP unless a trusted proxy reports `x-forwarded-proto: https`. Requires an HTTPS public URL. |
+| `KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND` | empty | Optional scanner executable receiving the temporary upload path; non-zero exit rejects the asset. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
 | `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
@@ -269,8 +271,11 @@ connection still receives snapshot events but is excluded from both presence cou
 
 Assets are uploaded as raw bytes with `x-file-name` and a content type, limited to 100 MB. The bytes
 are content-addressed and deduplicated in the object store; the project asset row keeps an opaque id,
-display name, content type and size. Executable and script extensions are rejected. List and download
-require project membership, while upload requires the editor role and the `projects:write` scope.
+display name, content type and size. Executable and script extensions are rejected. Image uploads are
+sniffed against PNG, JPEG, GIF and WebP signatures, mismatches are rejected and SVG is not accepted as
+an asset. If `KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND` is set, the temporary file is passed to that scanner
+with a ten second timeout and a non-zero exit rejects the upload. List and download require project
+membership, while upload requires the editor role and the `projects:write` scope.
 
 A share can download an asset only when `downloadAllowed` is true, the link is valid and its
 passphrase matches. Project shares can download any project asset; item and column shares only when
@@ -331,7 +336,9 @@ it revokes every session and token without touching project data.
 
 ## Reverse proxy
 
-Caddy:
+Terminate TLS at the proxy and set `KHAOYU_SERVICE_REQUIRE_HTTPS=true` and
+`KHAOYU_SERVICE_TRUST_PROXY=true`. The service then rejects plain HTTP with 426 unless the proxy
+reports `x-forwarded-proto: https`; the public URL must be HTTPS at startup. Caddy:
 
 ```caddyfile
 notes.example.com {
@@ -375,7 +382,8 @@ deletion grace and purge, scoped API tokens, email one-time codes, project/item/
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
 authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences, CORS preflight,
-encrypted backups, alert webhooks, trusted-proxy SSO, presence opt-in and comment mentions.
+encrypted backups, alert webhooks, trusted-proxy SSO, presence opt-in, comment mentions, HTTPS
+enforcement and upload signature scanning.
 
 ## Milestone boundaries
 

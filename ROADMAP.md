@@ -130,7 +130,7 @@ remaining work named in the item.
 
 ### Data protection
 
-- [ ] TLS everywhere; HTTP redirects to HTTPS or refuses to serve.
+- [x] TLS everywhere; HTTP redirects to HTTPS or refuses to serve.
 - [ ] Encryption at rest for the database volume and object storage where the platform supports it.
 - [ ] Application-level encryption for highly sensitive fields if the deployment requires it.
 - [x] Asset access checked through signed, short-lived URLs or an authenticated proxy.
@@ -140,7 +140,7 @@ remaining work named in the item.
 ### Input and output safety
 
 - [ ] Server-side validation for every request body, parameter and upload.
-- [ ] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks (partial: filename sanitisation, extension blocking and size limits implemented; MIME sniffing and malware hooks pending).
+- [x] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks.
 - [ ] Markdown and rich text sanitised on the server before rendering.
 - [ ] Stored XSS prevention through context-aware escaping and a strict CSP.
 - [x] Parameterised database queries only.
