@@ -34,7 +34,7 @@ khaoyu-note/
   README.md                  this file
   package.json               localhost web host scripts
   server.mjs                 Node web host: static UI plus SQLite JSON bridge
-  service/                   self-hosted service foundation (Milestone 1)
+  service/                   self-hosted service foundation and accounts (Milestones 1 and 2)
   app/                       the Tauri v2 application
     src-tauri/               Rust backend: SQLite storage, window, bundle config
       src/bin/khaoyu-note-mcp.rs  stdio MCP server binary (14 board tools)
@@ -195,29 +195,35 @@ module.
 Browser limitations: dropping a local file path from the OS is not available (upload through the file
 picker instead), and folder restore plus the stdio MCP server remain desktop-only.
 
-## Self-hosted service foundation (Milestone 1)
+## Self-hosted service foundation and accounts (Milestones 1 and 2)
 
-The `service/` directory contains the self-hosted foundation: one Node 24 HTTP process, a relational
-SQLite schema for accounts, projects, memberships, snapshots and audit rows, opaque object storage, a
-maintenance worker, reversible migrations, backup and restore, and a minimal health endpoint.
+The `service/` directory contains the self-hosted service: one Node 24 HTTP process, a relational
+SQLite schema for accounts, sessions, projects, memberships, snapshots and audit rows, opaque object
+storage, a maintenance worker, reversible migrations, backup and restore, and a minimal health
+endpoint. The account core includes email verification, Argon2id passwords, rotating refresh tokens
+with reuse detection, session management, password reset, TOTP, account deletion grace, project role
+checks and scoped API tokens.
 
 ```powershell
 cd service
 Copy-Item .env.example .env
 # Set KHAOYU_SERVICE_SECRET to: openssl rand -hex 32
+$env:KHAOYU_SERVICE_PUBLIC_URL = "http://127.0.0.1:8080"
+$env:KHAOYU_SERVICE_COOKIE_SECURE = "false"
+$env:KHAOYU_BOOTSTRAP_PASSWORD = "use-a-unique-password-of-12-plus"
 node src/cli.mjs migrate
 node src/cli.mjs bootstrap
 node src/server.mjs
 ```
 
-`GET /healthz` returns only `{"status":"ok"}`. Docker Compose, reverse proxy examples, configuration,
-backup and upgrade steps are documented in [service/README.md](<service/README.md>).
+`GET /healthz` returns only `{"status":"ok"}`. Docker Compose, reverse proxy examples, auth endpoints,
+configuration, backup and upgrade steps are documented in [service/README.md](<service/README.md>).
 
-This milestone does not include login, sharing or desktop sync. Those depend on the account and
-permission model in Milestone 2. The service tests run with:
+Sharing, a browser login UI and desktop sync are not included yet. Verification and reset mail is
+written to the service outbox until an SMTP adapter exists. The service tests run with:
 
 ```powershell
-node --test service/test/service.test.mjs
+node --test service/test/service.test.mjs service/test/auth.test.mjs
 ```
 
 ## MCP server
@@ -342,8 +348,8 @@ node tools/test-fonts.mjs
 # MCP server smoke test (spawns the binary against a temporary database)
 node tools/test-mcp.mjs
 
-# self-hosted service foundation (Node 24, in-memory temp databases)
-node --test service/test/service.test.mjs
+# self-hosted service and account tests (Node 24, temp databases)
+node --test service/test/service.test.mjs service/test/auth.test.mjs
 
 # screenshot of the native window
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/screenshot.ps1

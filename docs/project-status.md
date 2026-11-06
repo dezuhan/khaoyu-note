@@ -15,7 +15,7 @@ Snapshot date: 2026-11-07. Version: 0.1.0.
 | Self-hosted service | Node 24, built-in `node:sqlite`, one HTTP port, Docker Compose, reversible migrations |
 | Agent integration | `khaoyu-note-mcp`, a local stdio JSON-RPC 2.0 server with 14 tools |
 | File assets | Local assets directory with an `assets` table for original filenames |
-| Tests | Playwright UI suite, MCP smoke suite and service foundation tests |
+| Tests | Playwright UI suite, MCP smoke suite, service foundation tests and authentication tests |
 | Packaging | Windows NSIS and MSI locally; GitHub Actions matrix prepared for Linux and macOS |
 | Platform | Windows verified. Linux, macOS, Flatpak, Android and iOS are not verified yet |
 
@@ -191,10 +191,11 @@ Still blocked by the environment or missing credentials:
 - Backup, export and pre-restore names are collision-free within the same millisecond.
 - A failed legacy JSON import keeps the folder and retries on the next launch.
 - MCP search snippets preserve Unicode, `create_card` cannot override id/type through `fields`, and deleting a card removes its full descendant subtree.
-- Verification: 213/213 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 8/8 service foundation, 10 Rust library tests and 2 MCP unit tests.
+- Verification: 213/213 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 18/18 service foundation and auth, 10 Rust library tests and 2 MCP unit tests.
 - A localhost web host (`server.mjs`) now serves the same frontend against the same SQLite database and assets, with `/status`, a menu-bar host badge and Settings > About details.
 - A self-hosted service foundation (`service/`) now provides fail-closed configuration, explicit reversible migrations, account/project/membership/audit/object tables, content-addressed object storage, a maintenance worker, health endpoints, backup/restore and Docker Compose deployment.
-- Desktop project sync, login and sharing remain pending because they depend on the Milestone 2 account and permission model.
+- The service account core now adds Argon2id registration, email verification, rotating refresh tokens with reuse detection, session revocation, password reset, TOTP, account deletion grace, CSRF/cookie hardening, project role checks and scoped API tokens.
+- Sharing, SMTP delivery, SSO, passkeys, scoped API tokens, a browser login UI and desktop sync remain pending.
 - Deleting a board tree now runs in one transaction and terminates on a parent cycle.
 - Corrupt card or connection JSON is reported on stderr instead of disappearing silently, and `boards.parent_id` has an index.
 - Cards support a persisted position lock: they stay selectable for unlocking but block drag, resize, inline editing and sheet or column handles.

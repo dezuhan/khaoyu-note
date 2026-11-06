@@ -52,7 +52,7 @@ node --experimental-vm-modules scripts/check-web.cjs
 node tools/test-ui.mjs http://127.0.0.1:1430/
 node tools/test-card-features.mjs http://127.0.0.1:1430/
 node tools/test-web-mode.mjs
-node --test service/test/service.test.mjs
+node --test service/test/service.test.mjs service/test/auth.test.mjs
 ```
 
 Backend changes also run:

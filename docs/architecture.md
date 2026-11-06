@@ -315,6 +315,27 @@ The service listens on one port and binds to loopback by default. Docker Compose
 non-root, with a read-only root filesystem, no capabilities and a writable `/data` volume. Client
 sync, login and sharing are intentionally absent until Milestones 2 to 4.
 
+## Authentication and sessions
+
+`service/src/auth` implements the Milestone 2 account core. Passwords use Argon2id with a per-user
+salt. Email addresses are normalized to lowercase and unique. Registration queues a verification
+token; login is refused until the account is verified. Tokens for verification and reset are random,
+single use, short lived and stored as SHA-256 hashes.
+
+Login creates a session family with a 15 minute access token and a 7 day rotating refresh token.
+Every refresh marks the old token used and writes a replacement. Replaying an already used or
+revoked refresh token revokes the whole family. Session rows carry device, IP hash and user agent;
+access and refresh tokens are hashed at rest. Cookie authentication requires the double-submit CSRF
+header for writes, while bearer access tokens skip that check. Login failures are counted per email
+and IP with a fixed window and a generic 401 response.
+
+TOTP uses a base32 secret, SHA-1 HMAC, six digits and a 30 second period with one step of clock
+skew. Scoped API tokens use the `khn_` prefix, are stored hashed, grant `projects:read` or
+`projects:write`, and cannot manage sessions or account settings. Account deletion is scheduled with
+a grace period, can be cancelled, exports account and project metadata first, and is purged by the
+worker when due. Verification and reset mail is written to a mode `0600` outbox because an SMTP
+adapter is still pending.
+
 ## MCP server
 
 `app/src-tauri/src/bin/khaoyu-note-mcp.rs` is a second binary in the same crate. It links the same

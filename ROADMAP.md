@@ -56,39 +56,39 @@ remaining work named in the item.
 
 ### Account model
 
-- [ ] Email and password registration with email verification.
-- [ ] Unique, case-normalised email addresses; display name separate from email.
-- [ ] Account deletion request with a grace period, export before deletion.
-- [ ] Optional second factor: TOTP first, passkeys later.
+- [x] Email and password registration with email verification.
+- [x] Unique, case-normalised email addresses; display name separate from email.
+- [x] Account deletion request with a grace period, export before deletion.
+- [x] Optional second factor: TOTP first, passkeys later (TOTP implemented; passkeys pending).
 - [ ] Optional SSO for self-hosted enterprise deployments, behind an operator flag.
 
 ### Authentication
 
-- [ ] Passwords hashed with Argon2id and per-user salts; parameters tuned and versioned.
-- [ ] Short-lived access tokens plus rotating refresh tokens stored as hashes server-side.
-- [ ] Refresh token reuse detection revokes the whole session family.
-- [ ] Session list with device label, creation time, last seen time and a revoke action.
-- [ ] Logout everywhere action.
-- [ ] Login throttling per account and per IP, with progressive delays and alerting.
-- [ ] Generic login errors that do not reveal whether an email exists.
-- [ ] Password reset tokens single use, short lived, hashed at rest and bound to the account.
+- [x] Passwords hashed with Argon2id and per-user salts; parameters tuned and versioned.
+- [x] Short-lived access tokens plus rotating refresh tokens stored as hashes server-side.
+- [x] Refresh token reuse detection revokes the whole session family.
+- [x] Session list with device label, creation time, last seen time and a revoke action.
+- [x] Logout everywhere action.
+- [ ] Login throttling per account and per IP, with progressive delays and alerting (partial: fixed window and 429 implemented; progressive delay and alerting pending).
+- [x] Generic login errors that do not reveal whether an email exists.
+- [x] Password reset tokens single use, short lived, hashed at rest and bound to the account.
 - [ ] Optional email one-time codes as an alternative login method.
 
 ### CSRF and browser security
 
-- [ ] Session cookies use `Secure`, `HttpOnly` and `SameSite=Lax` or stricter.
-- [ ] State-changing requests require CSRF tokens or a strict origin check.
-- [ ] Content Security Policy on every server-rendered response.
-- [ ] No secrets, tokens or personal data in URLs or logs.
+- [x] Session cookies use `Secure`, `HttpOnly` and `SameSite=Lax` or stricter.
+- [x] State-changing requests require CSRF tokens or a strict origin check.
+- [x] Content Security Policy on every server-rendered response.
+- [x] No secrets, tokens or personal data in URLs or logs.
 - [ ] Third-party iframe embeds isolated and documented, since media cards load external content.
 
 ### Authorisation
 
-- [ ] Server-side authorisation on every request; the client never decides access.
-- [ ] Role and permission checks at the resource boundary, not only in the UI.
-- [ ] Object-level checks for board, card, column, asset and share link ids.
-- [ ] Deny-by-default policy for unknown routes and unknown resource types.
-- [ ] MCP and API integrations use scoped tokens, not the user's password.
+- [x] Server-side authorisation on every request; the client never decides access.
+- [x] Role and permission checks at the resource boundary, not only in the UI.
+- [ ] Object-level checks for board, card, column, asset and share link ids (partial: project and membership checks exist; board/card/asset APIs are not implemented yet).
+- [x] Deny-by-default policy for unknown routes and unknown resource types.
+- [x] MCP and API integrations use scoped tokens, not the user's password.
 
 ## Milestone 3: Sharing model
 

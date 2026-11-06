@@ -1,9 +1,9 @@
-# Khaoyu Note service foundation
+# Khaoyu Note service
 
-This is the Milestone 1 self-hosted foundation: one standalone HTTP process, a relational SQLite
-database for accounts, projects, memberships, snapshots and audit rows, opaque object storage, a
-maintenance worker, explicit reversible migrations, and backup/restore. It deliberately has no
-login, sharing or client sync endpoints yet. Those belong to Milestones 2 to 4.
+This is the self-hosted service foundation plus the core account and login model: one standalone
+HTTP process, a relational SQLite database for accounts, sessions, projects, memberships, snapshots
+and audit rows, opaque object storage, a maintenance worker, explicit reversible migrations, and
+backup/restore. Sharing, desktop login UI and client sync are not implemented yet.
 
 ## Requirements
 
@@ -17,13 +17,17 @@ cd service
 Copy-Item .env.example .env
 # Edit .env and replace KHAOYU_SERVICE_SECRET with: openssl rand -hex 32
 $env:KHAOYU_SERVICE_SECRET = "paste-the-generated-secret"
+$env:KHAOYU_SERVICE_PUBLIC_URL = "http://127.0.0.1:8080"
+$env:KHAOYU_SERVICE_COOKIE_SECURE = "false"
+$env:KHAOYU_BOOTSTRAP_PASSWORD = "use-a-unique-password-of-12-plus"
 node src/cli.mjs migrate
 node src/cli.mjs bootstrap
 node src/server.mjs
 ```
 
-Open `http://127.0.0.1:8080/healthz`. The bootstrap command creates the first account and project
-without a password; account login is added in Milestone 2.
+`bootstrap` creates a verified owner account and project. Registration through
+`POST /api/v1/auth/register` is the normal path for additional accounts. Verification and reset
+messages are written to `<data>/outbox/*.json` with mode `0600`; the SMTP adapter is not implemented.
 
 ## Docker Compose
 
@@ -33,7 +37,7 @@ Copy-Item .env.example .env
 # Edit .env, especially KHAOYU_SERVICE_SECRET and KHAOYU_SERVICE_PUBLIC_URL
 docker compose build
 docker compose run --rm khaoyu-note-service node src/cli.mjs migrate
-docker compose run --rm khaoyu-note-service node src/cli.mjs bootstrap
+docker compose run --rm -e KHAOYU_BOOTSTRAP_PASSWORD='use-a-unique-password-of-12-plus' khaoyu-note-service node src/cli.mjs bootstrap
 docker compose up -d
 ```
 
@@ -48,12 +52,19 @@ a migration is pending.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `KHAOYU_SERVICE_PROFILE` | `single-user` | `single-user` or `team`. Team accounts are completed in Milestone 2. |
+| `KHAOYU_SERVICE_PROFILE` | `single-user` | `single-user` or `team`. Team membership APIs are still limited. |
 | `KHAOYU_SERVICE_HOST` | `127.0.0.1` | Bind address. Compose sets `0.0.0.0` inside the container. |
 | `KHAOYU_SERVICE_PORT` | `8080` | Single HTTP port. |
-| `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files and backups. |
+| `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files, outbox and backups. |
 | `KHAOYU_SERVICE_SECRET` | required | At least 32 characters and not a placeholder. |
 | `KHAOYU_SERVICE_PUBLIC_URL` | `http://host:port` | Public HTTPS origin behind a proxy. |
+| `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
+| `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
+| `KHAOYU_SERVICE_ACCESS_TTL_MINUTES` | `15` | Access token lifetime. |
+| `KHAOYU_SERVICE_REFRESH_TTL_DAYS` | `7` | Refresh token and session lifetime. |
+| `KHAOYU_SERVICE_DELETION_GRACE_DAYS` | `30` | Days before a requested account deletion is purged. |
+| `KHAOYU_SERVICE_LOGIN_WINDOW_MINUTES` | `15` | Failed-login rate limit window. |
+| `KHAOYU_SERVICE_LOGIN_MAX_ATTEMPTS` | `5` | Failures before a temporary 429. |
 | `KHAOYU_SERVICE_BACKUP_INTERVAL_HOURS` | `24` | Automatic backup interval. |
 | `KHAOYU_SERVICE_BACKUP_RETENTION` | `7` | Number of backups kept. |
 | `KHAOYU_SERVICE_AUDIT_RETENTION_DAYS` | `90` | Audit retention before pruning. |
@@ -68,6 +79,51 @@ looks like a placeholder.
 - `GET /readyz` checks the database and returns `{"status":"ready"}` or `{"status":"not_ready"}`.
 
 Neither endpoint returns a version, database path, configuration or error details.
+
+## Authentication API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/auth/register` | Create an account and queue a verification token. |
+| `POST` | `/api/v1/auth/verify-email` | Consume the verification token. |
+| `POST` | `/api/v1/auth/login` | Password login, optional TOTP, sets session cookies. |
+| `POST` | `/api/v1/auth/refresh` | Rotate the refresh token and issue a new access token. |
+| `POST` | `/api/v1/auth/logout` | Revoke the current session and clear cookies. |
+| `POST` | `/api/v1/auth/logout-all` | Revoke every session for the account. |
+| `GET` | `/api/v1/auth/sessions` | List sessions with device, timestamps and current flag. |
+| `DELETE` | `/api/v1/auth/sessions/:id` | Revoke one session. |
+| `POST` | `/api/v1/auth/password-reset/request` | Queue a single-use reset token. |
+| `POST` | `/api/v1/auth/password-reset/confirm` | Set a new password and revoke sessions. |
+| `POST` | `/api/v1/auth/totp/setup` | Create a TOTP secret and `otpauth` URI. |
+| `POST` | `/api/v1/auth/totp/enable` | Confirm a TOTP code and enable it. |
+| `POST` | `/api/v1/auth/totp/disable` | Disable TOTP with password and code. |
+| `GET` | `/api/v1/account/export` | Export account and project metadata. |
+| `GET` | `/api/v1/account/tokens` | List scoped API tokens. |
+| `POST` | `/api/v1/account/tokens` | Create a scoped API token; the raw token is returned once. |
+| `DELETE` | `/api/v1/account/tokens/:id` | Revoke an API token. |
+| `POST` | `/api/v1/account/delete` | Schedule deletion after the grace period. |
+| `POST` | `/api/v1/account/delete/cancel` | Cancel a scheduled deletion. |
+| `GET` | `/api/v1/projects` | List projects the account can access. |
+| `POST` | `/api/v1/projects` | Create a project owned by the account. |
+| `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
+| `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. |
+
+Passwords use Argon2id with 64 MiB memory, 3 iterations and a 16-byte per-user salt. Access tokens live
+15 minutes. Refresh tokens live 7 days, rotate on every use and are stored as SHA-256 hashes. Reusing
+an old refresh token revokes the whole session family. Login failures are generic and limited per
+email and per IP.
+
+Cookies are `HttpOnly`, `SameSite=Lax` and `Secure` when the public URL is HTTPS. Write requests made
+with cookie authentication must send the CSRF token in `X-CSRF-Token`; the same value is in the
+non-HttpOnly `khaoyu_csrf` cookie. Bearer access tokens skip the CSRF check.
+
+Scoped API tokens use the `khn_` prefix and the `projects:read` or `projects:write` scopes. They are
+stored as hashes, returned only once, and can be revoked from the account token endpoints. API
+tokens cannot manage sessions, TOTP or account deletion; those require a user session.
+
+Email verification and password reset tokens are single use, short lived and stored as hashes. The
+development mailer writes messages to the outbox instead of sending SMTP; treat that directory as
+sensitive and add an SMTP adapter before production use.
 
 ## Migrations
 
@@ -142,19 +198,28 @@ Set `KHAOYU_SERVICE_PUBLIC_URL` to the public HTTPS origin after the proxy is ac
 ## Tests
 
 ```powershell
-node --test test/service.test.mjs
+node --test test/service.test.mjs test/auth.test.mjs
 ```
 
-The suite covers fail-closed configuration, reversible migrations, opaque object storage with
-deduplication, audit IP hashing, backup/restore round-trip, worker cleanup and the health endpoints.
+The service suite covers fail-closed configuration, reversible migrations, opaque object storage
+with deduplication, audit IP hashing, backup/restore round-trip, worker cleanup and the health
+endpoints. The auth suite covers verification, generic login errors and throttling, CSRF, project
+authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
+deletion grace and purge, and scoped API tokens.
 
-## Milestone 1 boundary
+## Milestone boundaries
 
-Implemented: standalone process, one HTTP port, relational schema, opaque object storage, worker,
-minimal health endpoint, environment configuration, fail-closed startup, reversible migrations,
-backup/restore and upgrade documentation.
+Implemented from Milestone 1: standalone process, one HTTP port, relational schema, opaque object
+storage, worker, minimal health endpoint, environment configuration, fail-closed startup, reversible
+migrations, backup/restore and upgrade documentation.
 
-Still pending: desktop project sync opt-in, explicit sync state in the app, an offline queue with
-conflict resolution, and the guarantee that deleting a local database never deletes server data.
-Those require the account and permission model from Milestone 2 before they can be implemented
-safely.
+Implemented from Milestone 2: email and password registration with verification, case-normalized
+email, display name, Argon2id, short-lived access tokens, rotating refresh tokens with reuse
+detection, session list and revocation, logout everywhere, login throttling, generic login errors,
+hashed single-use reset tokens, TOTP, account export, deletion grace and purge, cookie and CSRF
+hardening, project role checks and scoped API tokens.
+
+Still pending: SMTP delivery, passkeys, SSO, email one-time codes, team membership management, a
+browser login UI and desktop client sync. The Milestone 1 sync boundary remains open: desktop opt-in,
+explicit sync state, offline queue with conflict handling, and protection against a local database
+delete removing server data.

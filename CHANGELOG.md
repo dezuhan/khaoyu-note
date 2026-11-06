@@ -3,6 +3,17 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- Self-hosted service foundation with explicit migrations, opaque object storage, backup/restore,
+  audit hashing, a maintenance worker and Docker Compose deployment.
+- Account core with Argon2id, email verification, rotating refresh tokens and reuse detection,
+  session management, password reset, TOTP, account deletion grace, project role checks and scoped
+  API tokens.
+- Service health endpoints and a file-based verification and reset mail outbox.
+
 ## [0.1.0] - 2026-11-07
 
 ### Added
