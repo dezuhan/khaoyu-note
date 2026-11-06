@@ -13,7 +13,10 @@ function check(name, condition, detail = "") {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const page = await browser.newPage({
+  viewport: { width: 1440, height: 900 },
+  permissions: ["clipboard-read", "clipboard-write"],
+});
 page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
 page.on("console", (message) => {
   if (message.type() === "error") errors.push("console: " + message.text());
@@ -1892,6 +1895,17 @@ const persisted = await page.evaluate(() => {
 });
 check("Board persists card edits", persisted.max >= 15, JSON.stringify(persisted));
 check("Single-file header keeps the template menu visible", await page.locator("#template-btn").isVisible());
+check("Sync state is explicit and off by default", (await page.locator("#sync-state").innerText()).includes("Sync"));
+await page.click("#sync-state");
+await page.waitForTimeout(250);
+check(
+  "Sync dialog exposes server URL, API token and opt-in action",
+  (await page.locator(".mn-sync-panel").isVisible()) &&
+    (await page.locator(".mn-sync-field").count()) === 2 &&
+    (await page.locator(".mn-sync-foot").innerText()).includes("Enable for this board")
+);
+await page.locator(".mn-sync-panel .mn-modal-close").click();
+check("Sync dialog closes without changing the board", (await page.locator(".mn-sync-overlay").count()) === 0);
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
 const failed = results.filter((entry) => !entry.ok);

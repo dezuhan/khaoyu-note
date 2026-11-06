@@ -35,6 +35,7 @@ function configFor(dataDir) {
     cookieSecure: false,
     trustProxy: false,
     publicSharingEnabled: true,
+    corsOrigins: ["tauri://localhost"],
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
@@ -324,6 +325,24 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { doc: "{}", revision: 1 },
     });
     assert.equal(stale.status, 409);
+  });
+
+  await t.test("CORS preflight is limited to configured desktop origins", async () => {
+    const allowed = await api.raw("/api/v1/projects", {
+      method: "OPTIONS",
+      headers: {
+        origin: "tauri://localhost",
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    assert.equal(allowed.status, 204);
+    assert.equal(allowed.headers.get("access-control-allow-origin"), "tauri://localhost");
+    const denied = await api.raw("/api/v1/projects", {
+      method: "OPTIONS",
+      headers: { origin: "https://evil.example", "access-control-request-method": "PUT" },
+    });
+    assert.equal(denied.status, 403);
   });
 
   await t.test("revision history restores snapshots and SSE emits project changes", async () => {

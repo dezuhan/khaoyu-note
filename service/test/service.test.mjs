@@ -39,6 +39,7 @@ function configFor(dataDir) {
     cookieSecure: false,
     trustProxy: false,
     publicSharingEnabled: true,
+    corsOrigins: ["tauri://localhost"],
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
