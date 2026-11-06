@@ -169,11 +169,11 @@ remaining work named in the item.
 
 ## Milestone 4: Collaboration and sync
 
-- [ ] Realtime collaboration only after authentication, authorisation and audit are complete.
-- [ ] Per-project rooms with membership checks on connect and on every message.
-- [ ] Presence is opt-in and does not reveal board contents to non-members.
-- [ ] Conflict handling for offline edits with a visible resolution flow.
-- [ ] Revision history for shared projects, with restore limited to editors and above.
+- [x] Realtime collaboration only after authentication, authorisation and audit are complete.
+- [x] Per-project rooms with membership checks on connect and on every message.
+- [ ] Presence is opt-in and does not reveal board contents to non-members (partial: presence count is member-only; opt-in and cursor awareness pending).
+- [ ] Conflict handling for offline edits with a visible resolution flow (partial: server revision conflicts are enforced; offline queue and resolution UI pending).
+- [x] Revision history for shared projects, with restore limited to editors and above.
 - [ ] Comments and notifications respect scope: a column share cannot leak board-wide activity.
 
 ## Milestone 5: Notifications and activity (server side)
@@ -187,8 +187,8 @@ remaining work named in the item.
 ## Milestone 6: Quality and security validation
 
 - [ ] Threat model reviewed before the first server release.
-- [ ] Automated tests for authentication, authorisation, share scopes and session revocation.
-- [ ] Integration tests for cross-account access attempts, IDOR and link expiry.
+- [x] Automated tests for authentication, authorisation, share scopes and session revocation.
+- [x] Integration tests for cross-account access attempts, IDOR and link expiry.
 - [ ] Load and abuse tests for login, public shares and uploads.
 - [ ] External penetration test before advertising self-hosted production use.
 - [ ] Security disclosure policy and contact address published.

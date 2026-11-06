@@ -353,6 +353,17 @@ roles, roles can be changed by the owner, the owner cannot be removed directly, 
 transfer swaps both roles in one transaction. Share-token write permissions, asset download
 watermarking and a global sharing kill switch remain pending.
 
+## Revision history and realtime events
+
+Every accepted project snapshot writes a row to `project_versions`. Members can list the latest 100
+revisions; editors and owners can restore one, which creates a new revision instead of rewriting
+history. The worker trims older versions per project.
+
+`service/src/events.mjs` keeps in-memory per-project rooms. `GET /api/v1/projects/:id/events` checks
+membership before opening an SSE stream, emits presence counts and snapshot events, and sends a
+heartbeat. Events are published only to the matching project room; server shutdown closes streams
+before the listener. Offline queues and cursor or lock awareness are not implemented yet.
+
 ## MCP server
 
 `app/src-tauri/src/bin/khaoyu-note-mcp.rs` is a second binary in the same crate. It links the same

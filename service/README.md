@@ -114,6 +114,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects/:id/assets` | List project asset metadata. |
 | `POST` | `/api/v1/projects/:id/assets` | Upload an asset as raw bytes; editor role. |
 | `GET` | `/api/v1/projects/:id/assets/:assetId` | Download an asset as a project member. |
+| `GET` | `/api/v1/projects/:id/versions` | List recent project revisions. |
+| `POST` | `/api/v1/projects/:id/versions/:revision/restore` | Restore a revision as editor or owner. |
+| `GET` | `/api/v1/projects/:id/events` | SSE room for snapshot and presence events. |
 | `PATCH` | `/api/v1/projects/:id/members/:accountId` | Change a member role; owner only. |
 | `DELETE` | `/api/v1/projects/:id/members/:accountId` | Remove a member; owner only. |
 | `POST` | `/api/v1/projects/:id/transfer` | Transfer ownership to an existing member; owner only. |
@@ -175,6 +178,18 @@ enforcement are still pending.
 public access returns 404. Anyone holding a link can file an abuse report at
 `/api/v1/share/:token/report`; reports are stored with a hashed reporter IP and remain available to
 the operator in the database.
+
+## Revision history and events
+
+Every accepted snapshot update stores a `project_versions` row. Members can list the latest 100
+revisions, and editors or owners can restore one by creating a new revision, so history is never
+rewritten. The worker prunes versions beyond the latest 100 per project.
+
+`GET /api/v1/projects/:id/events` is an authenticated server-sent events room. It checks project
+membership before opening the stream, emits a `presence` event with connection and distinct account
+counts, and emits `snapshot` events with the new revision and restoring revision when applicable. A
+25 second heartbeat keeps proxies from closing idle streams. Only project rooms receive events, so a
+member of one project does not see activity in another.
 
 ## Project assets
 
@@ -274,7 +289,8 @@ endpoints. The auth suite covers verification, generic login errors and throttli
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
-transfer, asset authorization and share download permission.
+transfer, asset authorization, share download permission, revision restore and authenticated SSE
+rooms.
 
 ## Milestone boundaries
 
@@ -294,6 +310,10 @@ links; expiry; optional passphrase with rate limiting; neutral 404 responses; no
 per access; project roles; email-bound invitations; member removal; ownership transfer safeguards;
 public sharing off by default; scoped payload isolation; a global operator kill switch; abuse
 reports; and authenticated project asset upload/download with share download enforcement.
+
+Implemented from Milestone 4: authenticated per-project SSE rooms, presence counts, revision history,
+editor-only restore and audit. Offline queues, cursor and lock awareness, scoped comments and
+notifications remain pending.
 
 Still pending: share-token write permissions, watermarking, MIME sniffing and malware scanning,
 signed short-lived asset URLs, nested-board policy for project shares, SMTP delivery, passkeys, SSO,
