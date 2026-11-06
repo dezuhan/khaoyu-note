@@ -169,6 +169,26 @@ test("account, login, refresh, session, reset and authorization flows", async (t
   const api = await start();
   t.after(() => api.close());
 
+  async function createProject(user, title = "Test project") {
+    const created = await api.call("/api/v1/projects", {
+      method: "POST",
+      jar: user.jar,
+      body: { title },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    return created.body.id;
+  }
+
+  async function putSnapshot(user, projectId, doc, revision = 1) {
+    const updated = await api.call(`/api/v1/projects/${projectId}/snapshot`, {
+      method: "PUT",
+      jar: user.jar,
+      body: { doc: JSON.stringify(doc), revision },
+    });
+    assert.equal(updated.status, 200, JSON.stringify(updated.body));
+    return updated.body.revision;
+  }
+
   await t.test("registration requires email verification before login", async () => {
     const email = `verify-${crypto.randomUUID()}@example.com`;
     await api.register(email);
@@ -260,6 +280,259 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { doc: "{}", revision: 1 },
     });
     assert.equal(stale.status, 409);
+  });
+
+  await t.test("public sharing is off until the owner enables it", async () => {
+    const owner = await api.account(`share-off-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Private sharing");
+    const denied = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view" },
+    });
+    assert.equal(denied.status, 409);
+    assert.equal(denied.body.code, "sharing_disabled");
+    const enabled = await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    assert.equal(enabled.status, 204);
+    const created = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view", expiresInDays: 7 },
+    });
+    assert.equal(created.status, 201);
+    assert.ok(created.body.token.startsWith("khn_share_"));
+    const access = await api.call(`/api/v1/share/${created.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(access.status, 200);
+    assert.equal(access.body.scope, "project");
+    assert.equal(access.response.headers.get("x-robots-tag"), "noindex, nofollow");
+    const disabled = await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: false },
+    });
+    assert.equal(disabled.status, 204);
+    assert.equal(
+      (await api.call(`/api/v1/share/${created.body.token}/access`, { method: "POST", body: {} })).status,
+      404
+    );
+  });
+
+  await t.test("share links expose only their project, item or column scope", async () => {
+    const owner = await api.account(`share-scope-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Scoped sharing");
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    const doc = {
+      id: projectId,
+      title: "Scoped sharing",
+      cards: [
+        { id: "col1", type: "column", x: 0, y: 0, w: 200, h: 300, z: 1, title: "Column" },
+        { id: "child1", type: "note", x: 10, y: 70, w: 180, h: 70, z: 2, parentId: "col1", text: "Child" },
+        { id: "secret1", type: "note", x: 400, y: 0, w: 200, h: 70, z: 3, text: "Sibling secret" },
+        { id: "file1", type: "file", x: 0, y: 400, w: 200, h: 70, z: 4, path: "/home/secret/private.pdf" },
+      ],
+      connections: [],
+      trash: [{ id: "trash1", type: "note", text: "Deleted secret" }],
+    };
+    await putSnapshot(owner, projectId, doc);
+
+    const projectShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view" },
+    });
+    assert.equal(projectShare.status, 201);
+    const projectAccess = await api.call(`/api/v1/share/${projectShare.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(projectAccess.status, 200);
+    assert.equal(projectAccess.body.doc.trash, undefined);
+    assert.equal(
+      projectAccess.body.doc.cards.find((card) => card.id === "file1").path,
+      null
+    );
+
+    const item = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "secret1", permission: "view" },
+    });
+    assert.equal(item.status, 201);
+    const itemAccess = await api.call(`/api/v1/share/${item.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(itemAccess.status, 200);
+    assert.equal(itemAccess.body.card.id, "secret1");
+    assert.equal(itemAccess.body.doc, undefined);
+    assert.equal(itemAccess.body.cards, undefined);
+
+    const column = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "column", targetId: "col1", permission: "view" },
+    });
+    assert.equal(column.status, 201);
+    const columnAccess = await api.call(`/api/v1/share/${column.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(columnAccess.status, 200);
+    assert.deepEqual(columnAccess.body.cards.map((card) => card.id).sort(), ["child1", "col1"]);
+    assert.equal(columnAccess.body.cards.some((card) => card.id === "secret1"), false);
+  });
+
+  await t.test("share passwords, expiry, rotation and revocation are enforced", async () => {
+    const owner = await api.account(`share-life-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Share lifecycle");
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    await putSnapshot(owner, projectId, {
+      id: projectId,
+      title: "Share lifecycle",
+      cards: [{ id: "card1", type: "note", x: 0, y: 0, w: 200, h: 70, z: 1, text: "Hello" }],
+      connections: [],
+      trash: [],
+    });
+    const protectedShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "card1", permission: "view", password: "share-password-123" },
+    });
+    assert.equal(protectedShare.status, 201);
+    const noPassword = await api.call(`/api/v1/share/${protectedShare.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(noPassword.status, 404);
+    const wrongPassword = await api.call(`/api/v1/share/${protectedShare.body.token}/access`, {
+      method: "POST",
+      body: { password: "wrong-password-123" },
+    });
+    assert.equal(wrongPassword.status, 404);
+    const goodPassword = await api.call(`/api/v1/share/${protectedShare.body.token}/access`, {
+      method: "POST",
+      body: { password: "share-password-123" },
+    });
+    assert.equal(goodPassword.status, 200);
+
+    api.db.exec("DELETE FROM share_attempts");
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await api.call(`/api/v1/share/${protectedShare.body.token}/access`, {
+        method: "POST",
+        body: { password: "wrong-password-123" },
+      });
+    }
+    const blocked = await api.call(`/api/v1/share/${protectedShare.body.token}/access`, {
+      method: "POST",
+      body: { password: "share-password-123" },
+    });
+    assert.equal(blocked.status, 429);
+    api.db.exec("DELETE FROM share_attempts");
+
+    const expiring = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "card1", permission: "view", expiresInDays: 1 },
+    });
+    api.db.prepare("UPDATE share_links SET expires_at = ? WHERE id = ?").run(Date.now() - 1, expiring.body.id);
+    assert.equal(
+      (await api.call(`/api/v1/share/${expiring.body.token}/access`, { method: "POST", body: {} })).status,
+      404
+    );
+
+    const rotateSource = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "card1", permission: "view" },
+    });
+    const rotated = await api.call(`/api/v1/projects/${projectId}/shares/${rotateSource.body.id}/rotate`, {
+      method: "POST",
+      jar: owner.jar,
+    });
+    assert.equal(rotated.status, 200);
+    assert.equal(
+      (await api.call(`/api/v1/share/${rotateSource.body.token}/access`, { method: "POST", body: {} })).status,
+      404
+    );
+    assert.equal(
+      (await api.call(`/api/v1/share/${rotated.body.token}/access`, { method: "POST", body: {} })).status,
+      200
+    );
+    const revoked = await api.call(`/api/v1/projects/${projectId}/shares/${rotateSource.body.id}`, {
+      method: "DELETE",
+      jar: owner.jar,
+    });
+    assert.equal(revoked.status, 204);
+    assert.equal(
+      (await api.call(`/api/v1/share/${rotated.body.token}/access`, { method: "POST", body: {} })).status,
+      404
+    );
+  });
+
+  await t.test("invitations add members and ownership transfer is guarded", async () => {
+    const owner = await api.account(`owner-members-${crypto.randomUUID()}@example.com`);
+    const guestEmail = `guest-${crypto.randomUUID()}@example.com`;
+    const guest = await api.account(guestEmail);
+    const projectId = await createProject(owner, "Membership");
+    assert.equal((await api.call(`/api/v1/projects/${projectId}`, { jar: guest.jar })).status, 404);
+
+    const invitation = await api.call(`/api/v1/projects/${projectId}/invitations`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { email: guestEmail, role: "editor" },
+    });
+    assert.equal(invitation.status, 201);
+    const token = api.latestMail("invite", guestEmail).text.match(/token: (\S+)/)[1];
+    const accepted = await api.call("/api/v1/invitations/accept", {
+      method: "POST",
+      jar: guest.jar,
+      body: { token },
+    });
+    assert.equal(accepted.status, 200);
+    const guestView = await api.call(`/api/v1/projects/${projectId}`, { jar: guest.jar });
+    assert.equal(guestView.status, 200);
+    assert.equal(guestView.body.project.role, "editor");
+
+    const members = await api.call(`/api/v1/projects/${projectId}/members`, { jar: owner.jar });
+    assert.equal(members.body.members.length, 2);
+    const guestId = guest.account.id;
+    const demoted = await api.call(`/api/v1/projects/${projectId}/members/${guestId}`, {
+      method: "PATCH",
+      jar: owner.jar,
+      body: { role: "viewer" },
+    });
+    assert.equal(demoted.status, 204);
+    const transfer = await api.call(`/api/v1/projects/${projectId}/transfer`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { accountId: guestId },
+    });
+    assert.equal(transfer.status, 204);
+    const oldOwner = await api.call(`/api/v1/projects/${projectId}`, { jar: owner.jar });
+    assert.equal(oldOwner.body.project.role, "editor");
+    const newOwner = await api.call(`/api/v1/projects/${projectId}`, { jar: guest.jar });
+    assert.equal(newOwner.body.project.role, "owner");
+    const forbiddenTransfer = await api.call(`/api/v1/projects/${projectId}/transfer`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { accountId: guestId },
+    });
+    assert.equal(forbiddenTransfer.status, 403);
   });
 
   await t.test("scoped API tokens authorize project access without a password", async () => {

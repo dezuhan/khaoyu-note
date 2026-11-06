@@ -13,6 +13,7 @@ import { createBackup, restoreBackup } from "../src/backup.mjs";
 import { runMaintenance } from "../src/worker.mjs";
 import { createService } from "../src/app.mjs";
 import { assertSchemaCurrent } from "../src/app.mjs";
+import { logPath } from "../src/app.mjs";
 
 const SECRET = "Kx9-vQ2m-Rt7-pL4s-Wb8-nC3d-Hf6-jZ1a";
 
@@ -69,12 +70,12 @@ test("migrations are reversible and recreate the schema", () => {
   const db = openDatabase(config.databasePath);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [false, false]
+    [false, false, false]
   );
-  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2]);
+  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3]);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [true, true]
+    [true, true, true]
   );
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -94,13 +95,21 @@ test("migrations are reversible and recreate the schema", () => {
   ]) {
     assert.ok(tables.includes(table), `${table} missing`);
   }
-  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 2 }), [2, 1]);
+  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 3 }), [3, 2, 1]);
   assert.equal(
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get(),
     undefined
   );
   migrate(db, { directory: MIGRATIONS_DIR });
   db.close();
+});
+
+test("share tokens are redacted from request logs", () => {
+  assert.equal(
+    logPath("/api/v1/share/khn_share_supersecret/access"),
+    "/api/v1/share/[redacted]/access"
+  );
+  assert.equal(logPath("/api/v1/projects"), "/api/v1/projects");
 });
 
 test("the server refuses to start while a migration is pending", () => {
