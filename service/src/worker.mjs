@@ -69,6 +69,9 @@ function pruneTokens(db) {
     .prepare("DELETE FROM email_otps WHERE expires_at < ? OR used_at < ?")
     .run(now - 86_400_000, now - 86_400_000).changes;
   const versions = pruneVersions(db);
+  const notifications = db
+    .prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND read_at < ?")
+    .run(now - 90 * 86_400_000).changes;
   return {
     access: Number(access),
     email: Number(email),
@@ -76,6 +79,7 @@ function pruneTokens(db) {
     shares: Number(shares),
     otp: Number(otp),
     versions,
+    notifications: Number(notifications),
   };
 }
 

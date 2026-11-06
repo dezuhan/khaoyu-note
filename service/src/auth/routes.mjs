@@ -35,6 +35,13 @@ import {
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
 import { createEventHub } from "../events.mjs";
+import {
+  createNotification,
+  listNotifications,
+  notifyProjectMembers,
+  notifyProjectOwners,
+  removeResourceNotifications,
+} from "../notifications.mjs";
 
 function now() {
   return Date.now();
@@ -227,6 +234,13 @@ export function createApiRouter({ db, config, logger, mailer }) {
           resourceId: share.id,
           ip,
           secret: config.secret,
+        });
+        notifyProjectOwners(db, share.project_id, {
+          kind: "share.reported",
+          title: "A shared link was reported",
+          body: reason,
+          resourceType: "share_link",
+          resourceId: share.id,
         });
         sendJson(response, 202, { status: "reported" }, config);
         return true;
@@ -972,6 +986,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
         if (!revokeShare(db, shareItemMatch[1], shareItemMatch[2], auth.account.id, config)) {
           throw new HttpError(404, "share not found", "not_found");
         }
+        removeResourceNotifications(db, "share_link", shareItemMatch[2]);
         sendNoContent(response, 204, config);
         return true;
       }
@@ -1010,6 +1025,9 @@ export function createApiRouter({ db, config, logger, mailer }) {
           db.prepare(
             "UPDATE share_links SET revoked_at = ? WHERE project_id = ? AND revoked_at IS NULL"
           ).run(now(), publicFlagMatch[1]);
+          db.prepare(
+            "DELETE FROM notifications WHERE resource_type = 'share_link' AND resource_id IN (SELECT id FROM share_links WHERE project_id = ?)"
+          ).run(publicFlagMatch[1]);
         }
         writeAudit(db, {
           actorAccountId: auth.account.id,
@@ -1111,6 +1129,12 @@ export function createApiRouter({ db, config, logger, mailer }) {
           account: auth.account,
         });
         if (!result) throw new HttpError(404, "invitation not found", "not_found");
+        notifyProjectOwners(db, result.projectId, {
+          except: auth.account.id,
+          kind: "invitation.accepted",
+          title: "Invitation accepted",
+          body: `${auth.account.email} joined as ${result.role}.`,
+        });
         writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "invitation.accepted",
@@ -1161,6 +1185,14 @@ export function createApiRouter({ db, config, logger, mailer }) {
             memberMatch[1],
             memberMatch[2]
           );
+          createNotification(db, {
+            accountId: memberMatch[2],
+            kind: "member.role_changed",
+            title: "Project role changed",
+            body: `Your role is now ${body.role}.`,
+            resourceType: "project",
+            resourceId: memberMatch[1],
+          });
           writeAudit(db, {
             actorAccountId: auth.account.id,
             action: "member.role_changed",
@@ -1281,6 +1313,50 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/notifications") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const notifications = listNotifications(db, { accountId: auth.account.id });
+        sendJson(
+          response,
+          200,
+          {
+            notifications: notifications.map((entry) => ({
+              id: entry.id,
+              kind: entry.kind,
+              title: entry.title,
+              body: entry.body,
+              resourceType: entry.resource_type,
+              resourceId: entry.resource_id,
+              createdAt: entry.created_at,
+              readAt: entry.read_at,
+            })),
+            unread: notifications.filter((entry) => !entry.read_at).length,
+          },
+          config
+        );
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/notifications/read-all") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const result = db
+          .prepare("UPDATE notifications SET read_at = ? WHERE account_id = ? AND read_at IS NULL")
+          .run(now(), auth.account.id);
+        sendJson(response, 200, { updated: Number(result.changes) }, config);
+        return true;
+      }
+
+      const notificationReadMatch = url.pathname.match(/^\/api\/v1\/notifications\/([^/]+)\/read$/);
+      if (method === "PATCH" && notificationReadMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const result = db
+          .prepare("UPDATE notifications SET read_at = ? WHERE id = ? AND account_id = ? AND read_at IS NULL")
+          .run(now(), notificationReadMatch[1], auth.account.id);
+        if (!result.changes) throw new HttpError(404, "notification not found", "not_found");
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
       const eventsMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/events$/);
       if (method === "GET" && eventsMatch) {
         const auth = requireAuth(request, response, db, config);
@@ -1364,6 +1440,12 @@ export function createApiRouter({ db, config, logger, mailer }) {
           metadata: { fromRevision: Number(restoreMatch[2]), revision },
           ip,
           secret: config.secret,
+        });
+        notifyProjectMembers(db, restoreMatch[1], {
+          except: auth.account.id,
+          kind: "project.version_restored",
+          title: "Project restored to an earlier revision",
+          body: `Revision ${revision} was restored from revision ${restoreMatch[2]}.`,
         });
         sendJson(response, 200, { revision, restoredFrom: Number(restoreMatch[2]) }, config);
         return true;
