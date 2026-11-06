@@ -109,8 +109,9 @@ export function assertSameOrigin(request, config) {
   } catch {
     allowed = config.publicUrl;
   }
-  if (origin !== allowed) throw new HttpError(403, "origin not allowed", "origin_denied");
-}
+  if (origin !== allowed && !config.corsOrigins?.includes(origin)) {
+    throw new HttpError(403, "origin not allowed", "origin_denied");
+  }}
 
 export function requireString(value, field, maximum = 200) {
   if (typeof value !== "string") throw new HttpError(400, `${field} is required`, "invalid_input");

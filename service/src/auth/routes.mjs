@@ -267,8 +267,26 @@ export function createApiRouter({ db, config, logger, mailer }) {
     const method = request.method;
     const ip = clientIp(request, config);
     const ipHash = hashIp(ip, config.secret);
+    const origin = request.headers.origin;
+    const corsAllowed = Boolean(origin) && Boolean(config.corsOrigins?.includes(origin));
+    if (corsAllowed) {
+      response.setHeader("Access-Control-Allow-Origin", origin);
+      response.setHeader("Vary", "Origin");
+      response.setHeader(
+        "Access-Control-Allow-Headers",
+        "authorization, content-type, x-csrf-token, x-file-name"
+      );
+      response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      response.setHeader("Access-Control-Max-Age", "600");
+    }
 
     try {
+      if (method === "OPTIONS") {
+        if (!corsAllowed) throw new HttpError(403, "origin not allowed", "origin_denied");
+        response.writeHead(204);
+        response.end();
+        return true;
+      }
       if (!["GET", "HEAD"].includes(method)) assertSameOrigin(request, config);
 
       const publicReportMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/report$/);

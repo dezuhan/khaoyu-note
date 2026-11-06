@@ -69,6 +69,10 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     cookieSecure: boolean(env.KHAOYU_SERVICE_COOKIE_SECURE, publicUrl.startsWith("https://")),
     trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
+    corsOrigins: (env.KHAOYU_SERVICE_CORS_ORIGINS || "tauri://localhost,http://tauri.localhost")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     smtp: Object.freeze({
       host: smtpHost,
       port: integer(env.KHAOYU_SERVICE_SMTP_PORT, 587, 1, 65535, "KHAOYU_SERVICE_SMTP_PORT"),
