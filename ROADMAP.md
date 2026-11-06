@@ -171,14 +171,14 @@ remaining work named in the item.
 
 - [x] Realtime collaboration only after authentication, authorisation and audit are complete.
 - [x] Per-project rooms with membership checks on connect and on every message.
-- [ ] Presence is opt-in and does not reveal board contents to non-members (partial: presence count is member-only; opt-in and cursor awareness pending).
+- [x] Presence is opt-in and does not reveal board contents to non-members.
 - [x] Conflict handling for offline edits with a visible resolution flow.
 - [x] Revision history for shared projects, with restore limited to editors and above.
 - [x] Comments and notifications respect scope: a column share cannot leak board-wide activity.
 
 ## Milestone 5: Notifications and activity (server side)
 
-- [ ] Server notifications for invitations, role changes, comments on shared scopes and mention events (partial: invitations, role changes, restores, share reports and scoped share comments are implemented; mentions pending).
+- [x] Server notifications for invitations, role changes, comments on shared scopes and mention events.
 - [x] Email notifications opt-in with unsubscribe links and rate limiting.
 - [x] In-app notifications scoped to the resources the user can currently access.
 - [x] Deleting or revoking a share removes its pending notifications.

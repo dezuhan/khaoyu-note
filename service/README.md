@@ -3,7 +3,8 @@
 This is the self-hosted service foundation plus the core account and login model: one standalone
 HTTP process, a relational SQLite database for accounts, sessions, projects, memberships, snapshots
 and audit rows, opaque object storage, a maintenance worker, explicit reversible migrations, and
-backup/restore. Sharing, desktop login UI and client sync are not implemented yet.
+backup/restore. Sharing, accounts, desktop sync and encrypted backups are documented below; a browser
+login UI is not included.
 
 ## Requirements
 
@@ -133,6 +134,8 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. |
+| `GET` | `/api/v1/account/presence` | Read presence opt-in state. |
+| `PATCH` | `/api/v1/account/presence` | Opt in or out of project presence. |
 | `GET` | `/api/v1/account/email-preferences` | Read the email notification preference. |
 | `PATCH` | `/api/v1/account/email-preferences` | Opt in or out of notification email. |
 | `GET` | `/api/v1/email/unsubscribe` | One-click unsubscribe using a signed token. |
@@ -238,10 +241,11 @@ the operator in the database.
 ## Notifications
 
 In-app notifications are stored per account for invitation acceptance, role changes, revision
-restores and share reports. Listing filters every notification through current resource access, so a
-removed member stops seeing project notifications immediately even though the rows remain. Read state
-is per account; only the owner can mark a notification read. Revoking a share link, or disabling
-project sharing, deletes its pending notifications. Read notifications older than 90 days are pruned.
+restores, share reports, share comments and `@email` mentions in share comments. Listing filters every
+notification through current resource access, so a removed member stops seeing project notifications
+immediately even though the rows remain. Read state is per account; only the owner can mark a
+notification read. Revoking a share link, or disabling project sharing, deletes its pending
+notifications. Read notifications older than 90 days are pruned.
 
 Notification email is opt-in per account. When SMTP is configured, messages are delivered through
 `nodemailer`; otherwise they remain in the mode `0600` outbox. Each message has a signed one-click
@@ -258,7 +262,8 @@ rewritten. The worker prunes versions beyond the latest 100 per project.
 membership before opening the stream, emits a `presence` event with connection and distinct account
 counts, and emits `snapshot` events with the new revision and restoring revision when applicable. A
 25 second heartbeat keeps proxies from closing idle streams. Only project rooms receive events, so a
-member of one project does not see activity in another.
+member of one project does not see activity in another. Presence is opt-in per account: an opted-out
+connection still receives snapshot events but is excluded from both presence counts.
 
 ## Project assets
 
@@ -363,14 +368,14 @@ node ../tools/check-service-security.mjs --base http://127.0.0.1:8080 --credenti
 ```
 
 The service suite covers fail-closed configuration, reversible migrations, opaque object storage
-with deduplication, audit IP hashing, backup/restore round-trip, worker cleanup and the health
-endpoints. The auth suite covers verification, generic login errors and throttling, CSRF, project
+with deduplication, audit IP hashing, backup/restore round-trip, encrypted backup restore, worker
+cleanup and the health endpoints. The auth suite covers verification, generic login errors and throttling, CSRF, project
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
 deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
 isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance, ownership
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
 authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences, CORS preflight,
-encrypted backups, alert webhooks and trusted-proxy SSO.
+encrypted backups, alert webhooks, trusted-proxy SSO, presence opt-in and comment mentions.
 
 ## Milestone boundaries
 
@@ -380,10 +385,10 @@ migrations, backup/restore and upgrade documentation.
 
 Implemented from Milestone 2: email and password registration with verification, case-normalized
 email, display name, Argon2id, short-lived access tokens, rotating refresh tokens with reuse
-detection, session list and revocation, logout everywhere, login throttling, generic login errors,
-hashed single-use reset tokens, TOTP, account export, deletion grace and purge, cookie and CSRF
-hardening, project role checks and scoped API tokens. Email one-time login codes are also
-implemented.
+detection, session list and revocation, logout everywhere, login throttling with alert webhook,
+generic login errors, hashed single-use reset tokens, TOTP, email one-time codes, account export,
+deletion grace and purge, cookie and CSRF hardening, project role checks, scoped API tokens and
+trusted-proxy SSO.
 
 Implemented from Milestone 3: project, item and column share scopes; hashed revocable and rotating
 links; expiry; optional passphrase with rate limiting; neutral 404 responses; noindex headers; audit
@@ -391,17 +396,15 @@ per access; project roles; email-bound invitations; member removal; ownership tr
 public sharing off by default; scoped payload isolation; a global operator kill switch; abuse
 reports; and authenticated project asset upload/download with share download enforcement.
 
-Implemented from Milestone 4: authenticated per-project SSE rooms, presence counts, revision history,
-editor-only restore and audit. Offline queues, cursor and lock awareness, scoped comments and
-notifications remain pending.
+Implemented from Milestone 4: authenticated per-project SSE rooms, opt-in presence counts, revision
+history, editor-only restore, audit, scoped comments and the desktop offline sync queue with visible
+conflict choices. Cursor and lock awareness remain pending.
 
 Implemented from Milestone 5: scoped in-app notifications for invitations, role changes, revision
-restores and share reports; per-account read state; cleanup when a share is revoked; SMTP delivery
-with outbox fallback; opt-in notification email with signed unsubscribe links and a five minute rate
-limit.
+restores, share reports, comments and mentions; per-account read state; cleanup when a share is
+revoked; SMTP delivery with outbox fallback; opt-in notification email with signed unsubscribe links
+and a five minute rate limit.
 
 Still pending: a manage-specific share surface, watermarking, MIME sniffing and malware scanning,
-signed short-lived asset URLs, nested-board policy for project shares, passkeys, SSO, team membership
-UI, a browser login UI and desktop client sync. The Milestone 1 sync boundary remains
-open: desktop opt-in, explicit sync state, offline queue with conflict handling, and protection
-against a local database delete removing server data.
+signed short-lived asset URLs, nested-board policy for project shares, passkeys, team membership UI
+and a browser login UI.

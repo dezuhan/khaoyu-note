@@ -29,8 +29,8 @@ cmd /c "call ""C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxili
 
 Outputs:
 
-- `src-tauri/target/release/bundle/nsis/Khaoyu Note_0.13.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/Khaoyu Note_0.13.0_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/Khaoyu Note_0.14.0_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/Khaoyu Note_0.14.0_x64_en-US.msi`
 - `src-tauri/target/release/khaoyu-note.exe`
 - `src-tauri/target/release/khaoyu-note-mcp.exe`
 
