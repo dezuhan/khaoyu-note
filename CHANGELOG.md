@@ -3,6 +3,15 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.8.0] - 2026-11-07
+
+### Added
+
+- Share comment permission with scoped comments stored on the shared card, never sibling cards.
+- Share edit permission with a field allowlist, optional revision conflict check and passphrase
+  support.
+- Share writes create project revisions, emit SSE snapshot events, audit the link and notify owners.
+
 ## [0.7.0] - 2026-11-07
 
 ### Added
