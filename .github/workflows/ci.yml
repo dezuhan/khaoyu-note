@@ -97,6 +97,9 @@ jobs:
       - name: Font suite
         run: node tools/test-fonts.mjs http://127.0.0.1:1430/
 
+      - name: Sync engine checks
+        run: node tools/test-sync.mjs
+
       - name: Show preview server log on failure
         if: failure()
         run: cat /tmp/khaoyu-serve.log || true
@@ -114,11 +117,27 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install service dependencies
+        working-directory: service
+        run: npm ci --omit=dev
+
+      - name: Dependency audit
+        working-directory: service
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Service tests
         run: node --test service/test/service.test.mjs service/test/auth.test.mjs
 
       - name: Build service image
         run: docker build --tag khaoyu-note-service:ci service
+
+      - name: Scan service image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: khaoyu-note-service:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
 
   rust:
     name: Rust checks and MCP suite
