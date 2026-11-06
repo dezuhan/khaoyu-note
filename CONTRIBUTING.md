@@ -26,6 +26,7 @@ Scopes:
 
 - `web`: `app/web` frontend.
 - `db`: SQLite, persistence and migrations.
+- `service`: self-hosted service foundation.
 - `mcp`: MCP server and tool schemas.
 - `ui`: visual design, layout and interaction styling.
 - `packaging`: installers and platform distribution.
@@ -51,6 +52,7 @@ node --experimental-vm-modules scripts/check-web.cjs
 node tools/test-ui.mjs http://127.0.0.1:1430/
 node tools/test-card-features.mjs http://127.0.0.1:1430/
 node tools/test-web-mode.mjs
+node --test service/test/service.test.mjs
 ```
 
 Backend changes also run:
@@ -83,6 +85,7 @@ git tag -a v0.1.0 -m "Khaoyu Note 0.1.0"
 1. All matching test suites pass.
 2. Installer is rebuilt when the release includes desktop changes.
 3. `CHANGELOG.md` describes user-visible changes.
-4. Version in `package.json`, `app/package.json` and `app/src-tauri/tauri.conf.json` agrees.
+4. Version in `package.json`, `service/package.json`, `app/package.json` and
+   `app/src-tauri/tauri.conf.json` agrees.
 5. Working tree is clean before tagging.
 6. Tag points at the release commit.

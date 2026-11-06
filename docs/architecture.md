@@ -292,6 +292,29 @@ host, port, database, uptime, version and Node version. The host binds to loopba
 The browser cannot receive absolute OS drop paths or start the stdio MCP binary. Both remain
 desktop-only; the browser uses the file picker for uploads.
 
+## Self-hosted service foundation
+
+`service/` is a standalone Node 24 process for the Milestone 1 self-hosted foundation. It loads
+configuration from `KHAOYU_SERVICE_*` environment variables, refuses to start when the secret is
+missing, short, repetitive or a placeholder, and fails when a migration is pending.
+
+The SQLite schema covers accounts, sessions, projects, project memberships, project snapshots, audit
+rows and content-addressed objects. Migrations live in `service/src/migrations` as paired up and down
+SQL files and are recorded in `schema_migrations`; the server never migrates automatically. An
+optional bootstrap command creates the first account and project without a password; login is
+Milestone 2.
+
+Object storage writes `sha256` content under opaque two-level paths and deduplicates by hash. Audit
+rows store an HMAC of the IP address, never the raw address. The worker prunes old temp files and
+audit rows, creates a consistent `VACUUM INTO` backup on its interval and enforces backup retention.
+Restore verifies the manifest checksum and database integrity, keeps a `restore-previous-*` copy and
+rolls back if the replacement fails.
+
+`GET /healthz` and `GET /readyz` return only a status and no version, database path or configuration.
+The service listens on one port and binds to loopback by default. Docker Compose runs it as
+non-root, with a read-only root filesystem, no capabilities and a writable `/data` volume. Client
+sync, login and sharing are intentionally absent until Milestones 2 to 4.
+
 ## MCP server
 
 `app/src-tauri/src/bin/khaoyu-note-mcp.rs` is a second binary in the same crate. It links the same

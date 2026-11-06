@@ -34,6 +34,7 @@ khaoyu-note/
   README.md                  this file
   package.json               localhost web host scripts
   server.mjs                 Node web host: static UI plus SQLite JSON bridge
+  service/                   self-hosted service foundation (Milestone 1)
   app/                       the Tauri v2 application
     src-tauri/               Rust backend: SQLite storage, window, bundle config
       src/bin/khaoyu-note-mcp.rs  stdio MCP server binary (14 board tools)
@@ -194,6 +195,31 @@ module.
 Browser limitations: dropping a local file path from the OS is not available (upload through the file
 picker instead), and folder restore plus the stdio MCP server remain desktop-only.
 
+## Self-hosted service foundation (Milestone 1)
+
+The `service/` directory contains the self-hosted foundation: one Node 24 HTTP process, a relational
+SQLite schema for accounts, projects, memberships, snapshots and audit rows, opaque object storage, a
+maintenance worker, reversible migrations, backup and restore, and a minimal health endpoint.
+
+```powershell
+cd service
+Copy-Item .env.example .env
+# Set KHAOYU_SERVICE_SECRET to: openssl rand -hex 32
+node src/cli.mjs migrate
+node src/cli.mjs bootstrap
+node src/server.mjs
+```
+
+`GET /healthz` returns only `{"status":"ok"}`. Docker Compose, reverse proxy examples, configuration,
+backup and upgrade steps are documented in [service/README.md](<service/README.md>).
+
+This milestone does not include login, sharing or desktop sync. Those depend on the account and
+permission model in Milestone 2. The service tests run with:
+
+```powershell
+node --test service/test/service.test.mjs
+```
+
 ## MCP server
 
 A second binary, `khaoyu-note-mcp.exe`, exposes the boards to AI agents through the Model Context
@@ -316,6 +342,9 @@ node tools/test-fonts.mjs
 # MCP server smoke test (spawns the binary against a temporary database)
 node tools/test-mcp.mjs
 
+# self-hosted service foundation (Node 24, in-memory temp databases)
+node --test service/test/service.test.mjs
+
 # screenshot of the native window
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/screenshot.ps1
 
@@ -324,8 +353,9 @@ node server.mjs
 node tools/test-web-mode.mjs
 ```
 
-`.github/workflows/ci.yml` runs the web suites on Ubuntu and the Rust plus MCP gates on Windows for
-every push, pull request and manual dispatch. The separate `desktop-release.yml` stays tag-only.
+`.github/workflows/ci.yml` runs the web suites on Ubuntu, the service foundation tests and Docker
+build on Ubuntu, and the Rust plus MCP gates on Windows for every push, pull request and manual
+dispatch. The separate `desktop-release.yml` stays tag-only.
 
 The UI suite exercises: boot, tool rail, card creation, text editing, drag, resize, undo/redo,
 to-do items, comments, table cells, column drop, zoom, settings modal and custom select, theme

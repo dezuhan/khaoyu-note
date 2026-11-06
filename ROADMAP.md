@@ -29,21 +29,21 @@ remaining work named in the item.
 
 ### Architecture
 
-- [ ] A standalone server process that the operator runs with Docker Compose or a native binary.
-- [ ] Restricted network surface: one HTTP(S) port, optional reverse proxy, no direct database port.
-- [ ] Relational database for accounts, projects, memberships and audit data.
-- [ ] Object storage for uploaded assets, addressed by opaque ids, never by user-supplied paths.
-- [ ] Background worker for email invitations, thumbnails, backups and cleanup jobs.
-- [ ] Health endpoint that does not leak version, database or configuration details.
+- [x] A standalone server process that the operator runs with Docker Compose or a native binary.
+- [x] Restricted network surface: one HTTP(S) port, optional reverse proxy, no direct database port.
+- [x] Relational database for accounts, projects, memberships and audit data.
+- [x] Object storage for uploaded assets, addressed by opaque ids, never by user-supplied paths.
+- [ ] Background worker for email invitations, thumbnails, backups and cleanup jobs (partial: scheduled backups, temp cleanup and audit pruning implemented; email and thumbnail jobs pending).
+- [x] Health endpoint that does not leak version, database or configuration details.
 
 ### Deployment
 
-- [ ] Supported deployment profiles: single-user, small team, reverse proxy behind HTTPS.
-- [ ] Configuration through environment variables or a secrets file, never committed to the repo.
-- [ ] Startup fails closed when required secrets are missing or weak.
-- [ ] Database migrations run explicitly and are reversible where practical.
-- [ ] Backup and restore procedures documented before public release.
-- [ ] Upgrade path preserves all user data and invalidates sessions predictably.
+- [ ] Supported deployment profiles: single-user, small team, reverse proxy behind HTTPS (partial: single-user and proxy deployment documented; team profiles wait for accounts in Milestone 2).
+- [x] Configuration through environment variables or a secrets file, never committed to the repo.
+- [x] Startup fails closed when required secrets are missing or weak.
+- [x] Database migrations run explicitly and are reversible where practical.
+- [x] Backup and restore procedures documented before public release.
+- [ ] Upgrade path preserves all user data and invalidates sessions predictably (partial: schema and backups preserve data; session revocation lands with Milestone 2).
 
 ### Local-first boundary
 
