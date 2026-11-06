@@ -34,6 +34,7 @@ function configFor(dataDir) {
     outboxDir: path.join(dataDir, "outbox"),
     cookieSecure: false,
     trustProxy: false,
+    publicSharingEnabled: true,
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
@@ -205,6 +206,29 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     const projects = await api.call("/api/v1/projects", { jar: after.jar });
     assert.equal(projects.status, 200);
     assert.deepEqual(projects.body.projects, []);
+  });
+
+  await t.test("email one-time codes can log in and are single use", async () => {
+    const email = `otp-${crypto.randomUUID()}@example.com`;
+    await api.register(email);
+    await api.verify(email);
+    const request = await api.call("/api/v1/auth/otp/request", {
+      method: "POST",
+      body: { email },
+    });
+    assert.equal(request.status, 202);
+    const message = api.latestMail("otp", email);
+    const code = message.text.match(/code: (\d{6})/)[1];
+    const login = await api.call("/api/v1/auth/otp/login", {
+      method: "POST",
+      body: { email, code },
+    });
+    assert.equal(login.status, 200);
+    const reuse = await api.call("/api/v1/auth/otp/login", {
+      method: "POST",
+      body: { email, code },
+    });
+    assert.equal(reuse.status, 401);
   });
 
   await t.test("login errors are generic and throttling blocks repeated failures", async () => {
@@ -429,6 +453,29 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { password: "share-password-123" },
     });
     assert.equal(goodPassword.status, 200);
+
+    const report = await api.call(`/api/v1/share/${protectedShare.body.token}/report`, {
+      method: "POST",
+      body: { reason: "This link looks abusive" },
+    });
+    assert.equal(report.status, 202);
+    assert.equal(api.db.prepare("SELECT COUNT(*) AS count FROM abuse_reports").get().count, 1);
+
+    api.config.publicSharingEnabled = false;
+    assert.equal(
+      (await api.call(`/api/v1/share/${protectedShare.body.token}/access`, {
+        method: "POST",
+        body: { password: "share-password-123" },
+      })).status,
+      404
+    );
+    const disabledCreate = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "card1", permission: "view" },
+    });
+    assert.equal(disabledCreate.status, 409);
+    api.config.publicSharingEnabled = true;
 
     api.db.exec("DELETE FROM share_attempts");
     for (let attempt = 0; attempt < 5; attempt += 1) {
