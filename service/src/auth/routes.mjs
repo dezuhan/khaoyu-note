@@ -176,6 +176,18 @@ async function sendReset(db, config, mailer, account, token) {
   });
 }
 
+function otpHash(accountId, code, secret) {
+  return crypto.createHmac("sha256", secret).update(`${accountId}:${code}`).digest("hex");
+}
+
+function issueOtp(db, account, secret) {
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+  db.prepare(
+    "INSERT INTO email_otps (id, account_id, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(crypto.randomUUID(), account.id, otpHash(account.id, code, secret), now(), now() + 10 * 60_000);
+  return code;
+}
+
 export function createApiRouter({ db, config, logger, mailer }) {
   return async function route(request, response) {
     const url = new URL(request.url || "/", config.publicUrl);
@@ -187,8 +199,31 @@ export function createApiRouter({ db, config, logger, mailer }) {
     try {
       if (!["GET", "HEAD"].includes(method)) assertSameOrigin(request, config);
 
+      const publicReportMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/report$/);
+      if (method === "POST" && publicReportMatch) {
+        const token = decodeURIComponent(publicReportMatch[1]);
+        const share = findShare(db, token);
+        if (!share || share.revoked_at) throw new HttpError(404, "not found", "not_found");
+        const body = await readJson(request);
+        const reason = requireString(body.reason, "reason", 500);
+        if (reason.length < 3) throw new HttpError(400, "reason is too short", "invalid_reason");
+        db.prepare(
+          "INSERT INTO abuse_reports (id, share_id, reason, reporter_ip_hash, created_at) VALUES (?, ?, ?, ?, ?)"
+        ).run(crypto.randomUUID(), share.id, reason, hashIp(ip, config.secret), now());
+        writeAudit(db, {
+          action: "share.reported",
+          resourceType: "share_link",
+          resourceId: share.id,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 202, { status: "reported" }, config);
+        return true;
+      }
+
       const publicShareMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/access$/);
       if (method === "POST" && publicShareMatch) {
+        if (!config.publicSharingEnabled) throw new HttpError(404, "not found", "not_found");
         const token = decodeURIComponent(publicShareMatch[1]);
         const share = findShare(db, token);
         if (
@@ -290,6 +325,107 @@ export function createApiRouter({ db, config, logger, mailer }) {
           secret: config.secret,
         });
         sendNoContent(response, 204, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/otp/request") {
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const account = db
+          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL")
+          .get(email);
+        if (account && account.email_verified_at) {
+          const recent = db
+            .prepare("SELECT created_at FROM email_otps WHERE account_id = ? ORDER BY created_at DESC LIMIT 1")
+            .get(account.id);
+          if (!recent || now() - Number(recent.created_at) >= 60_000) {
+            const code = issueOtp(db, account, config.secret);
+            await mailer.send({
+              to: account.email,
+              kind: "otp",
+              subject: "Your Khaoyu Note login code",
+              text: `One-time login code: ${code}`,
+            });
+            writeAudit(db, {
+              actorAccountId: account.id,
+              action: "auth.otp_sent",
+              resourceType: "account",
+              resourceId: account.id,
+              secret: config.secret,
+            });
+          }
+        }
+        sendJson(response, 202, { status: "accepted" }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/otp/login") {
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const code = String(body.code || "");
+        if (!/^\d{6}$/.test(code)) throw new HttpError(401, "Invalid email or code", "invalid_credentials");
+        const throttle = loginBlocked(db, { email, ip, config });
+        if (throttle.blocked) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const account = db
+          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL")
+          .get(email);
+        const otp = account
+          ? db
+              .prepare(
+                "SELECT * FROM email_otps WHERE account_id = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1"
+              )
+              .get(account.id, now())
+          : null;
+        const valid =
+          Boolean(otp) &&
+          Number(otp.attempts) < 5 &&
+          otp.code_hash === otpHash(account.id, code, config.secret);
+        if (!valid || !account.email_verified_at) {
+          if (account) {
+            db.prepare("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?").run(
+              otp?.id || ""
+            );
+          }
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or code" }, config);
+          return true;
+        }
+        if (account.totp_enabled_at && !verifyTotp(account.totp_secret, body.totp)) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or code" }, config);
+          return true;
+        }
+        db.prepare("UPDATE email_otps SET used_at = ? WHERE id = ?").run(now(), otp.id);
+        clearLoginFailures(db, { email, ip, secret: config.secret });
+        const session = createSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.login_otp",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          200,
+          {
+            account: publicAccount(account),
+            csrfToken: session.csrfToken,
+            accessExpiresAt: session.accessExpiresAt,
+          },
+          config
+        );
         return true;
       }
 
@@ -716,6 +852,9 @@ export function createApiRouter({ db, config, logger, mailer }) {
         const body = await readJson(request);
         const snapshot = projectSnapshot(db, projectId);
         if (!snapshot) throw new HttpError(404, "project not found", "not_found");
+        if (!config.publicSharingEnabled) {
+          throw new HttpError(409, "public sharing is disabled by the operator", "sharing_disabled");
+        }
         if (!snapshot.project.public_sharing_enabled) {
           throw new HttpError(409, "public sharing is disabled for this project", "sharing_disabled");
         }

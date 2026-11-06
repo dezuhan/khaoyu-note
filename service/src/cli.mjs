@@ -16,6 +16,7 @@ function usage() {
   node src/cli.mjs backup
   node src/cli.mjs restore <backup-directory> [--force]
   node src/cli.mjs bootstrap
+  node src/cli.mjs invalidate-sessions
 
 Environment: KHAOYU_SERVICE_* variables. See .env.example.`);
 }
@@ -142,6 +143,18 @@ async function run(command, args, config) {
       force: args.includes("--force"),
     });
     console.log(JSON.stringify({ restored: true, safety: result.safety }, null, 2));
+    return;
+  }
+  if (command === "invalidate-sessions") {
+    const db = open(config);
+    const now = Date.now();
+    const sessions = db
+      .prepare("UPDATE sessions SET revoked_at = ? WHERE revoked_at IS NULL")
+      .run(now).changes;
+    db.prepare("UPDATE refresh_tokens SET revoked_at = ? WHERE revoked_at IS NULL").run(now);
+    db.prepare("UPDATE access_tokens SET revoked_at = ? WHERE revoked_at IS NULL").run(now);
+    db.close();
+    console.log(JSON.stringify({ revokedSessions: Number(sessions) }, null, 2));
     return;
   }
   if (command === "bootstrap") {

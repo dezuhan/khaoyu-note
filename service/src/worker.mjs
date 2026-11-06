@@ -65,11 +65,15 @@ function pruneTokens(db) {
   const shares = db
     .prepare("DELETE FROM share_attempts WHERE created_at < ?")
     .run(now - 30 * 86_400_000).changes;
+  const otp = db
+    .prepare("DELETE FROM email_otps WHERE expires_at < ? OR used_at < ?")
+    .run(now - 86_400_000, now - 86_400_000).changes;
   return {
     access: Number(access),
     email: Number(email),
     refresh: Number(refresh),
     shares: Number(shares),
+    otp: Number(otp),
   };
 }
 

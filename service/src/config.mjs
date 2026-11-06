@@ -54,6 +54,7 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     outboxDir: path.join(dataDir, "outbox"),
     cookieSecure: boolean(env.KHAOYU_SERVICE_COOKIE_SECURE, publicUrl.startsWith("https://")),
     trustProxy: boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false),
+    publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
     accessTtlMinutes: integer(env.KHAOYU_SERVICE_ACCESS_TTL_MINUTES, 15, 1, 1440, "KHAOYU_SERVICE_ACCESS_TTL_MINUTES"),
     refreshTtlDays: integer(env.KHAOYU_SERVICE_REFRESH_TTL_DAYS, 7, 1, 90, "KHAOYU_SERVICE_REFRESH_TTL_DAYS"),
     deletionGraceDays: integer(env.KHAOYU_SERVICE_DELETION_GRACE_DAYS, 30, 1, 365, "KHAOYU_SERVICE_DELETION_GRACE_DAYS"),
