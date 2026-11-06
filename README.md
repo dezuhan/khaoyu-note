@@ -43,6 +43,7 @@ khaoyu-note/
       vendor/                design-token stylesheet (ky.css, ky.js, unmodified copies)
   docs/
     architecture.md          module map, data flow, storage, design decisions
+    security-audit.md        Milestones 1 to 3 security and architecture audit
   scripts/                   static checks, window capture
   tools/                     Playwright preview, UI test suite, screenshots
   shots/                     screenshots used by this README
@@ -217,10 +218,14 @@ node src/server.mjs
 ```
 
 `GET /healthz` returns only `{"status":"ok"}`. Docker Compose, reverse proxy examples, auth endpoints,
-configuration, backup and upgrade steps are documented in [service/README.md](<service/README.md>).
+sharing endpoints, configuration, backup and upgrade steps are documented in
+[service/README.md](<service/README.md>). The current security findings and remaining risks are in
+[docs/security-audit.md](<docs/security-audit.md>).
 
-Sharing, a browser login UI and desktop sync are not included yet. Verification and reset mail is
-written to the service outbox until an SMTP adapter exists. The service tests run with:
+The service exposes project, item and column share links, passphrase and expiry controls, member
+roles, invitations and ownership transfer. A browser login UI, a share UI and desktop sync are not
+included yet. Verification and reset mail is written to the service outbox until an SMTP adapter
+exists. The service tests run with:
 
 ```powershell
 node --test service/test/service.test.mjs service/test/auth.test.mjs
@@ -374,8 +379,8 @@ Built artifacts are copied to `dist/`:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.2.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
-| `Khaoyu Note_0.2.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.3.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.3.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
 | `KhaoyuNote.exe` | 10.79 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.38 MiB | standalone MCP server for AI agents |
 

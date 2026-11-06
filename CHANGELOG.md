@@ -3,6 +3,22 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.3.0] - 2026-11-07
+
+### Added
+
+- Project, item and column share links with hashed tokens, permission metadata, expiry, optional
+  passphrases, rotation, revocation, rate limiting and noindex responses.
+- Project member roles, email-bound invitations, member removal and ownership transfer safeguards.
+- Public sharing opt-in per project; disabling it revokes existing links.
+- Share access audit entries with IP hashing, payload isolation, trash removal and local asset path
+  stripping.
+
+### Fixed
+
+- Share tokens are redacted from request logs.
+- Shared project snapshots no longer expose the trash or local filesystem asset paths.
+
 ## [0.2.0] - 2026-11-07
 
 ### Added
