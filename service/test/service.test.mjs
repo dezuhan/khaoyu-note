@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -14,6 +15,7 @@ import { runMaintenance } from "../src/worker.mjs";
 import { createService } from "../src/app.mjs";
 import { assertSchemaCurrent } from "../src/app.mjs";
 import { logPath } from "../src/app.mjs";
+import { createSmtpMailer } from "../src/auth/mailer.mjs";
 
 const SECRET = "Kx9-vQ2m-Rt7-pL4s-Wb8-nC3d-Hf6-jZ1a";
 
@@ -71,12 +73,12 @@ test("migrations are reversible and recreate the schema", () => {
   const db = openDatabase(config.databasePath);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [false, false, false, false, false, false, false]
+    [false, false, false, false, false, false, false, false]
   );
-  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5, 6, 7, 8]);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [true, true, true, true, true, true, true]
+    [true, true, true, true, true, true, true, true]
   );
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -96,7 +98,7 @@ test("migrations are reversible and recreate the schema", () => {
   ]) {
     assert.ok(tables.includes(table), `${table} missing`);
   }
-  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 7 }), [7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 8 }), [8, 7, 6, 5, 4, 3, 2, 1]);
   assert.equal(
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get(),
     undefined
@@ -204,6 +206,81 @@ test("worker cleans old temp files and creates a due backup", () => {
   assert.ok(fs.existsSync(path.join(result.backup.directory, "manifest.json")));
   assert.ok(db.prepare("SELECT value FROM service_meta WHERE key = 'last_backup_at'").get());
   db.close();
+});
+
+test("SMTP mailer delivers a message over plain SMTP", async () => {
+  const received = [];
+  const server = net.createServer((socket) => {
+    socket.setEncoding("utf8");
+    socket.write("220 test ESMTP\r\n");
+    let inData = false;
+    let data = "";
+    let buffer = "";
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      let index = buffer.indexOf("\r\n");
+      while (index >= 0) {
+        const line = buffer.slice(0, index);
+        buffer = buffer.slice(index + 2);
+        index = buffer.indexOf("\r\n");
+        if (inData) {
+          if (line === ".") {
+            inData = false;
+            received.push(data);
+            socket.write("250 2.0.0 queued\r\n");
+          } else {
+            data += `${line}\n`;
+          }
+          continue;
+        }
+        const command = line.toUpperCase();
+        if (command.startsWith("EHLO")) {
+          socket.write("250-test\r\n250-8BITMIME\r\n250 SIZE 10000000\r\n");
+        } else if (command.startsWith("MAIL FROM") || command.startsWith("RCPT TO")) {
+          socket.write("250 2.1.0 ok\r\n");
+        } else if (command === "DATA") {
+          inData = true;
+          data = "";
+          socket.write("354 end with .\r\n");
+        } else if (command === "QUIT") {
+          socket.write("221 bye\r\n");
+          socket.end();
+        } else {
+          socket.write("250 ok\r\n");
+        }
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const mailer = createSmtpMailer(
+    {
+      smtp: {
+        host: "127.0.0.1",
+        port,
+        secure: false,
+        user: "",
+        pass: "",
+        from: "noreply@example.com",
+      },
+    },
+    { info() {} }
+  );
+  try {
+    const result = await mailer.send({
+      to: "user@example.com",
+      subject: "SMTP test",
+      text: "Hello over SMTP",
+      kind: "test",
+    });
+    assert.equal(result.delivered, true);
+    assert.equal(received.length, 1);
+    assert.match(received[0], /Subject: SMTP test/);
+    assert.match(received[0], /Hello over SMTP/);
+  } finally {
+    await mailer.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("health endpoints expose no version, database or configuration", async () => {

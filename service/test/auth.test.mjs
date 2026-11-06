@@ -111,6 +111,14 @@ async function start() {
     return { status: response.status, headers: response.headers, buffer, text: buffer.toString("utf8"), response };
   }
 
+  function mailCount(kind, to) {
+    return fs
+      .readdirSync(config.outboxDir)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => JSON.parse(fs.readFileSync(path.join(config.outboxDir, file), "utf8")))
+      .filter((message) => message.kind === kind && (!to || message.to === to)).length;
+  }
+
   function latestMail(kind, to) {
     const files = fs
       .readdirSync(config.outboxDir)
@@ -170,6 +178,7 @@ async function start() {
     login,
     account,
     latestMail,
+    mailCount,
     async close() {
       await new Promise((resolve) => server.close(resolve));
       db.close();
@@ -817,6 +826,45 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     const cleaned = await api.call("/api/v1/notifications", { jar: owner.jar });
     assert.equal(cleaned.body.notifications.some((entry) => entry.resourceType === "share_link"), false);
     assert.equal(invitation.status, 201);
+  });
+
+  await t.test("email notifications require opt-in, are rate limited and can be unsubscribed", async () => {
+    const owner = await api.account(`email-owner-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Email notifications");
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    const share = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view" },
+    });
+    const enabled = await api.call("/api/v1/account/email-preferences", {
+      method: "PATCH",
+      jar: owner.jar,
+      body: { notifications: true },
+    });
+    assert.equal(enabled.status, 200);
+    await api.call(`/api/v1/share/${share.body.token}/report`, {
+      method: "POST",
+      body: { reason: "First notification email" },
+    });
+    assert.equal(api.mailCount("notification", owner.email), 1);
+    await api.call(`/api/v1/share/${share.body.token}/report`, {
+      method: "POST",
+      body: { reason: "Rate limited notification email" },
+    });
+    assert.equal(api.mailCount("notification", owner.email), 1);
+
+    const message = api.latestMail("notification", owner.email);
+    const token = decodeURIComponent(message.text.match(/unsubscribe\?token=(\S+)/)[1]);
+    const unsubscribed = await api.call(`/api/v1/email/unsubscribe?token=${encodeURIComponent(token)}`);
+    assert.equal(unsubscribed.status, 200);
+    assert.equal(unsubscribed.body.unsubscribed, true);
+    const preference = await api.call("/api/v1/account/email-preferences", { jar: owner.jar });
+    assert.equal(preference.body.notifications, false);
   });
 
   await t.test("project assets require authorization and share download permission", async () => {
