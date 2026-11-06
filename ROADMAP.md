@@ -43,7 +43,7 @@ remaining work named in the item.
 - [x] Startup fails closed when required secrets are missing or weak.
 - [x] Database migrations run explicitly and are reversible where practical.
 - [x] Backup and restore procedures documented before public release.
-- [ ] Upgrade path preserves all user data and invalidates sessions predictably (partial: schema and backups preserve data; session revocation lands with Milestone 2).
+- [x] Upgrade path preserves all user data and invalidates sessions predictably.
 
 ### Local-first boundary
 
@@ -72,7 +72,7 @@ remaining work named in the item.
 - [ ] Login throttling per account and per IP, with progressive delays and alerting (partial: fixed window, progressive Retry-After and a structured warning event implemented; external alert routing pending).
 - [x] Generic login errors that do not reveal whether an email exists.
 - [x] Password reset tokens single use, short lived, hashed at rest and bound to the account.
-- [ ] Optional email one-time codes as an alternative login method.
+- [x] Optional email one-time codes as an alternative login method.
 
 ### CSRF and browser security
 
@@ -124,7 +124,7 @@ remaining work named in the item.
 - [x] Public links show only the selected scope.
 - [x] Search engines excluded with `noindex` and no sitemap exposure.
 - [ ] Optional watermark and download restrictions for shared assets (partial: download flag stored; asset watermarking pending).
-- [ ] Abuse reporting and a kill switch for operators (partial: individual link revocation exists; global kill switch pending).
+- [x] Abuse reporting and a kill switch for operators.
 
 ## Security architecture requirements
 

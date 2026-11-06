@@ -60,6 +60,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_PUBLIC_URL` | `http://host:port` | Public HTTPS origin behind a proxy. |
 | `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
+| `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
 | `KHAOYU_SERVICE_ACCESS_TTL_MINUTES` | `15` | Access token lifetime. |
 | `KHAOYU_SERVICE_REFRESH_TTL_DAYS` | `7` | Refresh token and session lifetime. |
 | `KHAOYU_SERVICE_DELETION_GRACE_DAYS` | `30` | Days before a requested account deletion is purged. |
@@ -87,6 +88,8 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/register` | Create an account and queue a verification token. |
 | `POST` | `/api/v1/auth/verify-email` | Consume the verification token. |
 | `POST` | `/api/v1/auth/login` | Password login, optional TOTP, sets session cookies. |
+| `POST` | `/api/v1/auth/otp/request` | Queue a one-time login code by email. |
+| `POST` | `/api/v1/auth/otp/login` | Login with a one-time code; TOTP still applies. |
 | `POST` | `/api/v1/auth/refresh` | Rotate the refresh token and issue a new access token. |
 | `POST` | `/api/v1/auth/logout` | Revoke the current session and clear cookies. |
 | `POST` | `/api/v1/auth/logout-all` | Revoke every session for the account. |
@@ -121,11 +124,14 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `DELETE` | `/api/v1/projects/:id/shares/:shareId` | Revoke a share link. |
 | `POST` | `/api/v1/projects/:id/shares/:shareId/rotate` | Rotate the share token. |
 | `POST` | `/api/v1/share/:token/access` | Public scoped access, optional passphrase. |
+| `POST` | `/api/v1/share/:token/report` | Report an abusive or unwanted shared link. |
 
 Passwords use Argon2id with 64 MiB memory, 3 iterations and a 16-byte per-user salt. Access tokens live
 15 minutes. Refresh tokens live 7 days, rotate on every use and are stored as SHA-256 hashes. Reusing
 an old refresh token revokes the whole session family. Login failures are generic and limited per
 email and per IP with a progressive `Retry-After`; each block emits a structured warning event.
+Optional email one-time codes are single use, valid for 10 minutes, limited to five attempts and
+still require TOTP when it is enabled.
 
 Cookies are `HttpOnly`, `SameSite=Lax` and `Secure` when the public URL is HTTPS. Write requests made
 with cookie authentication must send the CSRF token in `X-CSRF-Token`; the same value is in the
@@ -160,6 +166,11 @@ keeps an owner role on both sides during the swap, and the owner cannot be remov
 Stored share permissions include view, comment, edit and manage. Public access currently returns the
 scoped read payload plus its permission; share-token write endpoints and asset download/watermark
 enforcement are still pending.
+
+`KHAOYU_SERVICE_PUBLIC_SHARING=false` is the operator kill switch: share creation returns 409 and all
+public access returns 404. Anyone holding a link can file an abuse report at
+`/api/v1/share/:token/report`; reports are stored with a hashed reporter IP and remain available to
+the operator in the database.
 
 ## Migrations
 
@@ -196,11 +207,12 @@ docker compose cp khaoyu-note-service:/data/backups/<directory> ./backups/
 2. Create a backup.
 3. Pull or unpack the new version.
 4. Run `migrate`.
-5. Start the service and check `/readyz`.
+5. Run `invalidate-sessions` when the release changes authentication or session behavior.
+6. Start the service and check `/readyz`.
 
-Database migrations preserve existing account, project, membership and audit rows. Session
-invalidation is completed with the login work in Milestone 2; the `sessions` table is present now so
-the upgrade path can revoke sessions without a destructive migration.
+Database migrations preserve existing account, project, membership and audit rows. Run
+`node src/cli.mjs invalidate-sessions` when an upgrade changes authentication or session behavior;
+it revokes every session and token without touching project data.
 
 ## Reverse proxy
 
@@ -244,8 +256,9 @@ The service suite covers fail-closed configuration, reversible migrations, opaqu
 with deduplication, audit IP hashing, backup/restore round-trip, worker cleanup and the health
 endpoints. The auth suite covers verification, generic login errors and throttling, CSRF, project
 authorization, refresh rotation and reuse, session revocation, password reset, TOTP, account
-deletion grace and purge, scoped API tokens, project/item/column share isolation, passphrase and
-expiry enforcement, invitation acceptance and ownership transfer.
+deletion grace and purge, scoped API tokens, email one-time codes, project/item/column share
+isolation, passphrase and expiry enforcement, abuse reports, invitation acceptance and ownership
+transfer.
 
 ## Milestone boundaries
 
@@ -257,15 +270,17 @@ Implemented from Milestone 2: email and password registration with verification,
 email, display name, Argon2id, short-lived access tokens, rotating refresh tokens with reuse
 detection, session list and revocation, logout everywhere, login throttling, generic login errors,
 hashed single-use reset tokens, TOTP, account export, deletion grace and purge, cookie and CSRF
-hardening, project role checks and scoped API tokens.
+hardening, project role checks and scoped API tokens. Email one-time login codes are also
+implemented.
 
 Implemented from Milestone 3: project, item and column share scopes; hashed revocable and rotating
 links; expiry; optional passphrase with rate limiting; neutral 404 responses; noindex headers; audit
 per access; project roles; email-bound invitations; member removal; ownership transfer safeguards;
-public sharing off by default; and scoped payload isolation.
+public sharing off by default; scoped payload isolation; a global operator kill switch; and abuse
+reports.
 
-Still pending: share-token write permissions, asset download and watermark enforcement, global
-sharing kill switch, nested-board policy for project shares, SMTP delivery, passkeys, SSO, email
-one-time codes, team membership UI, a browser login UI and desktop client sync. The Milestone 1 sync
-boundary remains open: desktop opt-in, explicit sync state, offline queue with conflict handling, and
-protection against a local database delete removing server data.
+Still pending: share-token write permissions, asset download and watermark enforcement, nested-board
+policy for project shares, SMTP delivery, passkeys, SSO, team membership UI, a browser login UI and
+desktop client sync. The Milestone 1 sync boundary remains open: desktop opt-in, explicit sync state,
+offline queue with conflict handling, and protection against a local database delete removing server
+data.
