@@ -32,6 +32,14 @@ function configFor(dataDir) {
     objectsDir: path.join(dataDir, "objects"),
     tempDir: path.join(dataDir, "tmp"),
     backupsDir: path.join(dataDir, "backups"),
+    outboxDir: path.join(dataDir, "outbox"),
+    cookieSecure: false,
+    trustProxy: false,
+    accessTtlMinutes: 15,
+    refreshTtlDays: 7,
+    deletionGraceDays: 30,
+    loginWindowMinutes: 15,
+    loginMaxAttempts: 5,
     backupIntervalHours: 24,
     backupRetention: 2,
     auditRetentionDays: 90,
@@ -61,21 +69,32 @@ test("migrations are reversible and recreate the schema", () => {
   const db = openDatabase(config.databasePath);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [false]
+    [false, false]
   );
-  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1]);
+  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2]);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [true]
+    [true, true]
   );
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
     .all()
     .map((row) => row.name);
-  for (const table of ["accounts", "projects", "project_members", "audit_log", "objects", "sessions"]) {
+  for (const table of [
+    "accounts",
+    "projects",
+    "project_members",
+    "audit_log",
+    "objects",
+    "sessions",
+    "access_tokens",
+    "refresh_tokens",
+    "email_tokens",
+    "login_attempts",
+  ]) {
     assert.ok(tables.includes(table), `${table} missing`);
   }
-  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR }), [1]);
+  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 2 }), [2, 1]);
   assert.equal(
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get(),
     undefined

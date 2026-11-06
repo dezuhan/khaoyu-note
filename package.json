@@ -17,6 +17,6 @@
     "service:bootstrap": "node service/src/cli.mjs bootstrap",
     "service:backup": "node service/src/cli.mjs backup",
     "service:restore": "node service/src/cli.mjs restore",
-    "test:service": "node --test service/test/service.test.mjs"
+    "test:service": "node --test service/test/service.test.mjs service/test/auth.test.mjs"
   }
 }
