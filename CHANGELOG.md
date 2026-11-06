@@ -3,6 +3,16 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.7.0] - 2026-11-07
+
+### Added
+
+- Scoped in-app notifications for invitation acceptance, role changes, revision restores and share
+  reports.
+- Per-account notification read state, unread counts, mark-one-read and mark-all-read endpoints.
+- Notification listing filtered through current project access, cleanup on share revocation and
+  project sharing disablement, and 90 day pruning for read notifications.
+
 ## [0.6.0] - 2026-11-07
 
 ### Added
