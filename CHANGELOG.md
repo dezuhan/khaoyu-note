@@ -3,6 +3,16 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [0.9.0] - 2026-11-07
+
+### Added
+
+- SMTP delivery through `nodemailer` with an outbox fallback and environment configuration.
+- Per-account email notification opt-in, signed one-click unsubscribe links and a five minute
+  notification email rate limit.
+- Notification email for invitations, role changes, revision restores, share reports, share comments
+  and share edits.
+
 ## [0.8.0] - 2026-11-07
 
 ### Added
