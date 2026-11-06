@@ -384,6 +384,94 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await reader.cancel().catch(() => {});
   });
 
+  await t.test("share write permissions respect scope, passphrases and revisions", async () => {
+    const owner = await api.account(`share-write-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Share writes");
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    const revision = await putSnapshot(owner, projectId, {
+      id: projectId,
+      title: "Share writes",
+      cards: [
+        { id: "col1", type: "column", x: 0, y: 0, w: 200, h: 300, z: 1, title: "Column" },
+        { id: "child1", type: "note", x: 10, y: 70, w: 180, h: 70, z: 2, parentId: "col1", text: "Child" },
+        { id: "sibling1", type: "note", x: 400, y: 0, w: 200, h: 70, z: 3, text: "Sibling" },
+      ],
+      connections: [],
+      trash: [],
+    });
+
+    const columnShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "column", targetId: "col1", permission: "comment" },
+    });
+    const comment = await api.call(`/api/v1/share/${columnShare.body.token}/comments`, {
+      method: "POST",
+      body: { cardId: "child1", text: "Scoped comment" },
+    });
+    assert.equal(comment.status, 201);
+    const columnAccess = await api.call(`/api/v1/share/${columnShare.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(
+      columnAccess.body.cards.find((card) => card.id === "child1").shareComments[0].text,
+      "Scoped comment"
+    );
+    assert.equal(
+      (await api.call(`/api/v1/share/${columnShare.body.token}/comments`, {
+        method: "POST",
+        body: { cardId: "sibling1", text: "Leaked comment" },
+      })).status,
+      404
+    );
+
+    const viewShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "sibling1", permission: "view" },
+    });
+    assert.equal(
+      (await api.call(`/api/v1/share/${viewShare.body.token}/comments`, {
+        method: "POST",
+        body: { cardId: "sibling1", text: "Not allowed" },
+      })).status,
+      403
+    );
+
+    const editShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "sibling1", permission: "edit" },
+    });
+    const edited = await api.call(`/api/v1/share/${editShare.body.token}/cards/sibling1`, {
+      method: "PATCH",
+      body: { fields: { text: "Edited by share" } },
+    });
+    assert.equal(edited.status, 200);
+    assert.equal(edited.body.revision, revision + 2);
+    const editedAccess = await api.call(`/api/v1/share/${editShare.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(editedAccess.body.card.text, "Edited by share");
+    assert.equal(
+      (await api.call(`/api/v1/share/${editShare.body.token}/cards/sibling1`, {
+        method: "PATCH",
+        body: { fields: { text: "Stale" }, revision: 1 },
+      })).status,
+      409
+    );
+
+    const notifications = await api.call("/api/v1/notifications", { jar: owner.jar });
+    assert.ok(notifications.body.notifications.some((entry) => entry.kind === "share.comment"));
+    assert.ok(notifications.body.notifications.some((entry) => entry.kind === "share.edit"));
+  });
+
   await t.test("public sharing is off until the owner enables it", async () => {
     const owner = await api.account(`share-off-${crypto.randomUUID()}@example.com`);
     const projectId = await createProject(owner, "Private sharing");
