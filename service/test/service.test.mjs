@@ -16,6 +16,8 @@ import { createService } from "../src/app.mjs";
 import { assertSchemaCurrent } from "../src/app.mjs";
 import { logPath } from "../src/app.mjs";
 import { createSmtpMailer } from "../src/auth/mailer.mjs";
+import { createFileMailer } from "../src/auth/mailer.mjs";
+import { scanUpload, validateUpload } from "../src/uploads.mjs";
 import http from "node:http";
 import { sendAlert } from "../src/alerts.mjs";
 import { createEventHub } from "../src/events.mjs";
@@ -43,6 +45,8 @@ function configFor(dataDir) {
     trustProxy: false,
     publicSharingEnabled: true,
     corsOrigins: ["tauri://localhost"],
+    requireHttps: false,
+    uploadScanCommand: "",
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
@@ -368,6 +372,58 @@ test("SMTP mailer delivers a message over plain SMTP", async () => {
     await mailer.close();
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("requireHttps rejects plain HTTP and accepts a trusted proxy", async (t) => {
+  const dataDir = tempDir();
+  const config = configFor(dataDir);
+  config.requireHttps = true;
+  config.trustProxy = true;
+  const db = openDatabase(config.databasePath);
+  migrate(db, { directory: MIGRATIONS_DIR });
+  const server = createService({
+    config,
+    db,
+    logger: quietLogger,
+    mailer: createFileMailer(config, quietLogger),
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    db.close();
+  });
+  const plain = await fetch(`http://127.0.0.1:${port}/healthz`);
+  assert.equal(plain.status, 426);
+  const proxied = await fetch(`http://127.0.0.1:${port}/healthz`, {
+    headers: { "x-forwarded-proto": "https" },
+  });
+  assert.equal(proxied.status, 200);
+});
+
+test("uploads validate image signatures and run the scanner hook", async (t) => {
+  assert.throws(
+    () => validateUpload("image/png", Buffer.from("not really a png")),
+    /does not match/
+  );
+  assert.equal(
+    validateUpload("image/png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    true
+  );
+  assert.throws(() => validateUpload("image/svg+xml", Buffer.from("<svg/>")), /SVG uploads/);
+
+  const dataDir = tempDir();
+  const config = configFor(dataDir);
+  const script = path.join(dataDir, "scan.mjs");
+  fs.writeFileSync(script, "process.exit(process.env.SCAN_RESULT === 'reject' ? 1 : 0);\n");
+  config.uploadScanCommand = `node ${script}`;
+  const accept = await scanUpload(config, Buffer.from("clean"), quietLogger);
+  assert.equal(accept, true);
+  process.env.SCAN_RESULT = "reject";
+  const reject = await scanUpload(config, Buffer.from("dirty"), quietLogger);
+  delete process.env.SCAN_RESULT;
+  assert.equal(reject, false);
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 });
 
 test("health endpoints expose no version, database or configuration", async () => {
