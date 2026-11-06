@@ -62,7 +62,15 @@ function pruneTokens(db) {
        (SELECT id FROM sessions WHERE revoked_at < ? OR expires_at < ?) AND created_at < ?`
     )
     .run(now - 86_400_000, now - 86_400_000, now - 86_400_000).changes;
-  return { access: Number(access), email: Number(email), refresh: Number(refresh) };
+  const shares = db
+    .prepare("DELETE FROM share_attempts WHERE created_at < ?")
+    .run(now - 30 * 86_400_000).changes;
+  return {
+    access: Number(access),
+    email: Number(email),
+    refresh: Number(refresh),
+    shares: Number(shares),
+  };
 }
 
 export function runMaintenance(db, config, logger) {

@@ -6,6 +6,19 @@ import { bearerToken, hashToken, parseCookies, randomToken, serializeCookie } fr
 import { createTotpSecret, generateTotp, totpUri, verifyTotp } from "./totp.mjs";
 import { clearLoginFailures, loginBlocked, recordLoginAttempt } from "./throttle.mjs";
 import {
+  acceptInvitation,
+  createInvitation,
+  createShareLink,
+  findShare,
+  hasRole,
+  projectSnapshot,
+  recordShareAttempt,
+  revokeShare,
+  rotateShare,
+  shareBlocked,
+  sharedPayload,
+} from "../sharing.mjs";
+import {
   appendCookie,
   assertSameOrigin,
   clientIp,
@@ -20,6 +33,14 @@ import {
 
 function now() {
   return Date.now();
+}
+
+function integerDays(value) {
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 1 || days > 365) {
+    throw new HttpError(400, "expiresInDays must be between 1 and 365", "invalid_expiry");
+  }
+  return days;
 }
 
 function accountById(db, id) {
@@ -165,6 +186,56 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
     try {
       if (!["GET", "HEAD"].includes(method)) assertSameOrigin(request, config);
+
+      const publicShareMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/access$/);
+      if (method === "POST" && publicShareMatch) {
+        const token = decodeURIComponent(publicShareMatch[1]);
+        const share = findShare(db, token);
+        if (
+          !share ||
+          share.revoked_at ||
+          (share.expires_at !== null && Number(share.expires_at) <= now())
+        ) {
+          throw new HttpError(404, "not found", "not_found");
+        }
+        if (shareBlocked(db, { shareId: share.id, ip, config })) {
+          throw new HttpError(429, "too many attempts", "rate_limited", {
+            "Retry-After": "300",
+          });
+        }
+        const body = await readJson(request);
+        if (share.password_hash) {
+          const valid = await verifyPassword(body.password, share.password_hash);
+          if (!valid) {
+            recordShareAttempt(db, { shareId: share.id, ip, success: false, config });
+            throw new HttpError(404, "not found", "not_found");
+          }
+        }
+        recordShareAttempt(db, { shareId: share.id, ip, success: true, config });
+        db.prepare("UPDATE share_links SET last_accessed_at = ? WHERE id = ?").run(now(), share.id);
+        const payload = sharedPayload(db, share);
+        if (!payload) throw new HttpError(404, "not found", "not_found");
+        writeAudit(db, {
+          action: "share.accessed",
+          resourceType: "share_link",
+          resourceId: share.id,
+          metadata: { scope: share.scope, permission: share.permission },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          200,
+          {
+            ...payload,
+            expiresAt: share.expires_at,
+            downloadAllowed: Boolean(share.download_allowed),
+          },
+          config,
+          { "X-Robots-Tag": "noindex, nofollow" }
+        );
+        return true;
+      }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/register") {
         const body = await readJson(request);
@@ -615,6 +686,353 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      const shareCollectionMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/shares$/);
+      if (shareCollectionMatch && (method === "GET" || method === "POST")) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const projectId = shareCollectionMatch[1];
+        const role = projectRole(db, projectId, auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
+        if (method === "GET") {
+          const links = db
+            .prepare(
+              "SELECT id, scope, target_id, permission, download_allowed, created_at, expires_at, revoked_at, last_accessed_at FROM share_links WHERE project_id = ? ORDER BY created_at DESC"
+            )
+            .all(projectId)
+            .map((link) => ({
+              id: link.id,
+              scope: link.scope,
+              targetId: link.target_id,
+              permission: link.permission,
+              downloadAllowed: Boolean(link.download_allowed),
+              createdAt: link.created_at,
+              expiresAt: link.expires_at,
+              revoked: Boolean(link.revoked_at),
+              lastAccessedAt: link.last_accessed_at,
+            }));
+          sendJson(response, 200, { shares: links }, config);
+          return true;
+        }
+        const body = await readJson(request);
+        const snapshot = projectSnapshot(db, projectId);
+        if (!snapshot) throw new HttpError(404, "project not found", "not_found");
+        if (!snapshot.project.public_sharing_enabled) {
+          throw new HttpError(409, "public sharing is disabled for this project", "sharing_disabled");
+        }
+        const scope = ["project", "item", "column"].includes(body.scope) ? body.scope : null;
+        const permission = ["view", "comment", "edit", "manage"].includes(body.permission)
+          ? body.permission
+          : null;
+        if (!scope || !permission) throw new HttpError(400, "invalid share scope or permission", "invalid_share");
+        let targetId = null;
+        if (scope !== "project") {
+          targetId = requireString(body.targetId, "targetId", 200);
+          const card = (snapshot.doc.cards || []).find((entry) => entry.id === targetId);
+          if (!card || (scope === "column" && card.type !== "column")) {
+            throw new HttpError(404, "shared target not found", "not_found");
+          }
+        }
+        const passwordHash =
+          body.password === undefined || body.password === ""
+            ? null
+            : await hashPassword(requirePassword(body.password));
+        const expiresAt =
+          body.expiresInDays === undefined || body.expiresInDays === null
+            ? null
+            : now() + integerDays(body.expiresInDays) * 86_400_000;
+        const created = createShareLink(db, {
+          projectId,
+          scope,
+          targetId,
+          permission,
+          passwordHash,
+          expiresAt,
+          downloadAllowed: Boolean(body.downloadAllowed),
+          createdBy: auth.account.id,
+        });
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "share.created",
+          resourceType: "share_link",
+          resourceId: created.id,
+          metadata: { scope, permission, targetId, expiresAt },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { id: created.id, token: created.token, scope, permission, expiresAt }, config);
+        return true;
+      }
+
+      const shareItemMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/shares\/([^/]+)$/);
+      if (method === "DELETE" && shareItemMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const role = projectRole(db, shareItemMatch[1], auth.account.id);
+        if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
+        if (!revokeShare(db, shareItemMatch[1], shareItemMatch[2], auth.account.id, config)) {
+          throw new HttpError(404, "share not found", "not_found");
+        }
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
+      const shareRotateMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/shares\/([^/]+)\/rotate$/);
+      if (method === "POST" && shareRotateMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const role = projectRole(db, shareRotateMatch[1], auth.account.id);
+        if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
+        const token = rotateShare(db, shareRotateMatch[1], shareRotateMatch[2], auth.account.id);
+        if (!token) throw new HttpError(404, "share not found", "not_found");
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "share.rotated",
+          resourceType: "share_link",
+          resourceId: shareRotateMatch[2],
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { token }, config);
+        return true;
+      }
+
+      const publicFlagMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/public-sharing$/);
+      if (method === "POST" && publicFlagMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const role = projectRole(db, publicFlagMatch[1], auth.account.id);
+        if (role !== "owner") throw new HttpError(403, "owner role required", "forbidden");
+        const body = await readJson(request);
+        db.prepare("UPDATE projects SET public_sharing_enabled = ?, updated_at = ? WHERE id = ?").run(
+          body.enabled ? 1 : 0,
+          now(),
+          publicFlagMatch[1]
+        );
+        if (!body.enabled) {
+          db.prepare(
+            "UPDATE share_links SET revoked_at = ? WHERE project_id = ? AND revoked_at IS NULL"
+          ).run(now(), publicFlagMatch[1]);
+        }
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: body.enabled ? "project.public_sharing_enabled" : "project.public_sharing_disabled",
+          resourceType: "project",
+          resourceId: publicFlagMatch[1],
+          ip,
+          secret: config.secret,
+        });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
+      const invitationCollectionMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/invitations$/);
+      if (invitationCollectionMatch && (method === "GET" || method === "POST")) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const projectId = invitationCollectionMatch[1];
+        const role = projectRole(db, projectId, auth.account.id);
+        if (method === "GET" && !hasRole(role, "editor")) {
+          throw new HttpError(403, "editor role required", "forbidden");
+        }
+        if (method === "POST" && role !== "owner") {
+          throw new HttpError(403, "owner role required", "forbidden");
+        }
+        if (method === "GET") {
+          const invitations = db
+            .prepare(
+              "SELECT id, email, role, created_at, expires_at, accepted_at, revoked_at FROM project_invitations WHERE project_id = ? ORDER BY created_at DESC"
+            )
+            .all(projectId)
+            .map((invitation) => ({
+              id: invitation.id,
+              email: invitation.email,
+              role: invitation.role,
+              createdAt: invitation.created_at,
+              expiresAt: invitation.expires_at,
+              accepted: Boolean(invitation.accepted_at),
+              revoked: Boolean(invitation.revoked_at),
+            }));
+          sendJson(response, 200, { invitations }, config);
+          return true;
+        }
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const invitedRole = ["editor", "commenter", "viewer"].includes(body.role) ? body.role : null;
+        if (!invitedRole) throw new HttpError(400, "invalid invitation role", "invalid_role");
+        const existing = db
+          .prepare(
+            "SELECT 1 FROM project_members m JOIN accounts a ON a.id = m.account_id WHERE m.project_id = ? AND a.email = ?"
+          )
+          .get(projectId, email);
+        if (existing) throw new HttpError(409, "account is already a member", "already_member");
+        const created = createInvitation(db, {
+          projectId,
+          email,
+          role: invitedRole,
+          invitedBy: auth.account.id,
+          expiresAt: now() + 7 * 86_400_000,
+        });
+        await mailer.send({
+          to: email,
+          kind: "invite",
+          subject: "Invitation to a Khaoyu Note project",
+          text: `Invitation token: ${created.token}`,
+        });
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "invitation.created",
+          resourceType: "project_invitation",
+          resourceId: created.id,
+          metadata: { role: invitedRole },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { id: created.id, email, role: invitedRole }, config);
+        return true;
+      }
+
+      const invitationItemMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/invitations\/([^/]+)$/);
+      if (method === "DELETE" && invitationItemMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const role = projectRole(db, invitationItemMatch[1], auth.account.id);
+        if (role !== "owner") throw new HttpError(403, "owner role required", "forbidden");
+        const result = db
+          .prepare(
+            "UPDATE project_invitations SET revoked_at = ? WHERE id = ? AND project_id = ? AND revoked_at IS NULL"
+          )
+          .run(now(), invitationItemMatch[2], invitationItemMatch[1]);
+        if (!result.changes) throw new HttpError(404, "invitation not found", "not_found");
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/invitations/accept") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const body = await readJson(request);
+        const result = acceptInvitation(db, {
+          token: requireString(body.token, "token", 200),
+          account: auth.account,
+        });
+        if (!result) throw new HttpError(404, "invitation not found", "not_found");
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "invitation.accepted",
+          resourceType: "project",
+          resourceId: result.projectId,
+          metadata: { role: result.role, alreadyMember: Boolean(result.alreadyMember) },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, result, config);
+        return true;
+      }
+
+      const membersMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/members$/);
+      if (method === "GET" && membersMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        const role = projectRole(db, membersMatch[1], auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        const members = db
+          .prepare(
+            `SELECT a.id, a.email, a.display_name, m.role, m.created_at
+             FROM project_members m JOIN accounts a ON a.id = m.account_id
+             WHERE m.project_id = ? ORDER BY m.created_at`
+          )
+          .all(membersMatch[1]);
+        sendJson(response, 200, { members }, config);
+        return true;
+      }
+
+      const memberMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/members\/([^/]+)$/);
+      if (memberMatch && (method === "PATCH" || method === "DELETE")) {
+        const auth = requireSessionAuth(request, response, db, config);
+        if (projectRole(db, memberMatch[1], auth.account.id) !== "owner") {
+          throw new HttpError(403, "owner role required", "forbidden");
+        }
+        const target = db
+          .prepare("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?")
+          .get(memberMatch[1], memberMatch[2]);
+        if (!target) throw new HttpError(404, "member not found", "not_found");
+        if (target.role === "owner") throw new HttpError(409, "cannot change the owner", "owner_protected");
+        if (method === "PATCH") {
+          const body = await readJson(request);
+          if (!["editor", "commenter", "viewer"].includes(body.role)) {
+            throw new HttpError(400, "invalid member role", "invalid_role");
+          }
+          db.prepare("UPDATE project_members SET role = ? WHERE project_id = ? AND account_id = ?").run(
+            body.role,
+            memberMatch[1],
+            memberMatch[2]
+          );
+          writeAudit(db, {
+            actorAccountId: auth.account.id,
+            action: "member.role_changed",
+            resourceType: "project",
+            resourceId: memberMatch[1],
+            metadata: { accountId: memberMatch[2], role: body.role },
+            ip,
+            secret: config.secret,
+          });
+          sendNoContent(response, 204, config);
+          return true;
+        }
+        db.prepare("DELETE FROM project_members WHERE project_id = ? AND account_id = ?").run(
+          memberMatch[1],
+          memberMatch[2]
+        );
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "member.removed",
+          resourceType: "project",
+          resourceId: memberMatch[1],
+          metadata: { accountId: memberMatch[2] },
+          ip,
+          secret: config.secret,
+        });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
+      const transferMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/transfer$/);
+      if (method === "POST" && transferMatch) {
+        const auth = requireSessionAuth(request, response, db, config);
+        if (projectRole(db, transferMatch[1], auth.account.id) !== "owner") {
+          throw new HttpError(403, "owner role required", "forbidden");
+        }
+        const body = await readJson(request);
+        const target = requireString(body.accountId, "accountId", 200);
+        const targetRole = projectRole(db, transferMatch[1], target);
+        if (!targetRole) throw new HttpError(404, "member not found", "not_found");
+        if (target === auth.account.id) throw new HttpError(409, "already the owner", "invalid_transfer");
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          db.prepare("UPDATE project_members SET role = 'editor' WHERE project_id = ? AND account_id = ?").run(
+            transferMatch[1],
+            auth.account.id
+          );
+          db.prepare("UPDATE project_members SET role = 'owner' WHERE project_id = ? AND account_id = ?").run(
+            transferMatch[1],
+            target
+          );
+          db.prepare("UPDATE projects SET owner_account_id = ?, updated_at = ? WHERE id = ?").run(
+            target,
+            now(),
+            transferMatch[1]
+          );
+          db.exec("COMMIT");
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
+        }
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "project.ownership_transferred",
+          resourceType: "project",
+          resourceId: transferMatch[1],
+          metadata: { to: target },
+          ip,
+          secret: config.secret,
+        });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/projects") {
         const auth = requireAuth(request, response, db, config);
         requireScope(auth, "projects:read");
@@ -631,8 +1049,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       if (method === "POST" && url.pathname === "/api/v1/projects") {
         const auth = requireAuth(request, response, db, config);
-        requireScope(auth, "projects:write");
-        const body = await readJson(request);
+        requireScope(auth, "projects:write");        const body = await readJson(request);
         const title = requireString(body.title, "title", 120);
         const projectId = crypto.randomUUID();
         db.exec("BEGIN IMMEDIATE");

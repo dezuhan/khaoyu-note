@@ -12,6 +12,13 @@ export function assertSchemaCurrent(db) {
   }
 }
 
+export function logPath(pathname) {
+  return pathname.replace(
+    /^\/api\/v1\/share\/[^/]+\/access$/,
+    "/api/v1/share/[redacted]/access"
+  );
+}
+
 export function createService({ config, db, logger, mailer }) {
   const api = createApiRouter({ db, config, logger, mailer });
   return http.createServer(async (request, response) => {
@@ -21,7 +28,7 @@ export function createService({ config, db, logger, mailer }) {
       if (url.pathname !== "/healthz" && url.pathname !== "/readyz") {
         logger.info("http.request", {
           method: request.method,
-          path: url.pathname,
+          path: logPath(url.pathname),
           status: response.statusCode,
           durationMs: Date.now() - started,
         });
