@@ -12,6 +12,16 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.28.0] - 2026-11-07
+
+### Fixed
+
+- Duplicate now works for column cards instead of silently skipping them.
+- Duplicating a column copies its child cards and remaps parent IDs.
+- Copy, cut and paste treat a column as a subtree, so pasted columns keep their child cards.
+- Repeated paste offsets the whole subtree and selects the copied column roots.
+- Added UI checks for duplicating and copy-pasting a column with children.
+
 ## [0.27.0] - 2026-11-07
 
 ### Added
