@@ -1175,6 +1175,23 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { title: "API project" },
     });
     assert.equal(created.status, 201);
+    const enabled = await api.call(`/api/v1/projects/${created.body.id}/public-sharing`, {
+      method: "POST",
+      headers: writeBearer,
+      body: { enabled: true, acknowledge: true },
+    });
+    assert.equal(enabled.status, 204);
+    const share = await api.call(`/api/v1/projects/${created.body.id}/shares`, {
+      method: "POST",
+      headers: writeBearer,
+      body: { scope: "project", permission: "view" },
+    });
+    assert.equal(share.status, 201);
+    const shares = await api.call(`/api/v1/projects/${created.body.id}/shares`, {
+      headers: readBearer,
+    });
+    assert.equal(shares.status, 200);
+    assert.ok(shares.body.shares.some((entry) => entry.id === share.body.id));
     const listed = await api.call("/api/v1/account/tokens", { jar: user.jar });
     assert.ok(listed.body.tokens.some((token) => token.id === writeToken.body.id));
     const revoked = await api.call(`/api/v1/account/tokens/${writeToken.body.id}`, {

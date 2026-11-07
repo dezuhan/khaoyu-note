@@ -1440,7 +1440,8 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       const shareCollectionMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/shares$/);
       if (shareCollectionMatch && (method === "GET" || method === "POST")) {
-        const auth = requireSessionAuth(request, response, db, config);
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, method === "GET" ? "projects:read" : "projects:write");
         const projectId = shareCollectionMatch[1];
         const role = projectRole(db, projectId, auth.account.id);
         if (!role) throw new HttpError(404, "project not found", "not_found");
@@ -1520,7 +1521,8 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       const shareItemMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/shares\/([^/]+)$/);
       if (method === "DELETE" && shareItemMatch) {
-        const auth = requireSessionAuth(request, response, db, config);
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
         const role = projectRole(db, shareItemMatch[1], auth.account.id);
         if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
         if (!revokeShare(db, shareItemMatch[1], shareItemMatch[2], auth.account.id, config)) {
@@ -1533,7 +1535,8 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       const shareRotateMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/shares\/([^/]+)\/rotate$/);
       if (method === "POST" && shareRotateMatch) {
-        const auth = requireSessionAuth(request, response, db, config);
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
         const role = projectRole(db, shareRotateMatch[1], auth.account.id);
         if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
         const token = rotateShare(db, shareRotateMatch[1], shareRotateMatch[2], auth.account.id);
@@ -1552,7 +1555,8 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       const publicFlagMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/public-sharing$/);
       if (method === "POST" && publicFlagMatch) {
-        const auth = requireSessionAuth(request, response, db, config);
+        const auth = requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
         const role = projectRole(db, publicFlagMatch[1], auth.account.id);
         if (role !== "owner") throw new HttpError(403, "owner role required", "forbidden");
         const body = await readJson(request);
