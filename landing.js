@@ -52,37 +52,31 @@ const shots = {
     src: "shots/board-light.png",
     alt: "Khaoyu Note board in light mode with cards and comments",
     title: "Khaoyu Note - Boards",
-    caption: "Light and dark themes share the same quiet token system.",
   },
   welcome: {
     src: "shots/welcome-all-tools.png",
     alt: "Welcome board with the enabled Khaoyu Note card types",
     title: "Khaoyu Note - Welcome",
-    caption: "A fresh board seeds the enabled tools without the three disabled card types.",
   },
   settings: {
     src: "shots/settings-general.png",
     alt: "Khaoyu Note Settings on the General page",
     title: "Khaoyu Note - Settings",
-    caption: "Server, Backup, General, Appearance, Tools, Performance, MCP and About.",
   },
   writing: {
     src: "shots/doc-editor.png",
     alt: "Khaoyu Note document editor",
     title: "Khaoyu Note - Writing",
-    caption: "A document card opens into a focused writing page with export.",
   },
   drawing: {
     src: "shots/drawing-editor.png",
     alt: "Khaoyu Note drawing editor",
     title: "Khaoyu Note - Drawing",
-    caption: "Sketch cards open into a full-page drawing editor.",
   },
 };
 
 const shotImage = document.getElementById("shot-image");
 const shotTitle = document.getElementById("shot-title");
-const shotCaption = document.getElementById("shot-caption");
 
 function selectShot(key) {
   const shot = shots[key];
@@ -90,7 +84,6 @@ function selectShot(key) {
   shotImage.src = shot.src;
   shotImage.alt = shot.alt;
   if (shotTitle) shotTitle.textContent = shot.title;
-  if (shotCaption) shotCaption.textContent = shot.caption;
   for (const button of document.querySelectorAll(".lp-tabs button")) {
     const active = button.dataset.shot === key;
     button.classList.toggle("is-active", active);
@@ -127,6 +120,21 @@ if ("IntersectionObserver" in window && revealItems.length) {
   for (const item of revealItems) observer.observe(item);
 } else {
   for (const item of revealItems) item.classList.add("is-visible");
+}
+
+// License dialog. Fall back to the raw license file when dialog is unavailable.
+const licenseDialog = document.getElementById("license-dialog");
+const licenseTrigger = document.getElementById("license-trigger");
+if (licenseDialog && licenseTrigger && typeof licenseDialog.showModal === "function") {
+  licenseTrigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    licenseDialog.showModal();
+  });
+  document.getElementById("license-close")?.addEventListener("click", () => licenseDialog.close());
+  licenseDialog.addEventListener("click", (event) => {
+    if (event.target === licenseDialog) licenseDialog.close();
+  });
+  licenseDialog.addEventListener("close", () => licenseTrigger.focus());
 }
 
 // Small nav elevation once the hero starts scrolling.

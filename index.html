@@ -182,7 +182,6 @@
             data-drawing="shots/drawing-editor.png"
           />
         </div>
-        <p class="lp-caption" id="shot-caption">Light and dark themes share the same quiet token system.</p>
       </section>
 
       <section class="lp-section lp-local" id="local">
@@ -242,7 +241,7 @@
           <a href="#screens">Screens</a>
           <a href="#download">Download</a>
           <a href="README.md">Documentation</a>
-          <a href="LICENSE">License</a>
+          <a href="LICENSE" id="license-trigger">License</a>
           <a href="TRADEMARK.md">Trademark</a>
         </div>
       </div>
@@ -251,6 +250,58 @@
         <span>Built with the Khaoyu design system.</span>
       </div>
     </footer>
+
+    <dialog class="lp-license-dialog" id="license-dialog" aria-labelledby="license-title">
+      <header class="lp-license-head">
+        <div>
+          <p class="lp-kicker">Open source license</p>
+          <h2 id="license-title">AGPL-3.0-only</h2>
+        </div>
+        <button type="button" class="lp-icon-button" id="license-close">Close</button>
+      </header>
+      <div class="lp-license-body">
+        <p>
+          Khaoyu Note is free software under the GNU Affero General Public License, version 3 only.
+          You can use it commercially, but modified versions and network services must keep their
+          complete source available.
+        </p>
+        <div class="lp-license-grid">
+          <section>
+            <h3>Allowed</h3>
+            <ul>
+              <li>Use, study and modify the code</li>
+              <li>Use it commercially</li>
+              <li>Distribute copies or forks</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Required</h3>
+            <ul>
+              <li>Keep copyright and license notices</li>
+              <li>Publish the source of modified versions</li>
+              <li>Publish source for network services</li>
+              <li>Give attribution to Khaoyu Note</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Not granted</h3>
+            <ul>
+              <li>The Khaoyu Note name</li>
+              <li>The logo and app icon</li>
+              <li>Official status or endorsement</li>
+            </ul>
+          </section>
+        </div>
+        <p class="lp-license-note">
+          This is a summary, not legal advice. The full license text governs. Forks must use their own
+          branding and may not be presented as the official Khaoyu Note app.
+        </p>
+      </div>
+      <footer class="lp-license-actions">
+        <a class="lp-button lp-button-quiet" href="TRADEMARK.md">Trademark policy</a>
+        <a class="lp-button" href="LICENSE" target="_blank" rel="noreferrer">Read full license</a>
+      </footer>
+    </dialog>
 
     <script src="landing.js"></script>
   </body>

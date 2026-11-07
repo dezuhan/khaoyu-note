@@ -580,11 +580,130 @@ body.lp {
   background: var(--ky-surface);
 }
 
-.lp-caption {
-  margin: 12px 0 0;
-  color: var(--ky-soft);
+.lp-license-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(86vh, 720px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius);
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  box-shadow: 0 30px 90px color-mix(in srgb, var(--ky-text) 22%, transparent);
+}
+
+.lp-license-dialog::backdrop {
+  background: color-mix(in srgb, var(--ky-bg) 62%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.lp-license-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--lp-line);
+}
+
+.lp-license-head h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.035em;
+}
+
+.lp-license-head .lp-kicker {
+  margin-bottom: 4px;
+}
+
+.lp-license-body {
+  padding: 18px 22px;
+}
+
+.lp-license-body > p {
+  margin: 0;
+  color: var(--ky-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.lp-license-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  overflow: hidden;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-control);
+  background: var(--lp-line);
+}
+
+.lp-license-grid section {
+  padding: 12px;
+  background: var(--ky-bg);
+}
+
+.lp-license-grid h3 {
+  margin: 0 0 8px;
   font-size: 10px;
-  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lp-license-grid ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lp-license-grid li {
+  color: var(--ky-muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.lp-license-grid li::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--ky-soft);
+}
+
+.lp-license-note {
+  padding-top: 14px;
+  border-top: 1px solid var(--lp-line);
+  color: var(--ky-soft) !important;
+  font-size: 10px !important;
+}
+
+.lp-license-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px 20px;
+  border-top: 1px solid var(--lp-line);
+}
+
+@media (max-width: 620px) {
+  .lp-license-head,
+  .lp-license-body,
+  .lp-license-actions {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .lp-license-grid {
+    grid-template-columns: 1fr;
+  }
+  .lp-license-actions {
+    flex-direction: column-reverse;
+  }
+  .lp-license-actions .lp-button {
+    width: 100%;
+  }
 }
 
 /* --------------------------------------------------------------- local */
