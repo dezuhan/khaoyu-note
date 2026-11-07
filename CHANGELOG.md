@@ -38,6 +38,20 @@ project uses Semantic Versioning.
 - The backup archive is written uncompressed (STORE). The payload is a SQLite snapshot plus images,
   audio and video that are already compressed, so it keeps the export free of an extra dependency.
 
+### Fixed
+
+- Server sync accepts a local service address. `127.0.0.1:8080`, `localhost:8080` and
+  `http://localhost:8080` are normalized instead of requiring a domain, remote hosts default to
+  `https`, and the desktop CSP allows loopback `connect-src`.
+- A real board can sync again. The snapshot route used the 64 KB JSON body limit, so any board above
+  that size failed with 413; snapshots now accept up to 8 MB and over-limit bodies are drained so the
+  client receives the 413 instead of a connection reset.
+- The service CORS defaults include the local web host origins, so the browser build can sync to a
+  local service without editing configuration.
+- The sync dialog reports the real connection state. `Check connection and connect` runs `/readyz`
+  and an authenticated project listing before connecting, and the Account pane shows the same result
+  under Server, API token and Status.
+
 ## [0.32.0] - 2026-11-07
 
 ### Fixed

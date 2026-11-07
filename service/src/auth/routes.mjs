@@ -61,6 +61,10 @@ function now() {
   return Date.now();
 }
 
+// A board snapshot carries the whole board document, so it needs much more room than the default
+// JSON body limit used by the small auth and account endpoints.
+const MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024;
+
 // Fixed argon2id hash (same parameters as passwords.mjs) used to make the unknown-email
 // login path cost roughly the same as a real password check.
 const DUMMY_PASSWORD_HASH =
@@ -2309,8 +2313,8 @@ export function createApiRouter({ db, config, logger, mailer }) {
         if (!["owner", "editor"].includes(role)) {
           throw new HttpError(403, "editor role required", "forbidden");
         }
-        const body = await readJson(request);
-        const doc = requireString(body.doc, "doc", 64 * 1024);
+        const body = await readJson(request, MAX_SNAPSHOT_BYTES);
+        const doc = requireString(body.doc, "doc", MAX_SNAPSHOT_BYTES);
         const project = db
           .prepare("SELECT revision FROM projects WHERE id = ? AND deleted_at IS NULL")
           .get(snapshotMatch[1]);

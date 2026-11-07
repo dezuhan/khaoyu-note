@@ -56,6 +56,8 @@ export function openSyncDialog() {
   });
   document.body.append(overlay);
   renderDialog();
+  const config = sync.loadSyncConfig();
+  if (config.url && config.token) void updateConnection();
 }
 
 function closeDialog() {
@@ -104,8 +106,8 @@ function renderDialog() {
   urlLabel.textContent = "Server URL";
   const url = document.createElement("input");
   url.className = "ky-input";
-  url.type = "url";
-  url.placeholder = "https://notes.example.com";
+  url.type = "text";
+  url.placeholder = "http://127.0.0.1:8080";
   url.value = config.url;
   urlLabel.append(url);
 
@@ -127,6 +129,13 @@ function renderDialog() {
   statusLine.dataset.status = status.status;
   statusLine.textContent = status.message;
   body.append(statusLine);
+
+  const connection = document.createElement("div");
+  connection.className = "mn-sync-connection";
+  connection.dataset.role = "sync-connection";
+  connection.dataset.status = sync.connectionStatus.state;
+  connection.textContent = connectionText(sync.connectionStatus);
+  body.append(connection);
 
   if (enabled) {
     const info = document.createElement("div");
@@ -160,16 +169,57 @@ function renderDialog() {
 
   const foot = document.createElement("footer");
   foot.className = "mn-modal-foot mn-sync-foot";
-  const save = button("Save connection", "mn-btn", async () => {
-    sync.saveSyncConfig({ url: url.value.trim(), token: token.value.trim() });
-    toast("Sync connection saved");
-    refresh();
+  const applyConfig = () => {
+    const saved = sync.saveSyncConfig({ url: url.value, token: token.value });
+    url.value = saved.url;
+    return saved;
+  };
+  const save = button("Save connection", "mn-btn", () => {
+    try {
+      applyConfig();
+      toast("Sync connection saved");
+      refresh();
+      renderConnection(sync.connectionStatus);
+    } catch (error) {
+      toast(error.message || "Could not save the connection");
+    }
   });
-  const primary = button(enabled ? "Sync now" : "Enable for this board", "mn-btn mn-btn-primary", async () => {
-    sync.saveSyncConfig({ url: url.value.trim(), token: token.value.trim() });
-    await runSync();
+  const checkButton = button("Check connection", "mn-btn", async () => {
+    try {
+      applyConfig();
+    } catch (error) {
+      renderConnection({ state: "unconfigured", message: error.message, projectCount: null });
+      toast(error.message || "Could not save the connection");
+      return;
+    }
+    await updateConnection();
   });
-  foot.append(save, primary);
+  const primary = button(
+    enabled ? "Sync now" : "Check connection and connect",
+    "mn-btn mn-btn-primary",
+    async () => {
+      try {
+        applyConfig();
+      } catch (error) {
+        renderConnection({ state: "unconfigured", message: error.message, projectCount: null });
+        toast(error.message || "Could not save the connection");
+        return;
+      }
+      if (enabled) {
+        await runSync();
+        return;
+      }
+      primary.disabled = true;
+      const result = await updateConnection();
+      primary.disabled = false;
+      if (!result.ok) {
+        toast(connectionText(result));
+        return;
+      }
+      await runSync();
+    }
+  );
+  foot.append(save, checkButton, primary);
   if (enabled) {
     foot.append(
       button("Disable for this board", "mn-btn mn-btn-quiet", async () => {
@@ -194,6 +244,24 @@ function button(label, className, handler) {
   element.textContent = label;
   element.addEventListener("click", () => handler());
   return element;
+}
+
+function connectionText(status) {
+  return sync.describeConnection(status);
+}
+
+function renderConnection(status) {
+  const line = overlay?.querySelector('[data-role="sync-connection"]');
+  if (!line) return;
+  line.dataset.status = status.state;
+  line.textContent = connectionText(status);
+}
+
+async function updateConnection() {
+  renderConnection({ state: "checking", message: "Checking...", projectCount: null });
+  const result = await sync.checkConnection();
+  renderConnection(result);
+  return result;
 }
 
 function renderStatus() {

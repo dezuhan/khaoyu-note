@@ -5405,6 +5405,21 @@ html[data-performance="true"] .mn-card {
 .mn-sync-status[data-status="conflict"] {
   color: var(--ky-danger);
 }
+.mn-sync-connection {
+  font-size: 11px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+}
+.mn-sync-connection[data-status="connected"] {
+  color: var(--ky-accent);
+}
+.mn-sync-connection[data-status="unreachable"],
+.mn-sync-connection[data-status="not-ready"],
+.mn-sync-connection[data-status="unauthorized"],
+.mn-sync-connection[data-status="forbidden"],
+.mn-sync-connection[data-status="error"] {
+  color: var(--ky-danger);
+}
 .mn-sync-meta {
   font-family: var(--mn-font-code);
   font-size: 10px;
@@ -5601,6 +5616,16 @@ html[data-performance="true"] .mn-card {
   font-size: 10px;
   color: var(--ky-soft);
   overflow-wrap: anywhere;
+}
+.mn-account-connection[data-status="connected"] {
+  color: var(--ky-accent);
+}
+.mn-account-connection[data-status="unreachable"],
+.mn-account-connection[data-status="not-ready"],
+.mn-account-connection[data-status="unauthorized"],
+.mn-account-connection[data-status="forbidden"],
+.mn-account-connection[data-status="error"] {
+  color: var(--ky-danger);
 }
 .mn-account-grid {
   display: grid;

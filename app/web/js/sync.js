@@ -30,7 +30,147 @@ export function loadSyncConfig() {
 }
 
 export function saveSyncConfig(config) {
-  storage().setItem(CONFIG_KEY, JSON.stringify({ url: config.url, token: config.token }));
+  const url = normalizeServerUrl(config.url);
+  const token = String(config.token || "").trim();
+  storage().setItem(CONFIG_KEY, JSON.stringify({ url, token }));
+  connectionStatus.state = "unknown";
+  connectionStatus.message = "Not checked";
+  connectionStatus.url = "";
+  connectionStatus.projectCount = null;
+  connectionStatus.checkedAt = 0;
+  return { url, token };
+}
+
+// A local service usually runs on http://localhost:PORT, so a bare host or host:port is accepted.
+// Only loopback and private addresses get an automatic http scheme; anything else defaults to https
+// so a typo in a remote host cannot silently downgrade the connection.
+export function normalizeServerUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) throw new Error("Enter the server URL");
+  let candidate = raw;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)) {
+    const authority = candidate.split("/")[0];
+    const host = (
+      authority.startsWith("[")
+        ? authority.slice(1, authority.indexOf("]"))
+        : authority.split(":")[0]
+    ).toLowerCase();
+    const local =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    candidate = `${local ? "http" : "https"}://${candidate}`;
+  }
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("That is not a valid server URL");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Server URL must start with http:// or https://");
+  }
+  if (!parsed.hostname) throw new Error("Server URL needs a host");
+  if (parsed.username || parsed.password) {
+    throw new Error("Server URL must not contain credentials");
+  }
+  const path = parsed.pathname.replace(/\/+$/, "");
+  return `${parsed.protocol}//${parsed.host}${path}`;
+}
+
+export const connectionStatus = {
+  state: "unknown",
+  message: "Not checked",
+  url: "",
+  projectCount: null,
+  checkedAt: 0,
+};
+
+function recordConnection(state, message, extra = {}) {
+  connectionStatus.state = state;
+  connectionStatus.message = message;
+  connectionStatus.url = extra.url || "";
+  connectionStatus.projectCount = extra.projectCount ?? null;
+  connectionStatus.checkedAt = Date.now();
+  return { ok: state === "connected", ...connectionStatus };
+}
+
+const CONNECTION_LABELS = {
+  unknown: "Connection not checked",
+  checking: "Checking connection...",
+  unconfigured: "Connection not configured",
+  unreachable: "Server unreachable",
+  "not-ready": "Server reachable, database not ready",
+  unauthorized: "API token rejected",
+  forbidden: "Token lacks projects:read",
+  error: "Connection error",
+  connected: "Connected",
+};
+
+export function describeConnection(status) {
+  if (!status || status.state === "unknown") return CONNECTION_LABELS.unknown;
+  if (status.state === "checking") return CONNECTION_LABELS.checking;
+  if (status.state === "connected") {
+    const projects =
+      status.projectCount === null
+        ? ""
+        : `, ${status.projectCount} project${status.projectCount === 1 ? "" : "s"}`;
+    return `Connected to ${status.url} · database ready${projects}`;
+  }
+  const label = CONNECTION_LABELS[status.state] || "Connection not checked";
+  return `${label}: ${status.message}`;
+}
+
+// Check the server and the token against the real API. `/readyz` proves the service and its
+// database respond; an authenticated `GET /projects` proves the token is valid and that the
+// database round trip works for this account.
+export async function checkConnection({ timeoutMs = 8000 } = {}) {
+  let url;
+  let token;
+  try {
+    const config = loadSyncConfig();
+    url = normalizeServerUrl(config.url);
+    token = String(config.token || "").trim();
+  } catch (error) {
+    return recordConnection("unconfigured", error.message || "Set the server URL and API token first");
+  }
+  if (!token) return recordConnection("unconfigured", "Set the server API token first", { url });
+
+  let ready;
+  try {
+    ready = await fetch(`${url}/readyz`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    return recordConnection("unreachable", `No response from ${url}`, { url });
+  }
+  if (!ready.ok) {
+    return recordConnection("not-ready", `The server answered ${ready.status}`, { url });
+  }
+
+  let response;
+  try {
+    response = await fetch(`${url}/api/v1/projects`, {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    return recordConnection("unreachable", `No response from ${url}`, { url });
+  }
+  if (response.status === 401) {
+    return recordConnection("unauthorized", "The API token was rejected", { url });
+  }
+  if (response.status === 403) {
+    return recordConnection("forbidden", "The token is missing the projects:read scope", { url });
+  }
+  if (!response.ok) {
+    return recordConnection("error", `The server answered ${response.status}`, { url });
+  }
+  const body = await response.json().catch(() => null);
+  const projectCount = Array.isArray(body?.projects) ? body.projects.length : null;
+  return recordConnection("connected", "Connected and database ready", { url, projectCount });
 }
 
 export function syncEnabled(board) {
@@ -52,10 +192,10 @@ export function syncStatusFor(board) {
 
 function requireConfig() {
   const config = loadSyncConfig();
-  if (!config.url || !config.token) {
-    throw new Error("Set the sync server URL and API token first");
+  if (!config.token) {
+    throw new Error("Set the sync server API token first");
   }
-  return { url: config.url.replace(/\/+$/, ""), token: config.token };
+  return { url: normalizeServerUrl(config.url), token: config.token };
 }
 
 async function api(pathname, { method = "GET", body } = {}) {

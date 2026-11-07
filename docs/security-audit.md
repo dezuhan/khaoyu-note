@@ -7,7 +7,7 @@ and the new share links.
 
 The service foundation and account core are usable for a single-tenant self-hosted deployment behind
 TLS. Authentication, session rotation, CSRF, share-token isolation and project authorization are
-covered by 47 automated service checks. The largest remaining risks are the absence of an external
+covered by 48 automated service checks. The largest remaining risks are the absence of an external
 penetration test, missing asset watermarking and signed download URLs, and the unauthenticated
 loopback web host described in `docs/threat-model.md`.
 

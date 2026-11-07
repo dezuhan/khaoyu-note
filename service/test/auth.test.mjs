@@ -236,6 +236,38 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     return updated.body.revision;
   }
 
+  await t.test("large board snapshots fit the sync payload limit", async () => {
+    const user = await api.account(`snapshot-size-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(user, "Large snapshot");
+    const cards = Array.from({ length: 2000 }, (_, index) => ({
+      id: `c${index}`,
+      type: "note",
+      text: "x".repeat(100),
+    }));
+    const doc = { id: projectId, title: "Large snapshot", cards, connections: [], updatedAt: 1000 };
+    assert.ok(
+      Buffer.byteLength(JSON.stringify(doc)) > 200_000,
+      "the test document must exceed the old 64 KB body limit"
+    );
+    const revision = await putSnapshot(user, projectId, doc, 1);
+    assert.equal(revision, 2);
+
+    const oversized = {
+      id: projectId,
+      title: "Too large",
+      cards: [{ id: "c1", type: "note", text: "y".repeat(9 * 1024 * 1024) }],
+      connections: [],
+      trash: [],
+      updatedAt: 2000,
+    };
+    const rejected = await api.call(`/api/v1/projects/${projectId}/snapshot`, {
+      method: "PUT",
+      jar: user.jar,
+      body: { doc: JSON.stringify(oversized), revision },
+    });
+    assert.equal(rejected.status, 413, JSON.stringify(rejected.body));
+  });
+
   await t.test("registration does not require email verification before login", async () => {
     const email = `verify-${crypto.randomUUID()}@example.com`;
     await api.register(email);

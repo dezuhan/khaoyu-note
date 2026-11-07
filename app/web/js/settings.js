@@ -4,7 +4,7 @@ import * as bridge from "./bridge.js";
 import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
-import { loadSyncConfig } from "./sync.js";
+import { checkConnection, describeConnection, loadSyncConfig } from "./sync.js";
 import { openSyncDialog } from "./sync-ui.js";
 
 export const DEFAULT_TOOL_ORDER = [
@@ -771,9 +771,15 @@ function renderAccountPage(content) {
   server.textContent = config.url ? `Server: ${config.url}` : "Server: not connected";
   const token = document.createElement("div");
   token.className = "mn-account-server";
-  token.textContent = config.token ? "API token: connected" : "API token: not connected";
-  status.append(server, token);
+  token.textContent = config.token ? "API token: set" : "API token: not set";
+  const connection = document.createElement("div");
+  connection.className = "mn-account-server mn-account-connection";
+  connection.dataset.role = "account-connection";
+  connection.dataset.status = "checking";
+  connection.textContent = "Status: checking...";
+  status.append(server, token, connection);
   content.append(status);
+  void refreshAccountConnection(connection);
 
   const grid = document.createElement("div");
   grid.className = "mn-account-grid";
@@ -810,6 +816,18 @@ function renderAccountPage(content) {
   });
   content.append(connect);
 
+  const recheck = document.createElement("button");
+  recheck.type = "button";
+  recheck.className = "mn-btn mn-btn-quiet";
+  recheck.textContent = "Check connection";
+  recheck.addEventListener("click", async () => {
+    const line = content.querySelector('[data-role="account-connection"]');
+    if (!line) return;
+    const result = await refreshAccountConnection(line);
+    setStatus(result ? describeConnection(result) : "Connection not configured");
+  });
+  content.append(recheck);
+
   const docs = document.createElement("button");
   docs.type = "button";
   docs.className = "mn-btn mn-btn-quiet";
@@ -819,6 +837,22 @@ function renderAccountPage(content) {
     window.dispatchEvent(new CustomEvent("mn:open-docs"));
   });
   content.append(docs);
+}
+
+async function refreshAccountConnection(element) {
+  const config = loadSyncConfig();
+  if (!config.url || !config.token) {
+    element.dataset.status = "unconfigured";
+    element.textContent = "Status: not configured";
+    return null;
+  }
+  element.dataset.status = "checking";
+  element.textContent = "Status: checking...";
+  const result = await checkConnection();
+  if (!element.isConnected) return result;
+  element.dataset.status = result.state;
+  element.textContent = `Status: ${describeConnection(result)}`;
+  return result;
 }
 
 function renderBackupPage(content) {

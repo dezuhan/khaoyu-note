@@ -125,7 +125,10 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     requireHttps,
     uploadScanCommand: env.KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND || "",
     alertWebhook,
-    corsOrigins: (env.KHAOYU_SERVICE_CORS_ORIGINS || "tauri://localhost,http://tauri.localhost")
+    corsOrigins: (
+      env.KHAOYU_SERVICE_CORS_ORIGINS ||
+      "tauri://localhost,http://tauri.localhost,http://127.0.0.1:1430,http://localhost:1430"
+    )
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),

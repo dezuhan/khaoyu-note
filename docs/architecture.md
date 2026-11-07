@@ -387,8 +387,20 @@ changes produce an explicit conflict with Use server and Keep local choices. Fai
 local queue and retry when online. Deleting or disabling a local board never deletes server data;
 there is no server project delete call in the sync client.
 
+`normalizeServerUrl` accepts a bare host or `host:port`, so a local service can be entered as
+`127.0.0.1:8080` or `localhost:8080`. Loopback and private addresses get an `http` scheme; any other
+host defaults to `https`, and credentials in the URL are rejected. Before the first push,
+`checkConnection` calls `/readyz` to prove the service and its database answer, then an authenticated
+`GET /api/v1/projects` to prove the token and the database round trip. The sync dialog and the Account
+pane both render that state (connected, unreachable, database not ready, token rejected, missing scope).
+The desktop CSP allows `http://localhost:*` and `http://127.0.0.1:*` in `connect-src` for this path,
+and the service snapshot route accepts documents up to 8 MB so real boards fit, while the smaller
+account endpoints keep the 64 KB JSON body limit.
+
 `service/src/http.mjs` and the API router accept bearer-token CORS preflight only from
-`KHAOYU_SERVICE_CORS_ORIGINS`, with no credentials. The desktop token is stored in webview local
+`KHAOYU_SERVICE_CORS_ORIGINS`, with no credentials. The default list contains the Tauri origins and
+the local web host (`http://127.0.0.1:1430`, `http://localhost:1430`), so both the desktop app and the
+browser build can sync to a local service. The desktop token is stored in webview local
 storage, which is documented as a residual risk in the security audit.
 
 ## Email delivery

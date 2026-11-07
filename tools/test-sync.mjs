@@ -20,6 +20,8 @@ globalThis.localStorage = new MemoryStorage();
 const calls = [];
 let remote = { revision: 0, doc: null };
 let offline = false;
+let readyStatus = 200;
+let projectsStatus = 200;
 const id = "project-sync-test";
 
 globalThis.fetch = async (url, options = {}) => {
@@ -30,10 +32,25 @@ globalThis.fetch = async (url, options = {}) => {
   const reply = (status, body) => ({
     ok: status >= 200 && status < 300,
     status,
+    headers: { get: () => null },
+    async json() {
+      return body;
+    },
     async text() {
       return JSON.stringify(body);
     },
   });
+  if (method === "GET" && path === "/readyz") {
+    return reply(readyStatus, readyStatus === 200 ? { status: "ready" } : { status: "not_ready" });
+  }
+  if (method === "GET" && path === "/api/v1/projects") {
+    return reply(
+      projectsStatus,
+      projectsStatus === 200
+        ? { projects: [{ id: "p1" }, { id: "p2" }] }
+        : { error: projectsStatus === 401 ? "unauthorized" : "forbidden" }
+    );
+  }
   if (method === "POST" && path === "/api/v1/projects") {
     remote = { revision: 1, doc: null };
     return reply(201, { id, title: "Board", revision: 1, role: "owner" });
@@ -56,7 +73,54 @@ globalThis.fetch = async (url, options = {}) => {
 };
 
 const sync = await import("../app/web/js/sync.js");
+
+// A local service is addressed without a scheme, and it must not be forced onto a domain.
+assert.equal(sync.normalizeServerUrl("localhost:8080"), "http://localhost:8080");
+assert.equal(sync.normalizeServerUrl("127.0.0.1:8080/"), "http://127.0.0.1:8080");
+assert.equal(sync.normalizeServerUrl("http://localhost:8080/"), "http://localhost:8080");
+assert.equal(sync.normalizeServerUrl("notes.example.com"), "https://notes.example.com");
+assert.equal(
+  sync.normalizeServerUrl("https://notes.example.com/base/"),
+  "https://notes.example.com/base"
+);
+assert.throws(() => sync.normalizeServerUrl("ftp://notes.example.com"), /http/);
+assert.throws(() => sync.normalizeServerUrl(""), /server URL/i);
+
+// The connection check proves readiness and the authenticated database round trip.
+sync.saveSyncConfig({ url: "localhost:8080", token: "token-value" });
+assert.equal(sync.loadSyncConfig().url, "http://localhost:8080");
+let connection = await sync.checkConnection();
+assert.equal(connection.state, "connected");
+assert.equal(connection.projectCount, 2);
+
+projectsStatus = 401;
+connection = await sync.checkConnection();
+assert.equal(connection.state, "unauthorized");
+
+projectsStatus = 403;
+connection = await sync.checkConnection();
+assert.equal(connection.state, "forbidden");
+
+projectsStatus = 200;
+readyStatus = 503;
+connection = await sync.checkConnection();
+assert.equal(connection.state, "not-ready");
+
+readyStatus = 200;
+const liveFetch = globalThis.fetch;
+globalThis.fetch = async () => {
+  throw new Error("network down");
+};
+connection = await sync.checkConnection();
+assert.equal(connection.state, "unreachable");
+globalThis.fetch = liveFetch;
+
+sync.saveSyncConfig({ url: "http://service.test", token: "" });
+connection = await sync.checkConnection();
+assert.equal(connection.state, "unconfigured");
+
 sync.saveSyncConfig({ url: "http://service.test", token: "token-value" });
+assert.equal((await sync.checkConnection()).state, "connected");
 
 const board = {
   id: "b1",
@@ -117,5 +181,5 @@ assert.equal(sync.loadSyncConfig().token, "token-value");
 const writes = calls.filter((call) => call.method === "DELETE");
 assert.equal(writes.length, 0);
 
-console.log("PASS  sync create, push, pull, conflict, offline queue and no delete");
+console.log("PASS  sync url, connection status, create, push, pull, conflict, offline queue and no delete");
 console.log(`${calls.length} fake service calls`);

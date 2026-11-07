@@ -63,7 +63,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
-| `KHAOYU_SERVICE_CORS_ORIGINS` | Tauri origins | Comma-separated origins allowed to call bearer-token APIs from the desktop client. |
+| `KHAOYU_SERVICE_CORS_ORIGINS` | Tauri origins plus `http://127.0.0.1:1430` and `http://localhost:1430` | Comma-separated origins allowed to call bearer-token APIs from the desktop client and the local web host. |
 | `KHAOYU_SERVICE_ADMIN_TOKEN` | empty | Optional operator token for admin audit, abuse and stats endpoints. |
 | `KHAOYU_SERVICE_BACKUP_PASSPHRASE` | empty | Encrypt backups with scrypt-derived AES-256-GCM. Required to restore them. |
 | `KHAOYU_SERVICE_ALERT_WEBHOOK` | empty | Optional HTTP(S) endpoint for login-block security alerts. |
@@ -160,7 +160,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects` | List projects the account can access. |
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
-| `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. |
+| `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. The document may be up to 8 MB. |
 | `GET` | `/api/v1/account/presence` | Read presence opt-in state. |
 | `PATCH` | `/api/v1/account/presence` | Opt in or out of project presence. |
 | `GET` | `/api/v1/account/email-preferences` | Read the email notification preference. |
@@ -222,8 +222,9 @@ manage share links for projects the account can edit, so the desktop header Shar
 right-click Share link action do not need a browser session. When a synced local board has a parent
 board that is already synced, the new server project is created with `parentProjectId`, so nested
 shares can include it under the policy above. The service allows bearer-token CORS preflight only from
-`KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are never allowed from those origins. Add the
-local web host origin manually if the browser build should sync directly.
+`KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are never allowed from those origins. The
+default list already includes the local web host on its default port, so a browser build can sync
+directly; add the origin when the web host runs on another port.
 
 ## Browser account pages
 

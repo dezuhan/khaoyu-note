@@ -8,6 +8,10 @@ export class HttpError extends Error {
 }
 
 const MAX_BODY = 64 * 1024;
+// When a body is over the limit the service keeps draining it (without buffering) up to this
+// ceiling before aborting. An early 413 would otherwise reset the connection while the client is
+// still uploading, and the client would report a network error instead of the status code.
+const MAX_DRAIN = 64 * 1024 * 1024;
 
 export function applySecurityHeaders(response, config) {
   response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
@@ -38,17 +42,27 @@ export function sendNoContent(response, status, config) {
   response.end();
 }
 
-export async function readJson(request) {
+export async function readJson(request, maximum = MAX_BODY) {
   if (!/^application\/json\b/i.test(request.headers["content-type"] || "")) {
     throw new HttpError(415, "JSON body required", "unsupported_media_type");
   }
   const chunks = [];
   let size = 0;
+  let exceeded = false;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > MAX_BODY) throw new HttpError(413, "request body too large", "payload_too_large");
+    if (size > maximum) {
+      exceeded = true;
+      chunks.length = 0;
+      if (size > maximum + MAX_DRAIN) {
+        request.destroy();
+        throw new HttpError(413, "request body too large", "payload_too_large");
+      }
+      continue;
+    }
     chunks.push(chunk);
   }
+  if (exceeded) throw new HttpError(413, "request body too large", "payload_too_large");
   if (!size) return {};
   try {
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));

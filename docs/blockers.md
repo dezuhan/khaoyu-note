@@ -37,7 +37,7 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 
 ## Current evidence
 
-- Service tests: 47 passing (18 service checks plus 29 auth subtests).
+- Service tests: 48 passing (18 service checks plus 30 auth subtests).
 - Sync engine checks: passing.
 - UI suite: 263 checks defined in `tools/test-ui.mjs`.
 - Live security check: 20 checks.
