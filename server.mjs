@@ -25,7 +25,7 @@ const PASSWORD_SCHEME = "pbkdf2-sha256";
 const PASSWORD_ITERATIONS = 600000;
 const PASSWORD_KEY_BYTES = 32;
 const SESSION_TOKEN_BYTES = 32;
-const WEB_SESSION_MS = 12 * 60 * 60 * 1000;
+const WEB_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const SESSION_COOKIE = "khaoyu_local_session";
 const CSRF_COOKIE = "khaoyu_local_csrf";
 const CSRF_HEADER = "x-khaoyu-csrf";
@@ -386,6 +386,19 @@ function logActivity(actor, action, resourceType = null, resourceId = null, meta
   );
 }
 
+function logBoardActivity(actor, action, boardId, metadata = null, throttleMs = 0) {
+  if (!actor || !boardId) return;
+  if (throttleMs > 0) {
+    const last = db
+      .prepare(
+        "SELECT created_at FROM activity_log WHERE actor_user_id = ? AND action = ? AND resource_id = ? ORDER BY created_at DESC LIMIT 1"
+      )
+      .get(actor.id, action, boardId);
+    if (last && Date.now() - last.created_at < throttleMs) return;
+  }
+  logActivity(actor, action, "board", boardId, metadata);
+}
+
 function claimUnattributed(user) {
   const author = authorJson(user);
   for (const statement of [
@@ -705,6 +718,16 @@ function writeDoc(doc, expectedUpdatedAt = null, actor = null) {
       );
     }
     db.exec("COMMIT");
+    if (actor) {
+      const cards = Array.isArray(doc.cards) ? doc.cards.length : 0;
+      logBoardActivity(
+        actor,
+        existing ? "board.updated" : "board.created",
+        id,
+        { title: typeof doc.title === "string" ? doc.title : "Untitled board", cards },
+        existing ? 5 * 60 * 1000 : 0
+      );
+    }
     return updatedAt;
   } catch (error) {
     db.exec("ROLLBACK");
@@ -944,7 +967,7 @@ async function invoke(cmd, args = {}, actor = null) {
       return doc ? JSON.stringify(doc) : null;
     }
     case "save_board": {
-      if (!actor && requireLocalLogin()) throw new Error("Sign in required");
+      if (!actor) throw new Error("Sign in required");
       if (
         actor &&
         actor.role === "member" &&
@@ -958,6 +981,7 @@ async function invoke(cmd, args = {}, actor = null) {
     }
     case "delete_board":
       deleteBoardTree(String(args.id));
+      logBoardActivity(actor, "board.deleted", String(args.id));
       return null;
     case "rename_board": {
       const title = String(args.title || "").trim();
@@ -967,6 +991,7 @@ async function invoke(cmd, args = {}, actor = null) {
         Date.now(),
         String(args.id)
       );
+      logBoardActivity(actor, "board.renamed", String(args.id), { title });
       return null;
     }
     case "archive_board":
@@ -974,10 +999,20 @@ async function invoke(cmd, args = {}, actor = null) {
         args.archived ? Date.now() : null,
         String(args.id)
       );
+      logBoardActivity(
+        actor,
+        args.archived ? "board.archived" : "board.unarchived",
+        String(args.id)
+      );
       return null;
     case "trash_board":
       db.prepare("UPDATE boards SET trashed_at = ? WHERE id = ?").run(
         args.trashed ? Date.now() : null,
+        String(args.id)
+      );
+      logBoardActivity(
+        actor,
+        args.trashed ? "board.trashed" : "board.restored",
         String(args.id)
       );
       return null;
@@ -1210,11 +1245,10 @@ function failLogin(key) {
 
 function authStatus(request) {
   const session = currentSession(request);
-  const requireLogin = requireLocalLogin();
   return {
     userCount: countUsers(),
-    requireLogin,
-    guestAllowed: !requireLogin,
+    requireLogin: true,
+    guestAllowed: false,
     user: session ? session.user : null,
     csrfToken: session ? readCookies(request)[CSRF_COOKIE] || null : null,
   };
@@ -1447,10 +1481,20 @@ const server = http.createServer(async (request, response) => {
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/asset") {
+      if (!currentSession(request)) {
+        response.writeHead(401, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "Sign in required" }));
+        return;
+      }
       serveAsset(request, response, false);
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/download") {
+      if (!currentSession(request)) {
+        response.writeHead(401, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "Sign in required" }));
+        return;
+      }
       serveAsset(request, response, true);
       return;
     }
@@ -1460,10 +1504,15 @@ const server = http.createServer(async (request, response) => {
     }
     if (request.method === "POST" && url.pathname === "/api/invoke") {
       const session = currentSession(request);
-      if (session) requireCsrf(request, session);
+      if (!session) {
+        response.writeHead(401, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "Sign in required" }));
+        return;
+      }
+      requireCsrf(request, session);
       const body = JSON.parse(await readBody(request));
       try {
-        const result = await invoke(String(body.cmd || ""), body.args || {}, session ? session.user : null);
+        const result = await invoke(String(body.cmd || ""), body.args || {}, session.user);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ result }));
       } catch (error) {

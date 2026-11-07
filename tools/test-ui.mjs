@@ -27,14 +27,21 @@ page.on("console", (message) => {
 await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(1200);
 
-// A fresh web host database shows the first-run account gate. Continue as a guest so the rest of
-// the UI suite exercises the same guest mode the static preview uses.
+// A fresh web host database shows the first-run account gate. Create the local admin so the rest of
+// the UI suite can run; the static preview has no host and skips the gate.
 const accountGate = page.locator(".mn-onboard-overlay");
 if (await accountGate.count()) {
-  const continueLocally = accountGate.locator('[data-role="continue-local"]');
-  if (await continueLocally.count()) {
-    await continueLocally.click();
-    await page.waitForTimeout(300);
+  const setupForm = accountGate.locator('[data-role="setup-form"]');
+  if (await setupForm.count()) {
+    await setupForm.locator('input[name="username"]').fill("owner");
+    await setupForm.locator('input[name="email"]').fill("owner@localhost");
+    await setupForm.locator('input[name="firstName"]').fill("Owner");
+    await setupForm.locator('input[name="password"]').fill("correct horse battery staple");
+    await setupForm
+      .locator('input[name="confirmPassword"]')
+      .fill("correct horse battery staple");
+    await accountGate.locator('[data-role="create-admin"]').click();
+    await page.waitForTimeout(1600);
   }
 }
 
@@ -314,8 +321,8 @@ check(
   )
 );
 check(
-  "Guest account information offers a sign-in action",
-  (await page.locator(".mn-account-pane").innerText()).toLowerCase().includes("sign in")
+  "Account information pane renders the selected section",
+  (await page.locator(".mn-account-pane").innerText()).trim().length > 0
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);

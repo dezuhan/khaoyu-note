@@ -504,6 +504,42 @@ pub fn log_activity(
     Ok(())
 }
 
+pub fn log_activity_throttled(
+    conn: &Connection,
+    actor: &PublicUser,
+    action: &str,
+    resource_type: &str,
+    resource_id: &str,
+    metadata: Value,
+    window_ms: i64,
+) -> Result<(), String> {
+    if window_ms > 0 {
+        let last: Option<i64> = conn
+            .query_row(
+                "SELECT created_at FROM activity_log
+                 WHERE actor_user_id = ?1 AND action = ?2 AND resource_id = ?3
+                 ORDER BY created_at DESC LIMIT 1",
+                params![actor.id, action, resource_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|error| error.to_string())?;
+        if let Some(last) = last {
+            if now_ms() - last < window_ms {
+                return Ok(());
+            }
+        }
+    }
+    log_activity(
+        conn,
+        Some(actor),
+        action,
+        Some(resource_type),
+        Some(resource_id),
+        metadata,
+    )
+}
+
 pub fn claim_unattributed(conn: &Connection, user: &PublicUser) -> Result<(), String> {
     let author = author_value(user).to_string();
     for statement in [
@@ -528,6 +564,7 @@ pub fn set_require_login(conn: &Connection, required: bool) -> Result<(), String
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn require_login(conn: &Connection) -> bool {
     conn.query_row(
         "SELECT value FROM meta WHERE key = 'require_local_login'",

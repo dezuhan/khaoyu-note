@@ -1299,24 +1299,10 @@ fn current_local_user(
     Ok(user.filter(|user| user.status == "active"))
 }
 
-fn require_editor(
-    conn: &Connection,
-    auth_state: &AuthState,
-) -> Result<Option<auth::PublicUser>, String> {
-    let user = current_local_user(conn, auth_state)?;
-    match &user {
-        Some(user) => {
-            if user.role == "member"
-                && (user.member_role == "viewer" || user.member_role == "commenter")
-            {
-                return Err("You do not have permission to edit this board".into());
-            }
-        }
-        None => {
-            if auth::require_login(conn) {
-                return Err("Sign in required".into());
-            }
-        }
+fn require_editor(conn: &Connection, auth_state: &AuthState) -> Result<auth::PublicUser, String> {
+    let user = current_local_user(conn, auth_state)?.ok_or("Sign in required")?;
+    if user.role == "member" && (user.member_role == "viewer" || user.member_role == "commenter") {
+        return Err("You do not have permission to edit this board".into());
     }
     Ok(user)
 }
@@ -1428,39 +1414,89 @@ fn download_asset(app: tauri::AppHandle, path: String) -> Result<String, String>
 }
 
 #[tauri::command]
-fn rename_board(db: State<'_, AppDb>, id: String, title: String) -> Result<(), String> {
-    let title = title.trim();
+fn rename_board(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    id: String,
+    title: String,
+) -> Result<(), String> {
+    let title = title.trim().to_string();
     if title.is_empty() {
         return Err("title cannot be empty".into());
     }
     let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = require_editor(&conn, &auth_state)?;
     conn.execute(
         "UPDATE boards SET title = ?1, updated_at = ?2 WHERE id = ?3",
-        params![title, now_ms(), id],
+        params![title, now_ms(), &id],
     )
     .map_err(|e| e.to_string())?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        "board.renamed",
+        Some("board"),
+        Some(&id),
+        json!({ "title": title }),
+    )?;
     Ok(())
 }
 
 #[tauri::command]
-fn archive_board(db: State<'_, AppDb>, id: String, archived: bool) -> Result<(), String> {
+fn archive_board(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    id: String,
+    archived: bool,
+) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = require_editor(&conn, &auth_state)?;
     conn.execute(
         "UPDATE boards SET archived_at = ?1 WHERE id = ?2",
-        params![if archived { Some(now_ms()) } else { None }, id],
+        params![if archived { Some(now_ms()) } else { None }, &id],
     )
     .map_err(|e| e.to_string())?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        if archived {
+            "board.archived"
+        } else {
+            "board.unarchived"
+        },
+        Some("board"),
+        Some(&id),
+        json!({}),
+    )?;
     Ok(())
 }
 
 #[tauri::command]
-fn trash_board(db: State<'_, AppDb>, id: String, trashed: bool) -> Result<(), String> {
+fn trash_board(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    id: String,
+    trashed: bool,
+) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = require_editor(&conn, &auth_state)?;
     conn.execute(
         "UPDATE boards SET trashed_at = ?1 WHERE id = ?2",
-        params![if trashed { Some(now_ms()) } else { None }, id],
+        params![if trashed { Some(now_ms()) } else { None }, &id],
     )
     .map_err(|e| e.to_string())?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        if trashed {
+            "board.trashed"
+        } else {
+            "board.restored"
+        },
+        Some("board"),
+        Some(&id),
+        json!({}),
+    )?;
     Ok(())
 }
 
@@ -1477,9 +1513,40 @@ fn save_board(
         return Err("board id mismatch".into());
     }
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let author = require_editor(&conn, &auth_state)?;
-    let author_value = author.as_ref().map(auth::author_value);
-    write_doc_checked_with_author(&conn, &doc, base_updated_at, author_value.as_ref(), true)
+    let user = require_editor(&conn, &auth_state)?;
+    let existed: bool = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM boards WHERE id = ?1)",
+            params![&id],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|error| error.to_string())?
+        != 0;
+    let author_value = auth::author_value(&user);
+    let updated_at =
+        write_doc_checked_with_author(&conn, &doc, base_updated_at, Some(&author_value), true)?;
+    let cards = doc
+        .get("cards")
+        .and_then(Value::as_array)
+        .map(|entries| entries.len())
+        .unwrap_or(0);
+    let title = str_field(&doc, "title").unwrap_or("Untitled board");
+    let metadata = json!({ "title": title, "cards": cards });
+    let action = if existed {
+        "board.updated"
+    } else {
+        "board.created"
+    };
+    auth::log_activity_throttled(
+        &conn,
+        &user,
+        action,
+        "board",
+        &id,
+        metadata,
+        if existed { 5 * 60 * 1000 } else { 0 },
+    )?;
+    Ok(updated_at)
 }
 
 pub fn delete_board_tree(conn: &Connection, id: &str) -> Result<(), String> {
@@ -1503,9 +1570,23 @@ pub fn delete_board_tree(conn: &Connection, id: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn delete_board(db: State<'_, AppDb>, id: String) -> Result<(), String> {
+fn delete_board(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    id: String,
+) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    delete_board_tree(&conn, &id)
+    let user = require_editor(&conn, &auth_state)?;
+    delete_board_tree(&conn, &id)?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        "board.deleted",
+        Some("board"),
+        Some(&id),
+        json!({}),
+    )?;
+    Ok(())
 }
 
 fn collect_descendants(
@@ -1974,11 +2055,10 @@ async fn check_update() -> Result<Value, String> {
 fn auth_status(db: State<'_, AppDb>, auth_state: State<'_, AuthState>) -> Result<Value, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let user = current_local_user(&conn, &auth_state)?;
-    let require_login = auth::require_login(&conn);
     Ok(json!({
         "userCount": auth::count_users(&conn)?,
-        "requireLogin": require_login,
-        "guestAllowed": !require_login,
+        "requireLogin": true,
+        "guestAllowed": false,
         "user": user,
         "csrfToken": Value::Null,
     }))
@@ -2963,6 +3043,15 @@ mod tests {
         assert!(auth::validate_session(&conn, &session.token)
             .expect("validate revoked")
             .is_none());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn editor_commands_require_a_signed_in_account() {
+        let root = test_root("auth-required");
+        let conn = open_db_at(&root).expect("open db");
+        let state = AuthState(Mutex::new(None));
+        assert!(require_editor(&conn, &state).is_err());
         let _ = fs::remove_dir_all(root);
     }
 

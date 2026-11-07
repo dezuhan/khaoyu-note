@@ -224,8 +224,8 @@ try {
     "status reports an empty account table",
     initial.status === 200 &&
       initial.body.userCount === 0 &&
-      initial.body.requireLogin === false &&
-      initial.body.guestAllowed === true &&
+      initial.body.requireLogin === true &&
+      initial.body.guestAllowed === false &&
       initial.body.user === null &&
       initial.body.csrfToken === null,
     JSON.stringify(initial.body)
@@ -243,9 +243,9 @@ try {
   );
   const guestVersion = await invoke(instance, cookieJar(), "app_version", {}, { csrf: false });
   check(
-    "the existing command bridge still works for guests",
-    guestVersion.status === 200 && typeof guestVersion.body?.result === "string",
-    JSON.stringify(guestVersion.body)
+    "commands require an account before setup",
+    guestVersion.status === 401 && /sign in/i.test(guestVersion.body?.error || ""),
+    JSON.stringify({ status: guestVersion.status, body: guestVersion.body })
   );
 
   const setupBody = {
@@ -267,10 +267,10 @@ try {
     JSON.stringify(setup.body)
   );
   check(
-    "setup returns the twelve hour web session expiry",
+    "setup returns a thirty day web session expiry",
     setup.status === 200 &&
       Number.isFinite(setup.body.expiresAt) &&
-      setup.body.expiresAt > Date.now() + 11 * 60 * 60 * 1000,
+      setup.body.expiresAt > Date.now() + 29 * 24 * 60 * 60 * 1000,
     String(setup.body?.expiresAt)
   );
   const sessionCookieLine =
@@ -422,6 +422,12 @@ try {
     JSON.stringify(loggedOut.body)
   );
 
+  check(
+    "the session cookie carries a thirty day Max-Age",
+    /Max-Age=2592000/.test(sessionCookieLine),
+    sessionCookieLine
+  );
+
   loadedDoc.updatedAt = loadedDoc.updatedAt + 1000;
   const guestSave = await invoke(
     instance,
@@ -431,19 +437,15 @@ try {
     { csrf: false }
   );
   check(
-    "a guest can still save after logout",
-    guestSave.status === 200 && !guestSave.body?.error,
-    JSON.stringify(guestSave.body)
+    "a signed-out client cannot save",
+    guestSave.status === 401 && /sign in/i.test(guestSave.body?.error || ""),
+    JSON.stringify({ status: guestSave.status, body: guestSave.body })
   );
   const guestLoaded = await invoke(instance, cookies, "load_board", { id: boardId }, { csrf: false });
-  const guestDoc = guestLoaded.body?.result ? JSON.parse(guestLoaded.body.result) : null;
   check(
-    "a guest save keeps createdBy and clears updatedBy",
-    guestDoc?.createdBy?.id === setup.body.user.id &&
-      guestDoc?.updatedBy === null &&
-      guestDoc?.cards?.[0]?.createdBy?.id === setup.body.user.id &&
-      guestDoc?.cards?.[0]?.updatedBy === null,
-    JSON.stringify({ board: guestDoc?.createdBy, card: guestDoc?.cards?.[0]?.createdBy })
+    "a signed-out client cannot read a board",
+    guestLoaded.status === 401 && /sign in/i.test(guestLoaded.body?.error || ""),
+    JSON.stringify({ status: guestLoaded.status, body: guestLoaded.body })
   );
 
   const wrongPassword = await api(instance, cookies, "/api/auth/login", {

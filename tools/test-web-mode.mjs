@@ -56,10 +56,18 @@ try {
   });
   await page.goto(url, { waitUntil: "load" });
   await page.waitForTimeout(1800);
-  // A fresh database shows the local account setup gate. This suite checks the web host, not auth.
+  // A fresh database requires the local admin account before the app opens.
   if ((await page.locator('[data-role="account-gate"]').count()) > 0) {
-    await page.locator('[data-role="continue-local"]').click();
-    await page.waitForTimeout(500);
+    await page.fill('[data-role="setup-form"] input[name="username"]', "owner");
+    await page.fill('[data-role="setup-form"] input[name="email"]', "owner@localhost");
+    await page.fill('[data-role="setup-form"] input[name="firstName"]', "Owner");
+    await page.fill('[data-role="setup-form"] input[name="password"]', "correct horse battery staple");
+    await page.fill(
+      '[data-role="setup-form"] input[name="confirmPassword"]',
+      "correct horse battery staple"
+    );
+    await page.click('[data-role="create-admin"]');
+    await page.waitForTimeout(1600);
   }
 
   check("the app boots against the web backend", await page.locator("#app").isVisible());

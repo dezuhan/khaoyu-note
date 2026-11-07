@@ -305,8 +305,8 @@ export async function authStatus() {
   if (hasTauri) return { ...(await invoke("auth_status")), available: true };
   return {
     userCount: 0,
-    requireLogin: false,
-    guestAllowed: true,
+    requireLogin: true,
+    guestAllowed: false,
     user: null,
     csrfToken: null,
     available: false,

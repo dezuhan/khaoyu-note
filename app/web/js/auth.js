@@ -10,8 +10,8 @@ const state = {
   loading: false,
   available: false,
   userCount: 0,
-  requireLogin: false,
-  guestAllowed: true,
+  requireLogin: true,
+  guestAllowed: false,
   csrfToken: null,
   user: null,
   error: "",
@@ -145,11 +145,11 @@ export function isAdmin() {
 }
 
 export function canEdit() {
-  if (!state.user) return state.guestAllowed;
+  if (!state.user) return false;
   return isAdmin() || state.user.memberRole === "editor";
 }
 
 export function canComment() {
-  if (!state.user) return state.guestAllowed;
+  if (!state.user) return false;
   return isAdmin() || state.user.memberRole === "editor" || state.user.memberRole === "commenter";
 }

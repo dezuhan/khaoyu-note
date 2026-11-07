@@ -55,6 +55,8 @@ const uiRefs = {
 
 async function boot() {
   initTheme();
+  // Accounts are mandatory, so finish the setup or sign-in gate before any board or setting is read.
+  await initAccountGate();
   await initSettings();
   initRender(refs);
   initInteractions(refs);
@@ -85,7 +87,6 @@ async function boot() {
   render("board");
   renderView();
   refreshSync();
-  void initAccountGate();
   initUpdateUI();
   initAutoBackup();
   document.getElementById("boot")?.remove();

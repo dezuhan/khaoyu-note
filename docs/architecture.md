@@ -340,19 +340,19 @@ format), random tokens, session validation, activity rows and the admin bootstra
 `auth_log_activity` back the UI. The desktop host keeps the session token in `session.json` under the
 app data folder only when Stay signed in is ticked. The web host exposes the same operations as
 `/api/auth/*`, with HttpOnly `khaoyu_local_session` and `khaoyu_local_csrf` cookies, a CSRF header for
-authenticated mutations, a 12 hour session and login rate limiting. The web host accepts
+authenticated mutations, a 30 day session and login rate limiting. The web host accepts
 `owner@localhost` as an email because the account is local.
 
-`save_board` resolves the signed-in account, rejects viewers and commenters, lets guests through only
-while `require_local_login` is off, and writes the author snapshots through
-`write_doc_checked_with_author`. A guest save keeps `created_by` and clears `updated_by`. Backups copy
+`save_board` resolves the signed-in account, rejects viewers and commenters, and writes the author
+snapshots through `write_doc_checked_with_author`. An account is mandatory: board writes and the web
+host command bridge return `Sign in required` without a session. Backups copy
 the database and assets but delete `sessions` from the snapshot with `secure_delete` before returning.
 
 The frontend keeps auth state in `auth.js`, shows the first-run setup or login gate in `account-ui.js`,
 and renders the avatar after Share plus a Documentation-style account center. The center has a left menu
 with Admin Dashboard (admins only), Account Information, Account Settings, History Activity and Log
-Out, and a content pane for the selected item. Continue locally sets `mn.auth.guest` so the setup
-prompt does not return on every launch; the avatar menu still offers Create admin. `bridge.js` calls
+Out, and a content pane for the selected item. The gate waits for setup or sign-in before any board or
+setting is read, and both hosts keep the session so a reload does not ask again. `bridge.js` calls
 Tauri commands on the desktop and the HTTP
 endpoints on the web host.
 

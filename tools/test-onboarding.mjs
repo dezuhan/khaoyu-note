@@ -14,20 +14,22 @@ function check(name, ok, detail = "") {
 
 try {
   await page.goto(url, { waitUntil: "load" });
-  await page.waitForTimeout(1400);
-  check("first run shows the local admin setup", await page.locator(".mn-onboard-panel").isVisible());
+  await page.waitForTimeout(1600);
+  check("first run requires the local admin account", await page.locator(".mn-onboard-panel").isVisible());
   check(
-    "setup offers create admin and continue locally",
-    (await page.locator(".mn-onboard-actions").innerText()).includes("Create admin") &&
-      (await page.locator(".mn-onboard-actions").innerText()).includes("Continue locally")
+    "the gate asks for the account fields",
+    (await page.locator('[data-role="setup-form"] input[name="username"]').count()) === 1 &&
+      (await page.locator('[data-role="setup-form"] input[name="email"]').count()) === 1 &&
+      (await page.locator('[data-role="setup-form"] input[name="password"]').count()) === 1
   );
   check(
-    "setup asks for the local account fields",
-    (await page.locator(".mn-auth-panel input").count()) >= 6
+    "the gate has no guest escape",
+    (await page.locator('[data-role="continue-local"]').count()) === 0
   );
-  await page.click('[data-role="continue-local"]');
-  check("continue locally dismisses the gate", (await page.locator(".mn-onboard-panel").count()) === 0);
-  check("the avatar stays available as a guest", (await page.locator("#account-btn").count()) === 1);
+  check(
+    "the create admin action is available",
+    (await page.locator('[data-role="create-admin"]').count()) === 1
+  );
 } finally {
   await browser.close();
 }

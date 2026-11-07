@@ -21,8 +21,8 @@ let modalApi = null;
 let accountModal = null;
 let gate = null;
 let gateKeyHandler = null;
+let gateResolve = null;
 
-const GUEST_KEY = "mn.auth.guest";
 const AVATAR_TONES = 6;
 const HISTORY_LIMIT = 50;
 
@@ -33,6 +33,14 @@ const ACTION_LABELS = {
   "auth.logout_all": "Signed out of every session",
   "auth.password_changed": "Password changed",
   "auth.profile_updated": "Profile updated",
+  "board.created": "Created board",
+  "board.updated": "Updated board",
+  "board.renamed": "Renamed board",
+  "board.archived": "Archived board",
+  "board.unarchived": "Unarchived board",
+  "board.trashed": "Moved board to trash",
+  "board.restored": "Restored board",
+  "board.deleted": "Deleted board",
 };
 
 // ------------------------------------------------------------------ helpers
@@ -126,22 +134,17 @@ function setFormStatus(element, message, isError = false) {
   element.classList.toggle("is-error", Boolean(isError));
 }
 
-function continueAsGuest() {
-  try {
-    localStorage.setItem(GUEST_KEY, "1");
-  } catch {
-    /* storage is optional */
-  }
-  closeGate();
-  notify("Continuing as a guest");
+function finishGate() {
+  const resolve = gateResolve;
+  gateResolve = null;
+  if (resolve) resolve();
 }
 
-// The desktop host persists the session file, the web host always uses a 12 hour cookie.
-function rememberFieldMarkup() {
-  if (bridge.hasWeb) {
-    return `<p class="mn-account-note">This browser session lasts 12 hours.</p>`;
-  }
-  return `<label class="ky-check"><input type="checkbox" name="remember" checked />Stay signed in on this computer</label>`;
+// The desktop host persists the session file, the web host keeps a 30 day cookie.
+function sessionNoteMarkup() {
+  return `<p class="mn-account-note">You stay signed in on this ${
+    bridge.hasWeb ? "browser for 30 days" : "device"
+  }.</p>`;
 }
 
 // ------------------------------------------------------------------ avatar
@@ -386,7 +389,7 @@ function settingsPane(user) {
 function historyPane() {
   return `
     <h3 class="mn-account-pane-title">History Activity</h3>
-    <p class="mn-account-note">Account actions recorded on this computer.</p>
+    <p class="mn-account-note">Account and board actions recorded on this computer.</p>
     <div class="mn-account-actions">
       <button type="button" class="mn-btn mn-btn-quiet" data-account-action="history-refresh">Refresh</button>
     </div>
@@ -578,10 +581,7 @@ async function performLogout() {
     notify(error?.message || "Could not log out");
     return;
   }
-  closeAccountCenter();
-  renderAvatar();
-  notify("Signed out");
-  if (authState().requireLogin) openLoginOverlay({ dismissible: false });
+  window.location.reload();
 }
 
 async function performLogoutAll() {
@@ -591,10 +591,7 @@ async function performLogoutAll() {
     notify(error?.message || "Could not log out everywhere");
     return;
   }
-  closeAccountCenter();
-  renderAvatar();
-  notify("Signed out everywhere");
-  if (authState().requireLogin) openLoginOverlay({ dismissible: false });
+  window.location.reload();
 }
 
 // ------------------------------------------------------------------ gate
@@ -602,15 +599,13 @@ async function performLogoutAll() {
 export async function initAccountGate() {
   if (!bridge.hasTauri && !bridge.hasWeb) return;
   const state = await initAuth();
-  if (!state.available) return;
-  let guestChosen = false;
-  try {
-    guestChosen = localStorage.getItem(GUEST_KEY) === "1";
-  } catch {
-    guestChosen = false;
-  }
-  if (!state.user && state.requireLogin) openLoginOverlay({ dismissible: false });
-  else if (!state.user && state.userCount === 0 && !guestChosen) openSetupOverlay();
+  if (!state.available || state.user) return;
+  const wait = new Promise((resolve) => {
+    gateResolve = resolve;
+  });
+  if (state.userCount === 0) openSetupOverlay();
+  else openLoginOverlay({ dismissible: false });
+  await wait;
 }
 
 function closeGate() {
@@ -678,11 +673,10 @@ export function openSetupOverlay() {
           </label>
         </div>
         <label class="ky-check"><input type="checkbox" name="claimBoards" checked />Claim existing boards as yours</label>
-        ${rememberFieldMarkup()}
-        <p class="mn-account-note">Server accounts arrive in M4. Local boards never require an account.</p>
+        ${sessionNoteMarkup()}
+        <p class="mn-account-note">An account is required so every board change is attributed. Server accounts arrive in M4.</p>
         <p class="mn-onboard-status" data-role="status" role="status"></p>
         <div class="mn-onboard-actions">
-          <button type="button" class="mn-btn mn-btn-quiet" data-role="continue-local">Continue locally</button>
           <button type="submit" class="mn-btn mn-btn-primary" data-role="create-admin">Create admin</button>
         </div>
       </form>
@@ -693,9 +687,6 @@ export function openSetupOverlay() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void submitSetup(form);
-  });
-  gate.querySelector('[data-role="continue-local"]').addEventListener("click", () => {
-    continueAsGuest();
   });
   form.elements.username?.focus();
 }
@@ -708,9 +699,6 @@ export function openLoginOverlay({ dismissible = true } = {}) {
         "close",
         12
       )}</button>`
-    : "";
-  const guestButton = dismissible && state.guestAllowed
-    ? `<button type="button" class="mn-btn mn-btn-quiet" data-role="continue-local">Continue locally</button>`
     : "";
   createGate(
     `
@@ -731,10 +719,9 @@ export function openLoginOverlay({ dismissible = true } = {}) {
         <label class="mn-onboard-field">Password
           <input class="ky-input" name="password" type="password" autocomplete="current-password" placeholder="Password" />
         </label>
-        ${rememberFieldMarkup()}
+        ${sessionNoteMarkup()}
         <p class="mn-onboard-status" data-role="status" role="status"></p>
         <div class="mn-onboard-actions">
-          ${guestButton}
           <button type="submit" class="mn-btn mn-btn-primary" data-role="sign-in">Sign in</button>
         </div>
       </form>
@@ -747,9 +734,6 @@ export function openLoginOverlay({ dismissible = true } = {}) {
     void submitLogin(form);
   });
   gate.querySelector('[data-role="close"]')?.addEventListener("click", closeGate);
-  gate.querySelector('[data-role="continue-local"]')?.addEventListener("click", () => {
-    continueAsGuest();
-  });
   form.elements.identifier?.focus();
 }
 
@@ -778,7 +762,6 @@ async function submitSetup(form) {
     lastName: String(form.elements.lastName.value || "").trim(),
     password: String(form.elements.password.value || ""),
     confirmPassword: String(form.elements.confirmPassword.value || ""),
-    remember: form.elements.remember ? Boolean(form.elements.remember.checked) : true,
     claimBoards: Boolean(form.elements.claimBoards.checked),
   };
   const problem = validateSetup(values);
@@ -796,14 +779,10 @@ async function submitSetup(form) {
       lastName: values.lastName,
       password: values.password,
       claimBoards: values.claimBoards,
-      remember: values.remember,
+      remember: true,
     });
-    try {
-      localStorage.removeItem(GUEST_KEY);
-    } catch {
-      /* storage is optional */
-    }
     closeGate();
+    finishGate();
     renderAvatar();
     notify(`Admin account created. Welcome, ${values.firstName}.`);
   } catch (error) {
@@ -828,14 +807,10 @@ async function submitLogin(form) {
     await login({
       identifier,
       password,
-      remember: form.elements.remember ? Boolean(form.elements.remember.checked) : true,
+      remember: true,
     });
-    try {
-      localStorage.removeItem(GUEST_KEY);
-    } catch {
-      /* storage is optional */
-    }
     closeGate();
+    finishGate();
     renderAvatar();
     notify("Signed in");
   } catch (error) {

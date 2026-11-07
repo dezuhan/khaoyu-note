@@ -9,7 +9,8 @@ export const DOCUMENTATION_SECTIONS = [
       <p class="mn-docs-lead">Khaoyu Note is a local-first board app. Boards stay on this device unless
       you explicitly enable server sync for a board.</p>
       <ul>
-        <li>On first run choose Continue locally, Create account on your server, or sign in with your email and password.</li>
+        <li>On first run create the local admin account, then sign in on later launches. An account is
+        required so board and account activity is attributed.</li>
         <li>Double-click empty canvas to create a note. Pick a tool from the left rail, then click the canvas to place a card.</li>
         <li>Drag cards to move them. Shift-click or drag a marquee to select several cards.</li>
         <li>Duplicating or copying a column also copies the cards inside it, with parent links remapped.</li>
@@ -142,13 +143,14 @@ export const DOCUMENTATION_SECTIONS = [
     html: `
       <h3>Local account</h3>
       <ul>
-        <li>The first run on an empty database offers to create the local admin, or Continue locally
-        as a guest. The avatar after Share opens the account center.</li>
+        <li>An account is required. The first run on an empty database creates the local admin, and
+        later launches ask for sign in. The avatar after Share opens the account center.</li>
         <li>The center has a left menu with Admin Dashboard, Account Information, Account Settings,
         History Activity and Log Out. Settings changes your profile and password and signs out every
-        session; History lists account activity.</li>
-        <li>Passwords use PBKDF2-SHA256 and sessions are stored hashed. A desktop session lasts 30
-        days when Stay signed in is ticked; a browser session lasts 12 hours.</li>
+        session; History lists account and board activity.</li>
+        <li>Passwords use PBKDF2-SHA256 and sessions are stored hashed. The desktop keeps you signed
+        in on this device; the browser keeps the session for 30 days. Log out to return to the login
+        gate.</li>
         <li>Roles enforcement (editor, commenter, viewer) and the Admin Panel arrive in M2 and M3.
         Service accounts and sharing remain in the self-hosted service section below.</li>
       </ul>

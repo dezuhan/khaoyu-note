@@ -6,8 +6,8 @@ frontend must match it exactly so the desktop app and the web host stay compatib
 ## Scope of M1
 
 - Local accounts in the app SQLite database, schema version 2.
-- First-run admin setup, login, logout, guest mode, profile update, password change, logout all,
-  basic activity history.
+- First-run admin setup, mandatory login on desktop and web, logout, profile update, password change,
+  logout all, basic account and board activity history.
 - Avatar button and account center in the app chrome.
 - Service accounts, roles enforcement and the Admin Panel are later milestones and are not part of
   this contract.
@@ -76,7 +76,7 @@ ALTER TABLE cards ADD COLUMN updated_by TEXT;
   `PRAGMA table_info`, then set `meta.schema_version = 2`.
 - Restore accepts schema 1 backups and migrates them to 2.
 - Backup includes `users` and `activity_log`. It must NOT include `sessions`.
-- New meta keys: `require_local_login` (`true` or `false`, default absent meaning false).
+- The old meta key `require_local_login` is ignored. Accounts are mandatory on both hosts.
 
 ## Password hash
 
@@ -94,10 +94,10 @@ Format: `pbkdf2-sha256$600000$<salt_base64url>$<hash_base64url>`
 
 - Token: 32 random bytes, base64url without padding. Returned to the app once at login.
 - At rest: `sessions.token_hash` is the lowercase hex SHA-256 of the token.
-- Desktop lifetime: 30 days. Web host lifetime: 12 hours.
+- Desktop lifetime: 30 days. Web host lifetime: 30 days.
 - `sessions.host` is `desktop` or `web`.
-- Desktop persists the token in `<app_data>/session.json` only when the user ticks
-  `Stay signed in`; otherwise it stays in memory for the process.
+- Desktop always persists the token in `<app_data>/session.json`, so a restart stays signed in until
+  logout.
 - Web host uses cookies:
   - `khaoyu_local_session`: HttpOnly, SameSite=Strict, Path=/, Secure when the request is HTTPS.
   - `khaoyu_local_csrf`: readable by JS, SameSite=Strict.
@@ -148,7 +148,13 @@ Notes:
 
 - `identifier` is a username or email, compared case-insensitively.
 - Desktop `auth_login` also accepts `remember` and writes the session file when true.
-- `auth_status.guestAllowed` is true when `requireLogin` is false.
+- `auth_status.requireLogin` is always true and `guestAllowed` is always false. The fields stay in the
+  payload for compatibility.
+- All web-host `/api/invoke`, `/api/asset` and `/api/download` requests require a session. The auth
+  endpoints and the static app shell stay public so the login screen can load.
+- Board writes and board mutations log `board.created`, `board.updated` (throttled per board and user),
+  `board.renamed`, `board.archived`, `board.unarchived`, `board.trashed`, `board.restored` and
+  `board.deleted` to `activity_log`.
 - `auth_setup_admin` is allowed only when `COUNT(users) = 0`; it creates the first account with
   `role = 'admin'`, logs `auth.setup`, and optionally sets `created_by`/`updated_by` on boards and
   cards that have no author yet when `claimBoards` is true.
@@ -190,13 +196,12 @@ Errors are plain messages. The web host returns `{ "error": "message" }`; Rust c
 - `app/web/js/auth.js` holds the session state, exposes `initAuth`, `authState`, `subscribeAuth`,
   `setupAdmin`, `login`, `logout`, `logoutAll`, `updateProfile`, `changePassword`, `loadHistory`,
   `refreshAuth`, and permission helpers `isAdmin`, `canEdit`, `canComment`.
-- First run: if `auth_status.userCount === 0` and no user, show the setup overlay. It offers
-  `This computer` (create admin) and `Continue locally` (guest). The server option belongs to M4 and
-  can stay as a disabled note.
-- If `userCount > 0` and `requireLogin === true` and no user, show the login overlay. Otherwise the
-  app opens as guest when no user.
-- Continue locally stores `mn.auth.guest` so the setup prompt does not return on every launch. The
-  avatar menu still offers Create admin, and creating or signing in clears the marker.
+- First run: if `auth_status.userCount === 0` and no user, show the setup overlay. It only offers
+  creating the local admin. The server option belongs to M4 and can stay as a disabled note.
+- If no user exists, the app waits at the setup or login overlay before reading any board or setting.
+  There is no guest path and the gate has no Escape or outside-click dismissal.
+- After login, `boot()` continues loading settings and boards, so a persisted session opens the app
+  directly.
 - Avatar: 30 px round button in the topbar right side, after Share. Initials from the first letter of
   the first name or username, soft background derived from a deterministic hash into the theme
   palette, readable text.
@@ -204,7 +209,8 @@ Errors are plain messages. The web host returns `{ "error": "message" }`; Rust c
   Information, Account Settings, History Activity, Log Out) and a content pane. It opens from the
   avatar, closes with Escape, and uses the existing modal layer. `settings.js` Account pane dispatches
   `mn:open-account` instead of importing `account-ui.js`, avoiding a cycle.
-- Guest mode must not write account activity. Guest attribution is `null`.
+- Logout reloads the app so the login gate returns and no board data stays visible. Guest attribution
+  no longer exists; every row is written by the signed-in account.
 
 ## Write ownership for M1
 
