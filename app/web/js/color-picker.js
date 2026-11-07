@@ -2,7 +2,8 @@
 // vertical hue slider, hex field, eyedropper, OK and Cancel.
 
 import { icon } from "./icons.js";
-import { hasTauri, pickScreenColor } from "./bridge.js";
+import { captureWindow, hasTauri } from "./bridge.js";
+import { openAppScreenPicker } from "./screen-color-picker.js";
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -199,14 +200,20 @@ export function openColorPicker({ color, anchor, onChange }) {
   });
   eyedrop.addEventListener("click", async () => {
     try {
-      let hex = null;
       if (hasTauri) {
-        hex = await pickScreenColor();
-      } else if ("EyeDropper" in window) {
-        const result = await new window.EyeDropper().open();
-        hex = result?.sRGBHex || null;
+        const capture = await captureWindow();
+        if (!capture?.data) return;
+        openAppScreenPicker({
+          capture,
+          onPick: (hex) => {
+            if (setFromHex(hex)) close();
+          },
+        });
+        return;
       }
-      if (setFromHex(hex)) close();
+      if (!("EyeDropper" in window)) return;
+      const result = await new window.EyeDropper().open();
+      if (setFromHex(result?.sRGBHex)) close();
     } catch {
       // The picker was cancelled or the platform does not expose the API.
     }

@@ -2018,74 +2018,111 @@ fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-/// Manual screen color picker. The desktop webview does not expose the browser EyeDropper
-/// capability, so hide the window, wait for a click, and read the pixel under the cursor with GDI.
+#[derive(Serialize)]
+struct ScreenCapture {
+    width: u32,
+    height: u32,
+    data: String,
+}
+
+/// Capture the app client area for the in-app screen color picker. The window stays visible so the
+/// picker can show a magnified preview instead of hiding the app and sampling the desktop.
 #[tauri::command]
-async fn pick_screen_color(app: tauri::AppHandle) -> Result<String, String> {
+fn capture_window(app: tauri::AppHandle) -> Result<ScreenCapture, String> {
     #[cfg(target_os = "windows")]
     {
-        use windows_sys::Win32::Foundation::POINT;
-        use windows_sys::Win32::Graphics::Gdi::{GetDC, GetPixel, ReleaseDC};
-        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-            GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON,
+        use std::ffi::c_void;
+        use windows_sys::Win32::Foundation::RECT;
+        use windows_sys::Win32::Graphics::Gdi::{
+            BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC,
+            GetDIBits, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS,
+            SRCCOPY,
         };
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetCursorPos, LoadCursorW, SetCursor, IDC_CROSS,
-        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
 
         let window = app
             .get_webview_window("main")
             .ok_or_else(|| "Main window is not available".to_string())?;
-        window.hide().map_err(|error| error.to_string())?;
-
-        let picked = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-            std::thread::sleep(Duration::from_millis(220));
-            unsafe {
-                let crosshair = LoadCursorW(std::ptr::null_mut(), IDC_CROSS);
-                let started = std::time::Instant::now();
-                while GetAsyncKeyState(VK_LBUTTON as i32) < 0 {
-                    if started.elapsed() > Duration::from_secs(2) {
-                        break;
-                    }
-                    std::thread::sleep(Duration::from_millis(15));
-                }
-                loop {
-                    SetCursor(crosshair);
-                    if GetAsyncKeyState(VK_ESCAPE as i32) < 0 {
-                        return Err("Screen color picking was cancelled".to_string());
-                    }
-                    if GetAsyncKeyState(VK_LBUTTON as i32) < 0 {
-                        let mut point = POINT { x: 0, y: 0 };
-                        if GetCursorPos(&mut point) == 0 {
-                            return Err("Could not read the cursor position".to_string());
-                        }
-                        let dc = GetDC(std::ptr::null_mut());
-                        if dc.is_null() {
-                            return Err("Could not access the screen".to_string());
-                        }
-                        let pixel = GetPixel(dc, point.x, point.y);
-                        ReleaseDC(std::ptr::null_mut(), dc);
-                        if pixel == u32::MAX {
-                            return Err("Could not read the screen color".to_string());
-                        }
-                        let red = (pixel & 0xFF) as u8;
-                        let green = ((pixel >> 8) & 0xFF) as u8;
-                        let blue = ((pixel >> 16) & 0xFF) as u8;
-                        return Ok(format!("#{:02X}{:02X}{:02X}", red, green, blue));
-                    }
-                    if started.elapsed() > Duration::from_secs(15) {
-                        return Err("Screen color picking timed out".to_string());
-                    }
-                    std::thread::sleep(Duration::from_millis(15));
-                }
+        let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+        unsafe {
+            let mut rect: RECT = std::mem::zeroed();
+            if GetClientRect(hwnd.0 as _, &mut rect) == 0 {
+                return Err("Could not read the window size".to_string());
             }
-        })
-        .await
-        .map_err(|error| error.to_string())?;
+            let width = (rect.right - rect.left).max(1) as u32;
+            let height = (rect.bottom - rect.top).max(1) as u32;
+            if width as u64 * height as u64 > 50_000_000 {
+                return Err("The window is too large to capture".to_string());
+            }
 
-        let _ = window.show();
-        let _ = window.set_focus();
-        picked
+            let screen_dc = GetDC(hwnd.0 as _);
+            if screen_dc.is_null() {
+                return Err("Could not access the window surface".to_string());
+            }
+            let memory_dc = CreateCompatibleDC(screen_dc);
+            if memory_dc.is_null() {
+                ReleaseDC(hwnd.0 as _, screen_dc);
+                return Err("Could not create the capture surface".to_string());
+            }
+            let bitmap = CreateCompatibleBitmap(screen_dc, width as i32, height as i32);
+            if bitmap.is_null() {
+                DeleteDC(memory_dc);
+                ReleaseDC(hwnd.0 as _, screen_dc);
+                return Err("Could not create the capture bitmap".to_string());
+            }
+            let previous = SelectObject(memory_dc, bitmap);
+            let copied = BitBlt(
+                memory_dc,
+                0,
+                0,
+                width as i32,
+                height as i32,
+                screen_dc,
+                0,
+                0,
+                SRCCOPY,
+            );
+
+            let mut info: BITMAPINFO = std::mem::zeroed();
+            info.bmiHeader = BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width as i32,
+                biHeight: -(height as i32),
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: 0,
+                biSizeImage: width * height * 4,
+                ..std::mem::zeroed()
+            };
+            let mut buffer = vec![0u8; (width * height * 4) as usize];
+            let lines = GetDIBits(
+                memory_dc,
+                bitmap,
+                0,
+                height,
+                buffer.as_mut_ptr() as *mut c_void,
+                &mut info,
+                DIB_RGB_COLORS,
+            );
+
+            SelectObject(memory_dc, previous);
+            DeleteObject(bitmap);
+            DeleteDC(memory_dc);
+            ReleaseDC(hwnd.0 as _, screen_dc);
+
+            if copied == 0 || lines == 0 {
+                return Err("Could not capture the window".to_string());
+            }
+            for pixel in buffer.chunks_exact_mut(4) {
+                pixel.swap(0, 2);
+                pixel[3] = 255;
+            }
+            Ok(ScreenCapture {
+                width,
+                height,
+                data: base64::engine::general_purpose::STANDARD.encode(buffer),
+            })
+        }
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -2712,7 +2749,7 @@ pub fn run() {
             app_data_dir,
             mcp_server_path,
             app_version,
-            pick_screen_color,
+            capture_window,
             check_update,
             auth_status,
             auth_setup_admin,
