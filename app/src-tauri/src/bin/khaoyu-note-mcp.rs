@@ -1153,7 +1153,7 @@ mod tests {
 
     #[test]
     fn snippets_keep_unicode_and_never_emit_mojibake() {
-        let text = "Catatan penting: résumé proyek dan 日本語テキスト";
+        let text = "Important note: résumé project and 日本語テキスト";
         let result = snippet(text, "résumé");
         assert!(
             result.contains("résumé"),

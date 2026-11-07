@@ -133,7 +133,7 @@ try {
   const unicodeNote = await tool("create_card", {
     board_id: board.board_id,
     type: "note",
-    text: "Résumé proyek 日本語",
+    text: "Résumé project 日本語",
   });
   const unicodeSearch = await tool("search", { query: "résumé" });
   const unicodeHit = (unicodeSearch.results || []).find((result) => result.cardId === unicodeNote.card.id);

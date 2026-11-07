@@ -2534,7 +2534,7 @@ mod tests {
         let source = root.join("khaoyu-note-1");
         fs::create_dir_all(source.join("assets")).expect("backup folders");
         fs::write(source.join(DB_FILE), b"database").expect("backup database");
-        fs::write(source.join("assets").join("catatan.txt"), b"hello").expect("backup asset");
+        fs::write(source.join("assets").join("notes.txt"), b"hello").expect("backup asset");
 
         let zip_path = source.with_extension("zip");
         write_zip_directory(&source, &zip_path).expect("write zip");
@@ -2554,7 +2554,7 @@ mod tests {
         let text = String::from_utf8_lossy(&archive);
         assert!(text.contains(DB_FILE), "archive keeps the database name");
         assert!(
-            text.contains("assets/catatan.txt"),
+            text.contains("assets/notes.txt"),
             "archive uses forward slashes for nested assets"
         );
         assert!(
