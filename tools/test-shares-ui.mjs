@@ -61,7 +61,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password, displayName: "Shares Test" }),
   });
-  check("account registered", registration.status === 201);
+  check("account registered", registration.status === 202);
   // Registration is auto-verified; no email verification step.
 
   browser = await chromium.launch();

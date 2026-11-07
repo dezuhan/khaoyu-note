@@ -19,6 +19,7 @@ import { createSmtpMailer } from "../src/auth/mailer.mjs";
 import { createFileMailer } from "../src/auth/mailer.mjs";
 import { createQueuedMailer } from "../src/auth/mailer.mjs";
 import { scanUpload, validateUpload } from "../src/uploads.mjs";
+import { sendBinary } from "../src/http.mjs";
 import http from "node:http";
 import { sendAlert } from "../src/alerts.mjs";
 import { createEventHub } from "../src/events.mjs";
@@ -123,6 +124,23 @@ test("share tokens are redacted from request logs", () => {
     logPath("/api/v1/share/khn_share_supersecret/access"),
     "/api/v1/share/[redacted]/access"
   );
+  assert.equal(
+    logPath("/api/v1/share/khn_share_supersecret/comments"),
+    "/api/v1/share/[redacted]/comments"
+  );
+  assert.equal(
+    logPath("/api/v1/share/khn_share_supersecret/cards/card-1"),
+    "/api/v1/share/[redacted]/cards/card-1"
+  );
+  assert.equal(
+    logPath("/api/v1/share/khn_share_supersecret/assets/asset-1"),
+    "/api/v1/share/[redacted]/assets/asset-1"
+  );
+  assert.equal(
+    logPath("/api/v1/share/khn_share_supersecret/report"),
+    "/api/v1/share/[redacted]/report"
+  );
+  assert.equal(logPath("/s/khn_share_supersecret"), "/s/[redacted]");
   assert.equal(logPath("/api/v1/projects"), "/api/v1/projects");
 });
 
@@ -458,6 +476,22 @@ test("uploads validate image signatures and run the scanner hook", async (t) => 
     true
   );
   assert.throws(() => validateUpload("image/svg+xml", Buffer.from("<svg/>")), /SVG uploads/);
+  assert.equal(validateUpload("text/plain", Buffer.from("plain text")), true);
+  assert.equal(validateUpload("application/pdf", Buffer.from("%PDF-1.7")), true);
+  assert.equal(validateUpload("video/mp4", Buffer.from("\u0000\u0000\u0000\u0018ftypmp42")), true);
+  assert.equal(validateUpload("application/octet-stream", Buffer.from("opaque")), true);
+  assert.throws(
+    () => validateUpload("application/x-msdownload", Buffer.from("MZ")),
+    /not allowed/
+  );
+  assert.throws(
+    () => validateUpload("text/html", Buffer.from("<html></html>")),
+    /not allowed/
+  );
+  assert.throws(
+    () => validateUpload("image/bmp", Buffer.from("BM")),
+    /does not match/
+  );
 
   const dataDir = tempDir();
   const config = configFor(dataDir);
@@ -490,6 +524,53 @@ test("health endpoints expose no version, database or configuration", async () =
   const missing = await fetch(`http://127.0.0.1:${port}/does-not-exist`);
   assert.equal(missing.status, 404);
   assert.deepEqual(await missing.json(), { error: "not found" });
+  await new Promise((resolve) => server.close(resolve));
+  db.close();
+});
+
+test("binary responses sanitise filenames", () => {
+  const headers = {};
+  const response = {
+    setHeader(name, value) {
+      headers[String(name).toLowerCase()] = value;
+    },
+    writeHead(status, values = {}) {
+      for (const [name, value] of Object.entries(values)) {
+        headers[name.toLowerCase()] = value;
+      }
+    },
+    end() {},
+  };
+  sendBinary(response, configFor(tempDir()), Buffer.from("data"), {
+    contentType: "text/plain",
+    filename: 'report\r\nX-Injected: yes".txt',
+    download: true,
+  });
+  const disposition = headers["content-disposition"];
+  assert.match(disposition, /^attachment; filename="/);
+  assert.equal(/[\r\n]/.test(disposition), false);
+  assert.equal(headers["x-content-type-options"], "nosniff");
+});
+
+test("browser pages and assets are served from the public directory", async () => {
+  const dataDir = tempDir();
+  const config = configFor(dataDir);
+  const db = openDatabase(config.databasePath);
+  migrate(db, { directory: MIGRATIONS_DIR });
+  const server = createService({ config, db, logger: quietLogger });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const account = await fetch(`http://127.0.0.1:${port}/account`);
+  assert.equal(account.status, 200);
+  assert.match(account.headers.get("content-type"), /text\/html/);
+  assert.ok((await account.text()).length > 0);
+  const styles = await fetch(`http://127.0.0.1:${port}/ui.css`);
+  assert.equal(styles.status, 200);
+  assert.match(styles.headers.get("content-type"), /text\/css/);
+  const share = await fetch(`http://127.0.0.1:${port}/s/sometoken`);
+  assert.equal(share.status, 200);
+  assert.match(share.headers.get("content-type"), /text\/html/);
+  assert.equal(share.headers.get("x-robots-tag"), "noindex, nofollow");
   await new Promise((resolve) => server.close(resolve));
   db.close();
 });

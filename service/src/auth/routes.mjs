@@ -4,7 +4,7 @@ import { hashPassword, verifyPassword } from "./passwords.mjs";
 import { AuthError, authenticateAccess, authenticateApiToken, createApiToken, createSession, listApiTokens, listSessions, publicAccount, revokeAllSessions, revokeApiToken, revokeByRefreshToken, revokeSession, rotateRefresh } from "./sessions.mjs";
 import { bearerToken, hashToken, parseCookies, randomToken, serializeCookie } from "./tokens.mjs";
 import { createTotpSecret, generateTotp, totpUri, verifyTotp } from "./totp.mjs";
-import { clearLoginFailures, loginBlocked, recordLoginAttempt } from "./throttle.mjs";
+import { clearLoginFailures, createRateLimiter, loginBlocked, recordLoginAttempt } from "./throttle.mjs";
 import {
   authenticationOptions,
   deletePasskey,
@@ -59,6 +59,32 @@ import {
 
 function now() {
   return Date.now();
+}
+
+// Fixed argon2id hash (same parameters as passwords.mjs) used to make the unknown-email
+// login path cost roughly the same as a real password check.
+const DUMMY_PASSWORD_HASH =
+  "$argon2id$v=19$m=65536,t=3,p=1$WLLmuzqbgiFAcmVucbER5Q$dpKYXtQhuHSXN5SvyBevE5/gWs7eEcl2Ogu12D9fbGE";
+
+// Content fields a card can use to reference an uploaded project asset.
+const ASSET_REFERENCE_FIELDS = [
+  "src",
+  "path",
+  "url",
+  "poster",
+  "assetId",
+  "asset_id",
+  "objectId",
+  "object_id",
+];
+
+function cardReferencesAsset(card, asset) {
+  if (!card) return false;
+  return ASSET_REFERENCE_FIELDS.some((field) => {
+    const value = card[field];
+    if (typeof value !== "string" || !value) return false;
+    return value.includes(asset.id) || value.includes(asset.object_id);
+  });
 }
 
 function integerDays(value) {
@@ -226,6 +252,21 @@ export function createApiRouter({ db, config, logger, mailer }) {
   const blockedExtensions = new Set([
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
   ]);
+  const rateWindowMs = 15 * 60_000;
+  const registerRate = createRateLimiter({ windowMs: rateWindowMs, max: 60 });
+  const passwordResetRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
+  const otpRequestRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
+  const passkeyLoginRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
+  const shareReportRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
+
+  function enforceRate(limiter, key) {
+    const result = limiter.check(key);
+    if (result.blocked) {
+      throw new HttpError(429, "too many requests", "rate_limited", {
+        "Retry-After": String(result.retryAfter),
+      });
+    }
+  }
 
   async function emailRecipients(accountIds, payload) {
     await Promise.all(
@@ -235,8 +276,16 @@ export function createApiRouter({ db, config, logger, mailer }) {
     );
   }
 
+  function pruneAdminRate() {
+    const current = Date.now();
+    for (const [key, hits] of adminRate) {
+      if (current >= hits.resetAt) adminRate.delete(key);
+    }
+  }
+
   function requireAdmin(request, ipHash) {
     if (!config.adminToken) throw new HttpError(404, "not found", "not_found");
+    pruneAdminRate();
     const hits = adminRate.get(ipHash) || { count: 0, resetAt: Date.now() + 60_000 };
     if (Date.now() >= hits.resetAt) {
       hits.count = 0;
@@ -253,14 +302,23 @@ export function createApiRouter({ db, config, logger, mailer }) {
     }
   }
 
-  function saveSharedDoc(projectId, doc, revision, actorId) {    const serialized = JSON.stringify(doc);
+  function bumpRevision(projectId, expectedRevision) {
+    const result = db
+      .prepare(
+        "UPDATE projects SET revision = revision + 1, updated_at = ? WHERE id = ? AND revision = ?"
+      )
+      .run(now(), projectId, expectedRevision);
+    if (result.changes !== 1) {
+      throw new HttpError(409, "revision conflict", "revision_conflict");
+    }
+    return expectedRevision + 1;
+  }
+
+  function saveSharedDoc(projectId, doc, expectedRevision, actorId) {
+    const serialized = JSON.stringify(doc);
     db.exec("BEGIN IMMEDIATE");
     try {
-      db.prepare("UPDATE projects SET revision = ?, updated_at = ? WHERE id = ?").run(
-        revision,
-        now(),
-        projectId
-      );
+      const revision = bumpRevision(projectId, expectedRevision);
       db.prepare(
         "UPDATE project_snapshots SET revision = ?, doc = ?, updated_by = ?, updated_at = ? WHERE project_id = ?"
       ).run(revision, serialized, actorId, now(), projectId);
@@ -268,6 +326,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
         "INSERT INTO project_versions (id, project_id, revision, doc, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
       ).run(crypto.randomUUID(), projectId, revision, serialized, actorId, now());
       db.exec("COMMIT");
+      return revision;
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
@@ -361,9 +420,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       const publicReportMatch = url.pathname.match(/^\/api\/v1\/share\/([^/]+)\/report$/);
       if (method === "POST" && publicReportMatch) {
+        if (!config.publicSharingEnabled) throw new HttpError(404, "not found", "not_found");
         const token = decodeURIComponent(publicReportMatch[1]);
         const share = findShare(db, token);
-        if (!share || share.revoked_at) throw new HttpError(404, "not found", "not_found");
+        if (
+          !share ||
+          share.revoked_at ||
+          (share.expires_at !== null && Number(share.expires_at) <= now())
+        ) {
+          throw new HttpError(404, "not found", "not_found");
+        }
+        enforceRate(shareReportRate, `${share.id}:${hashIp(ip, config.secret) || "unknown"}`);
         const body = await readJson(request);
         const reason = requireString(body.reason, "reason", 500);
         if (reason.length < 3) throw new HttpError(400, "reason is too short", "invalid_reason");
@@ -482,8 +549,12 @@ export function createApiRouter({ db, config, logger, mailer }) {
           ts: now(),
         };
         card.shareComments.push(comment);
-        const revision = snapshot.project.revision + 1;
-        saveSharedDoc(share.project_id, snapshot.doc, revision, null);
+        const revision = saveSharedDoc(
+          share.project_id,
+          snapshot.doc,
+          snapshot.project.revision,
+          null
+        );
         events.publish(share.project_id, {
           type: "snapshot",
           projectId: share.project_id,
@@ -588,8 +659,12 @@ export function createApiRouter({ db, config, logger, mailer }) {
           changed += 1;
         }
         if (!changed) throw new HttpError(400, "no editable fields", "invalid_input");
-        const revision = snapshot.project.revision + 1;
-        saveSharedDoc(share.project_id, snapshot.doc, revision, null);
+        const revision = saveSharedDoc(
+          share.project_id,
+          snapshot.doc,
+          snapshot.project.revision,
+          null
+        );
         events.publish(share.project_id, {
           type: "snapshot",
           projectId: share.project_id,
@@ -651,8 +726,14 @@ export function createApiRouter({ db, config, logger, mailer }) {
           .get(assetId, share.project_id);
         if (!asset) throw new HttpError(404, "not found", "not_found");
         if (share.scope !== "project") {
-          const scoped = sharedPayload(db, share);
-          if (!scoped || !JSON.stringify(scoped).includes(assetId)) {
+          // Only cards inside the shared scope may expose the asset, and only through a
+          // known reference field: an asset id merely mentioned in card text does not count.
+          const snapshot = projectSnapshot(db, share.project_id);
+          if (!snapshot) throw new HttpError(404, "not found", "not_found");
+          const scopedCards = (snapshot.doc.cards || []).filter((card) =>
+            cardInShareScope(snapshot.doc, share, card.id)
+          );
+          if (!scopedCards.some((card) => cardReferencesAsset(card, asset))) {
             throw new HttpError(404, "not found", "not_found");
           }
         }
@@ -772,6 +853,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/login/options") {
         if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        enforceRate(passkeyLoginRate, ipHash);
         const body = await readJson(request);
         const email = normalizeEmail(body.email);
         const options = await authenticationOptions(db, config, email);
@@ -781,6 +863,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/login/verify") {
         if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        enforceRate(passkeyLoginRate, ipHash);
         const body = await readJson(request);
         const email = normalizeEmail(body.email);
         try {
@@ -851,6 +934,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
       }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/register") {
+        enforceRate(registerRate, ipHash);
         const body = await readJson(request);
         const email = normalizeEmail(body.email);
         const password = requirePassword(body.password);
@@ -876,7 +960,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
           sendJson(response, 202, { status: "registered" }, config);
           return true;
         }
-        sendJson(response, 201, { status: "registered" }, config);
+        sendJson(response, 202, { status: "registered" }, config);
         return true;
       }
 
@@ -885,6 +969,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
       }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/otp/request") {
+        enforceRate(otpRequestRate, ipHash);
         const body = await readJson(request);
         const email = normalizeEmail(body.email);
         const account = db
@@ -1015,8 +1100,13 @@ export function createApiRouter({ db, config, logger, mailer }) {
           return true;
         }
         const account = db.prepare("SELECT * FROM accounts WHERE email = ?").get(email);
-        const valid = account ? await verifyPassword(body.password, account.password_hash) : false;
-        if (!valid || account.deleted_at) {
+        // Hash against a fixed dummy hash when the account or hash is missing so the
+        // unknown-email path costs about the same as a real verification.
+        const valid = await verifyPassword(
+          body.password,
+          account?.password_hash || DUMMY_PASSWORD_HASH
+        );
+        if (!valid || !account || account.deleted_at) {
           recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
           sendJson(response, 401, { error: "Invalid email or password" }, config);
           return true;
@@ -1143,6 +1233,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
       }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/password-reset/request") {
+        enforceRate(passwordResetRate, ipHash);
         const body = await readJson(request);
         const email = normalizeEmail(body.email);
         const account = db.prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL").get(email);
@@ -1903,10 +1994,36 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
-      if (method === "GET" && url.pathname === "/api/v1/email/unsubscribe") {
-        const token = url.searchParams.get("token") || "";
+      if (url.pathname === "/api/v1/email/unsubscribe" && (method === "GET" || method === "POST")) {
+        let token = url.searchParams.get("token") || "";
+        if (!token && /^application\/json\b/i.test(request.headers["content-type"] || "")) {
+          const body = await readJson(request);
+          token = String(body.token || "");
+        }
         const accountId = verifyUnsubscribeToken(token, config.secret);
         if (!accountId) throw new HttpError(400, "invalid unsubscribe token", "invalid_token");
+        if (method === "GET") {
+          const action = `/api/v1/email/unsubscribe?token=${encodeURIComponent(token)}`;
+          const page = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Unsubscribe from Khaoyu Note email</title></head>
+<body><h1>Email notifications</h1>
+<p>Confirm that you no longer want email notifications from Khaoyu Note. Nothing has changed yet.</p>
+<form method="post" action="${action}"><button type="submit">Unsubscribe</button></form>
+</body></html>`;
+          applySecurityHeaders(response, config);
+          // The default site CSP is `default-src 'none'`, which also blocks the form action.
+          // This page needs nothing else, so allow only a same-origin form post.
+          response.setHeader(
+            "Content-Security-Policy",
+            "default-src 'none'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+          );
+          response.writeHead(200, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Length": Buffer.byteLength(page),
+          });
+          response.end(page);
+          return true;
+        }
         db.prepare(
           `INSERT INTO email_preferences (account_id, notifications, updated_at) VALUES (?, 0, ?)
            ON CONFLICT(account_id) DO UPDATE SET notifications = 0, updated_at = excluded.updated_at`
@@ -2020,14 +2137,10 @@ export function createApiRouter({ db, config, logger, mailer }) {
           .prepare("SELECT revision FROM projects WHERE id = ? AND deleted_at IS NULL")
           .get(restoreMatch[1]);
         if (!current) throw new HttpError(404, "project not found", "not_found");
-        const revision = current.revision + 1;
+        let revision;
         db.exec("BEGIN IMMEDIATE");
         try {
-          db.prepare("UPDATE projects SET revision = ?, updated_at = ? WHERE id = ?").run(
-            revision,
-            now(),
-            restoreMatch[1]
-          );
+          revision = bumpRevision(restoreMatch[1], current.revision);
           db.prepare(
             "UPDATE project_snapshots SET revision = ?, doc = ?, updated_by = ?, updated_at = ? WHERE project_id = ?"
           ).run(revision, version.doc, auth.account.id, now(), restoreMatch[1]);
@@ -2155,7 +2268,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
         sendBinary(response, config, object.body, {
           contentType: asset.content_type,
           filename: asset.name,
-          download: false,
+          download: !String(asset.content_type || "").toLowerCase().startsWith("image/"),
         });
         return true;
       }
@@ -2205,14 +2318,10 @@ export function createApiRouter({ db, config, logger, mailer }) {
         if (body.revision !== undefined && Number(body.revision) !== project.revision) {
           throw new HttpError(409, "revision conflict", "revision_conflict");
         }
-        const revision = project.revision + 1;
+        let revision;
         db.exec("BEGIN IMMEDIATE");
         try {
-          db.prepare("UPDATE projects SET revision = ?, updated_at = ? WHERE id = ?").run(
-            revision,
-            now(),
-            snapshotMatch[1]
-          );
+          revision = bumpRevision(snapshotMatch[1], project.revision);
           db.prepare(
             "UPDATE project_snapshots SET revision = ?, doc = ?, updated_by = ?, updated_at = ? WHERE project_id = ?"
           ).run(revision, doc, auth.account.id, now(), snapshotMatch[1]);

@@ -1,17 +1,31 @@
 import crypto from "node:crypto";
 
-export function unsubscribeToken(accountId, secret) {
-  const signature = crypto.createHmac("sha256", secret).update(`unsubscribe:${accountId}`).digest("hex");
-  return `${accountId}.${signature}`;
+export const UNSUBSCRIBE_TOKEN_TTL_MS = 30 * 86_400_000;
+
+function unsubscribeSignature(accountId, issuedAt, secret) {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`unsubscribe:${accountId}:${issuedAt}`)
+    .digest("hex");
 }
 
-export function verifyUnsubscribeToken(token, secret) {
-  if (typeof token !== "string" || !token.includes(".")) return null;
-  const index = token.lastIndexOf(".");
-  const accountId = token.slice(0, index);
-  const expected = unsubscribeToken(accountId, secret);
-  if (token.length !== expected.length) return null;
-  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected)) ? accountId : null;
+export function unsubscribeToken(accountId, secret, issuedAt = Date.now()) {
+  return `${accountId}.${issuedAt}.${unsubscribeSignature(accountId, issuedAt, secret)}`;
+}
+
+export function verifyUnsubscribeToken(token, secret, ttlMs = UNSUBSCRIBE_TOKEN_TTL_MS) {
+  if (typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [accountId, issuedAtText, signature] = parts;
+  const issuedAt = Number(issuedAtText);
+  if (!accountId || !Number.isSafeInteger(issuedAt) || issuedAt <= 0) return null;
+  const expected = unsubscribeSignature(accountId, issuedAt, secret);
+  if (signature.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  const now = Date.now();
+  if (issuedAt > now + 300_000 || now - issuedAt > ttlMs) return null;
+  return accountId;
 }
 
 export function createNotification(db, { accountId, kind, title, body, resourceType, resourceId }) {

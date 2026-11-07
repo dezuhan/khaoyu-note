@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createBackup, pruneBackups } from "./backup.mjs";
 import { pruneLoginAttempts } from "./auth/throttle.mjs";
+import { ObjectStore } from "./objects.mjs";
 
 function removeOldEntries(directory, maxAgeMs) {
   if (!fs.existsSync(directory)) return 0;
@@ -23,7 +24,33 @@ function removeOldEntries(directory, maxAgeMs) {
   return removed;
 }
 
-export function purgeDeletedAccounts(db, logger) {
+function purgeOrphanedObjects(db, config, logger) {
+  const candidates = db
+    .prepare(
+      `SELECT id FROM objects WHERE NOT EXISTS
+       (SELECT 1 FROM project_assets WHERE project_assets.object_id = objects.id)`
+    )
+    .all();
+  if (!candidates.length) return 0;
+  const store = new ObjectStore(db, config.objectsDir);
+  let removed = 0;
+  for (const object of candidates) {
+    // Keep objects that still appear in a version document; card payloads may reference
+    // an asset after the project_assets row was removed by an earlier project purge.
+    const referenced = db
+      .prepare("SELECT 1 AS found FROM project_versions WHERE doc LIKE ? LIMIT 1")
+      .get(`%${object.id}%`);
+    if (referenced) continue;
+    try {
+      if (store.remove(object.id)) removed += 1;
+    } catch (error) {
+      logger.error("object.purge_failed", { message: error.message });
+    }
+  }
+  return removed;
+}
+
+export function purgeDeletedAccounts(db, logger, config = null) {
   const due = db
     .prepare("SELECT id, email FROM accounts WHERE deletion_due_at IS NOT NULL AND deletion_due_at <= ? AND deleted_at IS NULL")
     .all(Date.now());
@@ -44,6 +71,10 @@ export function purgeDeletedAccounts(db, logger) {
       db.exec("ROLLBACK");
       logger.error("account.purge_failed", { message: error.message });
     }
+  }
+  if (purged && config) {
+    const objectsRemoved = purgeOrphanedObjects(db, config, logger);
+    if (objectsRemoved) logger.info("objects.purged", { count: objectsRemoved });
   }
   return purged;
 }
@@ -107,7 +138,7 @@ export function runMaintenance(db, config, logger) {
   const audit = db
     .prepare("DELETE FROM audit_log WHERE created_at < ?")
     .run(Date.now() - config.auditRetentionDays * 86_400_000);
-  const purged = purgeDeletedAccounts(db, logger);
+  const purged = purgeDeletedAccounts(db, logger, config);
   const tokens = pruneTokens(db);
   pruneLoginAttempts(db, 30);
 

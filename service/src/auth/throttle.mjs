@@ -40,11 +40,48 @@ export function loginBlocked(db, { email, ip, config }) {
   };
 }
 
-export function clearLoginFailures(db, { email, ip, secret }) {
+export function clearLoginFailures(db, { email }) {
+  // A successful login only clears the per-email counter. The per-IP counter is kept so
+  // an attacker with one valid account cannot reset the shared IP-wide throttle. Failed
+  // attempts for this email are removed from both counters because the row is shared.
   db.prepare("DELETE FROM login_attempts WHERE email_hash = ? AND success = 0").run(emailHash(email));
-  db.prepare("DELETE FROM login_attempts WHERE ip_hash = ? AND success = 0").run(
-    hashIp(ip, secret) || "unknown"
-  );
+}
+
+// Bounded per-process limiter for endpoints that do not need durable attempt rows.
+// Entries expire after one window and the map is capped so memory cannot grow forever.
+export function createRateLimiter({ windowMs, max, maxEntries = 10_000 }) {
+  const hits = new Map();
+  let lastPrune = 0;
+  const prune = (nowMs) => {
+    if (nowMs - lastPrune < windowMs) return;
+    lastPrune = nowMs;
+    for (const [key, entry] of hits) {
+      if (entry.resetAt <= nowMs) hits.delete(key);
+    }
+  };
+  return {
+    check(key) {
+      const nowMs = Date.now();
+      prune(nowMs);
+      let entry = hits.get(key);
+      if (!entry || entry.resetAt <= nowMs) {
+        if (hits.size >= maxEntries) {
+          const oldest = hits.keys().next();
+          if (!oldest.done) hits.delete(oldest.value);
+        }
+        entry = { count: 0, resetAt: nowMs + windowMs };
+        hits.set(key, entry);
+      }
+      entry.count += 1;
+      if (entry.count > max) {
+        return {
+          blocked: true,
+          retryAfter: Math.max(1, Math.ceil((entry.resetAt - nowMs) / 1000)),
+        };
+      }
+      return { blocked: false, retryAfter: 0 };
+    },
+  };
 }
 
 export function pruneLoginAttempts(db, days = 30) {

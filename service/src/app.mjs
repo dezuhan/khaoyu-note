@@ -29,7 +29,7 @@ export function assertSchemaCurrent(db) {
 
 export function logPath(pathname) {
   return pathname
-    .replace(/^\/api\/v1\/share\/[^/]+\/access$/, "/api/v1/share/[redacted]/access")
+    .replace(/^\/api\/v1\/share\/[^/]+/, "/api/v1/share/[redacted]")
     .replace(/^\/s\/[^/]+$/, "/s/[redacted]");
 }
 
@@ -62,8 +62,16 @@ export function createService({ config, db, logger, mailer }) {
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
       );
       if (sharePage) response.setHeader("X-Robots-Tag", "noindex, nofollow");
+      let body;
+      try {
+        body = fs.readFileSync(path.join(PUBLIC_DIR, authPage[0]));
+      } catch (error) {
+        logger.error("http.page_failed", { message: error.message });
+        sendJson(response, 500, { error: "internal server error" }, config);
+        return;
+      }
       response.writeHead(200, { "Content-Type": authPage[1] });
-      response.end(fs.readFileSync(path.join(PUBLIC_DIR, authPage[0])));
+      response.end(body);
       return;
     }
     response.on("finish", () => {

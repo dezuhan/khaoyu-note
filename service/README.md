@@ -165,7 +165,8 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `PATCH` | `/api/v1/account/presence` | Opt in or out of project presence. |
 | `GET` | `/api/v1/account/email-preferences` | Read the email notification preference. |
 | `PATCH` | `/api/v1/account/email-preferences` | Opt in or out of notification email. |
-| `GET` | `/api/v1/email/unsubscribe` | One-click unsubscribe using a signed token. |
+| `GET` | `/api/v1/email/unsubscribe` | Confirmation page for the signed unsubscribe link. |
+| `POST` | `/api/v1/email/unsubscribe` | Apply the unsubscribe; the signed link expires after 30 days. |
 | `GET` | `/api/v1/projects/:id/members` | List project members. |
 | `GET` | `/api/v1/projects/:id/assets` | List project asset metadata. |
 | `POST` | `/api/v1/projects/:id/assets` | Upload an asset as raw bytes; editor role. |
@@ -333,9 +334,11 @@ with a ten second timeout and a non-zero exit rejects the upload. List and downl
 membership, while upload requires the editor role and the `projects:write` scope.
 
 A share can download an asset only when `downloadAllowed` is true, the link is valid and its
-passphrase matches. Project shares can download any project asset; item and column shares only when
-the asset id appears in the scoped payload. Downloads are audited per share link. MIME sniffing,
-malware scanning, watermarking and signed short-lived asset URLs are still pending.
+passphrase matches. Project shares can download any project asset; item and column shares only when a
+card inside the share scope references the asset in a known field (`src`, `path`, `url`, `poster` or
+an explicit asset or object id). Downloads are audited per share link. Image uploads are validated
+against their magic bytes and uploads pass an optional scanner hook; watermarking and signed
+short-lived asset URLs are still pending.
 
 ## Migrations
 
@@ -474,5 +477,6 @@ restores, share reports, comments and mentions; per-account read state; cleanup 
 revoked; SMTP delivery with outbox fallback; opt-in notification email with signed unsubscribe links
 and a five minute rate limit.
 
-Still pending: a manage-specific share surface, watermarking, signed short-lived asset URLs,
-nested-board policy for project shares, a full browser account UI and team membership UI.
+Still pending: a manage-specific share surface, watermarking, signed short-lived asset URLs and a
+team membership management UI. Nested-board policy for project shares and the browser account pages
+are implemented.

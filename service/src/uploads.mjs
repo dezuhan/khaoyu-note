@@ -20,12 +20,35 @@ export function detectImageType(buffer) {
   return null;
 }
 
+// Non-image asset types are served as attachments and never rendered inline, so an
+// explicit allowlist is enough: the browser will not interpret them as active content.
+const ALLOWED_NON_IMAGE_TYPES = new Set([
+  "application/octet-stream",
+  "application/pdf",
+  "text/plain",
+  "audio/aac",
+  "audio/flac",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+  "audio/webm",
+  "audio/x-m4a",
+  "audio/x-wav",
+  "video/mp4",
+  "video/ogg",
+  "video/quicktime",
+  "video/webm",
+  "video/x-matroska",
+  "video/x-msvideo",
+]);
+
 export function validateUpload(contentType, buffer) {
   const normalized = String(contentType || "").toLowerCase();
-  if (normalized === "image/svg+xml" || normalized.startsWith("image/")) {
-    if (normalized === "image/svg+xml") {
-      throw new HttpError(415, "SVG uploads are not allowed as assets", "unsupported_media_type");
-    }
+  if (normalized === "image/svg+xml") {
+    throw new HttpError(415, "SVG uploads are not allowed as assets", "unsupported_media_type");
+  }
+  if (normalized.startsWith("image/")) {
     const detected = detectImageType(buffer);
     if (!detected) {
       throw new HttpError(415, "image content does not match its media type", "unsupported_media_type");
@@ -33,6 +56,10 @@ export function validateUpload(contentType, buffer) {
     if (normalized !== detected && !(normalized === "image/jpg" && detected === "image/jpeg")) {
       throw new HttpError(415, "image content does not match its media type", "unsupported_media_type");
     }
+    return true;
+  }
+  if (!ALLOWED_NON_IMAGE_TYPES.has(normalized)) {
+    throw new HttpError(415, "content type is not allowed", "unsupported_media_type");
   }
   return true;
 }

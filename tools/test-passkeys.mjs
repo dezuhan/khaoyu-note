@@ -76,7 +76,7 @@ try {
     method: "POST",
     body: { email, password, displayName: "Passkey Test" },
   });
-  check("account registration accepted", register.status === 201, String(register.status));
+  check("account registration accepted", register.status === 202, String(register.status));
 
   browser = await chromium.launch();
   const page = await browser.newPage();

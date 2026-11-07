@@ -12,6 +12,7 @@ import { createFileMailer } from "../src/auth/mailer.mjs";
 import { generateTotp } from "../src/auth/totp.mjs";
 import { createService } from "../src/app.mjs";
 import { runMaintenance } from "../src/worker.mjs";
+import { unsubscribeToken } from "../src/notifications.mjs";
 
 const SECRET = "Kx9-vQ2m-Rt7-pL4s-Wb8-nC3d-Hf6-jZ1a";
 const PASSWORD = "correct-horse-9";
@@ -147,7 +148,7 @@ async function start() {
       method: "POST",
       body: { email, password, displayName: email.split("@")[0] },
     });
-    assert.equal(result.status, 201, JSON.stringify(result.body));
+    assert.equal(result.status, 202, JSON.stringify(result.body));
   }
 
   async function verify(email) {
@@ -255,6 +256,16 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(disabled.body.code, "verification_disabled");
   });
 
+  await t.test("registration returns the same response for new and existing emails", async () => {
+    const email = `enumerate-${crypto.randomUUID()}@example.com`;
+    const payload = { email, password: PASSWORD, displayName: "Enumeration" };
+    const first = await api.call("/api/v1/auth/register", { method: "POST", body: payload });
+    const second = await api.call("/api/v1/auth/register", { method: "POST", body: payload });
+    assert.equal(first.status, second.status);
+    assert.equal(first.status, 202);
+    assert.deepEqual(first.body, second.body);
+  });
+
   await t.test("trusted-proxy SSO requires a signed email and can auto-create", async () => {
     const email = `sso-${crypto.randomUUID()}@example.com`;
     const signature = crypto
@@ -349,6 +360,33 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     const blockedAgain = await api.login(email);
     const secondRetry = Number(blockedAgain.response.headers.get("retry-after"));
     assert.ok(secondRetry > firstRetry, `${secondRetry} should exceed ${firstRetry}`);
+    api.db.exec("DELETE FROM login_attempts");
+  });
+
+  await t.test("a successful login does not reset the IP-wide throttle", async () => {
+    const email = `ip-throttle-${crypto.randomUUID()}@example.com`;
+    await api.register(email);
+    api.db.exec("DELETE FROM login_attempts");
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const failed = await api.login(
+        `ip-throttle-other-${attempt}-${crypto.randomUUID()}@example.com`,
+        "wrong-password-123"
+      );
+      assert.equal(failed.status, 401);
+    }
+    const good = await api.login(email);
+    assert.equal(good.status, 200);
+    const remaining = api.db
+      .prepare("SELECT COUNT(*) AS count FROM login_attempts WHERE success = 0")
+      .get();
+    assert.equal(Number(remaining.count), 4);
+    const lastFailure = await api.login(
+      `ip-throttle-last-${crypto.randomUUID()}@example.com`,
+      "wrong-password-123"
+    );
+    assert.equal(lastFailure.status, 401);
+    const blocked = await api.login(email);
+    assert.equal(blocked.status, 429);
     api.db.exec("DELETE FROM login_attempts");
   });
 
@@ -1089,7 +1127,26 @@ test("account, login, refresh, session, reset and authorization flows", async (t
 
     const message = api.latestMail("notification", owner.email);
     const token = decodeURIComponent(message.text.match(/unsubscribe\?token=(\S+)/)[1]);
-    const unsubscribed = await api.call(`/api/v1/email/unsubscribe?token=${encodeURIComponent(token)}`);
+    const expired = unsubscribeToken(
+      owner.account.id,
+      SECRET,
+      Date.now() - 31 * 86_400_000
+    );
+    assert.equal(
+      (await api.call(`/api/v1/email/unsubscribe?token=${encodeURIComponent(expired)}`)).status,
+      400
+    );
+    const confirmation = await api.call(
+      `/api/v1/email/unsubscribe?token=${encodeURIComponent(token)}`
+    );
+    assert.equal(confirmation.status, 200);
+    assert.match(String(confirmation.body), /Unsubscribe/);
+    const unchanged = await api.call("/api/v1/account/email-preferences", { jar: owner.jar });
+    assert.equal(unchanged.body.notifications, true);
+    const unsubscribed = await api.call(
+      `/api/v1/email/unsubscribe?token=${encodeURIComponent(token)}`,
+      { method: "POST" }
+    );
     assert.equal(unsubscribed.status, 200);
     assert.equal(unsubscribed.body.unsubscribed, true);
     const preference = await api.call("/api/v1/account/email-preferences", { jar: owner.jar });
@@ -1113,11 +1170,24 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(upload.status, 201, upload.text);
     const assetId = JSON.parse(upload.text).id;
 
+    const rejectedType = await api.raw(`/api/v1/projects/${projectId}/assets`, {
+      method: "POST",
+      jar: owner.jar,
+      headers: { "content-type": "text/html", "x-file-name": "page.html" },
+      body: Buffer.from("<html></html>"),
+    });
+    assert.equal(rejectedType.status, 415);
+    assert.equal(JSON.parse(rejectedType.text).code, "unsupported_media_type");
+
     const ownDownload = await api.raw(`/api/v1/projects/${projectId}/assets/${assetId}`, {
       jar: owner.jar,
     });
     assert.equal(ownDownload.status, 200);
     assert.equal(ownDownload.buffer.toString(), body.toString());
+    assert.equal(
+      ownDownload.headers.get("content-disposition").startsWith("attachment"),
+      true
+    );
     assert.equal(
       (await api.raw(`/api/v1/projects/${projectId}/assets/${assetId}`, { jar: stranger.jar })).status,
       404
@@ -1160,6 +1230,68 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: "{}",
     });
     assert.equal(deniedDownload.status, 403);
+
+    // Scoped shares must not expose an asset merely because its id appears in card text.
+    const scopedBody = Buffer.from(`scoped asset ${crypto.randomUUID()}`);
+    const scopedUpload = await api.raw(`/api/v1/projects/${projectId}/assets`, {
+      method: "POST",
+      jar: owner.jar,
+      headers: { "content-type": "application/octet-stream", "x-file-name": "scoped.txt" },
+      body: scopedBody,
+    });
+    assert.equal(scopedUpload.status, 201, scopedUpload.text);
+    const scopedAssetId = JSON.parse(scopedUpload.text).id;
+    await putSnapshot(owner, projectId, {
+      id: projectId,
+      title: "Assets",
+      cards: [
+        {
+          id: "text-only",
+          type: "note",
+          x: 0,
+          y: 0,
+          w: 200,
+          h: 70,
+          z: 1,
+          text: `attached asset ${scopedAssetId}`,
+        },
+        {
+          id: "referencing",
+          type: "file",
+          x: 0,
+          y: 100,
+          w: 200,
+          h: 70,
+          z: 2,
+          name: "scoped.txt",
+          path: `/api/v1/projects/${projectId}/assets/${scopedAssetId}`,
+        },
+      ],
+      connections: [],
+      trash: [],
+    });
+    const textShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "text-only", permission: "view", downloadAllowed: true },
+    });
+    const textDownload = await api.raw(
+      `/api/v1/share/${textShare.body.token}/assets/${scopedAssetId}`,
+      { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }
+    );
+    assert.equal(textDownload.status, 404);
+    const referenceShare = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "item", targetId: "referencing", permission: "view", downloadAllowed: true },
+    });
+    const referenceDownload = await api.raw(
+      `/api/v1/share/${referenceShare.body.token}/assets/${scopedAssetId}`,
+      { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }
+    );
+    assert.equal(referenceDownload.status, 200);
+    assert.equal(referenceDownload.buffer.toString(), scopedBody.toString());
+    assert.equal(referenceDownload.headers.get("content-disposition").startsWith("attachment"), true);
   });
 
   await t.test("scoped API tokens authorize project access without a password", async () => {
@@ -1304,6 +1436,24 @@ test("account, login, refresh, session, reset and authorization flows", async (t
 
   await t.test("account deletion has a grace period and can be cancelled", async () => {
     const user = await api.account(`delete-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(user, "Deletion assets");
+    const orphanBody = Buffer.from(`orphan object ${crypto.randomUUID()}`);
+    const orphanUpload = await api.raw(`/api/v1/projects/${projectId}/assets`, {
+      method: "POST",
+      jar: user.jar,
+      headers: { "content-type": "application/octet-stream", "x-file-name": "orphan.txt" },
+      body: orphanBody,
+    });
+    assert.equal(orphanUpload.status, 201, orphanUpload.text);
+    const orphanAssetId = JSON.parse(orphanUpload.text).id;
+    const orphanObject = api.db
+      .prepare("SELECT object_id FROM project_assets WHERE id = ?")
+      .get(orphanAssetId);
+    const orphanStorage = api.db
+      .prepare("SELECT storage_key FROM objects WHERE id = ?")
+      .get(orphanObject.object_id);
+    const orphanPath = path.join(api.config.objectsDir, orphanStorage.storage_key);
+    assert.equal(fs.existsSync(orphanPath), true);
     const requested = await api.call("/api/v1/account/delete", {
       method: "POST",
       jar: user.jar,
@@ -1326,6 +1476,25 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       .run(Date.now() - 1000, user.account.id);
     runMaintenance(api.db, api.config, createLogger({ write() {} }));
     assert.equal(api.db.prepare("SELECT * FROM accounts WHERE id = ?").get(user.account.id), undefined);
+    assert.equal(
+      api.db.prepare("SELECT * FROM objects WHERE id = ?").get(orphanObject.object_id),
+      undefined
+    );
+    assert.equal(fs.existsSync(orphanPath), false);
     assert.equal((await api.call("/api/v1/account/export", { jar: user.jar })).status, 401);
+  });
+
+  await t.test("a burst of OTP requests is rate limited with 429", async () => {
+    const email = `otp-limit-${crypto.randomUUID()}@example.com`;
+    let response;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      response = await api.call("/api/v1/auth/otp/request", {
+        method: "POST",
+        body: { email },
+      });
+    }
+    assert.equal(response.status, 429);
+    assert.equal(response.body.code, "rate_limited");
+    assert.ok(Number(response.response.headers.get("retry-after")) >= 1);
   });
 });

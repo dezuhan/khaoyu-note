@@ -77,10 +77,11 @@ export async function readBinary(request, maximum = 100 * 1024 * 1024) {
 
 export function sendBinary(response, config, buffer, { contentType, filename, download = false }) {
   applySecurityHeaders(response, config);
+  const safeFilename = String(filename || "asset").replace(/[\r\n"\\]/g, "");
   response.writeHead(200, {
     "Content-Type": contentType || "application/octet-stream",
     "Content-Length": buffer.length,
-    "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${String(filename || "asset").replace(/["\\]/g, "")}"`,
+    "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${safeFilename}"`,
   });
   response.end(buffer);
 }

@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY src ./src
+COPY public ./public
 
 RUN mkdir -p /data && chown -R node:node /app /data
 
