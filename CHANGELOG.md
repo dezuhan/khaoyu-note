@@ -12,6 +12,23 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.33.0] - 2026-11-07
+
+### Added
+
+- Settings > Backup is its own pane with Back up now, Export ZIP and Open folder. It is listed in the
+  settings navigation between Account and General.
+- `export_backup_zip` writes the backup folder into one archive, in the desktop app and in the
+  localhost web host.
+- Video cards gain a seek bar, a current and total time label, back 5 and forward 5 buttons, and a
+  volume slider that slides out above the mute button.
+- Context menus can render a native checkbox row on the right; the media Repeat action uses it.
+
+### Changed
+
+- The backup archive is written uncompressed (STORE). The payload is a SQLite snapshot plus images,
+  audio and video that are already compressed, so it keeps the export free of an extra dependency.
+
 ## [0.32.0] - 2026-11-07
 
 ### Fixed
@@ -432,7 +449,6 @@ project uses Semantic Versioning.
 
 ### Changed
 
-- Renamed the application and identifiers from the earlier Milanote clone name to Khaoyu Note.
 - Menu bar uses a fixed three-column layout with the logo, centered search and action icons.
 - Tooltips use the design-system popup surface instead of native browser tooltips.
 - Line snapping and connection hit areas are tighter.
