@@ -39,6 +39,9 @@ jobs:
       - name: Static module check
         run: node --experimental-vm-modules scripts/check-web.cjs
 
+      - name: Version consistency check
+        run: node tools/test-version.mjs
+
       - name: Start preview server
         run: |
           node tools/serve.mjs 1430 > /tmp/khaoyu-serve.log 2>&1 &

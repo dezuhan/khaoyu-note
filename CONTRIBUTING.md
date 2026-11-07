@@ -87,8 +87,10 @@ not only when a milestone or release is finished.
 - Breaking data or workflow change: major, for example `1.0.0`.
 - Documentation, tests and CI-only changes do not need a version bump.
 
-Bump all version fields together: root `package.json`, `service/package.json`, `app/package.json`,
-`app/src-tauri/tauri.conf.json`, `app/src-tauri/Cargo.toml`, `Cargo.lock` and the Compose image tag.
+Bump all version fields together: root `package.json`, `package-lock.json`, `service/package.json`,
+`service/package-lock.json`, `app/package.json`, `app/package-lock.json`, `app/src-tauri/tauri.conf.json`,
+`app/src-tauri/Cargo.toml`, `app/src-tauri/Cargo.lock`, the Compose image tag, the changelog and the README
+artifact table. Run `node tools/test-version.mjs`; CI runs it too.
 Add the changelog entry in the same change, then tag the verified release:
 
 ```powershell

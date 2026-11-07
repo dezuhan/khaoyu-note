@@ -41,7 +41,7 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 - Sync engine checks: passing.
 - UI suite: 263 checks defined in `tools/test-ui.mjs`.
 - Live security check: 20 checks.
-- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt` for 0.33.0; signing is
+- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt` for 0.34.0; signing is
   still pending.
 - Linux and macOS: matrix workflow defined, never executed on this machine.
 
@@ -52,7 +52,7 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 2. Document that both installers include `khaoyu-note-mcp.exe` beside the desktop executable; the
    portable build ships both files. Remove the old manual-copy instruction from release notes.
 3. Run the Playwright suites and the MCP smoke suite on a machine with a browser and the built binary
-   before tagging 0.33.0.
+   before tagging 0.34.0.
 4. Re-enable the Map, Video and Audio tools once their embed paths are reliable again. The policy
    lives in `app/web/js/limits.js`; removing the entry restores the rail, palette, shortcuts and the
    Settings status in one place.

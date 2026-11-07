@@ -5,6 +5,8 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-08
+
 ### Added
 
 - Section surface cards: a pastel background with a small editable title, always below regular cards,

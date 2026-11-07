@@ -2,7 +2,7 @@
 
 Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
 
-> Status at 0.33.0, which supersedes the numbers below where they disagree:
+> Status at 0.34.0, which supersedes the numbers below where they disagree:
 >
 > - Backup has its own Settings pane with Back up now and Export ZIP. The restore command validates
 >   and stages a backup, but the Backup pane still has no Restore control.
