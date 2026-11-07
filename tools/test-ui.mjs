@@ -311,22 +311,21 @@ check(
   JSON.stringify(accountAvatar)
 );
 await page.click("#account-btn");
-await page.waitForTimeout(250);
-check("Account center opens from the avatar", await page.locator(".mn-account-shell").isVisible());
-const accountMenu = await page.locator(".mn-account-nav").innerText();
+await page.waitForTimeout(300);
 check(
-  "Account center menu lists the account sections",
-  ["Account Information", "Account Settings", "History Activity"].every((label) =>
-    accountMenu.includes(label)
-  )
+  "Avatar opens Settings on the Account page",
+  (await page.locator(".mn-prefs-dialog").isVisible()) &&
+    (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Account"
 );
 check(
-  "Account information pane renders the selected section",
-  (await page.locator(".mn-account-pane").innerText()).trim().length > 0
+  "Account page shows the sign-in prompt without an account",
+  (await page.locator('[data-role="content"]').innerText()).includes(
+    "Sign in to manage your local account"
+  )
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);
-check("Account center closes with Escape", (await page.locator(".mn-account-shell").count()) === 0);
+check("Settings closes with Escape", (await page.locator(".mn-prefs-overlay").count()) === 0);
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
 check(
   "Application menu bar has File, Edit, Tools, View and Help",

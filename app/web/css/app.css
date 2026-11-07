@@ -6625,6 +6625,55 @@ html[data-performance="true"] .mn-card {
 .mn-profile-status.is-error {
   color: var(--ky-danger);
 }
+.mn-account-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ky-border);
+}
+.mn-account-tab {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.mn-account-tab:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+.mn-account-tab.is-active {
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+  font-weight: 600;
+}
+.mn-account-tab-pane {
+  min-height: 260px;
+}
+.mn-account-tab-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ky-border);
+}
+.mn-account-info-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.mn-account-info-head .mn-profile-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
+}
 .mn-server-runtime {
   margin-bottom: 14px;
 }

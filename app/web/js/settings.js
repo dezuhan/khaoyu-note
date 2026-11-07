@@ -1,7 +1,15 @@
 // Settings dialog in the Photon preferences style, plus persisted app preferences.
 
 import * as bridge from "./bridge.js";
-import { authState, changePassword, subscribeAuth, updateProfile } from "./auth.js";
+import {
+  authState,
+  changePassword,
+  loadHistory,
+  logout,
+  logoutAll,
+  subscribeAuth,
+  updateProfile,
+} from "./auth.js";
 import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } from "./auto-backup.js";
 import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
@@ -103,6 +111,7 @@ const TOOL_LABELS = [
 let settings = { ...DEFAULT_SETTINGS };
 let overlay = null;
 let activePage = "account";
+let accountTab = "information";
 let query = "";
 let searchTimer = 0;
 let saveTimer = 0;
@@ -169,8 +178,18 @@ export function closeSettingsPage() {
   overlay = null;
 }
 
-export function openSettingsPage() {
-  if (overlay) return;
+export function openSettingsPage(page = null) {
+  if (overlay) {
+    if (page && pages().some((entry) => !entry.divider && entry.id === page)) {
+      activePage = page;
+      renderNav();
+      renderContent();
+    }
+    return;
+  }
+  if (page && pages().some((entry) => !entry.divider && entry.id === page)) {
+    activePage = page;
+  }
   overlay = document.createElement("div");
   overlay.className = "mn-prefs-overlay";
   overlay.innerHTML = `
@@ -853,6 +872,225 @@ function resizeAvatarImage(file) {
   });
 }
 
+const ACCOUNT_HISTORY_LABELS = {
+  "auth.setup": "Admin account created",
+  "auth.login": "Signed in",
+  "auth.logout": "Signed out",
+  "auth.logout_all": "Signed out of every session",
+  "auth.password_changed": "Password changed",
+  "auth.profile_updated": "Profile updated",
+  "board.created": "Created board",
+  "board.updated": "Updated board",
+  "board.renamed": "Renamed board",
+  "board.archived": "Archived board",
+  "board.unarchived": "Unarchived board",
+  "board.trashed": "Moved board to trash",
+  "board.restored": "Restored board",
+  "board.deleted": "Deleted board",
+};
+
+function accountDisplayName(user) {
+  if (!user) return "Account";
+  return user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username;
+}
+
+function accountInitials(user) {
+  const source = String(user?.firstName || user?.username || "").trim();
+  return source ? source.charAt(0).toUpperCase() : "?";
+}
+
+function accountRoleLabel(user) {
+  if (!user) return "Guest";
+  if (user.role === "admin") return "Admin";
+  return `Member (${user.memberRole || "editor"})`;
+}
+
+function accountStamp(value) {
+  if (!value) return "Unknown";
+  const date = new Date(Number(value));
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function accountHistoryLabel(action) {
+  return ACCOUNT_HISTORY_LABELS[action] || String(action || "Account activity").replace(/[._]/g, " ");
+}
+
+function accountInformationTab(pane) {
+  const user = authState().user;
+  if (!user) return;
+  const head = document.createElement("div");
+  head.className = "mn-account-info-head";
+  const avatar = document.createElement("span");
+  avatar.className = "mn-profile-avatar";
+  if (user.avatarUrl) {
+    avatar.classList.add("has-image");
+    avatar.style.backgroundImage = `url("${user.avatarUrl}")`;
+  } else {
+    avatar.textContent = accountInitials(user);
+  }
+  const copy = document.createElement("div");
+  copy.className = "mn-account-identity-copy";
+  const name = document.createElement("strong");
+  name.textContent = accountDisplayName(user);
+  const handle = document.createElement("span");
+  handle.textContent = `@${user.username} · ${accountRoleLabel(user)}`;
+  copy.append(name, handle);
+  head.append(avatar, copy);
+  pane.append(head);
+
+  const rows = [
+    ["Username", `@${user.username}`],
+    ["Email", user.email || "Not set"],
+    ["Role", accountRoleLabel(user)],
+    ["Status", user.status === "disabled" ? "Disabled" : "Active"],
+    ["Account type", "Local account"],
+    ["Member since", accountStamp(user.createdAt)],
+    ["Last login", accountStamp(user.lastLoginAt)],
+  ];
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "mn-account-row";
+    const left = document.createElement("span");
+    left.textContent = label;
+    const right = document.createElement("span");
+    right.className = "mn-account-value";
+    right.textContent = value;
+    row.append(left, right);
+    pane.append(row);
+  }
+}
+
+function accountHistoryTab(pane) {
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent = "Account and board actions recorded on this computer.";
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.className = "mn-btn mn-btn-quiet";
+  refresh.textContent = "Refresh";
+  const box = document.createElement("div");
+  box.className = "mn-account-history";
+  box.textContent = "Loading history...";
+  const fill = async () => {
+    try {
+      const data = await loadHistory(50, 0);
+      const entries = Array.isArray(data?.entries) ? data.entries : [];
+      box.innerHTML = "";
+      if (!entries.length) {
+        box.textContent = "No account activity yet.";
+        return;
+      }
+      for (const entry of entries) {
+        const row = document.createElement("div");
+        row.className = "mn-account-history-row";
+        const action = document.createElement("span");
+        action.className = "mn-account-history-action";
+        action.textContent = accountHistoryLabel(entry.action);
+        const time = document.createElement("span");
+        time.className = "mn-account-history-time";
+        time.textContent = accountStamp(entry.createdAt);
+        row.append(action, time);
+        box.append(row);
+      }
+    } catch {
+      box.textContent = "History is unavailable.";
+    }
+  };
+  refresh.addEventListener("click", () => {
+    box.textContent = "Loading history...";
+    void fill();
+  });
+  pane.append(note, refresh, box);
+  void fill();
+}
+
+function accountAdminTab(pane) {
+  const user = authState().user;
+  if (!user) return;
+  const grid = document.createElement("div");
+  grid.className = "mn-admin-grid";
+  const card = (label, value, role = "") => {
+    const item = document.createElement("div");
+    item.className = "mn-admin-card";
+    const title = document.createElement("span");
+    title.textContent = label;
+    const body = document.createElement("strong");
+    body.textContent = value;
+    if (role) body.dataset.role = role;
+    item.append(title, body);
+    return item;
+  };
+  grid.append(
+    card("Accounts", `${authState().userCount} ${authState().userCount === 1 ? "account" : "accounts"}`),
+    card("Your role", accountRoleLabel(user)),
+    card("App version", "Loading...", "admin-version")
+  );
+  void bridge
+    .appVersion()
+    .then((version) => {
+      const target = pane.querySelector('[data-role="admin-version"]');
+      if (target) target.textContent = version || "unknown";
+    })
+    .catch(() => {});
+  const actions = document.createElement("div");
+  actions.className = "mn-account-actions";
+  const backup = document.createElement("button");
+  backup.type = "button";
+  backup.className = "mn-btn";
+  backup.textContent = "Back up now";
+  const integrity = document.createElement("button");
+  integrity.type = "button";
+  integrity.className = "mn-btn";
+  integrity.textContent = "Check database";
+  const status = document.createElement("p");
+  status.className = "mn-profile-status";
+  status.setAttribute("role", "status");
+  backup.addEventListener("click", async () => {
+    status.textContent = "Creating backup...";
+    try {
+      const path = await bridge.backupData();
+      status.textContent = `Backup created: ${path}`;
+    } catch (error) {
+      status.textContent = error?.message || "Backup failed";
+    }
+  });
+  integrity.addEventListener("click", async () => {
+    status.textContent = "Checking database...";
+    try {
+      status.textContent = `Integrity: ${await bridge.dbIntegrity()}`;
+    } catch (error) {
+      status.textContent = error?.message || "Integrity check failed";
+    }
+  });
+  actions.append(backup, integrity);
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent = "User management, role changes and the full audit view arrive in M3.";
+  pane.append(grid, actions, status, note);
+}
+
+async function performAccountLogout(all = false) {
+  try {
+    if (all) await logoutAll();
+    else await logout();
+  } catch (error) {
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", {
+        detail: { message: error?.message || "Could not log out" },
+      })
+    );
+    return;
+  }
+  window.location.reload();
+}
+
 function renderAccountPage(content) {
   content.append(heading("Account"));
   const user = authState().user;
@@ -860,20 +1098,61 @@ function renderAccountPage(content) {
     const note = document.createElement("p");
     note.className = "mn-prefs-note";
     note.textContent = "Sign in to manage your local account.";
-    const open = document.createElement("button");
-    open.type = "button";
-    open.className = "mn-btn";
-    open.textContent = "Open account menu";
-    open.addEventListener("click", () => {
-      closeSettingsPage();
-      window.dispatchEvent(new CustomEvent("mn:open-account"));
-    });
-    content.append(note, open);
+    content.append(note);
     return;
   }
 
+  const tabs = [];
+  if (user.role === "admin") tabs.push(["admin", "Admin Dashboard"]);
+  tabs.push(
+    ["information", "Account Information"],
+    ["settings", "Account Settings"],
+    ["history", "History Activity"]
+  );
+  if (!tabs.some(([id]) => id === accountTab)) accountTab = "information";
+
+  const tabbar = document.createElement("div");
+  tabbar.className = "mn-account-tabs";
+  tabbar.setAttribute("role", "tablist");
+  for (const [id, label] of tabs) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `mn-account-tab${id === accountTab ? " is-active" : ""}`;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(id === accountTab));
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      accountTab = id;
+      renderContent();
+    });
+    tabbar.append(button);
+  }
+  content.append(tabbar);
+
+  const pane = document.createElement("div");
+  pane.className = "mn-account-tab-pane";
+  if (accountTab === "admin" && user.role === "admin") accountAdminTab(pane);
+  else if (accountTab === "settings") renderAccountSettingsTab(pane);
+  else if (accountTab === "history") accountHistoryTab(pane);
+  else accountInformationTab(pane);
+  content.append(pane);
+
+  const footer = document.createElement("div");
+  footer.className = "mn-account-tab-foot";
+  const out = document.createElement("button");
+  out.type = "button";
+  out.className = "mn-btn mn-btn-danger-outline";
+  out.textContent = "Log Out";
+  out.addEventListener("click", () => void performAccountLogout(false));
+  footer.append(out);
+  content.append(footer);
+}
+
+function renderAccountSettingsTab(container) {
+  const user = authState().user;
+  if (!user) return;
+
   let avatarUrl = user.avatarUrl || "";
-  let statusText = "";
   const page = document.createElement("div");
   page.className = "mn-profile";
 
@@ -1115,7 +1394,7 @@ function renderAccountPage(content) {
   });
 
   page.append(picture, details, security, footer, status);
-  content.append(page);
+  container.append(page);
 }
 
 function renderServerPage(content) {

@@ -67,6 +67,6 @@ gateway, browser isolation, audit and prompt-injection test design before any im
    snapshots and board activity rows. M2 adds full card-level activity coverage. M3 adds role
    enforcement in the UI and hosts plus the Admin Panel (users, roles, status, history, database
    backup).
-8. Wire the hybrid service identity. M4 connects the app account center to the self-hosted service,
+8. Wire the hybrid service identity. M4 connects the Settings > Account page to the self-hosted service,
    creates the first service admin from the app when the service database is empty, and maps project
    roles to the app permission helpers.

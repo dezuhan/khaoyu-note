@@ -49,8 +49,8 @@ project uses Semantic Versioning.
   first and last name and a PBKDF2-SHA256 password. Sign in is now mandatory on both the desktop and
   the browser edition so board and account activity is attributed. The desktop keeps the session on
   the device and the web host keeps a 30 day cookie. The topbar shows an avatar after Share, and the
-  Documentation-style account center covers Admin Dashboard, Account Information, Account Settings,
-  History Activity and Log Out. Boards and cards store creator and last editor snapshots, History
+  avatar opens Settings > Account with tabs for Admin Dashboard, Account Information, Account Settings
+  and History Activity plus Log Out. Boards and cards store creator and last editor snapshots, History
   records account and board actions, and backups leave live sessions out. Role enforcement and the
   Admin Panel follow in M2 and M3.
 - Automatic backups. Settings > Backup offers Off, every day, every 3, 7 or 14 days, and every month

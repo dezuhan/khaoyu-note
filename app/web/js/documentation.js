@@ -150,10 +150,10 @@ export const DOCUMENTATION_SECTIONS = [
       <h3>Local account</h3>
       <ul>
         <li>An account is required. The first run on an empty database creates the local admin, and
-        later launches ask for sign in. The avatar after Share opens the account center.</li>
-        <li>The center has a left menu with Admin Dashboard, Account Information, Account Settings,
-        History Activity and Log Out. Settings changes your profile and password and signs out every
-        session; History lists account and board activity.</li>
+        later launches ask for sign in. The avatar after Share opens Settings &gt; Account.</li>
+        <li>The Account page has tabs for Admin Dashboard, Account Information, Account Settings and
+        History Activity, with Log Out in the footer. Settings changes your profile and password and
+        signs out every session; History lists account and board activity.</li>
         <li>Passwords use PBKDF2-SHA256 and sessions are stored hashed. The desktop keeps you signed
         in on this device; the browser keeps the session for 30 days. Log out to return to the login
         gate.</li>

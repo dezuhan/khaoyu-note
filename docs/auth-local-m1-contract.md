@@ -8,7 +8,7 @@ frontend must match it exactly so the desktop app and the web host stay compatib
 - Local accounts in the app SQLite database, schema version 3.
 - First-run admin setup, mandatory login on desktop and web, logout, profile update, password change,
   logout all, basic account and board activity history.
-- Avatar button and account center in the app chrome.
+- Avatar button and the Settings > Account page in the app chrome.
 - Service accounts, roles enforcement and the Admin Panel are later milestones and are not part of
   this contract.
 
@@ -209,10 +209,10 @@ Errors are plain messages. The web host returns `{ "error": "message" }`; Rust c
 - Avatar: 30 px round button in the topbar right side, after Share. Initials from the first letter of
   the first name or username, soft background derived from a deterministic hash into the theme
   palette, readable text.
-- Account center: a Documentation-style modal with a left menu (Admin Dashboard for admins, Account
-  Information, Account Settings, History Activity, Log Out) and a content pane. It opens from the
-  avatar, closes with Escape, and uses the existing modal layer. `settings.js` Account pane dispatches
-  `mn:open-account` instead of importing `account-ui.js`, avoiding a cycle.
+- Account UI: the avatar opens Settings > Account. The page has tabs for Admin Dashboard (admins
+  only), Account Information, Account Settings and History Activity, plus a Log Out button in the
+  footer. There is no separate account modal. `settings.js` owns the account content; `account-ui.js`
+  only renders the avatar and the first-run gate.
 - Logout reloads the app so the login gate returns and no board data stays visible. Guest attribution
   no longer exists; every row is written by the signed-in account.
 
