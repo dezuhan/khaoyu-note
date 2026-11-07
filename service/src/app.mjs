@@ -11,6 +11,8 @@ const AUTH_PAGES = {
   "/passkeys.js": ["passkeys.js", "text/javascript; charset=utf-8"],
   "/account": ["account.html", "text/html; charset=utf-8"],
   "/account.js": ["account.js", "text/javascript; charset=utf-8"],
+  "/shares": ["shares.html", "text/html; charset=utf-8"],
+  "/shares.js": ["shares.js", "text/javascript; charset=utf-8"],
 };
 
 export function assertSchemaCurrent(db) {

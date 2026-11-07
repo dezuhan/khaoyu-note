@@ -1556,6 +1556,13 @@ export function createApiRouter({ db, config, logger, mailer }) {
         const role = projectRole(db, publicFlagMatch[1], auth.account.id);
         if (role !== "owner") throw new HttpError(403, "owner role required", "forbidden");
         const body = await readJson(request);
+        if (body.enabled === true && body.acknowledge !== true) {
+          throw new HttpError(
+            400,
+            "public sharing requires explicit acknowledgement",
+            "acknowledgement_required"
+          );
+        }
         db.prepare("UPDATE projects SET public_sharing_enabled = ?, updated_at = ? WHERE id = ?").run(
           body.enabled ? 1 : 0,
           now(),
@@ -2211,6 +2218,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
             revision: project.revision,
             role,
             parentProjectId: project.parent_project_id,
+            publicSharingEnabled: Boolean(project.public_sharing_enabled),
           },
           snapshot,
         }, config);
