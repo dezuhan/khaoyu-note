@@ -25,15 +25,25 @@ export function convertFileSrc(path) {
     const raw = localStorage.getItem(path);
     if (raw) {
       const extension = String(path).split(".").pop()?.toLowerCase();
-      const mime =
-        extension === "jpg" || extension === "jpeg"
-          ? "image/jpeg"
-          : extension === "webp"
-            ? "image/webp"
-            : extension === "gif"
-              ? "image/gif"
-              : "image/png";
-      return `data:${mime};base64,${raw}`;
+      const types = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        webp: "image/webp",
+        svg: "image/svg+xml",
+        mp3: "audio/mpeg",
+        wav: "audio/wav",
+        m4a: "audio/mp4",
+        aac: "audio/aac",
+        ogg: "audio/ogg",
+        oga: "audio/ogg",
+        opus: "audio/ogg",
+        flac: "audio/flac",
+        mp4: "video/mp4",
+        webm: "video/webm",
+      };
+      return `data:${types[extension] || "application/octet-stream"};base64,${raw}`;
     }
   }
   return path;

@@ -1831,8 +1831,11 @@ function onClick(event) {
     case "audio-toggle": {
       const audio = cardElement(card.id)?.querySelector("audio");
       if (!audio) break;
-      if (audio.paused) audio.play().catch(() => {});
-      else audio.pause();
+      if (audio.paused) {
+        audio.play().catch(() => toast("This audio file cannot be played. Try MP3, WAV, M4A or OGG."));
+      } else {
+        audio.pause();
+      }
       break;
     }
     case "audio-mute": {

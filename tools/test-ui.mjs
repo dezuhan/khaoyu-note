@@ -1100,10 +1100,26 @@ check(
 );
 const audioUrlBefore = await audioCard.locator('[data-field="url"]').inputValue();
 await audioCard.locator(".mn-audio-clip").click();
+const toneRate = 8000;
+const toneSamples = 4000;
+const tone = Buffer.alloc(44 + toneSamples * 2);
+tone.write("RIFF", 0);
+tone.writeUInt32LE(36 + toneSamples * 2, 4);
+tone.write("WAVE", 8);
+tone.write("fmt ", 12);
+tone.writeUInt32LE(16, 16);
+tone.writeUInt16LE(1, 20);
+tone.writeUInt16LE(1, 22);
+tone.writeUInt32LE(toneRate, 24);
+tone.writeUInt32LE(toneRate * 2, 28);
+tone.writeUInt16LE(2, 32);
+tone.writeUInt16LE(16, 34);
+tone.write("data", 36);
+tone.writeUInt32LE(toneSamples * 2, 40);
 await page.locator('input[type="file"]').setInputFiles({
-  name: "replacement.mp3",
-  mimeType: "audio/mpeg",
-  buffer: Buffer.from("ID3replacement-audio"),
+  name: "replacement.wav",
+  mimeType: "audio/wav",
+  buffer: tone,
 });
 await page.waitForTimeout(600);
 check(
@@ -1118,6 +1134,12 @@ check(
   "Submit closes audio editing with the new source",
   (await audioCard.locator("audio").count()) === 1 &&
     (await audioCard.locator('[data-action="edit-embed"]').count()) === 1
+);
+await audioCard.locator('[data-action="audio-toggle"]').click();
+await page.waitForTimeout(800);
+check(
+  "Audio player plays an uploaded file",
+  await audioCard.locator("audio").evaluate((audio) => audio.currentTime > 0 || audio.ended)
 );
 const audioCardBox = await audioCard.boundingBox();
 const audioWrapBox = await audioCard.locator(".mn-audio").boundingBox();

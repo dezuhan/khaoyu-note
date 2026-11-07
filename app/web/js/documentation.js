@@ -41,7 +41,7 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Table</td><td>Editable cells, rows and columns.</td></tr>
     <tr><td>Image / Upload</td><td>Local image or file asset stored with the board. Right-click an image and choose Crop image for a free crop.</td></tr>
     <tr><td>Link</td><td>URL card. A hero image is fetched automatically from the page metadata when available. Links without a hero image show a dotted globe fallback. Right-click for Add, Change, Crop or Remove header image.</td></tr>
-    <tr><td>Audio</td><td>Upload a file or paste a link. The edit action shows a clip-only upload button and Submit. Uploading again while editing replaces the source, then Submit returns to the player.</td></tr>
+    <tr><td>Audio</td><td>Upload MP3, WAV, M4A, AAC, OGG, Opus or FLAC, or paste a link. The edit action shows a clip-only upload button and Submit. Uploading again while editing replaces the source, then Submit returns to the player.</td></tr>
     <tr><td>Video</td><td>YouTube, Vimeo or a local video file.</td></tr>
     <tr><td>Map</td><td>Google Maps link or place query.</td></tr>
     <tr><td>Line</td><td>Connect two cards. Select the line to add a midpoint curve.</td></tr>
