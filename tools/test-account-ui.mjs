@@ -61,6 +61,16 @@ try {
   const page = await browser.newPage();
   page.on("pageerror", (error) => console.log("PAGEERROR", error.message));
   await page.goto(`${base}/account`, { waitUntil: "load" });
+  const design = await page.evaluate(() => ({
+    css: Boolean(document.querySelector('link[href="/ui.css"]')),
+    bg: getComputedStyle(document.body).backgroundColor,
+    surface: getComputedStyle(document.querySelector("main")).backgroundColor,
+  }));
+  check(
+    "account page uses the shared design tokens",
+    design.css && design.bg === "rgb(17, 17, 17)" && design.surface === "rgb(27, 27, 27)",
+    `${design.bg} / ${design.surface}`
+  );
 
   await page.click("#tab-register");
   await page.fill("#register-email", email);

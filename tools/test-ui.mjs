@@ -1535,16 +1535,34 @@ check(
   "Topbar language button is present but disabled",
   (await page.locator("#language-btn").isVisible()) && (await page.locator("#language-btn").isDisabled())
 );
-await page.locator(".mn-prefs-nav-item", { hasText: "Language" }).click();
-await page.waitForTimeout(300);
 check(
-  "Settings marks the language options as coming soon",
-  (await page.locator(".mn-prefs-content").innerText()).includes("English only") &&
-    (await page.locator(".mn-prefs-select select").isDisabled()) &&
-    (await page.locator(".mn-prefs-content .mn-btn", { hasText: "Coming soon" }).isDisabled())
+  "Account is the first settings page",
+  (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Account"
+);
+const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
+check(
+  "Settings navigation follows the requested order",
+  navLabels.join(",") === "Account,General,Appearance,Tools,Performance,MCP,About",
+  navLabels.join(", ")
+);
+check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
+check(
+  "Settings overlay uses a blurred glass backdrop",
+  (await page.locator(".mn-prefs-overlay").evaluate((el) => getComputedStyle(el).backdropFilter)).includes("blur")
+);
+check(
+  "Account page links the service pages",
+  (await page.locator('[data-role="content"]').innerText()).includes("Server: not connected") &&
+    (await page.locator(".mn-account-grid").innerText()).includes("Passkeys") &&
+    (await page.locator(".mn-account-grid").innerText()).includes("Sharing")
 );
 await page.locator(".mn-prefs-nav-item", { hasText: "General" }).click();
 await page.waitForTimeout(300);
+check(
+  "Language is merged into General as coming soon",
+  (await page.locator(".mn-prefs-content").innerText()).includes("English only") &&
+    (await page.locator(".mn-prefs-select select").first().isDisabled())
+);
 const prefsHead = await page.locator(".mn-prefs-head").evaluate((el) => {
   const style = getComputedStyle(el);
   return { background: style.backgroundColor, color: style.color };
@@ -1571,25 +1589,38 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 8, String(await page.locator(".mn-prefs-nav-item").count()));
-const navLabels = await page.locator(".mn-prefs-nav-item").allInnerTexts();
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 7, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
-  "Removed categories are gone",
-  !navLabels.some((label) => ["Account", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label.trim())),
+  "Language and Canvas are merged away",
+  !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),
   navLabels.join(", ")
 );
 check("General page is selected", (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "General");
 check("Custom Khaoyu select enhanced in settings", (await page.locator(".mn-prefs-select .ky-select-trigger").count()) >= 1);
 
-// Tools pane lists every tool including Kanban
+// Tools pane is a two-column icon grid
 await page.locator(".mn-prefs-nav-item", { hasText: "Tools" }).click();
 await page.waitForTimeout(350);
-const toolLabels = await page.locator(".mn-prefs-check").allInnerTexts();
+const toolLabels = await page.locator(".mn-tool-card-label").allInnerTexts();
 check(
   "Tools settings lists every tool including Kanban",
   toolLabels.includes("Kanban") && toolLabels.length === 19,
   `${toolLabels.length} labels, kanban=${toolLabels.includes("Kanban")}`
 );
+const toolsGridColumns = await page
+  .locator(".mn-tools-grid")
+  .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length);
+check("Tools are arranged in a two-column grid", toolsGridColumns === 2, String(toolsGridColumns));
+check(
+  "Each tool card shows an icon before its name",
+  (await page.locator(".mn-tool-card-icon svg").count()) === 19
+);
+const firstTool = page.locator(".mn-tool-card").first();
+await firstTool.click();
+await page.waitForTimeout(250);
+check("Tool visibility can be toggled from the grid", (await firstTool.getAttribute("aria-pressed")) === "false");
+await firstTool.click();
+await page.waitForTimeout(200);
 
 // MCP settings pane
 await page.locator(".mn-prefs-nav-item", { hasText: "MCP" }).click();
@@ -1669,6 +1700,13 @@ await bodyFontRow.locator(".ky-select-trigger").click();
 await page.waitForTimeout(200);
 await page.locator('.ky-select-item[data-value="Plus Jakarta Sans"]').first().click();
 await page.waitForTimeout(250);
+await page.locator(".mn-prefs-nav-item", { hasText: "About" }).click();
+await page.waitForTimeout(300);
+check(
+  "About page reports the current version and storage",
+  (await page.locator(".mn-prefs-content").innerText()).includes("Version") &&
+    (await page.locator(".mn-prefs-content").innerText()).includes("0.23.2")
+);
 await page.locator('[data-role="done"]').click();
 await page.waitForTimeout(250);
 check("Done closes settings", (await page.locator(".mn-prefs-dialog").count()) === 0);
