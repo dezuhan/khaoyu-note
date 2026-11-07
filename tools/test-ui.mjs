@@ -2000,6 +2000,11 @@ check("Documentation page closes", (await page.locator(".mn-docs").count()) === 
 
 const linkCard = page.locator('.mn-card[data-type="link"]').first();
 if (await linkCard.count()) {
+  check(
+    "Links without a fetched hero image show the dotted globe fallback",
+    (await linkCard.locator(".mn-link-header-default").isVisible()) &&
+      (await linkCard.locator(".mn-link-header-default svg").count()) === 1
+  );
   await linkCard.click({ button: "right" });
   await page.waitForTimeout(250);
   await page.locator(".mn-menu-item", { hasText: /header image/i }).first().click();
@@ -2048,7 +2053,11 @@ if (await linkCard.count()) {
   );
   await page.locator(".mn-menu-item", { hasText: "Remove header image" }).click();
   await page.waitForTimeout(400);
-  check("Remove header image clears the preview", (await linkCard.locator(".mn-link-header").count()) === 0);
+  check(
+    "Remove header image clears the image and restores the default hero",
+    (await linkCard.locator(".mn-link-header img").count()) === 0 &&
+      (await linkCard.locator(".mn-link-header-default").count()) === 1
+  );
 }
 const imageCard = page.locator('.mn-card[data-type="image"]').first();
 if (await imageCard.count()) {
