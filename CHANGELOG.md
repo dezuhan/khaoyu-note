@@ -12,6 +12,14 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.22.0] - 2026-11-07
+
+### Added
+
+- Help > Documentation page with an offline guide for cards, shortcuts, sync, accounts, passkeys,
+  sharing, self-hosting, privacy and troubleshooting.
+- Documentation checks in the UI suite.
+
 ## [0.21.0] - 2026-11-07
 
 ### Added
