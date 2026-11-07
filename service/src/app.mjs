@@ -14,6 +14,7 @@ const AUTH_PAGES = {
   "/shares": ["shares.html", "text/html; charset=utf-8"],
   "/shares.js": ["shares.js", "text/javascript; charset=utf-8"],
   "/share-view.js": ["share-view.js", "text/javascript; charset=utf-8"],
+  "/ui.css": ["ui.css", "text/css; charset=utf-8"],
 };
 
 export function assertSchemaCurrent(db) {
@@ -51,7 +52,7 @@ export function createService({ config, db, logger, mailer }) {
       applySecurityHeaders(response, config);
       response.setHeader(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
       );
       if (sharePage) response.setHeader("X-Robots-Tag", "noindex, nofollow");
       response.writeHead(200, { "Content-Type": authPage[1] });
