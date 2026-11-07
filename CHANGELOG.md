@@ -12,6 +12,15 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.19.0] - 2026-11-07
+
+### Added
+
+- Browser sharing page at `/shares` with project/item/column links, permission, expiry, passphrase,
+  download permission, token reveal and revocation.
+- Explicit acknowledgement is required before enabling public sharing, both in the page and the API.
+- Playwright browser sharing suite and CI step.
+
 ## [0.18.0] - 2026-11-07
 
 ### Added
