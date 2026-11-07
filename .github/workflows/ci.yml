@@ -154,6 +154,11 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
+      - name: Service image ships the browser pages
+        run: |
+          docker run --rm khaoyu-note-service:ci sh -c \
+            'test -f /app/public/account.html && test -f /app/public/passkeys.html && test -f /app/public/share.html && test -f /app/public/ky.css'
+
   rust:
     name: Rust checks and MCP suite
     runs-on: windows-latest
