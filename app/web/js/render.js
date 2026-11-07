@@ -232,10 +232,8 @@ function contentFor(card) {
             <input type="checkbox" class="mn-check mn-msg-check" data-msg-check="${message.id}" ${
             message.done ? "checked" : ""
           } title="Mark comment done" />
-            <span class="mn-avatar">${escapeHtml(initials(message.author || "You"))}</span>
-            <div class="mn-msg-body"><span class="mn-msg-meta"><span class="mn-msg-author">${escapeHtml(
-              message.author || "You"
-            )}</span><span class="mn-msg-time">${escapeHtml(
+            <span class="mn-avatar">${escapeHtml(initials("You"))}</span>
+            <div class="mn-msg-body"><span class="mn-msg-meta"><span class="mn-msg-author">You</span><span class="mn-msg-time">${escapeHtml(
               formatCommentTime(message.ts)
             )}</span></span><span class="mn-msg-text">${escapeHtml(message.text)}</span></div>
             <button type="button" class="mn-msg-menu" data-action="comment-menu" data-msg="${

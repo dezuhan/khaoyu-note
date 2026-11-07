@@ -102,7 +102,7 @@ async function collectComments() {
           messageId: message.id || `${card.id}:${index}:${message.ts || 0}`,
           boardTitle: meta?.title || doc.title || "Board",
           path,
-          author: message.author || "You",
+          author: "You",
           text: message.text || "",
           ts: message.ts || 0,
         });
