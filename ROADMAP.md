@@ -33,7 +33,7 @@ remaining work named in the item.
 - [x] Restricted network surface: one HTTP(S) port, optional reverse proxy, no direct database port.
 - [x] Relational database for accounts, projects, memberships and audit data.
 - [x] Object storage for uploaded assets, addressed by opaque ids, never by user-supplied paths.
-- [ ] Background worker for email invitations, thumbnails, backups and cleanup jobs (partial: scheduled backups, temp cleanup and audit pruning implemented; email and thumbnail jobs pending).
+- [ ] Background worker for email invitations, thumbnails, backups and cleanup jobs (partial: scheduled backups, temp cleanup, audit pruning, email retry queue and session/OTP cleanup implemented; thumbnail jobs pending).
 - [x] Health endpoint that does not leak version, database or configuration details.
 
 ### Deployment

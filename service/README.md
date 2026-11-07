@@ -345,6 +345,12 @@ operator must protect that directory.
 attempt count, retry delay and hashed IP. It is best-effort with a three second timeout and never
 blocks the login response.
 
+If SMTP is configured and a send fails, the message is stored in `email_jobs` instead of failing the
+request. The worker retries due jobs with exponential backoff (one to 30 minutes, up to 10 attempts)
+and records the last error; the admin stats and logs expose the retry warnings. This keeps
+verification and invitation mail recoverable through a short SMTP outage. Thumbnail generation is
+still pending.
+
 ## Backup and restore
 
 ```powershell
