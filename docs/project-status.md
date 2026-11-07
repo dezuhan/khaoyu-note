@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.29.0.
+Snapshot date: 2026-11-07. Version: 0.29.1.
 
 ## Technology
 
@@ -221,7 +221,7 @@ Still blocked by the environment or missing credentials:
 - Settings navigation is Account, divider, General, Appearance, Tools, Performance, divider, MCP, About. Language and Canvas are merged, Tools is a two-column icon grid, and Account links the service pages.
 - The desktop app and service account, passkey, sharing and share viewer pages use the same framework stylesheet (`ky.css`); the service adds only an auth-panel layout layer.
 - Account browser checks now include the shared service design tokens.
-- Link header images and image cards support free crop with a Fit to image reset, applied from the context menu.
+- Link header images and image cards support free crop with a Fit to image reset, applied from the context menu; the crop dialog fits the whole image on screen before editing.
 - Audio editing uses a clip-only upload button and Submit; uploading again while editing replaces the source before submit.
 - Link cards fetch an Open Graph hero image automatically in the desktop and web host, with SSRF host guards, a size cap and a dotted globe fallback when no image is available.
 - Duplicate, copy, cut and paste include a column subtree, remap parent IDs and select only the copied roots.
