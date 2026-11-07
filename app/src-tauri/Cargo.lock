@@ -1774,7 +1774,7 @@ dependencies = [
 
 [[package]]
 name = "khaoyu-note"
-version = "0.30.1"
+version = "0.31.0"
 dependencies = [
  "base64 0.22.1",
  "reqwest 0.12.28",

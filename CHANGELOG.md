@@ -12,6 +12,16 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.31.0] - 2026-11-07
+
+### Added
+
+- Settings > Account now has a Backup section with Back up now, the created backup path and Open
+  folder.
+- Backups use the existing desktop and web host `backup_data` command and are written to
+  Documents/Khaoyu Note Backups.
+- UI check for the backup controls.
+
 ## [0.30.1] - 2026-11-07
 
 ### Changed
