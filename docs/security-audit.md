@@ -85,6 +85,8 @@ authorization.
 - Optional SSO only behind trust-proxy, HMAC-signed email headers and a fail-closed secret.
 - Presence is opt-in, excludes opted-out connections from counts and never sends board contents.
 - Mention notifications resolve only current project members and never expose comments to outsiders.
+- WebAuthn passkeys use random single-use five minute challenges, verify origin and RP ID, update
+  signature counters and prevent removing the last credential from a passwordless account.
 - Threat model, security policy, incident runbook, release checklist and data residency docs.
 
 ## Recommended next work

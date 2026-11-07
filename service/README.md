@@ -73,6 +73,8 @@ a migration is pending.
 | `KHAOYU_SERVICE_SSO_AUTO_CREATE` | `false` | Create a verified account for an unknown SSO email. |
 | `KHAOYU_SERVICE_REQUIRE_HTTPS` | `false` | Reject plain HTTP unless a trusted proxy reports `x-forwarded-proto: https`. Requires an HTTPS public URL. |
 | `KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND` | empty | Optional scanner executable receiving the temporary upload path; non-zero exit rejects the asset. |
+| `KHAOYU_SERVICE_PASSKEYS_ENABLED` | `true` | Enable WebAuthn passkey registration and login. |
+| `KHAOYU_SERVICE_RP_ID` | public hostname | WebAuthn relying-party id; must match the browser origin host. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |
 | `KHAOYU_SERVICE_SMTP_SECURE` | `false` | Use implicit TLS for SMTP. |
@@ -116,6 +118,12 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/login` | Password login, optional TOTP, sets session cookies. |
 | `POST` | `/api/v1/auth/otp/request` | Queue a one-time login code by email. |
 | `POST` | `/api/v1/auth/otp/login` | Login with a one-time code; TOTP still applies. |
+| `POST` | `/api/v1/auth/passkeys/register/options` | Start passkey registration for the signed-in account. |
+| `POST` | `/api/v1/auth/passkeys/register/verify` | Verify and store a passkey credential. |
+| `POST` | `/api/v1/auth/passkeys/login/options` | Start passkey login for an email. |
+| `POST` | `/api/v1/auth/passkeys/login/verify` | Verify a passkey assertion and create a session. |
+| `GET` | `/api/v1/auth/passkeys` | List the signed-in account's passkeys. |
+| `DELETE` | `/api/v1/auth/passkeys/:id` | Remove a passkey, guarding the last credential. |
 | `POST` | `/api/v1/auth/refresh` | Rotate the refresh token and issue a new access token. |
 | `POST` | `/api/v1/auth/logout` | Revoke the current session and clear cookies. |
 | `POST` | `/api/v1/auth/logout-all` | Revoke every session for the account. |
@@ -195,6 +203,18 @@ Desktop sync uses a scoped API token with `projects:read` and `projects:write`. 
 bearer-token CORS preflight only from `KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are
 never allowed from those origins. Add the local web host origin manually if the browser build should
 sync directly.
+
+## Passkeys
+
+`/passkeys` is a small browser page for password login, passkey registration, passkey login and
+listing the account's credentials. WebAuthn requires a secure context: use HTTPS or localhost.
+`KHAOYU_SERVICE_RP_ID` must match the browser origin host and defaults to the public URL hostname.
+
+Challenges are random, single use, bound to the email and expire after five minutes; the worker
+removes stale rows. Registration stores the credential id, COSE public key, counter, transports,
+device type and backup state. Login verifies the assertion, updates the counter and creates the same
+session cookies as password login. The last passkey cannot be removed when the account has no
+password, so an account cannot be locked out accidentally. Passkey sessions and failures are audited.
 
 ## Trusted-proxy SSO
 
@@ -383,7 +403,7 @@ isolation, passphrase and expiry enforcement, abuse reports, invitation acceptan
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
 authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences, CORS preflight,
 encrypted backups, alert webhooks, trusted-proxy SSO, presence opt-in, comment mentions, HTTPS
-enforcement and upload signature scanning.
+enforcement, upload signature scanning and WebAuthn passkeys.
 
 ## Milestone boundaries
 
@@ -395,8 +415,8 @@ Implemented from Milestone 2: email and password registration with verification,
 email, display name, Argon2id, short-lived access tokens, rotating refresh tokens with reuse
 detection, session list and revocation, logout everywhere, login throttling with alert webhook,
 generic login errors, hashed single-use reset tokens, TOTP, email one-time codes, account export,
-deletion grace and purge, cookie and CSRF hardening, project role checks, scoped API tokens and
-trusted-proxy SSO.
+deletion grace and purge, cookie and CSRF hardening, project role checks, scoped API tokens,
+trusted-proxy SSO and WebAuthn passkeys.
 
 Implemented from Milestone 3: project, item and column share scopes; hashed revocable and rotating
 links; expiry; optional passphrase with rate limiting; neutral 404 responses; noindex headers; audit
@@ -413,6 +433,5 @@ restores, share reports, comments and mentions; per-account read state; cleanup 
 revoked; SMTP delivery with outbox fallback; opt-in notification email with signed unsubscribe links
 and a five minute rate limit.
 
-Still pending: a manage-specific share surface, watermarking, MIME sniffing and malware scanning,
-signed short-lived asset URLs, nested-board policy for project shares, passkeys, team membership UI
-and a browser login UI.
+Still pending: a manage-specific share surface, watermarking, signed short-lived asset URLs,
+nested-board policy for project shares, a full browser account UI and team membership UI.

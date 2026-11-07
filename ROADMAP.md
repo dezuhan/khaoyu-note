@@ -59,7 +59,7 @@ remaining work named in the item.
 - [x] Email and password registration with email verification.
 - [x] Unique, case-normalised email addresses; display name separate from email.
 - [x] Account deletion request with a grace period, export before deletion.
-- [x] Optional second factor: TOTP first, passkeys later (TOTP implemented; passkeys pending).
+- [x] Optional second factor: TOTP first, passkeys later (TOTP and WebAuthn passkeys are implemented).
 - [x] Optional SSO for self-hosted enterprise deployments, behind an operator flag (trusted-proxy header SSO with HMAC; OIDC discovery is not included).
 
 ### Authentication
