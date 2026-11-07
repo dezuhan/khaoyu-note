@@ -1682,6 +1682,11 @@ check(
     (await page.locator(".mn-account-grid").innerText()).includes("Passkeys") &&
     (await page.locator(".mn-account-grid").innerText()).includes("Sharing")
 );
+check(
+  "Account page exposes local backup controls",
+  (await page.locator(".mn-account-backup").isVisible()) &&
+    (await page.locator(".mn-account-backup-actions .mn-btn", { hasText: "Back up now" }).count()) === 1
+);
 await page.locator(".mn-prefs-nav-item", { hasText: "General" }).click();
 await page.waitForTimeout(300);
 check(

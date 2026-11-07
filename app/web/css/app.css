@@ -5857,3 +5857,22 @@ html[data-performance="true"] .mn-card {
 .mn-video.is-started .mn-video-play {
   display: none;
 }
+
+/* Settings backup section */
+.mn-account-backup {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ky-stroke);
+}
+.mn-account-backup-status {
+  margin: 6px 0 8px;
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+}
+.mn-account-backup-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

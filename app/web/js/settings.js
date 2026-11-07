@@ -803,6 +803,54 @@ function renderAccountPage(content) {
     window.dispatchEvent(new CustomEvent("mn:open-docs"));
   });
   content.append(docs);
+  renderBackupSection(content);
+}
+
+function renderBackupSection(content) {
+  const section = document.createElement("div");
+  section.className = "mn-account-backup";
+  const title = document.createElement("div");
+  title.className = "mn-prefs-group-label";
+  title.textContent = "Backup";
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent =
+    "Back up the local SQLite database, assets and settings. Backups are written to Documents/Khaoyu Note Backups in the desktop and web host.";
+  const status = document.createElement("p");
+  status.className = "mn-account-backup-status";
+  status.textContent = "No backup created in this session.";
+  let lastPath = "";
+  const row = document.createElement("div");
+  row.className = "mn-account-backup-actions";
+  const backup = document.createElement("button");
+  backup.type = "button";
+  backup.className = "mn-btn mn-btn-primary";
+  backup.textContent = "Back up now";
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "mn-btn mn-btn-quiet";
+  open.textContent = "Open folder";
+  open.disabled = true;
+  backup.addEventListener("click", async () => {
+    backup.disabled = true;
+    status.textContent = "Creating backup...";
+    try {
+      lastPath = await bridge.backupData();
+      status.textContent = `Backup created: ${lastPath}`;
+      open.disabled = false;
+      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Backup created" } }));
+    } catch (error) {
+      status.textContent = error.message || "Backup failed";
+    } finally {
+      backup.disabled = false;
+    }
+  });
+  open.addEventListener("click", () => {
+    if (lastPath) bridge.openPath(lastPath).catch(() => {});
+  });
+  row.append(backup, open);
+  section.append(title, note, status, row);
+  content.append(section);
 }
 
 function renderToolsGrid(content) {

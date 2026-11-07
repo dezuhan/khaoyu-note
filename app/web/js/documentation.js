@@ -70,7 +70,8 @@ export const DOCUMENTATION_HTML = `
   Performance, then another divider, MCP and About. Language is part of General and Canvas is part of
   Appearance. Tools uses a two-column icon grid where clicking a card shows or hides that tool.
   Account links the service account, passkey and sharing pages and can open the server connection
-  dialog.</p>
+  dialog. Account also has a Backup section: Back up now writes the local database, assets and
+  settings to Documents/Khaoyu Note Backups, and Open folder opens the latest backup.</p>
   <p>The desktop app and the service pages share the same design tokens. Dialogs and popups with a
   translucent backdrop also blur the content behind them.</p>
 
