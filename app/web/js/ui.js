@@ -42,6 +42,7 @@ import {
   sendToBack,
   setBoardTitle,
   setCardsLocked,
+  setColumnDirection,
   setSectionPositionLocked,
   toggleMediaRepeat,
   wrapInColumn,
@@ -688,6 +689,14 @@ function togglePerformanceMode() {
   toast(performanceMode ? "Performance mode enabled" : "Performance mode disabled");
 }
 
+function toggleSnapToGrid() {
+  if (!state.board) return;
+  checkpoint();
+  state.board.snapToGrid = state.board.snapToGrid !== true;
+  markDirty("board");
+  toast(state.board.snapToGrid ? "Snap to grid enabled" : "Snap to grid disabled");
+}
+
 function setBoardBackground(color) {
   if (!state.board) return;
   checkpoint();
@@ -841,6 +850,13 @@ function buildCommands() {
       group: "View",
       icon: "settings",
       run: togglePerformanceMode,
+    },
+    {
+      id: "view.snap",
+      label: `Snap to grid: ${state.board?.snapToGrid ? "on" : "off"}`,
+      group: "View",
+      icon: "grid",
+      run: toggleSnapToGrid,
     },
     { id: "view.bg.default", label: "Board background: Default", group: "View", icon: "sun", run: () => setBoardBackground("") },
     { id: "view.bg.paper", label: "Board background: Paper", group: "View", icon: "sun", run: () => setBoardBackground("#f6f1e8") },
@@ -1843,6 +1859,10 @@ window.addEventListener("mn:open-menu", (event) => {
       }
       if (!card.locked && card.type === "column") {
         items.push({ text: "Convert to board", onClick: () => convertColumnToBoard(card.id) });
+        items.push({
+          text: card.direction === "row" ? "Convert to column" : "Convert to row",
+          onClick: () => setColumnDirection(card.id, card.direction === "row" ? "column" : "row"),
+        });
         items.push({ type: "sep" });
       }
       if (!card.locked && card.type === "link") {

@@ -543,7 +543,7 @@ function contentFor(card) {
         <span class="mn-column-title" data-field="title" data-placeholder="Column">${escapeHtml(
           card.title || "Column"
         )}</span>
-        <span class="mn-column-summary">${summary}</span>
+        <span class="mn-column-summary">${summary}${card.direction === "row" ? " · row" : ""}</span>
         <button class="mn-column-toggle" type="button" data-action="toggle-column" title="${
           collapsed ? "Expand column" : "Collapse column"
         }" aria-expanded="${collapsed ? "false" : "true"}">${icon(collapsed ? "expand" : "minus", 12)}</button>
@@ -800,9 +800,9 @@ export function buildCard(card) {
   const el = document.createElement("div");
   el.className = `mn-card mn-card-${card.type}${card.parentId ? " is-child" : ""}${
     card.type === "column" && card.collapsed ? " is-collapsed" : ""
-  }${card.locked ? " is-locked" : ""}${
-    card.type === "section" && card.positionLocked ? " is-position-locked" : ""
-  }`;
+  }${card.type === "column" && card.direction === "row" ? " is-row" : ""}${
+    card.locked ? " is-locked" : ""
+  }${card.type === "section" && card.positionLocked ? " is-position-locked" : ""}`;
   el.dataset.id = card.id;
   el.dataset.type = card.type;
   if (card.type === "section") {
@@ -814,7 +814,14 @@ export function buildCard(card) {
     (card.locked || (card.type === "section" && card.positionLocked)
       ? `<span class="mn-lock-badge" title="Position locked">${icon("lock", 12)}</span>`
       : "") +
-    `<div class="mn-resize" data-role="resize" title="Resize"></div>`;
+    (card.type === "section"
+      ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+          .map(
+            (handle) =>
+              `<div class="mn-resize mn-resize-${handle}" data-role="resize" data-handle="${handle}" title="Resize"></div>`
+          )
+          .join("")
+      : `<div class="mn-resize" data-role="resize" title="Resize"></div>`);
   if (card.type === "sketch") paintSketch(el, card);
   return el;
 }

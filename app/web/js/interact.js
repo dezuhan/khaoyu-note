@@ -55,6 +55,11 @@ const COLUMN_GAP = 10;
 const KANBAN_COL_WIDTH = 168;
 const KANBAN_GAP = 8;
 
+function snap(value) {
+  const grid = Math.max(1, Number(state.board?.grid) || 24);
+  return Math.round(value / grid) * grid;
+}
+
 function kanbanWidth(columnCount) {
   return Math.max(360, 20 + columnCount * KANBAN_COL_WIDTH + Math.max(0, columnCount - 1) * KANBAN_GAP);
 }
@@ -355,10 +360,14 @@ function beginDrag(card, event) {
 
 function beginResize(card, event) {
   checkpoint();
+  const handle = event.target.closest('[data-role="resize"]')?.dataset.handle || "se";
   gesture = {
     type: "resize",
     id: card.id,
+    handle,
     start: worldOf(event),
+    startX: card.x,
+    startY: card.y,
     startW: card.w,
     startH: card.h,
     minW: (MIN_SIZES[card.type] || [120, 60])[0],
@@ -447,6 +456,10 @@ function onPointerMove(event) {
         if (!card || !origin) continue;
         card.x = origin.x + dx;
         card.y = origin.y + dy;
+        if (!card.parentId && state.board?.snapToGrid) {
+          card.x = snap(card.x);
+          card.y = snap(card.y);
+        }
         applyCardGeometry(card);
       }
       syncColumnChildren();
@@ -579,12 +592,44 @@ function onPointerMove(event) {
       if (!card) return;
       const world = worldOf(event);
       const dx = world.x - gesture.start.x;
+      const dy = world.y - gesture.start.y;
+      const handle = gesture.handle || "se";
+      let x = gesture.startX;
+      let y = gesture.startY;
+      let width = gesture.startW;
+      let height = gesture.startH;
+      if (handle.includes("e")) width = gesture.startW + dx;
+      if (handle.includes("s")) height = gesture.startH + dy;
+      if (handle.includes("w")) {
+        width = gesture.startW - dx;
+        x = gesture.startX + dx;
+      }
+      if (handle.includes("n")) {
+        height = gesture.startH - dy;
+        y = gesture.startY + dy;
+      }
+      if (width < gesture.minW) {
+        if (handle.includes("w")) x = gesture.startX + gesture.startW - gesture.minW;
+        width = gesture.minW;
+      }
+      if (height < gesture.minH) {
+        if (handle.includes("n")) y = gesture.startY + gesture.startH - gesture.minH;
+        height = gesture.minH;
+      }
+      if (state.board?.snapToGrid) {
+        x = snap(x);
+        y = snap(y);
+        width = Math.max(gesture.minW, snap(width));
+        height = Math.max(gesture.minH, snap(height));
+      }
       if (card.type === "column" || card.type === "section") {
-        card.w = Math.max(gesture.minW, gesture.startW + dx);
-        const dy = world.y - gesture.start.y;
-        card.h = Math.max(gesture.minH, gesture.startH + dy);
+        card.x = x;
+        card.y = y;
+        card.w = Math.max(gesture.minW, width);
+        card.h = Math.max(gesture.minH, height);
+        if (card.type === "column") layoutColumns(state.board);
       } else {
-        card.w = Math.max(gesture.minW, gesture.startW + dx);
+        card.w = Math.max(gesture.minW, width);
         if (card.aspect || card.type === "image" || card.type === "sketch" || card.type === "video" || card.type === "map" || card.type === "color") {
           card.h = cardHeightFor(card);
         }

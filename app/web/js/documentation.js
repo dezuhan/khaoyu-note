@@ -38,8 +38,8 @@ export const DOCUMENTATION_SECTIONS = [
         <tr><td>To-do</td><td>Checklist with reorder by dragging the burger handle.</td></tr>
         <tr><td>Comment</td><td>Threaded comments with per-message done state and delete.</td></tr>
         <tr><td>Table</td><td>Editable cells, resizable columns, Add row and Add column.</td></tr>
-        <tr><td>Column</td><td>Groups cards; drag cards in and out, collapse and expand.</td></tr>
-        <tr><td>Section</td><td>Pastel background surface with a small title. Always below cards, not a column, with a bottom swatch and position-lock toolbar.</td></tr>
+        <tr><td>Column</td><td>Groups cards; drag cards in and out, collapse and expand. Convert to row lays the children out horizontally; Convert to column restores the stack.</td></tr>
+        <tr><td>Section</td><td>Pastel background surface with a small title. Always below cards, not a column, resizable from every edge and corner, with a bottom swatch and position-lock toolbar.</td></tr>
         <tr><td>Board</td><td>Nested board card with a mini preview, opened in place.</td></tr>
         <tr><td>Kanban</td><td>Columns and cards with pointer drag between columns.</td></tr>
         <tr><td>Color</td><td>HSV picker with HEX, RGB, CMYK and an automatic color name.</td></tr>
@@ -288,6 +288,7 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
         <tr><td>Duplicate</td><td>Ctrl + D</td></tr>
         <tr><td>Copy / cut / paste</td><td>Ctrl + C / Ctrl + X / Ctrl + V</td></tr>
         <tr><td>Wrap selection in a column</td><td>Ctrl + G</td></tr>
+        <tr><td>Snap to grid</td><td>View &gt; Snap to grid</td></tr>
         <tr><td>Delete</td><td>Delete or Backspace</td></tr>
         <tr><td>Command palette</td><td>Ctrl + K</td></tr>
         <tr><td>Shortcuts list</td><td>?</td></tr>

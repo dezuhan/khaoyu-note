@@ -154,6 +154,49 @@ check(
     .first()
     .evaluate((el) => getComputedStyle(el).display)) === "none"
 );
+const firstColumnId = await firstColumnCard.getAttribute("data-id");
+async function openColumnContextMenu() {
+  await page.evaluate((id) => {
+    const el = document.querySelector(`.mn-card[data-id="${id}"]`);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    el.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: rect.left + 20,
+        clientY: rect.top + 20,
+      })
+    );
+  }, firstColumnId);
+  await page.waitForTimeout(250);
+}
+await openColumnContextMenu();
+await page.locator(".mn-menu-item", { hasText: "Convert to row" }).click();
+await page.waitForTimeout(450);
+const rowChildren = await page.locator(".mn-card.is-child").evaluateAll((els) =>
+  els.map((el) => ({ x: el.offsetLeft, y: el.offsetTop }))
+);
+check(
+  "Column converts to a horizontal row",
+  (await firstColumnCard.getAttribute("class")).includes("is-row") &&
+    rowChildren.length === 2 &&
+    rowChildren[0].y === rowChildren[1].y &&
+    rowChildren[0].x !== rowChildren[1].x
+);
+await openColumnContextMenu();
+await page.locator(".mn-menu-item", { hasText: "Convert to column" }).click();
+await page.waitForTimeout(450);
+const columnChildrenAfter = await page.locator(".mn-card.is-child").evaluateAll((els) =>
+  els.map((el) => ({ x: el.offsetLeft, y: el.offsetTop }))
+);
+check(
+  "Row converts back to a vertical column",
+  !(await firstColumnCard.getAttribute("class")).includes("is-row") &&
+    columnChildrenAfter.length === 2 &&
+    columnChildrenAfter[0].x === columnChildrenAfter[1].x &&
+    columnChildrenAfter[0].y !== columnChildrenAfter[1].y
+);
 check("breadcrumb shows current board", (await page.locator(".mn-crumb.is-current").innerText()).toLowerCase().includes("home"));
 const connectionsBeforeLine = await page.locator(".mn-connection").count();
 check(
@@ -1003,12 +1046,24 @@ check(
   "Section title persists after editing",
   (await sectionCard.locator(".mn-section-title").inputValue()) === "Test section"
 );
+const sectionWidthBefore = await sectionCard.evaluate((el) => el.offsetWidth);
+const eastHandle = await sectionCard.locator(".mn-resize-e").boundingBox();
+await page.mouse.move(eastHandle.x + 4, eastHandle.y + 4);
+await page.mouse.down();
+await page.mouse.move(eastHandle.x + 52, eastHandle.y + 4, { steps: 5 });
+await page.mouse.up();
+await page.waitForTimeout(300);
+check(
+  "Section width can be resized from its east edge",
+  (await sectionCard.evaluate((el) => el.offsetWidth)) > sectionWidthBefore
+);
 await page.locator("[data-section-lock]").click();
 await page.waitForTimeout(300);
 check(
   "Section position lock hides resize and keeps the card selected",
   (await sectionCard.getAttribute("class")).includes("is-position-locked") &&
-    (await sectionCard.locator(".mn-resize").evaluate((el) => getComputedStyle(el).display)) === "none"
+    (await sectionCard.locator(".mn-resize").count()) === 8 &&
+    (await sectionCard.locator(".mn-resize-se").evaluate((el) => getComputedStyle(el).display)) === "none"
 );
 await page.evaluate((id) => {
   const el = document.querySelector(`.mn-card[data-id="${id}"]`);
@@ -1046,6 +1101,39 @@ await page.evaluate(async (ids) => {
   }
 }, [sectionId, sectionNoteId]);
 await page.waitForTimeout(300);
+
+// ---------------------------------------------------------------- snap to grid
+await page.locator(".mn-menubar-btn", { hasText: "View" }).click();
+await page.waitForTimeout(200);
+await page.locator(".mn-menu-item", { hasText: "Snap to grid: off" }).click();
+await page.waitForTimeout(250);
+await page.click('.mn-tool[data-tool="note"]');
+await page.waitForTimeout(300);
+const snapNoteId = await selectedId();
+const snapNote = byId(snapNoteId);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+const snapBox = await snapNote.boundingBox();
+await page.mouse.move(snapBox.x + 24, snapBox.y + 24);
+await page.mouse.down();
+await page.mouse.move(snapBox.x + 61, snapBox.y + 59, { steps: 5 });
+await page.mouse.up();
+await page.waitForTimeout(300);
+const snapped = await snapNote.evaluate((el) => ({
+  x: parseInt(el.style.left, 10),
+  y: parseInt(el.style.top, 10),
+}));
+check(
+  "Snap to grid aligns a dragged card",
+  snapped.x % 24 === 0 && snapped.y % 24 === 0,
+  `${snapped.x}, ${snapped.y}`
+);
+await page.keyboard.press("Delete");
+await page.waitForTimeout(250);
+await page.locator(".mn-menubar-btn", { hasText: "View" }).click();
+await page.waitForTimeout(200);
+await page.locator(".mn-menu-item", { hasText: "Snap to grid: on" }).click();
+await page.waitForTimeout(200);
 
 // ---------------------------------------------------------------- kanban
 await page.click('.mn-tool[data-tool="kanban"]');

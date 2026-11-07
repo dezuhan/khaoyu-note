@@ -1209,6 +1209,69 @@ body.ky-scope {
   background: var(--section-color, #f8d7da);
   box-shadow: var(--ky-hairline), 0 1px 2px var(--ph-stroke);
   border: 1px solid color-mix(in srgb, #1b1b1b 9%, transparent);
+  overflow: visible;
+}
+
+.mn-card-section .mn-resize {
+  right: auto;
+  bottom: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ky-muted);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ky-bg) 70%, transparent);
+}
+
+.mn-card-section .mn-resize-nw {
+  left: -5px;
+  top: -5px;
+  cursor: nwse-resize;
+}
+
+.mn-card-section .mn-resize-n {
+  left: 50%;
+  top: -5px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.mn-card-section .mn-resize-ne {
+  right: -5px;
+  top: -5px;
+  cursor: nesw-resize;
+}
+
+.mn-card-section .mn-resize-e {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.mn-card-section .mn-resize-se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+.mn-card-section .mn-resize-s {
+  left: 50%;
+  bottom: -5px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.mn-card-section .mn-resize-sw {
+  left: -5px;
+  bottom: -5px;
+  cursor: nesw-resize;
+}
+
+.mn-card-section .mn-resize-w {
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
 }
 
 .mn-card-section.is-selected {

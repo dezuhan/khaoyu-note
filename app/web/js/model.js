@@ -207,6 +207,7 @@ export function newBoardDoc(title = "Untitled board", parentId = null) {
     updatedAt: Date.now(),
     grid: 24,
     showGrid: true,
+    snapToGrid: false,
     view: { x: 0, y: 0, zoom: 1 },
     cards: [],
     connections: [],
@@ -246,7 +247,8 @@ export function columnSummary(board, column) {
   return docWord ? `${cardsWord}, ${docWord}` : cardsWord;
 }
 
-// Position column children and grow the column to fit them.
+// Position column children and grow the column to fit them. A row is the same container with its
+// children laid out horizontally, so a column can be converted back and forth without losing cards.
 export function layoutColumn(board, column) {
   const padding = 14;
   const gap = 10;
@@ -258,6 +260,24 @@ export function layoutColumn(board, column) {
   const children = columnChildren(board, column.id).filter(
     (card) => !isTemporarilyDisabledType(card.type)
   );
+  if (column.direction === "row") {
+    const count = Math.max(1, children.length);
+    const available = Math.max(160, column.w - padding * 2 - gap * (count - 1));
+    const childW = Math.max(120, Math.floor(available / count));
+    let x = column.x + padding;
+    let maxH = 0;
+    for (const child of children) {
+      child.x = x;
+      child.y = column.y + header;
+      child.w = childW;
+      const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
+      if (child.h < minimum) child.h = minimum;
+      x += childW + gap;
+      maxH = Math.max(maxH, child.h);
+    }
+    column.h = Math.max(column.minHeight || 160, header + maxH + padding);
+    return;
+  }
   let y = column.y + header;
   for (const child of children) {
     child.x = column.x + padding;

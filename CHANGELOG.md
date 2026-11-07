@@ -8,9 +8,12 @@ project uses Semantic Versioning.
 ### Added
 
 - Section surface cards: a pastel background with a small editable title, always below regular cards,
-  freely resizable, excluded from columns and layer controls. Selecting a Section opens a bottom
-  toolbar with pastel swatches and a position-only lock that stops movement while title and color
-  edits stay available.
+  freely resizable from all four edges and corners, excluded from columns and layer controls. Selecting
+  a Section opens a bottom toolbar with pastel swatches and a position-only lock that stops movement
+  while title and color edits stay available.
+- View > Snap to grid aligns dragged cards and Section resize edges to the board grid.
+- Columns can convert to rows and back. Row mode lays the children out horizontally and shares the
+  column width between them; Convert to column restores the vertical stack.
 - Color cards can pick a color directly from the screen with the eyedropper button beside the hex
   field. The EyeDropper API is tried first in both the browser and the desktop webview; if the host
   rejects it, the desktop falls back to an in-app magnifier over a client-area capture.

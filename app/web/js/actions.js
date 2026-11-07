@@ -119,8 +119,7 @@ export function canWrapInColumn(ids = []) {
 
 // Wrap the selected cards in a new column, keeping their top-to-bottom order.
 export function wrapInColumn(ids) {
-  if (!state.board || !canWrapInColumn(ids)) return null;
-  const cards = ids.map((id) => getCard(state.board, id)).filter(Boolean);
+  if (!state.board || !canWrapInColumn(ids)) return null;  const cards = ids.map((id) => getCard(state.board, id)).filter(Boolean);
   checkpoint();
   const minX = Math.min(...cards.map((card) => card.x));
   const minY = Math.min(...cards.map((card) => card.y));
@@ -463,6 +462,20 @@ export function setSectionPositionLocked(cardId, locked) {
   if (!card || card.type !== "section") return;
   checkpoint();
   card.positionLocked = Boolean(locked);
+  markDirty("board");
+}
+
+export function setColumnDirection(cardId, direction) {
+  if (!state.board) return;
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "column") return;
+  checkpoint();
+  card.direction = direction === "row" ? "row" : "column";
+  if (card.direction === "row") {
+    const count = columnChildren(state.board, card.id).length;
+    card.w = Math.max(card.w, 28 + count * 220 + Math.max(0, count - 1) * 10);
+  }
+  layoutColumns(state.board);
   markDirty("board");
 }
 
