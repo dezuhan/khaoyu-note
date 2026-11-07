@@ -5,7 +5,6 @@ import { icon } from "./icons.js";
 import { ingestComments } from "./notifications.js";
 import { notify, openBoard, setSelection, state, subscribe } from "./store.js";
 import { formatCommentTime } from "./time.js";
-import { commentAuthor } from "./comment-author.js";
 
 let anchor = null;
 let panel = null;
@@ -103,7 +102,7 @@ async function collectComments() {
           messageId: message.id || `${card.id}:${index}:${message.ts || 0}`,
           boardTitle: meta?.title || doc.title || "Board",
           path,
-          author: commentAuthor(message).name,
+          author: message.author || "You",
           text: message.text || "",
           ts: message.ts || 0,
         });

@@ -16,7 +16,6 @@ import {
   visibleCards,
 } from "./model.js";
 import { markDirty, state } from "./store.js";
-import { commentAuthor, currentCommentAuthor } from "./comment-author.js";
 import { formatCommentTime } from "./time.js";
 import { paintBoardPreview } from "./preview.js";
 
@@ -227,40 +226,28 @@ function contentFor(card) {
     }
 
     case "comment": {
-      const me = currentCommentAuthor();
-      const avatar = (author) => {
-        const image = author.avatarUrl
-          ? ` style="background-image:url('${escapeHtml(author.avatarUrl)}')"`
-          : /^#[0-9a-f]{6}$/i.test(author.avatarColor)
-            ? ` style="background:color-mix(in srgb, ${author.avatarColor} 32%, var(--ky-control-active))"`
-            : "";
-        return `<span class="mn-avatar${author.avatarUrl ? " has-image" : ""}"${image}>${
-          author.avatarUrl ? "" : escapeHtml(author.initials)
-        }</span>`;
-      };
       const messages = (card.messages || [])
-        .map((message) => {
-          const author = commentAuthor(message);
-          return `<div class="mn-msg${message.done ? " is-done" : ""}" data-msg="${message.id}">
+        .map(
+          (message) => `<div class="mn-msg${message.done ? " is-done" : ""}" data-msg="${message.id}">
             <input type="checkbox" class="mn-check mn-msg-check" data-msg-check="${message.id}" ${
             message.done ? "checked" : ""
           } title="Mark comment done" />
-            ${avatar(author)}
+            <span class="mn-avatar">${escapeHtml(initials(message.author || "You"))}</span>
             <div class="mn-msg-body"><span class="mn-msg-meta"><span class="mn-msg-author">${escapeHtml(
-              author.name
+              message.author || "You"
             )}</span><span class="mn-msg-time">${escapeHtml(
               formatCommentTime(message.ts)
             )}</span></span><span class="mn-msg-text">${escapeHtml(message.text)}</span></div>
             <button type="button" class="mn-msg-menu" data-action="comment-menu" data-msg="${
               message.id
             }" title="Comment actions">${icon("more", 13)}</button>
-          </div>`;
-        })
+          </div>`
+        )
         .join("");
       return `<div class="mn-comment">
         <div class="mn-comment-rows">${messages || `<div class="mn-comment-empty">No comments yet</div>`}</div>
         <div class="mn-comment-row">
-          ${avatar(me)}
+          <span class="mn-avatar mn-avatar-me">${escapeHtml(initials("You"))}</span>
           <input class="mn-field-input mn-comment-input" data-field="comment-draft" placeholder="Comment" />
           <button class="mn-primary-btn" data-action="send-comment">Send</button>
         </div>

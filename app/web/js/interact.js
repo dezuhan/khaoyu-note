@@ -12,7 +12,6 @@ import {
 } from "./actions.js";
 import * as bridge from "./bridge.js";
 import { openColorPicker } from "./color-picker.js";
-import { authState } from "./auth.js";
 import { colorNameForHex } from "./color-names.js";
 import { isTemporarilyDisabledType } from "./limits.js";
 import { confirmAction, toast } from "./ui.js";
@@ -1848,19 +1847,7 @@ function onClick(event) {
         break;
       }
       card.messages = card.messages || [];
-      const user = authState().user;
-      const author = user
-        ? user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username
-        : "You";
-      card.messages.push({
-        id: uid("m"),
-        author,
-        authorId: user?.id || null,
-        avatarUrl: user?.avatarUrl || "",
-        avatarColor: user?.avatarColor || "",
-        text,
-        ts: Date.now(),
-      });
+      card.messages.push({ id: uid("m"), author: "You", text, ts: Date.now() });
       markDirty("save");
       refreshCard(card.id);
       syncAutoHeight(card);

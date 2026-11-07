@@ -1,9 +1,49 @@
+# Dependencies and build output
 node_modules/
-target/
 app/node_modules/
 tools/node_modules/
-*.log
+target/
 dist/
-*.bak-*
+coverage/
+playwright-report/
+test-results/
+
+# Local runtime data, databases and sessions
+.env
 service/.env
 .khaoyu-service-data/
+service/.khaoyu-service-data/
+service/.tmp-*
+service/logs/
+*.db
+*.db-wal
+*.db-shm
+auth-session.json
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak-*
+.tmp-*
+
+# Local binaries and installers
+*.exe
+*.msi
+*.msix
+*.AppImage
+*.deb
+*.dmg
+*.zip
+*.pdb
+*.rlib
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local agent/plugin bundles
+dsh-bundle-note-studio-mcp/
