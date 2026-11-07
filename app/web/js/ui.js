@@ -1,5 +1,6 @@
 // Chrome UI: tool rail, top bar, modals, menus, toasts and shortcuts.
 
+import { DOCUMENTATION_HTML } from "./documentation.js";
 import * as bridge from "./bridge.js";
 import { closeDocumentEditor, documentEditorOpen, openDocumentEditor } from "./document-editor.js";
 import { closeDrawingEditor, drawingEditorOpen, openDrawingEditor } from "./drawing-editor.js";
@@ -807,6 +808,7 @@ function buildCommands() {
     { id: "view.bg.sage", label: "Board background: Sage", group: "View", icon: "sun", run: () => setBoardBackground("#e9efe5") },
     { id: "help.palette", label: "Command palette", group: "Help", icon: "search", shortcut: "Ctrl+K", run: () => openCommandPalette() },
     { id: "help.shortcuts", label: "Keyboard shortcuts", group: "Help", icon: "help", shortcut: "?", run: () => openHelpModal() },
+    { id: "help.documentation", label: "Documentation", group: "Help", icon: "help", shortcut: "", run: () => openDocumentation() },
   );
   return commands;
 }
@@ -1652,6 +1654,15 @@ export function closeModal() {
 }
 
 // ------------------------------------------------------------------ help
+
+function openDocumentation() {
+  openModal({
+    title: "Documentation",
+    body: DOCUMENTATION_HTML,
+    footer: [{ label: "Close" }],
+    width: "min(760px, calc(100vw - 48px))",
+  });
+}
 
 function openHelpModal() {
   const rows = [
