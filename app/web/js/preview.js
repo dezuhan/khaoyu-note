@@ -1,5 +1,7 @@
 // Shared mini preview painter used by the home gallery and nested board cards.
 
+import { isTemporarilyDisabledType } from "./limits.js";
+
 export const PREVIEW_TYPE_COLORS = {
   note: "var(--ph-black-7, #ffffff)",
   heading: "var(--ph-black-7, #ffffff)",
@@ -21,7 +23,9 @@ export const PREVIEW_TYPE_COLORS = {
 export function paintBoardPreview(container, doc, { emptyLabel = "Empty board", maxScale = 0.16 } = {}) {
   if (!container) return;
   container.innerHTML = "";
-  const cards = (doc && doc.cards) || [];
+  const cards = ((doc && doc.cards) || []).filter(
+    (card) => !isTemporarilyDisabledType(card.type)
+  );
   container.classList.toggle("is-empty", cards.length === 0);
   if (!cards.length) {
     const empty = document.createElement("span");

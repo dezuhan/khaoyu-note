@@ -2,7 +2,7 @@
 
 import * as bridge from "./bridge.js";
 import { addCardAt } from "./actions.js";
-import { isBlockedUpload, reportUploadProblem } from "./limits.js";
+import { isBlockedUpload, isTemporarilyDisabledType, reportUploadProblem } from "./limits.js";
 import { markDirty, state } from "./store.js";
 
 const IMAGE_EXTENSIONS = new Set([
@@ -90,7 +90,12 @@ export async function handleDroppedPaths(paths, clientX, clientY) {
       reportUploadProblem(`Skipped ${name}: this file type is not allowed.`);
       continue;
     }
-    const kind = classifyDropFile(name);
+    let kind = classifyDropFile(name);
+    // Local media still uploads through this path, but a disabled card type falls back to a file
+    // card so the asset is stored and visible instead of becoming a hidden card.
+    if ((kind === "audio" || kind === "video") && isTemporarilyDisabledType(kind)) {
+      kind = "file";
+    }
     let stored = null;
     try {
       stored = await bridge.storeAssetFromPath(sourcePath);

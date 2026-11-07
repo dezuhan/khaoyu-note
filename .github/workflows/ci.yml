@@ -109,6 +109,9 @@ jobs:
       - name: Auto backup checks
         run: node tools/test-auto-backup.mjs
 
+      - name: Disabled card checks
+        run: node tools/test-disabled-cards.mjs
+
       - name: Passkey virtual-authenticator suite
         run: node tools/test-passkeys.mjs
 

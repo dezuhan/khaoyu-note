@@ -39,3 +39,9 @@ export const TEMPORARILY_DISABLED_TOOLS = {
 export function toolDisabledReason(key) {
   return TEMPORARILY_DISABLED_TOOLS[key] || "";
 }
+
+// Temporarily disabled cards are hidden from boards and templates. This is different from hiding a
+// tool in Settings, which only removes the rail button and leaves the feature available.
+export function isTemporarilyDisabledType(type) {
+  return Boolean(TEMPORARILY_DISABLED_TOOLS[type]);
+}

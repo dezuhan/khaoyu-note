@@ -2,7 +2,7 @@
 
 import { createDocumentation } from "./documentation.js";
 import { openImageCrop } from "./image-crop.js";
-import { toolDisabledReason } from "./limits.js";
+import { isTemporarilyDisabledType, toolDisabledReason } from "./limits.js";
 import { openSharePanel } from "./share-ui.js";
 import * as bridge from "./bridge.js";
 import { closeDocumentEditor, documentEditorOpen, openDocumentEditor } from "./document-editor.js";
@@ -590,15 +590,25 @@ function runTool(tool) {
         const card = addCardAtCenter("image");
         if (card) await attachImage(card.id, file);
       } else if (file.type.startsWith("audio/")) {
-        const card = addCardAtCenter("audio");
-        if (card) await attachAudio(card.id, file);
+        if (isTemporarilyDisabledType("audio")) {
+          const card = addCardAtCenter("file");
+          if (card) await attachFile(card.id, file);
+        } else {
+          const card = addCardAtCenter("audio");
+          if (card) await attachAudio(card.id, file);
+        }
       } else if (file.type.startsWith("video/")) {
-        const card = addCardAtCenter("video");
-        if (card) {
-          const base64 = await bridge.readFileAsBase64(file);
-          const path = await bridge.storeAsset(file.name, base64);
-          card.url = path;
-          notify("board");
+        if (isTemporarilyDisabledType("video")) {
+          const card = addCardAtCenter("file");
+          if (card) await attachFile(card.id, file);
+        } else {
+          const card = addCardAtCenter("video");
+          if (card) {
+            const base64 = await bridge.readFileAsBase64(file);
+            const path = await bridge.storeAsset(file.name, base64);
+            card.url = path;
+            notify("board");
+          }
         }
       } else {
         const card = addCardAtCenter("file");
@@ -1453,8 +1463,13 @@ async function onDrop(event) {
       const card = addCardAt("image", point);
       if (card) await attachImage(card.id, file);
     } else if (file.type.startsWith("audio/")) {
-      const card = addCardAt("audio", point);
-      if (card) await attachAudio(card.id, file);
+      if (isTemporarilyDisabledType("audio")) {
+        const card = addCardAt("file", point);
+        if (card) await attachFile(card.id, file);
+      } else {
+        const card = addCardAt("audio", point);
+        if (card) await attachAudio(card.id, file);
+      }
     } else {
       const card = addCardAt("file", point);
       if (card) await attachFile(card.id, file);

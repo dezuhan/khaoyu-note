@@ -23,9 +23,12 @@ export const DOCUMENTATION_SECTIONS = [
     label: "Boards and cards",
     html: `
       <h3>Cards and tools</h3>
-      <p><strong>Temporarily disabled:</strong> Map, Video and Audio cannot be created from the tool rail
-      for now. They stay listed in Settings &gt; Tools with a disabled status, existing cards keep
-      rendering, and local media is uploaded with the Upload tool.</p>
+      <p><strong>Temporarily disabled:</strong> Map, Video and Audio cards are hidden from boards,
+      columns, previews and templates while the feature is off. The data stays in the document, so the
+      cards return when the feature is re-enabled. They are still listed in Settings &gt; Tools with a
+      disabled status. This is different from hiding a tool in Settings, which only removes the rail
+      button and leaves the feature available. Upload local media with the Upload tool; while audio or
+      video is disabled, those files become file cards.</p>
       <table>
         <tr><th>Tool</th><th>Behavior</th></tr>
         <tr><td>Note</td><td>Markdown-style text, bold, italic, lists and links.</td></tr>
@@ -58,7 +61,9 @@ export const DOCUMENTATION_SECTIONS = [
     html: `
       <h3>Uploading files</h3>
       <p>The Upload tool is the single entry point for local media. An image becomes an image card, an
-      audio file an audio card, a video file a video card, and any other file a file card. Uploads are
+      audio file an audio card, a video file a video card, and any other file a file card. While the
+      audio or video card type is temporarily disabled, those files are stored as file cards so the
+      asset stays visible. Uploads are
       capped at 100 MB and executable or script extensions are blocked. Dropping files from the
       operating system uses the same path in the desktop app.</p>
       <h3>Hero images and cropping</h3>

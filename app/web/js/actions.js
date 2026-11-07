@@ -1,7 +1,7 @@
 // High-level board actions shared by the UI and the interaction layer.
 
 import * as bridge from "./bridge.js";
-import { isBlockedUpload, MAX_UPLOAD_BYTES, reportUploadProblem } from "./limits.js";
+import { isBlockedUpload, isTemporarilyDisabledType, MAX_UPLOAD_BYTES, reportUploadProblem } from "./limits.js";
 import { refreshCard } from "./render.js";
 import { createCard, columnChildren, getCard, layoutColumns, maxZ, newBoardDoc, uid } from "./model.js";
 import {
@@ -345,7 +345,11 @@ export function duplicateSelected() {
 
 export function selectAllCards() {
   if (!state.board) return;
-  setSelection(state.board.cards.map((card) => card.id));
+  setSelection(
+    state.board.cards
+      .filter((card) => !isTemporarilyDisabledType(card.type))
+      .map((card) => card.id)
+  );
 }
 
 export function bringToFront(card, ids = [card.id]) {

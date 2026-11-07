@@ -1,6 +1,7 @@
 // Pure data model: board documents, card factories, layout helpers.
 
 import { colorNameForHex } from "./color-names.js";
+import { isTemporarilyDisabledType } from "./limits.js";
 
 export const uid = (prefix = "c") =>
   `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-3)}`;
@@ -197,6 +198,12 @@ export function getCard(board, id) {
   return board.cards.find((card) => card.id === id) || null;
 }
 
+// Cards that the app currently shows. Temporarily disabled card types stay in the document so no
+// data is lost, but they are not rendered and do not reserve space until the feature returns.
+export function visibleCards(board) {
+  return (board?.cards || []).filter((card) => !isTemporarilyDisabledType(card.type));
+}
+
 export function columnChildren(board, columnId) {
   return board.cards
     .filter((card) => card.parentId === columnId)
@@ -204,7 +211,9 @@ export function columnChildren(board, columnId) {
 }
 
 export function columnSummary(board, column) {
-  const children = columnChildren(board, column.id);
+  const children = columnChildren(board, column.id).filter(
+    (card) => !isTemporarilyDisabledType(card.type)
+  );
   if (!children.length) return "0 cards";
   const docs = children.filter((card) => card.type === "document").length;
   const rest = children.length - docs;
@@ -222,7 +231,9 @@ export function layoutColumn(board, column) {
     column.h = Math.max(column.minHeight || 96, 96);
     return;
   }
-  const children = columnChildren(board, column.id);
+  const children = columnChildren(board, column.id).filter(
+    (card) => !isTemporarilyDisabledType(card.type)
+  );
   let y = column.y + header;
   for (const child of children) {
     child.x = column.x + padding;
@@ -345,7 +356,7 @@ export function welcomeBoard() {
   const showcaseNote = add(
     createCard("note", 180, 1040, {
       text:
-        "All the tools from the left rail are represented on this board.\nScroll down and right to try the media cards, the kanban board and the nested board.",
+        "All the enabled tools from the left rail are represented on this board.\nScroll down and right to try the kanban board and the nested board.",
     })
   );
   showcaseNote.w = 380;
@@ -413,6 +424,14 @@ export function welcomeBoard() {
 
   board.connections.push({ id: uid("conn"), from: heading.id, to: note.id });
   board.connections.push({ id: uid("conn"), from: showcaseHeading.id, to: showcaseNote.id });
+
+  board.cards = visibleCards(board);
+  const visibleIds = new Set(board.cards.map((card) => card.id));
+  board.connections = board.connections.filter(
+    (connection) =>
+      (!connection.from || visibleIds.has(connection.from)) &&
+      (!connection.to || visibleIds.has(connection.to))
+  );
 
   layoutColumns(board);
   board.view = { x: 40, y: -40, zoom: 0.9 };

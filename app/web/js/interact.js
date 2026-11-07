@@ -13,6 +13,7 @@ import {
 import * as bridge from "./bridge.js";
 import { openColorPicker } from "./color-picker.js";
 import { colorNameForHex } from "./color-names.js";
+import { isTemporarilyDisabledType } from "./limits.js";
 import { confirmAction, toast } from "./ui.js";
 import {
   CARD_ASPECTS,
@@ -606,6 +607,7 @@ function onPointerMove(event) {
       const a = screenToWorld(gesture.rect, x, y);
       const b = screenToWorld(gesture.rect, x + w, y + h);
       const hit = state.board.cards
+        .filter((card) => !isTemporarilyDisabledType(card.type))
         .filter(
           (card) =>
             card.x < b.x && card.x + card.w > a.x && card.y < b.y && card.y + card.h > a.y

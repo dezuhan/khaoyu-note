@@ -89,8 +89,8 @@ the app works offline; only optional video and map embeds need the internet.
 | Color swatch card | implemented (custom HSV picker that opens to the left of the card with saturation/value square, vertical hue slider and hex field, no title and no OK/Cancel buttons because every change applies live, automatic color name from the Coolors name library with nearest-match fallback, HEX/RGB/CMYK stacked vertically with a hover copy button for each code, editable name) |
 | Image card | implemented (local file, caption) |
 | File card | implemented (local asset; inset hover row, direct download button on hover, click opens the file with the system default app, right-click Download asset copies it to the Downloads folder) |
-| Upload tool | implemented and now the single entry point for local media: an image becomes an image card, an audio file an audio card, a video file a video card and any other file a file card |
-| Audio / video / map cards | rendered and playable for existing cards, but their tools are temporarily disabled: the rail and command palette do not offer them, and local media is uploaded with the Upload tool. Existing cards keep YouTube/Vimeo and direct video previews, Google Maps embeds, and the custom themed audio player (play/pause, time, seek, mute, edit); loaded video and map iframes ignore pointer events so the whole card can be dragged; uploaded images keep their natural ratio with a caption strip; embeds need internet, local files do not |
+| Upload tool | implemented and now the single entry point for local media: an image becomes an image card, an audio file an audio card, a video file a video card and any other file a file card. While the audio or video card type is temporarily disabled, those files become file cards instead so the asset stays stored and visible. |
+| Audio / video / map cards | temporarily disabled: their cards are hidden from boards, columns, previews and templates, and the stored data is kept so it returns when the feature is re-enabled. Local audio and video files uploaded through the Upload tool are stored as file cards while those types are disabled. Their existing embed code is not removed. |
 | Column container + nesting | implemented: drag cards in and out, wrap a multi-selection into a column, child cards hide their resize grip because the column controls their width, collapse/expand toggle with card summary and symmetric top and bottom spacing, drop line, target ghost and settle animation; right-click Convert to board moves the column items into a nested board and replaces the column with a board card |
 | Lock position | implemented: right-click Lock position keeps a card selectable and unlockable while blocking drag, resize, inline editing, column and sheet handles; the card shows a lock badge |
 | Card conversions | implemented: right-click a note to Convert to document with its text preserved, or a column to Convert to board with its items moved into the new board |
@@ -105,7 +105,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color, column and kanban |
 | Settings | implemented: token-based styling with only the essentials (Account, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done |
-| Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and shown with a disabled status in Settings > Tools |
+| Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and their cards are hidden from boards and templates. Hiding a tool in Settings only removes the rail button and leaves the feature available. |
 | Tool drag to canvas | implemented: floating label plus dashed drop preview, card created at the pointer, works reliably in WebView2 because it does not depend on HTML5 drag (board/document/image keep their own flows) |
 | MCP server | implemented: `khaoyu-note-mcp.exe` with 14 board tools over the same SQLite database |
 | Update check | implemented: the app reads the latest GitHub release of `dezuhan/khaoyu-note` at startup and then once per hour, and from Help > Check for updates or Settings > About. It compares versions, shows the release notes and opens the release page in the browser; it never downloads or runs an installer. A check needs published GitHub Releases, and the request reveals the user IP to GitHub. |
@@ -391,6 +391,9 @@ node tools/test-update.mjs
 
 # automatic backup interval and catch-up rules
 node tools/test-auto-backup.mjs
+
+# temporarily disabled card types stay out of boards and templates
+node tools/test-disabled-cards.mjs
 
 # self-hosted service and account tests (Node 24, temp databases)
 node --test service/test/service.test.mjs service/test/auth.test.mjs

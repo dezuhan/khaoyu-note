@@ -13,6 +13,7 @@ import {
   layoutColumns,
   MIN_CARD_H,
   SWATCHES,
+  visibleCards,
 } from "./model.js";
 import { markDirty, state } from "./store.js";
 import { formatCommentTime } from "./time.js";
@@ -761,7 +762,7 @@ export function refreshColorPreview(card) {
 
 function measureHeights() {
   const zoom = state.view.zoom || 1;
-  for (const card of state.board.cards) {
+  for (const card of visibleCards(state.board)) {
     if (card.type === "column") continue;
     if (CARD_ASPECTS[card.type] || card.aspect) {
       card.h = cardHeightFor(card);
@@ -779,7 +780,7 @@ function measureHeights() {
 }
 
 function applyAllGeometry() {
-  for (const card of state.board.cards) {
+  for (const card of visibleCards(state.board)) {
     const el = cardElement(card.id);
     if (el) applyGeometry(el, card);
   }
@@ -838,7 +839,7 @@ export function render(kind = "board") {
     rebuildCards();
   }
   if (kind === "geometry") {
-    for (const card of state.board.cards) {
+    for (const card of visibleCards(state.board)) {
       const el = cardElement(card.id);
       if (el) el.classList.toggle("is-child", Boolean(card.parentId));
     }
@@ -849,7 +850,7 @@ export function render(kind = "board") {
   renderSelection();
   renderConnections();
   if (kind === "view" || kind === "board") renderView();
-  for (const card of state.board.cards) {
+  for (const card of visibleCards(state.board)) {
     if (card.type === "sketch") paintSketch(cardElement(card.id), card);
   }
   hydrateBoardCards();
@@ -901,7 +902,7 @@ async function hydrateBoardCards() {
     painted = true;
     const count = el.querySelector('[data-role="board-count"]');
     if (count) {
-      const total = doc?.cards?.length || 0;
+      const total = visibleCards(doc).length;
       count.textContent = total ? `${total} card${total === 1 ? "" : "s"}` : "Empty";
     }
   }
@@ -952,11 +953,12 @@ function rebuildCards() {
     }
   }
   preserveMediaNext = false;
-  const wanted = new Set(state.board.cards.map((card) => card.id));
+  const cards = visibleCards(state.board);
+  const wanted = new Set(cards.map((card) => card.id));
   for (const child of [...cardsEl.children]) {
     if (!wanted.has(child.dataset.id)) child.remove();
   }
-  for (const card of state.board.cards) {
+  for (const card of cards) {
     const held = preserved.get(card.id);
     if (held) {
       held.classList.toggle("is-child", Boolean(card.parentId));
@@ -968,7 +970,7 @@ function rebuildCards() {
     if (old && old.parentElement === cardsEl) old.replaceWith(next);
     else cardsEl.append(next);
   }
-  for (const card of state.board.cards) {
+  for (const card of cards) {
     if (card.type === "link" && !card.headerImage) {
       const el = cardElement(card.id);
       if (!el) continue;
@@ -1086,10 +1088,17 @@ export function renderConnections() {
   defs.innerHTML = `<marker id="mn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`;
   connEl.append(defs);
   const connections = state.board.connections || [];
+  const visibleIds = new Set(visibleCards(state.board).map((card) => card.id));
   const hitPaths = [];
   const lines = [];
   const handles = [];
   for (const connection of connections) {
+    if (
+      (connection.from && !visibleIds.has(connection.from)) ||
+      (connection.to && !visibleIds.has(connection.to))
+    ) {
+      continue;
+    }
     const geometry = connectionGeometry(connection);
     const { start, end, control } = geometry;
     const d = control

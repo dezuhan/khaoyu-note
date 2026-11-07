@@ -79,18 +79,35 @@ const expectedWelcomeTypes = [
   "table",
   "sketch",
   "image",
-  "video",
-  "audio",
-  "map",
   "file",
   "board",
   "kanban",
 ];
 check(
-  "Welcome template shows every card type",
+  "Welcome template shows every enabled card type",
   expectedWelcomeTypes.every((type) => welcomeTypes.includes(type)),
   welcomeTypes.join(", ")
 );
+check(
+  "Temporarily disabled card types are absent from the welcome template",
+  !welcomeTypes.includes("video") && !welcomeTypes.includes("audio") && !welcomeTypes.includes("map"),
+  welcomeTypes.join(", ")
+);
+const hiddenCardId = await page.evaluate(async () => {
+  const actions = await import("/js/actions.js");
+  return actions.addCardAtCenter("audio").id;
+});
+await page.waitForTimeout(300);
+check(
+  "A temporarily disabled card added through the action layer stays hidden",
+  (await page.locator(`.mn-card[data-id="${hiddenCardId}"]`).count()) === 0
+);
+await page.evaluate(async (id) => {
+  const actions = await import("/js/actions.js");
+  const store = await import("/js/store.js");
+  actions.deleteCards([id], { trash: false });
+  store.clearSelection();
+}, hiddenCardId);
 check("Welcome template includes line connections", (await page.locator(".mn-connection").count()) >= 2);
 check("Welcome template has a nested board card", (await page.locator('.mn-card[data-type="board"] .mn-board-card').count()) >= 1);
 check("column children are visible", (await page.locator(".mn-card.is-child").count()) === 2);
@@ -987,6 +1004,13 @@ await page.keyboard.press("Delete");
 await page.waitForTimeout(450);
 check("Kanban board can be deleted", (await byId(kanbanId).count()) === 0);
 
+// Temporarily re-enable the disabled card types so the existing-card behaviour stays covered.
+await page.evaluate(async () => {
+  const limits = await import("/js/limits.js");
+  window.__disabledToolsBackup = { ...limits.TEMPORARILY_DISABLED_TOOLS };
+  for (const key of ["video", "audio", "map"]) delete limits.TEMPORARILY_DISABLED_TOOLS[key];
+});
+
 // ---------------------------------------------------------------- embedded media previews
 // The video, map and audio tools are temporarily disabled, so these cards are created through the
 // action layer to keep the existing-card behaviour covered.
@@ -1356,6 +1380,13 @@ for (const type of ["video", "audio", "map"]) {
   await page.locator(".mn-menu-item", { hasText: "Delete" }).click();
   await page.waitForTimeout(300);
 }
+
+// Restore the temporary disable list so the rest of the suite runs against the real policy.
+await page.evaluate(async () => {
+  const limits = await import("/js/limits.js");
+  Object.assign(limits.TEMPORARILY_DISABLED_TOOLS, window.__disabledToolsBackup || {});
+  delete window.__disabledToolsBackup;
+});
 
 // ---------------------------------------------------------------- drawing popup
 await page.click('.mn-tool[data-tool="sketch"]');

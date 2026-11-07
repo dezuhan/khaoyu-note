@@ -246,6 +246,13 @@ transport, database, copyable client config) and About (version, storage, data f
 The cosmetic options from the reference window (integrations, scratch disks, plug-ins, units,
 history log) were dropped.
 
+Hiding a tool in Settings only removes its rail button: the card type stays available and existing
+cards keep rendering. That is separate from `TEMPORARILY_DISABLED_TOOLS` in `limits.js`, which
+switches a feature off. A temporarily disabled card type is filtered by `visibleCards` and does not
+render, lay out inside a column, appear in a board preview, accept a marquee selection, or seed a
+template. The cards stay in the board document so re-enabling the feature restores them, and Upload
+routes local audio or video to a file card while those types are disabled.
+
 GPU acceleration is applied at window creation, not from JavaScript. `run()` reads
 `gpu_acceleration` from SQLite before building the window and, when it is false, passes
 `additional_browser_args("--disable-gpu --disable-gpu-compositing")` to `WebviewWindowBuilder`. The

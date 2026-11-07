@@ -30,6 +30,11 @@ project uses Semantic Versioning.
   and from Help > Check for updates or Settings > About. It compares versions, shows the release notes
   and offers to open the release page. It never downloads or runs an installer. The About pane now
   reports the real app version instead of a hardcoded value.
+- Temporarily disabled card types (Map, Video and Audio) are now hidden from boards, columns,
+  previews, marquee selection and templates instead of only losing their tool. The cards stay in the
+  document and return when the feature is re-enabled. Uploading local audio or video while those types
+  are disabled stores a file card so the asset stays visible. Hiding a tool in Settings still only
+  removes the rail button.
 - Automatic backups. Settings > Backup offers Off, every day, every 3, 7 or 14 days, and every month
   (30 days). The app checks the schedule while it runs and catches up on the next launch when an
   interval was missed. A manual backup or Export ZIP resets the schedule so it is not duplicated.

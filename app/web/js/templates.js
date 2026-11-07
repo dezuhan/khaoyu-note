@@ -1,7 +1,7 @@
 // Template library: replace the single current board with a starter layout.
 
 import { icon } from "./icons.js";
-import { createCard, newBoardDoc, uid, welcomeBoard } from "./model.js";
+import { createCard, newBoardDoc, uid, visibleCards, welcomeBoard } from "./model.js";
 import { checkpoint, markDirty, notify, state } from "./store.js";
 
 let overlay = null;
@@ -215,6 +215,14 @@ async function applyTemplate(template) {
   if (state.board.cards.length && !(await confirmTemplateOverwrite(template))) return;
   checkpoint();
   const built = template.build();
+  // A starter must never seed a card type that is temporarily disabled.
+  built.cards = visibleCards({ cards: built.cards });
+  const templateCardIds = new Set(built.cards.map((card) => card.id));
+  built.connections = (built.connections || []).filter(
+    (connection) =>
+      (!connection.from || templateCardIds.has(connection.from)) &&
+      (!connection.to || templateCardIds.has(connection.to))
+  );
   state.board.cards = built.cards;
   state.board.connections = built.connections || [];
   state.board.trash = [];
