@@ -12,6 +12,14 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.18.0] - 2026-11-07
+
+### Added
+
+- Project parent links and nested board inclusion in project shares under a same-owner, no-extra-members
+  policy, with exclusion counts and a documented depth and count limit.
+- Desktop sync creates a nested server project when its parent board is already synced.
+
 ## [0.17.0] - 2026-11-07
 
 ### Added
