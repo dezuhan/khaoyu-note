@@ -12,6 +12,15 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.21.0] - 2026-11-07
+
+### Added
+
+- Public read-only share viewer at `/s/:token` with passphrase entry, project/item/column rendering,
+  nested-board sections, scope isolation and neutral errors.
+- `noindex`, self-only CSP and token redaction for share viewer requests.
+- Playwright share viewer suite in CI.
+
 ## [0.20.0] - 2026-11-07
 
 ### Added
