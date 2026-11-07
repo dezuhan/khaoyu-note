@@ -156,7 +156,8 @@ body.lp {
   padding: 0 10px;
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-control);
-  background: transparent;
+  background: var(--ky-raise), transparent;
+  box-shadow: var(--ky-hairline);
   color: var(--ky-muted);
   font: inherit;
   font-size: 11px;
@@ -166,7 +167,7 @@ body.lp {
 }
 
 .lp-icon-button:hover {
-  background: var(--ky-control);
+  background: var(--ky-raise), var(--ky-control);
   color: var(--ky-text);
 }
 
@@ -177,7 +178,8 @@ body.lp {
   padding: 8px;
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-control);
-  background: transparent;
+  background: var(--ky-raise), transparent;
+  box-shadow: var(--ky-hairline);
   cursor: pointer;
 }
 
@@ -203,8 +205,9 @@ body.lp {
   min-height: 40px;
   padding: 0 18px;
   border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--ky-text);
+  border-radius: var(--lp-control);
+  background: var(--ky-raise), var(--ky-text);
+  box-shadow: var(--ky-hairline);
   color: var(--ky-bg);
   font: inherit;
   font-size: 12px;
@@ -216,7 +219,7 @@ body.lp {
 }
 
 .lp-button:hover {
-  opacity: 0.9;
+  opacity: 0.92;
   transform: translateY(-1px);
 }
 
@@ -228,12 +231,13 @@ body.lp {
 
 .lp-button-quiet {
   border-color: var(--lp-line);
-  background: transparent;
+  background: var(--ky-raise), transparent;
+  box-shadow: var(--ky-hairline);
   color: var(--ky-text);
 }
 
 .lp-button-quiet:hover {
-  background: var(--ky-control);
+  background: var(--ky-raise), var(--ky-control);
   opacity: 1;
 }
 
@@ -566,7 +570,8 @@ body.lp {
 }
 
 .lp-tabs button.is-active {
-  background: var(--ky-control-active);
+  background: var(--ky-raise), var(--ky-control-active);
+  box-shadow: var(--ky-hairline);
   color: var(--ky-text);
 }
 
