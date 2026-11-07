@@ -146,6 +146,8 @@ async function renderPanel() {
   fields.className = "mn-share-fields";
   const permissionLabel = document.createElement("label");
   permissionLabel.textContent = "Access type";
+  const permissionWrap = document.createElement("span");
+  permissionWrap.className = "ky-select";
   const permission = document.createElement("select");
   permission.className = "ky-input";
   for (const [value, label] of [
@@ -158,7 +160,11 @@ async function renderPanel() {
     option.textContent = label;
     permission.append(option);
   }
-  permissionLabel.append(permission);
+  const chevron = document.createElement("span");
+  chevron.className = "ky-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  permissionWrap.append(permission, chevron);
+  permissionLabel.append(permissionWrap);
 
   const passwordLabel = document.createElement("label");
   passwordLabel.textContent = "Password (optional)";
@@ -188,6 +194,7 @@ async function renderPanel() {
   downloadLabel.append(download, downloadText);
   fields.append(permissionLabel, passwordLabel, expiryLabel, downloadLabel);
   body.append(fields);
+  window.KySelect?.enhanceAll(fields);
 
   const tokenOutput = document.createElement("p");
   tokenOutput.className = "mn-share-token";
