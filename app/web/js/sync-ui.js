@@ -14,7 +14,7 @@ function toast(message) {
 
 export function initSyncUI(uiRefs) {
   refs = uiRefs;
-  refs.syncButton?.addEventListener("click", openDialog);
+  refs.syncButton?.addEventListener("click", openSyncDialog);
   window.addEventListener("mn:board-saved", onBoardSaved);
   window.addEventListener("online", () => {
     sync.flushQueue().finally(refresh);
@@ -47,7 +47,7 @@ function onBoardSaved(event) {
   autoTimer = setTimeout(() => runSync({ quiet: true }), 1200);
 }
 
-function openDialog() {
+export function openSyncDialog() {
   if (overlay) return;
   overlay = document.createElement("div");
   overlay.className = "mn-sync-overlay";

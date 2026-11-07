@@ -5579,3 +5579,108 @@ html[data-performance="true"] .mn-card {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+/* Settings navigation and account/tools pages */
+.mn-prefs-nav-sep {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--ky-stroke);
+}
+.mn-account-status {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  padding: 9px 10px;
+  margin: 8px 0 12px;
+  background: var(--ky-control);
+}
+.mn-account-server {
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+}
+.mn-account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.mn-account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  padding: 10px;
+  background: var(--ky-surface);
+}
+.mn-account-card strong {
+  font-size: 12px;
+}
+.mn-account-card .mn-btn {
+  align-self: flex-start;
+  margin-top: auto;
+}
+.mn-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.mn-tool-card {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.mn-tool-card:hover {
+  background: var(--ky-control-hover);
+}
+.mn-tool-card.is-visible {
+  border-color: color-mix(in srgb, var(--ky-accent) 55%, var(--ky-stroke));
+}
+.mn-tool-card-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  color: var(--ky-soft);
+}
+.mn-tool-card-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mn-tool-card-state {
+  font-size: 10px;
+  color: var(--ky-soft);
+}
+.mn-tool-card.is-visible .mn-tool-card-state {
+  color: var(--ky-accent);
+}
+@media (max-width: 720px) {
+  .mn-account-grid { grid-template-columns: 1fr; }
+}
+
+/* Glass overlays */
+.mn-overlay,
+.mn-prefs-overlay,
+.mn-sync-overlay,
+.mn-share-overlay,
+.mn-onboard-overlay {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}

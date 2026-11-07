@@ -54,6 +54,15 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Shortcuts list</td><td>?</td></tr>
   </table>
 
+  <h3>Settings</h3>
+  <p>Settings opens with Account at the top, then a divider, General, Appearance, Tools and
+  Performance, then another divider, MCP and About. Language is part of General and Canvas is part of
+  Appearance. Tools uses a two-column icon grid where clicking a card shows or hides that tool.
+  Account links the service account, passkey and sharing pages and can open the server connection
+  dialog.</p>
+  <p>The desktop app and the service pages share the same design tokens. Dialogs and popups with a
+  translucent backdrop also blur the content behind them.</p>
+
   <h3>Server sync</h3>
   <p>Sync is opt-in per board. Open the Sync control in the topbar, enter the service URL and a scoped
   API token, then choose Enable for this board. The local board remains authoritative. Conflicts show

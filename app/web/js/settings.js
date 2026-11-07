@@ -3,6 +3,8 @@
 import * as bridge from "./bridge.js";
 import { icon } from "./icons.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
+import { loadSyncConfig } from "./sync.js";
+import { openSyncDialog } from "./sync-ui.js";
 
 export const DEFAULT_TOOL_ORDER = [
   "note",
@@ -59,20 +61,14 @@ const HEADING_FONT_CHOICES = [["Georgia", "Georgia (system serif)"], ...FONT_CHO
 
 const NAV = [
   { id: "account", label: "Account" },
-  { id: "appearance", label: "Appearance" },
-  { id: "integrations", label: "Integrations" },
+  { divider: true },
   { id: "general", label: "General" },
-  { id: "language", label: "Language" },
-  { id: "workspace", label: "Workspace" },
+  { id: "appearance", label: "Appearance" },
   { id: "tools", label: "Tools" },
-  { id: "history", label: "History Log" },
-  { id: "filehandling", label: "File Handling" },
-  { id: "export", label: "Export" },
   { id: "performance", label: "Performance" },
-  { id: "scratch", label: "Scratch Disks" },
-  { id: "canvas", label: "Canvas" },
-  { id: "units", label: "Units & Rulers" },
-  { id: "plugins", label: "Plug-ins" },
+  { divider: true },
+  { id: "mcp", label: "MCP" },
+  { id: "about", label: "About" },
 ];
 
 const TOOL_LABELS = [
@@ -99,7 +95,7 @@ const TOOL_LABELS = [
 
 let settings = { ...DEFAULT_SETTINGS };
 let overlay = null;
-let activePage = "general";
+let activePage = "account";
 let query = "";
 let searchTimer = 0;
 let saveTimer = 0;
@@ -208,7 +204,7 @@ export function openSettingsPage() {
     }, 120);
   });
   overlay.querySelector('[data-role="reset"]').addEventListener("click", () => {
-    const page = pages().find((entry) => entry.id === activePage);
+    const page = pages().find((entry) => !entry.divider && entry.id === activePage);
     if (!page) return;
     for (const row of page.rows()) {
       if (!row.key) continue;
@@ -218,7 +214,7 @@ export function openSettingsPage() {
       settings.hiddenTools = [];
       settings.toolOrder = [...DEFAULT_TOOL_ORDER];
     }
-    if (activePage === "canvas") {
+    if (activePage === "appearance") {
       settings.gridSize = 24;
       settings.showGrid = true;
       if (state.board) {
@@ -226,12 +222,12 @@ export function openSettingsPage() {
         state.board.showGrid = true;
         notify("board");
       }
+      applyGlobalSettings();
     }
     if (activePage === "performance") {
       settings.gpuAcceleration = true;
       bridge.setSetting("gpu_acceleration", "true").catch(() => {});
     }
-    if (activePage === "appearance") applyGlobalSettings();
     persist();
     renderContent();
     setStatus("Page reset to defaults");
@@ -310,13 +306,18 @@ function webviewLabel() {
 function pages() {
   return [
     {
-      id: "language",
-      title: "Language",
+      id: "account",
+      title: "Account",
+      divider: false,
       rows: () => [
-        {
-          type: "note",
-          text: "Khaoyu Note is English only. Multi-language support is coming soon.",
-        },
+        { type: "note", text: "Optional self-hosted service account, passkeys, API tokens and sharing." },
+      ],
+    },
+    { divider: true },
+    {
+      id: "general",
+      title: "General",
+      rows: () => [
         {
           type: "select",
           label: "Display language",
@@ -332,19 +333,7 @@ function pages() {
           disabledReason: "More languages are coming soon",
           onChange: () => {},
         },
-        {
-          type: "action",
-          label: "Add another language",
-          buttonLabel: "Coming soon",
-          disabled: true,
-          run: () => {},
-        },
-      ],
-    },
-    {
-      id: "general",
-      title: "General",
-      rows: () => [
+        note("Khaoyu Note is English only for now. More languages are coming soon."),
         toggle("Auto-Update Open Documents", "autoUpdateOpenDocuments"),
         toggle("Export Clipboard", "exportClipboard"),
         {
@@ -418,12 +407,7 @@ function pages() {
           },
         },
         toggle("Reduce motion", "reduceMotion", () => applyGlobalSettings()),
-      ],
-    },
-    {
-      id: "canvas",
-      title: "Canvas",
-      rows: () => [
+        note("Canvas"),
         {
           type: "select",
           label: "Grid size",
@@ -474,13 +458,7 @@ function pages() {
           type: "toggle",
           label,
           checked: !settings.hiddenTools.includes(key),
-          onChange: (checked) => {
-            const hidden = new Set(settings.hiddenTools);
-            if (checked) hidden.delete(key);
-            else hidden.add(key);
-            settings.hiddenTools = [...hidden];
-            persist();
-          },
+          onChange: () => {},
         })),
     },
     {
@@ -522,33 +500,7 @@ function pages() {
         ];
       },
     },
-    {
-      id: "about",
-      title: "About",
-      rows: () => [
-        info("Version", "0.1.0"),
-        info(
-          "Storage",
-          bridge.hasWeb
-            ? "SQLite via local web server"
-            : bridge.hasTauri
-              ? "SQLite database (offline)"
-              : "localStorage (browser preview)"
-        ),
-        ...(bridge.webInfo
-          ? [
-              info("Mode", "Web (localhost)"),
-              info("Host", bridge.webInfo.host),
-              info("Port", String(bridge.webInfo.port)),
-              info("URL", bridge.webInfo.url),
-            ]
-          : []),
-        info("Data folder", awaitPath()),
-        info("Projects", String(state.boards.filter((board) => !board.parentId).length)),
-        info("Nested boards", String(state.boards.filter((board) => board.parentId).length)),
-        note("Local-first visual boards. No account, no cloud, no remote sync."),
-      ],
-    },
+    { divider: true },
     {
       id: "mcp",
       title: "MCP",
@@ -576,6 +528,33 @@ function pages() {
           buttonLabel: "Copy JSON",
           run: () => copyMcpConfig(),
         },
+      ],
+    },
+    {
+      id: "about",
+      title: "About",
+      rows: () => [
+        info("Version", bridge.webInfo?.version || "0.23.2"),
+        info(
+          "Storage",
+          bridge.hasWeb
+            ? "SQLite via local web server"
+            : bridge.hasTauri
+              ? "SQLite database (offline)"
+              : "localStorage (browser preview)"
+        ),
+        ...(bridge.webInfo
+          ? [
+              info("Mode", "Web (localhost)"),
+              info("Host", bridge.webInfo.host),
+              info("Port", String(bridge.webInfo.port)),
+              info("URL", bridge.webInfo.url),
+            ]
+          : []),
+        info("Data folder", awaitPath()),
+        info("Projects", String(state.boards.filter((board) => !board.parentId).length)),
+        info("Nested boards", String(state.boards.filter((board) => board.parentId).length)),
+        note("Local-first visual boards. Accounts and server sync are optional."),
       ],
     },
   ];
@@ -659,8 +638,16 @@ function renderNav() {
   const nav = overlay.querySelector('[data-role="nav"]');
   if (!nav) return;
   nav.innerHTML = "";
-  const visible = query ? pages().filter((page) => pageMatches(page)) : pages();
-  for (const page of visible) {
+  for (const page of pages()) {
+    if (page.divider) {
+      if (!query) {
+        const separator = document.createElement("div");
+        separator.className = "mn-prefs-nav-sep";
+        nav.append(separator);
+      }
+      continue;
+    }
+    if (query && !pageMatches(page)) continue;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "mn-prefs-nav-item" + (page.id === activePage ? " is-active" : "");
@@ -675,6 +662,7 @@ function renderNav() {
 }
 
 function pageMatches(page) {
+  if (page.divider) return false;
   if (page.title.toLowerCase().includes(query)) return true;
   return page.rows().some((row) => rowMatches(row));
 }
@@ -692,6 +680,7 @@ function renderContent() {
   if (query) {
     const matches = [];
     for (const page of pages()) {
+      if (page.divider) continue;
       for (const row of page.rows()) {
         if (rowMatches(row) || page.title.toLowerCase().includes(query)) matches.push({ page, row });
       }
@@ -711,9 +700,16 @@ function renderContent() {
     return;
   }
 
-  const page = pages().find((entry) => entry.id === activePage) || pages()[0];
-  content.append(heading(page.title));
-  for (const row of page.rows()) content.append(buildRow(row));
+  const page = pages().find((entry) => !entry.divider && entry.id === activePage);
+  if (activePage === "account") {
+    renderAccountPage(content);
+  } else if (activePage === "tools") {
+    content.append(heading("Tools"));
+    renderToolsGrid(content);
+  } else if (page) {
+    content.append(heading(page.title));
+    for (const row of page.rows()) content.append(buildRow(row));
+  }
 
   const status = document.createElement("div");
   status.className = "mn-prefs-inline-status";
@@ -729,6 +725,117 @@ function renderContent() {
 
   const statusEl = overlay.querySelector('[data-role="status"]');
   if (statusEl) statusEl.textContent = statusText;
+}
+
+function serviceBase() {
+  const config = loadSyncConfig();
+  return (config.url || "http://127.0.0.1:8080").replace(/\/+$/, "");
+}
+
+function serviceButton(label, path) {
+  return {
+    label,
+    onClick: () => bridge.openExternal(serviceBase() + path),
+  };
+}
+
+function renderAccountPage(content) {
+  content.append(heading("Account"));
+  const config = loadSyncConfig();
+  const intro = document.createElement("p");
+  intro.className = "mn-prefs-note";
+  intro.textContent =
+    "Accounts are optional. Local boards never require login. Connect the self-hosted service for passkeys, sharing and sync.";
+  content.append(intro);
+
+  const status = document.createElement("div");
+  status.className = "mn-account-status";
+  const server = document.createElement("div");
+  server.className = "mn-account-server";
+  server.textContent = config.url ? `Server: ${config.url}` : "Server: not connected";
+  const token = document.createElement("div");
+  token.className = "mn-account-server";
+  token.textContent = config.token ? "API token: connected" : "API token: not connected";
+  status.append(server, token);
+  content.append(status);
+
+  const grid = document.createElement("div");
+  grid.className = "mn-account-grid";
+  const actions = [
+    ["Open account", "Create or sign in, reset password, manage sessions and API tokens.", "/account"],
+    ["Passkeys", "Register or use a WebAuthn passkey.", "/passkeys"],
+    ["Sharing", "Create and revoke public board or card links.", "/shares"],
+  ];
+  for (const [title, description, path] of actions) {
+    const card = document.createElement("div");
+    card.className = "mn-account-card";
+    const headingEl = document.createElement("strong");
+    headingEl.textContent = title;
+    const text = document.createElement("p");
+    text.className = "mn-prefs-note";
+    text.textContent = description;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mn-btn";
+    button.textContent = "Open";
+    button.addEventListener("click", () => bridge.openExternal(serviceBase() + path));
+    card.append(headingEl, text, button);
+    grid.append(card);
+  }
+  content.append(grid);
+
+  const connect = document.createElement("button");
+  connect.type = "button";
+  connect.className = "mn-btn mn-btn-primary";
+  connect.textContent = "Connect or change server";
+  connect.addEventListener("click", () => {
+    closeSettingsPage();
+    openSyncDialog();
+  });
+  content.append(connect);
+
+  const docs = document.createElement("button");
+  docs.type = "button";
+  docs.className = "mn-btn mn-btn-quiet";
+  docs.textContent = "Open documentation";
+  docs.addEventListener("click", () => {
+    closeSettingsPage();
+    window.dispatchEvent(new CustomEvent("mn:open-docs"));
+  });
+  content.append(docs);
+}
+
+function renderToolsGrid(content) {
+  content.querySelector(".mn-tools-grid")?.remove();
+  const grid = document.createElement("div");
+  grid.className = "mn-tools-grid";
+  for (const [key, label] of TOOL_LABELS) {
+    const visible = !settings.hiddenTools.includes(key);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "mn-tool-card" + (visible ? " is-visible" : "");
+    card.setAttribute("aria-pressed", String(visible));
+    const iconEl = document.createElement("span");
+    iconEl.className = "mn-tool-card-icon";
+    iconEl.innerHTML = icon(key, 18);
+    const labelEl = document.createElement("span");
+    labelEl.className = "mn-tool-card-label";
+    labelEl.textContent = label;
+    const stateEl = document.createElement("span");
+    stateEl.className = "mn-tool-card-state";
+    stateEl.textContent = visible ? "On" : "Hidden";
+    card.append(iconEl, labelEl, stateEl);
+    card.addEventListener("click", () => {
+      settings.hiddenTools = visible
+        ? [...settings.hiddenTools, key]
+        : settings.hiddenTools.filter((entry) => entry !== key);
+      persist();
+      renderToolsGrid(content);
+      setStatus(`${label} ${visible ? "hidden" : "shown"}`);
+    });
+    grid.append(card);
+  }
+  content.append(grid);
 }
 
 function heading(text) {

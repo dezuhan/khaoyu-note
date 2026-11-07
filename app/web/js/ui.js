@@ -1730,6 +1730,7 @@ function relativeTime(date) {
 
 export function initContextMenu() {
   const viewport = document.getElementById("viewport");
+  window.addEventListener("mn:open-docs", openDocumentation);
   window.addEventListener("mn:toast", (event) => {
   if (event.detail?.message) toast(event.detail.message);
 });
