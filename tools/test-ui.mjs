@@ -216,10 +216,15 @@ const chromeOrder = await page.evaluate(() =>
   [...document.getElementById("app").children].slice(0, 2).map((el) => el.id || el.className)
 );
 check(
-  "Menu bar sits above the header and search lives in the header",
-  chromeOrder[0] === "menubar" &&
-    chromeOrder[1] === "mn-topbar" &&
+  "Header sits above the menu bar and search stays in the header area",
+  chromeOrder[0] === "mn-topbar" &&
+    chromeOrder[1] === "menubar" &&
     (await page.locator("#command-search-btn").isVisible())
+);
+check(
+  "Board access control is in the header right corner",
+  (await page.locator("#share-btn").isVisible()) &&
+    (await page.locator(".mn-topbar-right #share-btn").count()) === 1
 );
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
 check(
@@ -1906,6 +1911,15 @@ check(
 );
 await page.locator(".mn-sync-panel .mn-modal-close").click();
 check("Sync dialog closes without changing the board", (await page.locator(".mn-sync-overlay").count()) === 0);
+await page.click("#share-btn");
+await page.waitForTimeout(300);
+check(
+  "Header share control explains the server requirement before sharing",
+  (await page.locator(".mn-share-panel").isVisible()) &&
+    (await page.locator(".mn-share-panel").innerText()).includes("Connect a server")
+);
+await page.locator(".mn-share-panel .mn-modal-close").click();
+check("Share panel closes", (await page.locator(".mn-share-overlay").count()) === 0);
 await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
 await page.locator(".mn-menu-item", { hasText: "Documentation" }).click();
 await page.waitForTimeout(250);
