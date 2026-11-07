@@ -40,7 +40,7 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Comment</td><td>Threaded comments with checkboxes and replies.</td></tr>
     <tr><td>Table</td><td>Editable cells, rows and columns.</td></tr>
     <tr><td>Image / Upload</td><td>Local image or file asset stored with the board. Right-click an image and choose Crop image for a free crop.</td></tr>
-    <tr><td>Link</td><td>URL card. A hero image is fetched automatically from the page metadata when available. Links without a hero image show a dotted globe fallback. Right-click for Add, Change, Crop or Remove header image.</td></tr>
+    <tr><td>Link</td><td>URL card. A hero image is fetched automatically from the page metadata when available. Links without a hero image show a soft dotted globe fallback at the same 24px spacing as the board dots. Right-click for Add, Change, Crop or Remove header image.</td></tr>
     <tr><td>Audio</td><td>Upload MP3, WAV, M4A, AAC, OGG, Opus or FLAC, or paste a link. The edit action shows a clip-only upload button and Submit. Right-click for Play, Pause and a Repeat checkbox.</td></tr>
     <tr><td>Video</td><td>YouTube, Vimeo or a local video file. A centered circular play button starts the embed with autoplay. Right-click for Play, Pause and a Repeat checkbox.</td></tr>
     <tr><td>Map</td><td>Google Maps link or place query.</td></tr>

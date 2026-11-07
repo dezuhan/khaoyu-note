@@ -2102,6 +2102,15 @@ if (await linkCard.count()) {
     (await linkCard.locator(".mn-link-header-default").isVisible()) &&
       (await linkCard.locator(".mn-link-header-default svg").count()) === 1
   );
+  const dotStyle = await linkCard.locator(".mn-link-header-default").evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { image: style.backgroundImage, size: style.backgroundSize };
+  });
+  check(
+    "Fallback dots match the board dot spacing",
+    dotStyle.image.includes("radial-gradient") && dotStyle.size === "24px 24px",
+    `${dotStyle.size}`
+  );
   await linkCard.click({ button: "right" });
   await page.waitForTimeout(250);
   await page.locator(".mn-menu-item", { hasText: /header image/i }).first().click();
