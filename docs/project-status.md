@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.25.0.
+Snapshot date: 2026-11-07. Version: 0.25.1.
 
 ## Technology
 
@@ -216,7 +216,7 @@ Still blocked by the environment or missing credentials:
 - Failed SMTP sends are queued in `email_jobs` and retried by the worker with exponential backoff.
 - Shared links open a read-only `/s/:token` viewer with passphrase handling, scope isolation, neutral errors and noindex.
 - Help > Documentation opens an offline in-app guide with cards, shortcuts, sync, accounts, sharing and troubleshooting.
-- The header now sits above the menu bar with a right-corner Share control, per-board access, default view-only links, optional passwords and a right-click Share link action.
+- The menu bar sits above the file header, with a right-corner Share control, per-board access, default view-only links, optional passwords and a right-click Share link action.
 - First-run setup offers local-only use, account creation on a service, or connecting a custom server with an API token.
 - Settings navigation is Account, divider, General, Appearance, Tools, Performance, divider, MCP, About. Language and Canvas are merged, Tools is a two-column icon grid, and Account links the service pages.
 - The desktop app and service account, passkey, sharing and share viewer pages use one token vocabulary from `docs/design-system.md`; dialog and popup backdrops blur their content.

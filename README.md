@@ -25,8 +25,8 @@ Document page editor and drawing page editor:
 ![Drawing editor](shots/drawing-editor.png)
 
 Status: working MVP. Every behavior below is covered by an automated Playwright suite
-(240/240 UI checks) and the MCP server has its own smoke suite (16/16 checks). The header sits above
-the menu bar, its Share control manages per-board access, right-clicking a card offers Share link, and
+(240/240 UI checks) and the MCP server has its own smoke suite (16/16 checks). The menu bar sits above
+the file header, its Share control manages per-board access, right-clicking a card offers Share link, and
 **Help > Documentation** opens the offline guide.
 
 ## What is here
@@ -405,8 +405,8 @@ Built artifacts are copied to `dist/`:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.25.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
-| `Khaoyu Note_0.25.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.25.1_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.25.1_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
 | `KhaoyuNote.exe` | 10.79 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.38 MiB | standalone MCP server for AI agents |
 
