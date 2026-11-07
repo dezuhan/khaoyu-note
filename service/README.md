@@ -199,7 +199,9 @@ Email verification and password reset tokens are single use, short lived and sto
 development mailer writes messages to the outbox instead of sending SMTP; treat that directory as
 sensitive and add an SMTP adapter before production use.
 
-Desktop sync uses a scoped API token with `projects:read` and `projects:write`. The service allows
+Desktop sync uses a scoped API token with `projects:read` and `projects:write`. When a synced local
+board has a parent board that is already synced, the new server project is created with
+`parentProjectId`, so nested shares can include it under the policy above. The service allows
 bearer-token CORS preflight only from `KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are
 never allowed from those origins. Add the local web host origin manually if the browser build should
 sync directly.
@@ -281,6 +283,12 @@ Notification email is opt-in per account. When SMTP is configured, messages are 
 `nodemailer`; otherwise they remain in the mode `0600` outbox. Each message has a signed one-click
 unsubscribe link, and at most one notification email is sent per account per five minutes. Invitation,
 verification and reset mail remain transactional and are not governed by the notification preference.
+
+Project shares include eligible nested boards as `nestedProjects`. A nested project is included only
+when it has the same owner and no members beyond that owner, recursively up to five levels and at most
+20 nested projects. Children with additional members are omitted and counted in
+`excludedNestedProjects`; the payload states this policy. A project share still omits the trash and
+local asset paths. Item and column shares never include nested boards.
 
 ## Revision history and events
 

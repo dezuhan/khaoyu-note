@@ -94,7 +94,7 @@ remaining work named in the item.
 
 ### Share scopes
 
-- [ ] **Project share**: a whole project, including nested boards according to policy (partial: current project snapshot implemented; nested board inclusion policy pending).
+- [x] **Project share**: a whole project, including nested boards according to policy.
 - [x] **Item share**: one card, with enough context to render it, but not sibling cards.
 - [x] **Column share**: a column and its current children, with an explicit notice that later
   additions may or may not be included depending on the permission chosen.
