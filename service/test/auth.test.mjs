@@ -621,6 +621,70 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.ok(notifications.body.notifications.some((entry) => entry.kind === "comment.mention"));
   });
 
+  await t.test("project shares include eligible nested boards and exclude shared children", async () => {
+    const owner = await api.account(`nested-owner-${crypto.randomUUID()}@example.com`);
+    const guest = await api.account(`nested-guest-${crypto.randomUUID()}@example.com`);
+    const parentId = await createProject(owner, "Parent board");
+    const created = await api.call("/api/v1/projects", {
+      method: "POST",
+      jar: owner.jar,
+      body: { title: "Nested board", parentProjectId: parentId },
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.parentProjectId, parentId);
+    const childId = created.body.id;
+    await putSnapshot(owner, parentId, {
+      id: parentId,
+      title: "Parent board",
+      cards: [{ id: "parent-card", type: "note", x: 0, y: 0, w: 200, h: 70, z: 1, text: "Parent" }],
+      connections: [],
+      trash: [],
+    });
+    await putSnapshot(owner, childId, {
+      id: childId,
+      title: "Nested board",
+      cards: [{ id: "child-card", type: "note", x: 0, y: 0, w: 200, h: 70, z: 1, text: "Child" }],
+      connections: [],
+      trash: [],
+    });
+    await api.call(`/api/v1/projects/${parentId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true },
+    });
+    const share = await api.call(`/api/v1/projects/${parentId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view" },
+    });
+    const shared = await api.call(`/api/v1/share/${share.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(shared.status, 200);
+    assert.equal(shared.body.nestedProjects.length, 1);
+    assert.equal(shared.body.nestedProjects[0].id, childId);
+    assert.equal(shared.body.nestedProjects[0].doc.cards[0].id, "child-card");
+    assert.equal(shared.body.doc.cards.some((card) => card.id === "child-card"), false);
+
+    api.db
+      .prepare("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'viewer', ?)")
+      .run(childId, guest.account.id, Date.now());
+    const afterMember = await api.call(`/api/v1/share/${share.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(afterMember.body.nestedProjects.length, 0);
+    assert.equal(afterMember.body.excludedNestedProjects, 1);
+
+    const forbidden = await api.call("/api/v1/projects", {
+      method: "POST",
+      jar: guest.jar,
+      body: { title: "Forbidden child", parentProjectId: parentId },
+    });
+    assert.equal(forbidden.status, 404);
+  });
+
   await t.test("public sharing is off until the owner enables it", async () => {
     const owner = await api.account(`share-off-${crypto.randomUUID()}@example.com`);
     const projectId = await createProject(owner, "Private sharing");
