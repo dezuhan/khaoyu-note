@@ -1639,6 +1639,56 @@ fn mcp_server_path(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Check the latest published GitHub release. The request never downloads an installer; the client
+/// only compares versions and shows the release notes.
+#[tauri::command]
+async fn check_update() -> Result<Value, String> {
+    const UPDATE_REPO: &str = "dezuhan/khaoyu-note";
+    const USER_AGENT: &str = concat!("KhaoyuNote/", env!("CARGO_PKG_VERSION"));
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .redirect(reqwest::redirect::Policy::limited(3))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .get(format!(
+            "https://api.github.com/repos/{UPDATE_REPO}/releases/latest"
+        ))
+        .header(reqwest::header::USER_AGENT, USER_AGENT)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = response.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Ok(json!({
+            "currentVersion": env!("CARGO_PKG_VERSION"),
+            "release": None::<Value>,
+        }));
+    }
+    if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return Err("GitHub rate limit reached, try again later".into());
+    }
+    if !status.is_success() {
+        return Err(format!("GitHub answered {status}"));
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() > 1_000_000 {
+        return Err("the release description is too large".into());
+    }
+    let release: Value =
+        serde_json::from_slice(&bytes).map_err(|_| "GitHub returned an unexpected response")?;
+    Ok(json!({
+        "currentVersion": env!("CARGO_PKG_VERSION"),
+        "release": release,
+    }))
+}
+
+#[tauri::command]
 fn open_external(url: String) -> Result<(), String> {
     let lower = url.to_lowercase();
     if !(lower.starts_with("http://") || lower.starts_with("https://")) {
@@ -1712,6 +1762,8 @@ pub fn run() {
             export_board,
             app_data_dir,
             mcp_server_path,
+            app_version,
+            check_update,
             open_external,
             fetch_link_preview,
             open_path,

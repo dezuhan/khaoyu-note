@@ -26,6 +26,10 @@ project uses Semantic Versioning.
 - Help > Documentation is now a tabbed guide with a Settings-like left navigation and a scrolling
   section pane, including new MCP and HTTP API sections, environment tables, endpoint lists and code
   examples. Arrow keys move between sections.
+- The app checks the latest GitHub release of `dezuhan/khaoyu-note` at startup and then once per hour,
+  and from Help > Check for updates or Settings > About. It compares versions, shows the release notes
+  and offers to open the release page. It never downloads or runs an installer. The About pane now
+  reports the real app version instead of a hardcoded value.
 - Server sync signs in with the account email and password instead of an API token. The service
   exchanges the credentials for a scoped project token, revokes the previous sync token on each
   sign-in, and the client stores it without showing it. The sync dialog, the first-run screen and the

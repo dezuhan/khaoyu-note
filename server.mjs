@@ -16,6 +16,7 @@ const PORT = Number(process.env.KHAOYU_WEB_PORT || process.env.PORT || 1430);
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 const DB_FILE = "khaoyu-note.db";
 const MAX_ASSET_BYTES = 100 * 1024 * 1024;
+const UPDATE_REPO = "dezuhan/khaoyu-note";
 const BLOCKED_EXTENSIONS = new Set([
   "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
 ]);
@@ -400,6 +401,30 @@ async function fetchLinkPreview(url) {
   return downloadPreviewImage(imageUrl.href);
 }
 
+async function checkUpdate() {
+  const response = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+    signal: AbortSignal.timeout(8000),
+    headers: {
+      "user-agent": `KhaoyuNote/${VERSION}`,
+      accept: "application/vnd.github+json",
+    },
+  });
+  if (response.status === 404) {
+    return { currentVersion: VERSION, release: null };
+  }
+  if (response.status === 403 || response.status === 429) {
+    throw new Error("GitHub rate limit reached, try again later");
+  }
+  if (!response.ok) {
+    throw new Error(`GitHub answered ${response.status}`);
+  }
+  const text = await response.text();
+  if (text.length > 1_000_000) {
+    throw new Error("the release description is too large");
+  }
+  return { currentVersion: VERSION, release: JSON.parse(text) };
+}
+
 function exportBackupZip() {
   const source = backupData();
   const entries = {};
@@ -476,6 +501,10 @@ async function invoke(cmd, args = {}) {
       return null;
     case "app_data_dir":
       return DATA_DIR;
+    case "app_version":
+      return VERSION;
+    case "check_update":
+      return checkUpdate();
     case "mcp_server_path":
       return "";
     case "backup_data":

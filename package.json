@@ -19,6 +19,7 @@
     "service:restore": "node service/src/cli.mjs restore",
     "test:service": "node --test service/test/service.test.mjs service/test/auth.test.mjs",
     "test:sync": "node --no-warnings tools/test-sync.mjs",
+    "test:update": "node --no-warnings tools/test-update.mjs",
     "test:passkeys": "node tools/test-passkeys.mjs",
     "test:account-ui": "node tools/test-account-ui.mjs",
     "test:shares-ui": "node tools/test-shares-ui.mjs",

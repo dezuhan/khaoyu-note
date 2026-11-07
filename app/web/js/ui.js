@@ -828,6 +828,7 @@ function buildCommands() {
     { id: "view.bg.sage", label: "Board background: Sage", group: "View", icon: "sun", run: () => setBoardBackground("#e9efe5") },
     { id: "help.palette", label: "Command palette", group: "Help", icon: "search", shortcut: "Ctrl+K", run: () => openCommandPalette() },
     { id: "help.shortcuts", label: "Keyboard shortcuts", group: "Help", icon: "help", shortcut: "?", run: () => openHelpModal() },
+    { id: "help.updates", label: "Check for updates", group: "Help", icon: "download", run: () => window.dispatchEvent(new CustomEvent("mn:check-updates")) },
     { id: "help.documentation", label: "Documentation", group: "Help", icon: "help", shortcut: "", run: () => openDocumentation() },
   );
   return commands;

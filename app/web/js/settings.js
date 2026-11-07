@@ -5,6 +5,7 @@ import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
 import { checkConnection, describeConnection, loadSyncConfig, signOut } from "./sync.js";
+import { currentVersion, initCurrentVersion, releaseSummary } from "./update.js";
 import { openSyncDialog } from "./sync-ui.js";
 
 export const DEFAULT_TOOL_ORDER = [
@@ -114,6 +115,7 @@ export async function initSettings() {
     settings = { ...DEFAULT_SETTINGS };
   }
   applyGlobalSettings();
+  void initCurrentVersion();
   return settings;
 }
 
@@ -543,7 +545,14 @@ function pages() {
       id: "about",
       title: "About",
       rows: () => [
-        info("Version", bridge.webInfo?.version || "0.23.2"),
+        info("Version", currentVersion() || bridge.webInfo?.version || "unknown"),
+        info("Update status", releaseSummary()),
+        {
+          type: "action",
+          label: "Updates",
+          buttonLabel: "Check for updates",
+          run: () => window.dispatchEvent(new CustomEvent("mn:check-updates")),
+        },
         info(
           "Storage",
           bridge.hasWeb

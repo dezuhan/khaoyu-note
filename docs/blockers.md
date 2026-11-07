@@ -56,3 +56,7 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 4. Re-enable the Map, Video and Audio tools once their embed paths are reliable again. The policy
    lives in `app/web/js/limits.js`; removing the entry restores the rail, palette, shortcuts and the
    Settings status in one place.
+5. Publish GitHub Releases for the update check. The repository has no remote yet and
+   `desktop-release.yml` only uploads artifacts for 14 days, so a check currently reports "no published
+   release". Push the repo, create `v*` releases with notes and installers, then the existing check
+   starts reporting versions.

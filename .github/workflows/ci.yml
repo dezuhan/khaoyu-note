@@ -103,6 +103,9 @@ jobs:
       - name: Sync engine checks
         run: node tools/test-sync.mjs
 
+      - name: Update check checks
+        run: node tools/test-update.mjs
+
       - name: Passkey virtual-authenticator suite
         run: node tools/test-passkeys.mjs
 

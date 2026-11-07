@@ -4,6 +4,7 @@ import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
 import { initShareUI } from "./share-ui.js";
+import { initUpdateUI } from "./update-ui.js";
 import { maybeShowOnboarding } from "./onboarding.js";
 import {
   createBoard,
@@ -83,6 +84,7 @@ async function boot() {
   renderView();
   refreshSync();
   maybeShowOnboarding();
+  initUpdateUI();
   document.getElementById("boot")?.remove();
   document.fonts?.ready.then(() => {
     if (state.board) render("geometry");

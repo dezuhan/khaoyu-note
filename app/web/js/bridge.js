@@ -160,6 +160,16 @@ export async function mcpServerPath() {
   return "";
 }
 
+export async function appVersion() {
+  if (hasTauri) return invoke("app_version");
+  return webInfo?.version || "";
+}
+
+export async function checkUpdate() {
+  if (hasTauri) return invoke("check_update");
+  throw new Error("Checking for updates needs the desktop app or the local web host");
+}
+
 export async function openExternal(url) {
   if (hasTauri) return invoke("open_external", { url });
   window.open(url, "_blank");

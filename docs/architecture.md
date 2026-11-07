@@ -284,6 +284,25 @@ image and line tools get their own behaviour (nested board at the point, editor 
 toast for line). This keeps rail reordering and canvas creation on one drag gesture: dropping on a
 rail button reorders, dropping on the canvas creates.
 
+## Update check
+
+`app/web/js/update.js` compares the installed version with the latest published GitHub release of
+`dezuhan/khaoyu-note`. It exposes the pure helpers `normalizeVersion`, `compareVersions` (semver with
+prerelease ordering), `parseRelease` and `evaluateRelease`, so the version logic is testable without a
+network. `update-ui.js` runs the check at startup and then every hour, shows the release notes in a
+modal, and listens for the `mn:check-updates` event raised by Help > Check for updates and Settings >
+About. A release that the user already dismissed is not shown again automatically; the dismissed
+version lives in `mn.update.dismissed` and the last result in `mn.update.cache`.
+
+The host side is a Rust `check_update` command and the same command in `server.mjs`, so the desktop app
+and the local web host behave the same. Both call
+`GET https://api.github.com/repos/dezuhan/khaoyu-note/releases/latest` with a Khaoyu user agent, an 8
+second timeout, a 1 MB response cap and the GitHub JSON media type. A 404 means no release has been
+published yet, 403 and 429 report the GitHub rate limit, and any other status is an error. The current
+version comes from a separate `app_version` command (the Cargo package version on desktop, the root
+`package.json` version on the web host). The check never downloads an installer: it only opens the
+release page with the existing external-link command.
+
 ## Web host
 
 `server.mjs` serves the same `app/web` frontend on `http://127.0.0.1:1430` and opens the same

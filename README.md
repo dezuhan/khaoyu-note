@@ -108,6 +108,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and shown with a disabled status in Settings > Tools |
 | Tool drag to canvas | implemented: floating label plus dashed drop preview, card created at the pointer, works reliably in WebView2 because it does not depend on HTML5 drag (board/document/image keep their own flows) |
 | MCP server | implemented: `khaoyu-note-mcp.exe` with 14 board tools over the same SQLite database |
+| Update check | implemented: the app reads the latest GitHub release of `dezuhan/khaoyu-note` at startup and then once per hour, and from Help > Check for updates or Settings > About. It compares versions, shows the release notes and opens the release page in the browser; it never downloads or runs an installer. A check needs published GitHub Releases, and the request reveals the user IP to GitHub. |
 | Card layout | implemented: note/link/document content sits centred, the grip is bottom-right and resizes width only |
 | Undo / redo | implemented (snapshot history) |
 | Context menu | implemented: grouped Khaoyu menu with shortcuts, disabled states, New note/link/to-do/line/heading/board/column/comment/table/image/file at the click point, wrap multi-selection in a column, archive and move-to-trash/restore, and Rename on projects |
@@ -384,6 +385,9 @@ node tools/test-fonts.mjs
 
 # MCP server smoke test (spawns the binary against a temporary database)
 node tools/test-mcp.mjs
+
+# update check version comparison, release parsing and error handling
+node tools/test-update.mjs
 
 # self-hosted service and account tests (Node 24, temp databases)
 node --test service/test/service.test.mjs service/test/auth.test.mjs

@@ -342,6 +342,34 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
     `,
   },
   {
+    id: "updates",
+    label: "Updates",
+    html: `
+      <p class="mn-docs-lead">The app checks the latest GitHub release of
+      <code>dezuhan/khaoyu-note</code>. It never downloads or runs an installer.</p>
+      <h3>When it checks</h3>
+      <ul>
+        <li>Once at startup, then every hour while the app stays open.</li>
+        <li>Manually from Help &gt; Check for updates or Settings &gt; About.</li>
+      </ul>
+      <h3>What it shows</h3>
+      <p>When a newer version is published, a dialog shows the release tag, published date and the
+      release notes. Open release page opens the GitHub release in the browser, where the installer can
+      be downloaded. A dismissed version is not shown again automatically, but Settings &gt; About keeps
+      the last status.</p>
+      <h3>Limits and privacy</h3>
+      <ul>
+        <li>Only the GitHub API is called; no board data is sent.</li>
+        <li>The request reveals the user IP to GitHub and counts against GitHub's unauthenticated rate
+        limit of 60 requests per hour per IP. One check per hour stays well below it.</li>
+        <li>When no release is published or the network is unavailable, About reports the status and
+        the app keeps working.</li>
+        <li>Updates are notification only: there is no silent download, no auto-install and no signed
+        update channel yet.</li>
+      </ul>
+    `,
+  },
+  {
     id: "privacy",
     label: "Privacy and safety",
     html: `
