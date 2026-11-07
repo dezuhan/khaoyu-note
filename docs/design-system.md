@@ -39,10 +39,15 @@ The desktop app also exposes theme variants (`light`, `softLight`, `softDark`, `
 
 ## Service pages
 
-`service/public/ui.css` carries the same token names for `/account`, `/passkeys`, `/shares` and
-`/s/:token`. Pages keep their layout rules inline but load the shared stylesheet after them, so
-colors, typography, controls, links and focus states come from the token layer. The service CSP allows
-`style-src 'self' 'unsafe-inline'` so the shared stylesheet and page-level layout can coexist.
+`service/public/ky.css` is the same framework stylesheet used by the desktop app
+(`app/web/vendor/ky.css`). Every service page loads it first, then `service/public/ui.css`, a small
+layout layer for the auth panel. Pages use the real `.ky-scope`, `.ky-panel`, `.ky-title`,
+`.ky-label`, `.ky-input` and `.ky-button` components, so buttons, inputs, typography, focus rings and
+surfaces match the app rather than a hand-written token copy.
+
+When the vendored framework changes, copy it to `service/public/ky.css` and re-run the account,
+passkey, sharing and share viewer suites. The service CSP allows `style-src 'self' 'unsafe-inline'`
+for the stylesheet links and any page-level inline attributes.
 
 ## Settings structure
 

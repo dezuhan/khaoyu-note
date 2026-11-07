@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.28.0.
+Snapshot date: 2026-11-07. Version: 0.28.1.
 
 ## Technology
 
@@ -219,7 +219,7 @@ Still blocked by the environment or missing credentials:
 - The menu bar sits above the file header, with a right-corner Share control, per-board access, default view-only links, optional passwords and a right-click Share link action.
 - First-run setup offers local-only use, account creation on a service, or connecting a custom server with an API token.
 - Settings navigation is Account, divider, General, Appearance, Tools, Performance, divider, MCP, About. Language and Canvas are merged, Tools is a two-column icon grid, and Account links the service pages.
-- The desktop app and service account, passkey, sharing and share viewer pages use one token vocabulary from `docs/design-system.md`; dialog and popup backdrops blur their content.
+- The desktop app and service account, passkey, sharing and share viewer pages use the same framework stylesheet (`ky.css`); the service adds only an auth-panel layout layer.
 - Account browser checks now include the shared service design tokens.
 - Link header images and image cards support free crop with a Fit to image reset, applied from the context menu.
 - Audio editing uses a clip-only upload button and Submit; uploading again while editing replaces the source before submit.
