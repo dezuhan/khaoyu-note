@@ -4,13 +4,16 @@ const root = document.documentElement;
 root.classList.add("lp-js");
 
 const themeButton = document.getElementById("theme-toggle");
-const themeLabel = document.getElementById("theme-label");
 const THEME_KEY = "khaoyu.landing.theme";
 
 function applyTheme(theme) {
   root.dataset.kyTheme = theme;
   localStorage.setItem(THEME_KEY, theme);
-  if (themeLabel) themeLabel.textContent = theme === "dark" ? "Light" : "Dark";
+  if (themeButton) {
+    const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+    themeButton.setAttribute("aria-label", label);
+    themeButton.title = label;
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", theme === "dark" ? "#111111" : "#f7f7f7");
 }
