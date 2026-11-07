@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.31.0.
+Snapshot date: 2026-11-07. Version: 0.32.0.
 
 ## Technology
 
@@ -191,7 +191,7 @@ Still blocked by the environment or missing credentials:
 - Backup, export and pre-restore names are collision-free within the same millisecond.
 - A failed legacy JSON import keeps the folder and retries on the next launch.
 - MCP search snippets preserve Unicode, `create_card` cannot override id/type through `fields`, and deleting a card removes its full descendant subtree.
-- Verification: 255/255 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 42/42 service foundation, auth, SSO, passkeys, sharing, nested shares, assets, collaboration, notifications, email, admin, backup, transport hardening, email queue and malformed-request handling, sync engine checks, 8/8 passkey browser checks, 8/8 browser sharing checks, 8/8 share viewer checks, 4/4 first-run checks, 11/11 browser account checks, 10 Rust library tests and 2 MCP unit tests.
+- Verification: 258/258 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 42/42 service foundation, auth, SSO, passkeys, sharing, nested shares, assets, collaboration, notifications, email, admin, backup, transport hardening, email queue and malformed-request handling, sync engine checks, 8/8 passkey browser checks, 8/8 browser sharing checks, 8/8 share viewer checks, 4/4 first-run checks, 11/11 browser account checks, 10 Rust library tests and 2 MCP unit tests.
 - A localhost web host (`server.mjs`) now serves the same frontend against the same SQLite database and assets, with `/status`, a menu-bar host badge and Settings > About details.
 - A self-hosted service foundation (`service/`) now provides fail-closed configuration, explicit reversible migrations, account/project/membership/audit/object tables, content-addressed object storage, a maintenance worker, health endpoints, backup/restore and Docker Compose deployment.
 - The service account core now adds Argon2id registration, email verification, rotating refresh tokens with reuse detection, session revocation, password reset, TOTP, account deletion grace, CSRF/cookie hardening, project role checks and scoped API tokens.
@@ -225,6 +225,7 @@ Still blocked by the environment or missing credentials:
 - Audio editing uses a clip-only upload button and Submit; uploading again while editing replaces the source before submit.
 - Audio playback supports MP3, WAV, M4A, AAC, OGG, Opus and FLAC MIME types in the web host and preview fallback, with a visible error toast for unsupported files.
 - Video embeds render a centered circular play button and load the autoplay embed only on click. Audio and video context menus expose Play, Pause and a Repeat checkbox with disabled states tied to playback.
+- Moving or resizing a card preserves active audio, video and map DOM nodes; video embeds show pause, mute and volume controls and audio adds a volume slider.
 - The default link hero uses the board dot pattern: 24px spacing, 1px soft stroke and a centered globe.
 - Settings > Account includes a Backup section with Back up now, the created backup path and Open folder.
 - Link cards fetch an Open Graph hero image automatically in the desktop and web host, with SSRF host guards, a size cap and a dotted globe fallback when no image is available.
