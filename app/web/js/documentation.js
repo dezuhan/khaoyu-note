@@ -38,10 +38,15 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Board</td><td>Nested board card. Opens a separate local board.</td></tr>
     <tr><td>Comment</td><td>Threaded comments with checkboxes and replies.</td></tr>
     <tr><td>Table</td><td>Editable cells, rows and columns.</td></tr>
-    <tr><td>Image / Upload</td><td>Local image or file asset stored with the board.</td></tr>
-    <tr><td>Link</td><td>URL card. Right-click and choose Add header image to show a preview image above the link. When a header exists, Change header image and Remove header image appear in the same menu.</td></tr>
+    <tr><td>Image / Upload</td><td>Local image or file asset stored with the board. Right-click an image and choose Crop image for a free crop.</td></tr>
+    <tr><td>Link</td><td>URL card. Right-click and choose Add header image to show a preview image above the link. When a header exists, Change header image, Crop header image and Remove header image appear in the same menu.</td></tr>
     <tr><td>Line</td><td>Connect two cards. Select the line to add a midpoint curve.</td></tr>
   </table>
+
+  <h3>Cropping images</h3>
+  <p>Right-click a link header image and choose Crop header image, or right-click an image card and
+  choose Crop image. Drag the frame to move it and drag any edge or corner for a free ratio. Fit to
+  image resets the frame to the full image ratio. Apply crop stores the region with the card.</p>
 
   <h3>Keyboard shortcuts</h3>
   <table>
