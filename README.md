@@ -1,8 +1,9 @@
 # Khaoyu Note
 
 A local-first desktop app for visual notes, boards, kanban, tables and freehand drawing. Rust backend
-(Tauri v2) with a vanilla ES-module frontend. No account, no cloud, no network required: boards live in
-a local SQLite database.
+(Tauri v2) with a vanilla ES-module frontend. Boards live in a local SQLite database and need no
+network. A local account is optional: the first run offers to create the database admin, and guest use
+stays available.
 
 ![Light theme](shots/board-light.png)
 
@@ -103,6 +104,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Menu bar and command palette | implemented: the fixed menu bar has three columns (logo and menus, centered Search commands, icon actions), grouped command menus, and the command palette with Recently used, Tools, File, Edit, View and Help groups plus arrow keys, Enter and Escape |
 | Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; automatic backups can run daily, every 3, 7 or 14 days, or monthly (30 days) while the app is open, and a missed interval is caught up on the next launch; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
+| Local accounts (M1) | implemented: first-run setup creates the local admin in the same SQLite database, with PBKDF2-SHA256 password hashes, hashed sessions, a 30-day desktop or 12-hour web session, an avatar button after Share, and an account popover with account, settings, history and logout. Guest mode stays available, and boards and cards now store their creator and last editor. Role enforcement and the Admin Panel follow in M2 and M3. |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color, column and kanban |
 | Settings | implemented: token-based styling with only the essentials (Account, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done |
 | Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and their cards are hidden from boards and templates. Hiding a tool in Settings only removes the rail button and leaves the feature available. |
@@ -394,6 +396,9 @@ node tools/test-auto-backup.mjs
 
 # temporarily disabled card types stay out of boards and templates
 node tools/test-disabled-cards.mjs
+
+# local accounts on the web host (schema, setup, sessions, CSRF, history)
+node tools/test-auth-web.mjs
 
 # self-hosted service and account tests (Node 24, temp databases)
 node --test service/test/service.test.mjs service/test/auth.test.mjs

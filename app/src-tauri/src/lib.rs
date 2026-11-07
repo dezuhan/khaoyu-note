@@ -2,17 +2,22 @@ use base64::Engine;
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 
+mod auth;
+
 struct AppDb(Mutex<Connection>);
 
+// The signed-in local account for the current process. Cleared on logout.
+struct AuthState(Mutex<Option<auth::SessionUser>>);
+
 const MAX_ASSET_BYTES: u64 = 100 * 1024 * 1024;
-const CURRENT_SCHEMA_VERSION: i64 = 1;
+const CURRENT_SCHEMA_VERSION: i64 = 2;
 pub const DB_FILE: &str = "khaoyu-note.db";
 // Only used to find and migrate data written by releases before the rename. These values must keep
 // matching the identifiers those releases actually wrote, or the migration becomes a no-op and an
@@ -90,7 +95,11 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let mp = (5 * doy + 2) / 153;
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    (if month <= 2 { year + 1 } else { year }, month as u32, day as u32)
+    (
+        if month <= 2 { year + 1 } else { year },
+        month as u32,
+        day as u32,
+    )
 }
 
 /// DOS date and time fields used by the ZIP local and central headers.
@@ -115,7 +124,10 @@ fn collect_zip_entries(
     directory: &Path,
     entries: &mut Vec<(String, PathBuf)>,
 ) -> Result<(), String> {
-    for entry in fs::read_dir(directory).map_err(|e| e.to_string())?.flatten() {
+    for entry in fs::read_dir(directory)
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
         let path = entry.path();
         if path.is_dir() {
             collect_zip_entries(root, &path, entries)?;
@@ -241,6 +253,45 @@ fn schema_version(conn: &Connection) -> Result<i64, String> {
         .optional()
         .map_err(|e| e.to_string())?;
     Ok(value.and_then(|entry| entry.parse().ok()).unwrap_or(0))
+}
+
+fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>, String> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|error| error.to_string())?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .collect();
+    Ok(columns)
+}
+
+fn ensure_column(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<(), String> {
+    let columns = table_columns(conn, table)?;
+    if !columns.iter().any(|name| name == column) {
+        conn.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"),
+            [],
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+/// Schema 2 adds local accounts and the author columns. Tables are created by SCHEMA above, so an
+/// existing database only needs the missing columns.
+fn ensure_auth_schema(conn: &Connection) -> Result<(), String> {
+    ensure_column(conn, "boards", "created_by", "TEXT")?;
+    ensure_column(conn, "boards", "updated_by", "TEXT")?;
+    ensure_column(conn, "cards", "created_by", "TEXT")?;
+    ensure_column(conn, "cards", "updated_by", "TEXT")?;
+    Ok(())
 }
 
 fn check_schema_version(conn: &Connection) -> Result<(), String> {
@@ -444,7 +495,9 @@ CREATE TABLE IF NOT EXISTS boards (
     theme TEXT,
     archived_at INTEGER,
     trashed_at INTEGER,
-    trash TEXT
+    trash TEXT,
+    created_by TEXT,
+    updated_by TEXT
 );
 CREATE TABLE IF NOT EXISTS cards (
     id TEXT PRIMARY KEY,
@@ -457,7 +510,9 @@ CREATE TABLE IF NOT EXISTS cards (
     h REAL NOT NULL,
     z REAL NOT NULL,
     ord REAL NOT NULL,
-    data TEXT NOT NULL
+    data TEXT NOT NULL,
+    created_by TEXT,
+    updated_by TEXT
 );
 CREATE INDEX IF NOT EXISTS cards_board ON cards(board_id);
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
@@ -476,6 +531,47 @@ CREATE TABLE IF NOT EXISTS assets (
     path TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    email TEXT UNIQUE COLLATE NOCASE,
+    first_name TEXT,
+    last_name TEXT,
+    display_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+    member_role TEXT NOT NULL DEFAULT 'editor' CHECK (member_role IN ('editor', 'commenter', 'viewer')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
+    avatar_color TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_login_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    csrf_hash TEXT,
+    host TEXT,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    revoked_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS activity_log (
+    id TEXT PRIMARY KEY,
+    actor_user_id TEXT,
+    actor_source TEXT,
+    actor_name TEXT,
+    action TEXT NOT NULL,
+    resource_type TEXT,
+    resource_id TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS activity_actor ON activity_log(actor_user_id, created_at);
+CREATE INDEX IF NOT EXISTS activity_created ON activity_log(created_at);
 "#;
 
 pub fn now_ms() -> i64 {
@@ -587,6 +683,16 @@ pub fn write_doc_checked(
     doc: &Value,
     expected_updated_at: Option<i64>,
 ) -> Result<i64, String> {
+    write_doc_checked_with_author(conn, doc, expected_updated_at, None, false)
+}
+
+pub fn write_doc_checked_with_author(
+    conn: &Connection,
+    doc: &Value,
+    expected_updated_at: Option<i64>,
+    author: Option<&Value>,
+    touch_author: bool,
+) -> Result<i64, String> {
     let id = str_field(doc, "id").ok_or("board id missing")?.to_string();
     let title = str_field(doc, "title")
         .unwrap_or("Untitled board")
@@ -637,9 +743,49 @@ pub fn write_doc_checked(
         }
     }
 
+    let author_text = author.map(|value| value.to_string());
+    let existing_board: Option<(Option<String>, Option<String>)> = tx
+        .query_row(
+            "SELECT created_by, updated_by FROM boards WHERE id = ?1",
+            params![&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    let board_created = existing_board
+        .as_ref()
+        .and_then(|(created, _)| created.clone())
+        .or_else(|| author_text.clone());
+    let board_updated = if touch_author {
+        author_text.clone()
+    } else {
+        existing_board
+            .as_ref()
+            .and_then(|(_, updated)| updated.clone())
+            .or_else(|| author_text.clone())
+    };
+    let mut card_authors: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
+    {
+        let mut stmt = tx
+            .prepare("SELECT id, created_by, updated_by FROM cards WHERE board_id = ?1")
+            .map_err(|error| error.to_string())?;
+        let rows = stmt
+            .query_map(params![&id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            })
+            .map_err(|error| error.to_string())?;
+        for row in rows.flatten() {
+            card_authors.insert(row.0, (row.1, row.2));
+        }
+    }
+
     tx.execute(
-        "INSERT INTO boards (id, title, parent_id, created_at, updated_at, view, grid, show_grid, theme, archived_at, trashed_at, trash)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        "INSERT INTO boards (id, title, parent_id, created_at, updated_at, view, grid, show_grid, theme, archived_at, trashed_at, trash, created_by, updated_by)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(id) DO UPDATE SET
              title = excluded.title,
              parent_id = excluded.parent_id,
@@ -648,9 +794,11 @@ pub fn write_doc_checked(
              grid = excluded.grid,
              show_grid = excluded.show_grid,
              theme = excluded.theme,
-             archived_at = CASE WHEN ?13 THEN excluded.archived_at ELSE boards.archived_at END,
-             trashed_at = CASE WHEN ?14 THEN excluded.trashed_at ELSE boards.trashed_at END,
-             trash = CASE WHEN ?15 THEN excluded.trash ELSE boards.trash END",
+             archived_at = CASE WHEN ?15 THEN excluded.archived_at ELSE boards.archived_at END,
+             trashed_at = CASE WHEN ?16 THEN excluded.trashed_at ELSE boards.trashed_at END,
+             trash = CASE WHEN ?17 THEN excluded.trash ELSE boards.trash END,
+             created_by = COALESCE(boards.created_by, excluded.created_by),
+             updated_by = excluded.updated_by",
         params![
             id,
             title,
@@ -664,6 +812,8 @@ pub fn write_doc_checked(
             archived_at,
             trashed_at,
             trash,
+            board_created,
+            board_updated,
             has_archived_at,
             has_trashed_at,
             has_trash
@@ -684,9 +834,22 @@ pub fn write_doc_checked(
             let h = num_field(card, "h").unwrap_or(70.0);
             let z = num_field(card, "z").unwrap_or(1.0);
             let ord = num_field(card, "order").unwrap_or(0.0);
+            let previous = card_authors.get(&card_id);
+            let card_created = previous
+                .and_then(|(created, _)| created.clone())
+                .or_else(|| card.get("createdBy").map(|value| value.to_string()))
+                .or_else(|| author_text.clone());
+            let card_updated = if touch_author {
+                author_text.clone()
+            } else {
+                previous
+                    .and_then(|(_, updated)| updated.clone())
+                    .or_else(|| card.get("updatedBy").map(|value| value.to_string()))
+                    .or_else(|| author_text.clone())
+            };
             tx.execute(
-                "INSERT INTO cards (id, board_id, type, parent_id, x, y, w, h, z, ord, data)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                "INSERT INTO cards (id, board_id, type, parent_id, x, y, w, h, z, ord, data, created_by, updated_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     card_id,
                     id,
@@ -698,7 +861,9 @@ pub fn write_doc_checked(
                     h,
                     z,
                     ord,
-                    card.to_string()
+                    card.to_string(),
+                    card_created,
+                    card_updated
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -726,10 +891,14 @@ pub fn write_doc_checked(
     Ok(updated_at)
 }
 
+fn parse_author(value: Option<String>) -> Option<Value> {
+    value.and_then(|text| serde_json::from_str::<Value>(&text).ok())
+}
+
 pub fn read_doc(conn: &Connection, id: &str) -> Result<Option<String>, String> {
     let row = conn
         .query_row(
-            "SELECT title, parent_id, created_at, updated_at, view, grid, show_grid, theme, archived_at, trashed_at, trash
+            "SELECT title, parent_id, created_at, updated_at, view, grid, show_grid, theme, archived_at, trashed_at, trash, created_by, updated_by
              FROM boards WHERE id = ?1",
             params![id],
             |r| {
@@ -745,6 +914,8 @@ pub fn read_doc(conn: &Connection, id: &str) -> Result<Option<String>, String> {
                     r.get::<_, Option<i64>>(8)?,
                     r.get::<_, Option<i64>>(9)?,
                     r.get::<_, Option<String>>(10)?,
+                    r.get::<_, Option<String>>(11)?,
+                    r.get::<_, Option<String>>(12)?,
                 ))
             },
         )
@@ -762,26 +933,44 @@ pub fn read_doc(conn: &Connection, id: &str) -> Result<Option<String>, String> {
         archived_at,
         trashed_at,
         trash,
+        created_by,
+        updated_by,
     )) = row
     else {
         return Ok(None);
     };
 
     let mut card_stmt = conn
-        .prepare("SELECT data FROM cards WHERE board_id = ?1 ORDER BY z ASC, ord ASC")
+        .prepare("SELECT data, created_by, updated_by FROM cards WHERE board_id = ?1 ORDER BY z ASC, ord ASC")
         .map_err(|e| e.to_string())?;
     let mut cards: Vec<Value> = Vec::new();
     for entry in card_stmt
-        .query_map(params![id], |r| r.get::<_, String>(0))
+        .query_map(params![id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+            ))
+        })
         .map_err(|e| e.to_string())?
     {
         match entry {
-            Ok(text) => match serde_json::from_str::<Value>(&text) {
-                Ok(card) => cards.push(card),
-                Err(error) => {
-                    eprintln!("khaoyu-note: skipping a corrupt card in board {id}: {error}")
+            Ok((text, card_created_by, card_updated_by)) => {
+                match serde_json::from_str::<Value>(&text) {
+                    Ok(mut card) => {
+                        if let Some(value) = parse_author(card_created_by) {
+                            card["createdBy"] = value;
+                        }
+                        if let Some(value) = parse_author(card_updated_by) {
+                            card["updatedBy"] = value;
+                        }
+                        cards.push(card);
+                    }
+                    Err(error) => {
+                        eprintln!("khaoyu-note: skipping a corrupt card in board {id}: {error}")
+                    }
                 }
-            },
+            }
             Err(error) => eprintln!("khaoyu-note: could not read a card in board {id}: {error}"),
         }
     }
@@ -825,6 +1014,12 @@ pub fn read_doc(conn: &Connection, id: &str) -> Result<Option<String>, String> {
     }
     if let Some(value) = trashed_at {
         doc["trashedAt"] = json!(value);
+    }
+    if let Some(value) = parse_author(created_by) {
+        doc["createdBy"] = value;
+    }
+    if let Some(value) = parse_author(updated_by) {
+        doc["updatedBy"] = value;
     }
     serde_json::to_string(&doc)
         .map(Some)
@@ -1045,6 +1240,7 @@ pub fn open_db_at(root: &Path) -> Result<Connection, String> {
     conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
     ensure_board_flag_columns(&conn)?;
     migrate_legacy(&conn, root)?;
+    ensure_auth_schema(&conn)?;
     normalize_timestamps(&conn)?;
     check_schema_version(&conn)?;
     Ok(conn)
@@ -1086,6 +1282,77 @@ pub fn list_board_meta(conn: &Connection) -> Result<Vec<BoardMeta>, String> {
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
+}
+
+fn current_local_user(
+    conn: &Connection,
+    auth_state: &AuthState,
+) -> Result<Option<auth::PublicUser>, String> {
+    let guard = auth_state
+        .0
+        .lock()
+        .map_err(|_| "auth state is locked".to_string())?;
+    let Some(session) = guard.as_ref() else {
+        return Ok(None);
+    };
+    let user = auth::find_user(conn, &session.user.id)?;
+    Ok(user.filter(|user| user.status == "active"))
+}
+
+fn require_editor(
+    conn: &Connection,
+    auth_state: &AuthState,
+) -> Result<Option<auth::PublicUser>, String> {
+    let user = current_local_user(conn, auth_state)?;
+    match &user {
+        Some(user) => {
+            if user.role == "member"
+                && (user.member_role == "viewer" || user.member_role == "commenter")
+            {
+                return Err("You do not have permission to edit this board".into());
+            }
+        }
+        None => {
+            if auth::require_login(conn) {
+                return Err("Sign in required".into());
+            }
+        }
+    }
+    Ok(user)
+}
+
+#[allow(dead_code)]
+fn require_admin(conn: &Connection, auth_state: &AuthState) -> Result<auth::PublicUser, String> {
+    let user = current_local_user(conn, auth_state)?.ok_or("Sign in required")?;
+    if user.role != "admin" {
+        return Err("Admin permission required".into());
+    }
+    Ok(user)
+}
+
+fn session_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(root_dir(app)?.join("auth-session.json"))
+}
+
+fn write_session_file(app: &tauri::AppHandle, token: &str) -> Result<(), String> {
+    let path = session_file_path(app)?;
+    fs::write(&path, json!({ "token": token }).to_string()).map_err(|error| error.to_string())
+}
+
+fn read_session_token(app: &tauri::AppHandle) -> Option<String> {
+    let path = session_file_path(app).ok()?;
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<Value>(&text)
+        .ok()?
+        .get("token")?
+        .as_str()
+        .map(str::to_string)
+}
+
+fn clear_session_file(app: &tauri::AppHandle) {
+    if let Ok(path) = session_file_path(app) {
+        let _ = fs::remove_file(path);
+    }
 }
 
 #[tauri::command]
@@ -1200,6 +1467,7 @@ fn trash_board(db: State<'_, AppDb>, id: String, trashed: bool) -> Result<(), St
 #[tauri::command]
 fn save_board(
     db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
     id: String,
     data: String,
     base_updated_at: Option<i64>,
@@ -1209,7 +1477,9 @@ fn save_board(
         return Err("board id mismatch".into());
     }
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    write_doc_checked(&conn, &doc, base_updated_at)
+    let author = require_editor(&conn, &auth_state)?;
+    let author_value = author.as_ref().map(auth::author_value);
+    write_doc_checked_with_author(&conn, &doc, base_updated_at, author_value.as_ref(), true)
 }
 
 pub fn delete_board_tree(conn: &Connection, id: &str) -> Result<(), String> {
@@ -1342,6 +1612,14 @@ fn backup_data(app: tauri::AppHandle) -> Result<String, String> {
             params![db_target.to_string_lossy().to_string()],
         )
         .map_err(|e| e.to_string())?;
+    }
+    // A backup must never carry live session tokens. Rebuild the copy after removing them so the
+    // pages cannot be recovered from the snapshot.
+    {
+        let backup = Connection::open(&db_target).map_err(|e| e.to_string())?;
+        backup
+            .execute_batch("PRAGMA secure_delete = ON; DELETE FROM sessions; VACUUM;")
+            .map_err(|e| e.to_string())?;
     }
     let assets = root.join("assets");
     if assets.is_dir() {
@@ -1481,7 +1759,10 @@ const PREVIEW_USER_AGENT: &str = concat!("KhaoyuNote/", env!("CARGO_PKG_VERSION"
 /// bot page instead of Open Graph tags, so the thumbnail is resolved from the id directly.
 fn youtube_video_id(url: &reqwest::Url) -> Option<String> {
     let host = url.host_str()?.to_ascii_lowercase();
-    let host = host.strip_prefix("www.").unwrap_or(host.as_str()).to_string();
+    let host = host
+        .strip_prefix("www.")
+        .unwrap_or(host.as_str())
+        .to_string();
     let first_segment = |prefix: &str| {
         url.path()
             .strip_prefix(prefix)
@@ -1670,7 +1951,8 @@ async fn check_update() -> Result<Value, String> {
             "release": None::<Value>,
         }));
     }
-    if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+    if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+    {
         return Err("GitHub rate limit reached, try again later".into());
     }
     if !status.is_success() {
@@ -1686,6 +1968,405 @@ async fn check_update() -> Result<Value, String> {
         "currentVersion": env!("CARGO_PKG_VERSION"),
         "release": release,
     }))
+}
+
+#[tauri::command]
+fn auth_status(db: State<'_, AppDb>, auth_state: State<'_, AuthState>) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = current_local_user(&conn, &auth_state)?;
+    let require_login = auth::require_login(&conn);
+    Ok(json!({
+        "userCount": auth::count_users(&conn)?,
+        "requireLogin": require_login,
+        "guestAllowed": !require_login,
+        "user": user,
+        "csrfToken": Value::Null,
+    }))
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn auth_setup_admin(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    app: tauri::AppHandle,
+    username: String,
+    email: String,
+    first_name: String,
+    last_name: String,
+    password: String,
+    claim_boards: Option<bool>,
+    remember: Option<bool>,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let claims = claim_boards.unwrap_or(true);
+    let new_user = auth::NewUser {
+        username: &username,
+        email: &email,
+        first_name: &first_name,
+        last_name: &last_name,
+        password: &password,
+    };
+    let user = auth::create_first_admin(&conn, &new_user)?;
+    if claims {
+        auth::claim_unattributed(&conn, &user)?;
+    }
+    let session = auth::create_session(&conn, &user.id, "desktop", auth::DESKTOP_SESSION_DAYS)?;
+    auth::mark_login(&conn, &user.id)?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        "auth.setup",
+        Some("user"),
+        Some(&user.id),
+        json!({ "claimedBoards": claims }),
+    )?;
+    let user = auth::find_user(&conn, &user.id)?.ok_or("could not read the new account")?;
+    if remember.unwrap_or(true) {
+        write_session_file(&app, &session.token)?;
+    } else {
+        clear_session_file(&app);
+    }
+    {
+        let mut guard = auth_state
+            .0
+            .lock()
+            .map_err(|_| "auth state is locked".to_string())?;
+        *guard = Some(auth::SessionUser {
+            session_id: session.session_id,
+            user: user.clone(),
+        });
+    }
+    Ok(json!({ "user": user, "expiresAt": session.expires_at }))
+}
+
+#[tauri::command]
+fn auth_login(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    app: tauri::AppHandle,
+    identifier: String,
+    password: String,
+    remember: Option<bool>,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let found = auth::find_user_by_identifier(&conn, &identifier)?;
+    let stored_hash = match &found {
+        Some(user) => auth::password_hash_for(&conn, &user.id)?,
+        None => None,
+    };
+    let valid = auth::verify_password(
+        &password,
+        stored_hash
+            .as_deref()
+            .unwrap_or(auth::dummy_password_hash()),
+    );
+    let Some(user) = found.filter(|_| valid) else {
+        return Err("Invalid username or password".into());
+    };
+    if user.status != "active" {
+        return Err("Invalid username or password".into());
+    }
+    let session = auth::create_session(&conn, &user.id, "desktop", auth::DESKTOP_SESSION_DAYS)?;
+    auth::mark_login(&conn, &user.id)?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        "auth.login",
+        Some("session"),
+        Some(&session.session_id),
+        json!({}),
+    )?;
+    let user = auth::find_user(&conn, &user.id)?.ok_or("could not read the account")?;
+    if remember.unwrap_or(true) {
+        write_session_file(&app, &session.token)?;
+    } else {
+        clear_session_file(&app);
+    }
+    {
+        let mut guard = auth_state
+            .0
+            .lock()
+            .map_err(|_| "auth state is locked".to_string())?;
+        *guard = Some(auth::SessionUser {
+            session_id: session.session_id,
+            user: user.clone(),
+        });
+    }
+    Ok(json!({ "user": user, "expiresAt": session.expires_at }))
+}
+
+#[tauri::command]
+fn auth_logout(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    app: tauri::AppHandle,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let session = {
+        let mut guard = auth_state
+            .0
+            .lock()
+            .map_err(|_| "auth state is locked".to_string())?;
+        guard.take()
+    };
+    if let Some(session) = &session {
+        auth::revoke_session(&conn, &session.session_id)?;
+        auth::log_activity(
+            &conn,
+            Some(&session.user),
+            "auth.logout",
+            Some("session"),
+            Some(&session.session_id),
+            json!({}),
+        )?;
+    }
+    clear_session_file(&app);
+    Ok(Value::Null)
+}
+
+#[tauri::command]
+fn auth_logout_all(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    app: tauri::AppHandle,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let session = {
+        let mut guard = auth_state
+            .0
+            .lock()
+            .map_err(|_| "auth state is locked".to_string())?;
+        guard.take()
+    };
+    let Some(session) = session else {
+        return Err("Sign in required".into());
+    };
+    auth::revoke_all_sessions(&conn, &session.user.id, None)?;
+    auth::log_activity(
+        &conn,
+        Some(&session.user),
+        "auth.logout_all",
+        Some("session"),
+        None,
+        json!({}),
+    )?;
+    clear_session_file(&app);
+    Ok(Value::Null)
+}
+
+#[tauri::command]
+fn auth_me(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+) -> Result<Option<auth::PublicUser>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    current_local_user(&conn, &auth_state)
+}
+
+#[tauri::command]
+fn auth_update_profile(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    first_name: String,
+    last_name: String,
+    email: String,
+    avatar_color: Option<String>,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = current_local_user(&conn, &auth_state)?.ok_or("Sign in required")?;
+    let first = first_name.trim();
+    if first.is_empty() || first.chars().count() > 80 {
+        return Err("First name is required".into());
+    }
+    if last_name.trim().chars().count() > 80 {
+        return Err("Last name is too long".into());
+    }
+    auth::validate_email(&email)?;
+    let color = avatar_color.unwrap_or_default();
+    if !color.is_empty() && !is_hex_color(&color) {
+        return Err("Avatar color must be a hex color".into());
+    }
+    let display = auth::display_name(first, &last_name, &user.username);
+    conn.execute(
+        "UPDATE users SET first_name = ?1, last_name = ?2, email = ?3, display_name = ?4,
+             avatar_color = ?5, updated_at = ?6 WHERE id = ?7",
+        params![
+            first,
+            last_name.trim(),
+            email.trim().to_lowercase(),
+            display,
+            if color.is_empty() { None } else { Some(color) },
+            now_ms(),
+            user.id
+        ],
+    )
+    .map_err(|error| {
+        let text = error.to_string();
+        if text.contains("users.email") {
+            "That email is already registered".to_string()
+        } else {
+            text
+        }
+    })?;
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        "auth.profile_updated",
+        Some("user"),
+        Some(&user.id),
+        json!({}),
+    )?;
+    let updated = auth::find_user(&conn, &user.id)?.ok_or("could not read the account")?;
+    Ok(json!(updated))
+}
+
+#[tauri::command]
+fn auth_change_password(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    current_password: String,
+    new_password: String,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let session = {
+        let guard = auth_state
+            .0
+            .lock()
+            .map_err(|_| "auth state is locked".to_string())?;
+        guard.clone()
+    };
+    let Some(session) = session else {
+        return Err("Sign in required".into());
+    };
+    let stored =
+        auth::password_hash_for(&conn, &session.user.id)?.ok_or("could not read the account")?;
+    if !auth::verify_password(&current_password, &stored) {
+        return Err("Current password is not correct".into());
+    }
+    auth::validate_password(&new_password)?;
+    let hash = auth::hash_password(&new_password)?;
+    conn.execute(
+        "UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3",
+        params![hash, now_ms(), session.user.id],
+    )
+    .map_err(|error| error.to_string())?;
+    auth::revoke_all_sessions(&conn, &session.user.id, Some(&session.session_id))?;
+    auth::log_activity(
+        &conn,
+        Some(&session.user),
+        "auth.password_changed",
+        Some("user"),
+        Some(&session.user.id),
+        json!({}),
+    )?;
+    Ok(Value::Null)
+}
+
+#[tauri::command]
+fn auth_history(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = current_local_user(&conn, &auth_state)?.ok_or("Sign in required")?;
+    let limit = limit.unwrap_or(20).clamp(1, 100);
+    let offset = offset.unwrap_or(0).max(0);
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, action, resource_type, resource_id, metadata, created_at
+             FROM activity_log WHERE actor_user_id = ?1 ORDER BY created_at DESC LIMIT ?2 OFFSET ?3",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = stmt
+        .query_map(params![user.id, limit + 1, offset], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })
+        .map_err(|error| error.to_string())?;
+    let mut entries = Vec::new();
+    for row in rows.flatten() {
+        entries.push(json!({
+            "id": row.0,
+            "action": row.1,
+            "resourceType": row.2,
+            "resourceId": row.3,
+            "metadata": parse_author(row.4),
+            "createdAt": row.5,
+        }));
+    }
+    let has_more = entries.len() as i64 > limit;
+    if has_more {
+        entries.pop();
+    }
+    Ok(json!({ "entries": entries, "hasMore": has_more }))
+}
+
+#[tauri::command]
+fn auth_restore_session(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    app: tauri::AppHandle,
+) -> Result<Option<auth::PublicUser>, String> {
+    let Some(token) = read_session_token(&app) else {
+        return Ok(None);
+    };
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let Some(session) = auth::validate_session(&conn, &token)? else {
+        clear_session_file(&app);
+        return Ok(None);
+    };
+    let user = session.user.clone();
+    {
+        let mut guard = auth_state
+            .0
+            .lock()
+            .map_err(|_| "auth state is locked".to_string())?;
+        *guard = Some(session);
+    }
+    Ok(Some(user))
+}
+
+#[tauri::command]
+fn auth_log_activity(
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    action: String,
+    resource_type: Option<String>,
+    resource_id: Option<String>,
+    metadata: Option<Value>,
+) -> Result<Value, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let Some(user) = current_local_user(&conn, &auth_state)? else {
+        return Ok(Value::Null);
+    };
+    let action = action.trim();
+    if action.is_empty() || action.len() > 80 {
+        return Err("Activity action is required".into());
+    }
+    auth::log_activity(
+        &conn,
+        Some(&user),
+        action,
+        resource_type.as_deref(),
+        resource_id.as_deref(),
+        metadata.unwrap_or_else(|| json!({})),
+    )?;
+    Ok(Value::Null)
+}
+
+fn is_hex_color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value[1..].chars().all(|ch| ch.is_ascii_hexdigit())
 }
 
 #[tauri::command]
@@ -1726,6 +2407,7 @@ pub fn run() {
             let conn = open_db(app.handle()).expect("failed to open the local SQLite database");
             let gpu = gpu_enabled(&conn);
             app.manage(AppDb(Mutex::new(conn)));
+            app.manage(AuthState(Mutex::new(None)));
 
             let mut builder = tauri::WebviewWindowBuilder::new(
                 app,
@@ -1764,6 +2446,17 @@ pub fn run() {
             mcp_server_path,
             app_version,
             check_update,
+            auth_status,
+            auth_setup_admin,
+            auth_login,
+            auth_logout,
+            auth_logout_all,
+            auth_me,
+            auth_update_profile,
+            auth_change_password,
+            auth_history,
+            auth_restore_session,
+            auth_log_activity,
             open_external,
             fetch_link_preview,
             open_path,
@@ -1849,8 +2542,15 @@ mod tests {
 
         assert_eq!(&archive[0..4], b"PK\x03\x04", "local file header signature");
         let end = archive.len() - 22;
-        assert_eq!(&archive[end..end + 4], b"PK\x05\x06", "end of central directory");
-        assert_eq!(u16::from_le_bytes([archive[end + 10], archive[end + 11]]), 2);
+        assert_eq!(
+            &archive[end..end + 4],
+            b"PK\x05\x06",
+            "end of central directory"
+        );
+        assert_eq!(
+            u16::from_le_bytes([archive[end + 10], archive[end + 11]]),
+            2
+        );
         let text = String::from_utf8_lossy(&archive);
         assert!(text.contains(DB_FILE), "archive keeps the database name");
         assert!(
@@ -1858,7 +2558,9 @@ mod tests {
             "archive uses forward slashes for nested assets"
         );
         assert!(
-            archive.windows(4).any(|window| window == [0x86, 0xA6, 0x10, 0x36]),
+            archive
+                .windows(4)
+                .any(|window| window == [0x86, 0xA6, 0x10, 0x36]),
             "archive stores the CRC of the asset bytes"
         );
         let _ = fs::remove_dir_all(root);
@@ -2178,7 +2880,8 @@ mod tests {
         fs::create_dir_all(&older).expect("older backup folder");
         fs::write(
             boards.join("good.json"),
-            serde_json::to_string(&sample_doc("b_primary", "Primary", 1_700_000_000)).expect("json"),
+            serde_json::to_string(&sample_doc("b_primary", "Primary", 1_700_000_000))
+                .expect("json"),
         )
         .expect("good file");
         fs::write(older.join("broken.json"), b"{ not json").expect("broken file");
@@ -2189,6 +2892,110 @@ mod tests {
             !boards.exists(),
             "the clean primary folder must still be archived"
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn schema_v2_has_local_accounts_and_author_columns() {
+        let root = test_root("auth-schema");
+        let conn = open_db_at(&root).expect("open db");
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+            .expect("table list")
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("tables")
+            .flatten()
+            .collect();
+        for table in ["users", "sessions", "activity_log"] {
+            assert!(
+                tables.iter().any(|name| name == table),
+                "missing table {table}"
+            );
+        }
+        let board_columns = table_columns(&conn, "boards").expect("board columns");
+        let card_columns = table_columns(&conn, "cards").expect("card columns");
+        for column in ["created_by", "updated_by"] {
+            assert!(board_columns.iter().any(|name| name == column));
+            assert!(card_columns.iter().any(|name| name == column));
+        }
+        assert_eq!(schema_version(&conn).expect("version"), 2);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn first_admin_is_created_once_and_sessions_revoke() {
+        let root = test_root("auth-admin");
+        let conn = open_db_at(&root).expect("open db");
+        let new_user = auth::NewUser {
+            username: "owner",
+            email: "owner@localhost",
+            first_name: "Owner",
+            last_name: "",
+            password: "correct horse battery staple",
+        };
+        let admin = auth::create_first_admin(&conn, &new_user).expect("first admin");
+        assert_eq!(admin.role, "admin");
+        assert_eq!(admin.username, "owner");
+        let second = auth::NewUser {
+            username: "second",
+            email: "second@localhost",
+            first_name: "Second",
+            last_name: "",
+            password: "another correct horse battery",
+        };
+        assert!(auth::create_first_admin(&conn, &second).is_err());
+
+        let stored = auth::password_hash_for(&conn, &admin.id)
+            .expect("hash")
+            .expect("stored hash");
+        assert!(auth::verify_password(
+            "correct horse battery staple",
+            &stored
+        ));
+        assert!(!auth::verify_password("wrong password", &stored));
+
+        let session = auth::create_session(&conn, &admin.id, "desktop", 1).expect("session");
+        let validated = auth::validate_session(&conn, &session.token)
+            .expect("validate")
+            .expect("session present");
+        assert_eq!(validated.user.id, admin.id);
+        auth::revoke_session(&conn, &session.session_id).expect("revoke");
+        assert!(auth::validate_session(&conn, &session.token)
+            .expect("validate revoked")
+            .is_none());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn author_columns_preserve_creator_and_track_editor() {
+        let root = test_root("auth-author");
+        let conn = open_db_at(&root).expect("open db");
+        let author_a = json!({ "source": "local", "id": "u_a", "name": "Alice" });
+        let author_b = json!({ "source": "local", "id": "u_b", "name": "Bob" });
+        let mut doc = sample_doc("b_authors", "Authors", 1_700_000_000);
+        doc["cards"] = json!([{
+            "id": "c_authors",
+            "type": "note",
+            "x": 0,
+            "y": 0,
+            "w": 240,
+            "h": 70,
+            "z": 1,
+            "order": 0,
+            "text": "hello"
+        }]);
+        write_doc_checked_with_author(&conn, &doc, None, Some(&author_a), true)
+            .expect("first write");
+        write_doc_checked_with_author(&conn, &doc, None, Some(&author_b), true)
+            .expect("second write");
+        let text = read_doc(&conn, "b_authors")
+            .expect("read")
+            .expect("board exists");
+        let value: Value = serde_json::from_str(&text).expect("json");
+        assert_eq!(value["createdBy"]["name"], "Alice");
+        assert_eq!(value["updatedBy"]["name"], "Bob");
+        assert_eq!(value["cards"][0]["createdBy"]["name"], "Alice");
+        assert_eq!(value["cards"][0]["updatedBy"]["name"], "Bob");
         let _ = fs::remove_dir_all(root);
     }
 }

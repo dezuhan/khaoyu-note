@@ -22,6 +22,7 @@
     "test:update": "node --no-warnings tools/test-update.mjs",
     "test:auto-backup": "node --no-warnings tools/test-auto-backup.mjs",
     "test:disabled-cards": "node --no-warnings tools/test-disabled-cards.mjs",
+    "test:auth-web": "node --no-warnings tools/test-auth-web.mjs",
     "test:passkeys": "node tools/test-passkeys.mjs",
     "test:account-ui": "node tools/test-account-ui.mjs",
     "test:shares-ui": "node tools/test-shares-ui.mjs",

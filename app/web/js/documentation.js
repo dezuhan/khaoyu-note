@@ -140,6 +140,17 @@ export const DOCUMENTATION_SECTIONS = [
     id: "accounts",
     label: "Accounts and passkeys",
     html: `
+      <h3>Local account</h3>
+      <ul>
+        <li>The first run on an empty database offers to create the local admin, or Continue locally
+        as a guest. The avatar after Share opens the account popover.</li>
+        <li>The popover shows Account, Settings and History. Settings changes the password and signs
+        out every session; History lists account activity.</li>
+        <li>Passwords use PBKDF2-SHA256 and sessions are stored hashed. A desktop session lasts 30
+        days when Stay signed in is ticked; a browser session lasts 12 hours.</li>
+        <li>Roles enforcement (editor, commenter, viewer) and the Admin Panel arrive in M2 and M3.
+        Service accounts and sharing remain in the self-hosted service section below.</li>
+      </ul>
       <h3>Account page</h3>
       <ul>
         <li><code>/account</code>: register and sign in immediately, reset the password, manage sessions and API tokens. Email verification is disabled and hidden.</li>

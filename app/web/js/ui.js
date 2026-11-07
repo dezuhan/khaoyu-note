@@ -1,6 +1,7 @@
 // Chrome UI: tool rail, top bar, modals, menus, toasts and shortcuts.
 
 import { createDocumentation } from "./documentation.js";
+import { initAccountUI } from "./account-ui.js";
 import { openImageCrop } from "./image-crop.js";
 import { isTemporarilyDisabledType, toolDisabledReason } from "./limits.js";
 import { openSharePanel } from "./share-ui.js";
@@ -211,6 +212,7 @@ export function initUI(elements) {
   if (refs.homePage) initHome(refs.homePage);
   if (refs.commentCount) initComments(refs.commentCount);
   if (refs.notificationBtn) initNotifications(refs.notificationBtn);
+  if (refs.accountBtn) initAccountUI(refs);
   initContextToolbar();
   initCommandPalette(buildCommands);
   wireMenuBar();

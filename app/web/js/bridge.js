@@ -247,3 +247,146 @@ export function readFileAsBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// ------------------------------------------------------------------ accounts
+
+const AUTH_CSRF_COOKIE = "khaoyu_local_csrf";
+
+function readCookie(name) {
+  if (typeof document === "undefined") return "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp("(?:^|; )" + escaped + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+async function fetchAuth(path, { method = "GET", body } = {}) {
+  const headers = {};
+  if (body !== undefined) headers["content-type"] = "application/json";
+  const csrf = readCookie(AUTH_CSRF_COOKIE);
+  if (csrf) headers["x-khaoyu-csrf"] = csrf;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await fetch(path, {
+      method,
+      headers,
+      credentials: "include",
+      signal: controller.signal,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new Error(
+      error?.name === "AbortError"
+        ? "The account request timed out"
+        : "The account service is not reachable"
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    throw new Error(data?.error || `The account request failed (${response.status})`);
+  }
+  return data;
+}
+
+function accountsUnavailable() {
+  return Promise.reject(new Error("Accounts need the desktop app or the local web host"));
+}
+
+export async function authStatus() {
+  if (hasWeb) return { ...(await fetchAuth("/api/auth/status")), available: true };
+  if (hasTauri) return { ...(await invoke("auth_status")), available: true };
+  return {
+    userCount: 0,
+    requireLogin: false,
+    guestAllowed: true,
+    user: null,
+    csrfToken: null,
+    available: false,
+  };
+}
+
+// Desktop restores the session.json token once at boot. The web host restores from its cookie.
+export async function authRestoreSession() {
+  if (hasWeb) return null;
+  if (hasTauri) return invoke("auth_restore_session");
+  return null;
+}
+
+export async function authSetupAdmin(input) {
+  const body = {
+    username: input.username,
+    email: input.email,
+    firstName: input.firstName,
+    lastName: input.lastName ?? "",
+    password: input.password,
+    claimBoards: Boolean(input.claimBoards),
+    remember: Boolean(input.remember),
+  };
+  if (hasWeb) return fetchAuth("/api/auth/setup", { method: "POST", body });
+  if (hasTauri) return invoke("auth_setup_admin", body);
+  return accountsUnavailable();
+}
+
+export async function authLogin(input) {
+  const body = {
+    identifier: input.identifier,
+    password: input.password,
+    remember: Boolean(input.remember),
+  };
+  if (hasWeb) return fetchAuth("/api/auth/login", { method: "POST", body });
+  if (hasTauri) return invoke("auth_login", body);
+  return accountsUnavailable();
+}
+
+export async function authLogout() {
+  if (hasWeb) return fetchAuth("/api/auth/logout", { method: "POST" });
+  if (hasTauri) return invoke("auth_logout");
+  return accountsUnavailable();
+}
+
+export async function authLogoutAll() {
+  if (hasWeb) return fetchAuth("/api/auth/logout-all", { method: "POST" });
+  if (hasTauri) return invoke("auth_logout_all");
+  return accountsUnavailable();
+}
+
+export async function authMe() {
+  if (hasWeb) return fetchAuth("/api/auth/me");
+  if (hasTauri) return invoke("auth_me");
+  return null;
+}
+
+export async function authUpdateProfile(input) {
+  const body = {
+    firstName: input.firstName,
+    lastName: input.lastName,
+    email: input.email,
+    avatarColor: input.avatarColor,
+  };
+  if (hasWeb) return fetchAuth("/api/auth/profile", { method: "PATCH", body });
+  if (hasTauri) return invoke("auth_update_profile", body);
+  return accountsUnavailable();
+}
+
+export async function authChangePassword(input) {
+  const body = { currentPassword: input.currentPassword, newPassword: input.newPassword };
+  if (hasWeb) return fetchAuth("/api/auth/password", { method: "POST", body });
+  if (hasTauri) return invoke("auth_change_password", body);
+  return accountsUnavailable();
+}
+
+export async function authHistory({ limit = 20, offset = 0 } = {}) {
+  if (hasWeb) {
+    return fetchAuth(`/api/auth/history?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`);
+  }
+  if (hasTauri) return invoke("auth_history", { limit, offset });
+  return { entries: [], hasMore: false };
+}

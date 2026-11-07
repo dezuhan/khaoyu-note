@@ -1,12 +1,12 @@
 import * as bridge from "./bridge.js";
 import { initAutoBackup } from "./auto-backup.js";
+import { initAccountGate } from "./account-ui.js";
 import { initInteractions } from "./interact.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
 import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
-import { maybeShowOnboarding } from "./onboarding.js";
 import {
   createBoard,
   firstOpenableBoard,
@@ -37,6 +37,7 @@ const uiRefs = {
   syncButton: document.getElementById("sync-state"),
   syncState: document.getElementById("sync-state"),
   shareButton: document.getElementById("share-btn"),
+  accountBtn: document.getElementById("account-btn"),
   undoBtn: document.getElementById("undo-btn"),
   redoBtn: document.getElementById("redo-btn"),
   commentCount: document.getElementById("comment-count"),
@@ -84,7 +85,7 @@ async function boot() {
   render("board");
   renderView();
   refreshSync();
-  maybeShowOnboarding();
+  void initAccountGate();
   initUpdateUI();
   initAutoBackup();
   document.getElementById("boot")?.remove();

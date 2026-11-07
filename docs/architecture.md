@@ -325,6 +325,35 @@ duplicate it. A failed backup keeps the previous timestamp, so it is retried on 
 backup folders are not pruned yet; the Backup pane says so and retention is listed in
 `docs/blockers.md`.
 
+## Local accounts
+
+Milestone M1 adds local accounts to the app database, schema version 2. The new tables are `users`,
+`sessions` and `activity_log`; `boards` and `cards` gain `created_by` and `updated_by` columns that
+hold `{"source":"local","id":"...","name":"..."}` snapshots. Existing databases are migrated with
+idempotent `ALTER TABLE` checks, and `server.mjs` applies the same migration so both hosts stay
+compatible.
+
+`app/src-tauri/src/auth.rs` owns password hashing (`pbkdf2-sha256`, 600000 iterations, versioned
+format), random tokens, session validation, activity rows and the admin bootstrap. Tauri commands
+`auth_status`, `auth_setup_admin`, `auth_login`, `auth_logout`, `auth_logout_all`, `auth_me`,
+`auth_update_profile`, `auth_change_password`, `auth_history`, `auth_restore_session` and
+`auth_log_activity` back the UI. The desktop host keeps the session token in `session.json` under the
+app data folder only when Stay signed in is ticked. The web host exposes the same operations as
+`/api/auth/*`, with HttpOnly `khaoyu_local_session` and `khaoyu_local_csrf` cookies, a CSRF header for
+authenticated mutations, a 12 hour session and login rate limiting. The web host accepts
+`owner@localhost` as an email because the account is local.
+
+`save_board` resolves the signed-in account, rejects viewers and commenters, lets guests through only
+while `require_local_login` is off, and writes the author snapshots through
+`write_doc_checked_with_author`. A guest save keeps `created_by` and clears `updated_by`. Backups copy
+the database and assets but delete `sessions` from the snapshot with `secure_delete` before returning.
+
+The frontend keeps auth state in `auth.js`, shows the first-run setup or login gate in `account-ui.js`,
+and renders the avatar after Share plus an anchored account popover with Account, Settings, History
+and Logout. Continue locally sets `mn.auth.guest` so the setup prompt does not return on every launch;
+the avatar menu still offers Create admin. `bridge.js` calls Tauri commands on the desktop and the HTTP
+endpoints on the web host.
+
 ## Web host
 
 `server.mjs` serves the same `app/web` frontend on `http://127.0.0.1:1430` and opens the same

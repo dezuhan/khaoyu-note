@@ -1,6 +1,7 @@
 // Settings dialog in the Photon preferences style, plus persisted app preferences.
 
 import * as bridge from "./bridge.js";
+import { authState, subscribeAuth } from "./auth.js";
 import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } from "./auto-backup.js";
 import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
@@ -117,6 +118,9 @@ export async function initSettings() {
     settings = { ...DEFAULT_SETTINGS };
   }
   applyGlobalSettings();
+  subscribeAuth(() => {
+    if (overlay && activePage === "account" && !query) renderContent();
+  });
   void initCurrentVersion();
   return settings;
 }
@@ -316,7 +320,10 @@ function pages() {
       title: "Account",
       divider: false,
       rows: () => [
-        { type: "note", text: "Optional self-hosted service account, passkeys, API tokens and sharing." },
+        {
+          type: "note",
+          text: "Local account on this computer. Self-hosted service accounts and sharing arrive in M4.",
+        },
       ],
     },
     {
@@ -774,6 +781,33 @@ function renderAccountPage(content) {
   intro.textContent =
     "Accounts are optional. Local boards never require login. Connect the self-hosted service for passkeys, sharing and sync.";
   content.append(intro);
+
+  const local = authState();
+  const localBox = document.createElement("div");
+  localBox.className = "mn-account-status mn-account-local";
+  const localTitle = document.createElement("div");
+  localTitle.className = "mn-account-server";
+  localTitle.textContent = "This computer";
+  const localLine = document.createElement("div");
+  localLine.className = "mn-account-server";
+  localLine.textContent = local.user
+    ? `Local account: ${local.user.displayName || local.user.username} (${local.user.role})`
+    : "Local account: guest, not signed in";
+  const localNote = document.createElement("p");
+  localNote.className = "mn-prefs-note";
+  localNote.textContent = local.user
+    ? "Manage your profile, password and account history from the avatar menu."
+    : "Create a local admin account or sign in from the avatar menu in the top right.";
+  const localButton = document.createElement("button");
+  localButton.type = "button";
+  localButton.className = "mn-btn";
+  localButton.textContent = "Open account menu";
+  localButton.addEventListener("click", () => {
+    closeSettingsPage();
+    window.dispatchEvent(new CustomEvent("mn:open-account"));
+  });
+  localBox.append(localTitle, localLine, localNote, localButton);
+  content.append(localBox);
 
   const status = document.createElement("div");
   status.className = "mn-account-status";

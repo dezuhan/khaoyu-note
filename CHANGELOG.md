@@ -35,6 +35,12 @@ project uses Semantic Versioning.
   document and return when the feature is re-enabled. Uploading local audio or video while those types
   are disabled stores a file card so the asset stays visible. Hiding a tool in Settings still only
   removes the rail button.
+- Local accounts (milestone M1). A fresh database offers to create the local admin, with username,
+  email, first and last name and a PBKDF2-SHA256 password. The app keeps a hashed session, the topbar
+  shows an avatar after Share, and the account popover covers Account, Settings, History and Logout.
+  Guest use stays available with Continue locally. Boards and cards now store creator and last editor
+  snapshots, and backups leave live sessions out. Role enforcement and the Admin Panel follow in M2
+  and M3.
 - Automatic backups. Settings > Backup offers Off, every day, every 3, 7 or 14 days, and every month
   (30 days). The app checks the schedule while it runs and catches up on the next launch when an
   interval was missed. A manual backup or Export ZIP resets the schedule so it is not duplicated.

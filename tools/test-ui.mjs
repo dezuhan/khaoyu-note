@@ -27,6 +27,17 @@ page.on("console", (message) => {
 await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(1200);
 
+// A fresh web host database shows the first-run account gate. Continue as a guest so the rest of
+// the UI suite exercises the same guest mode the static preview uses.
+const accountGate = page.locator(".mn-onboard-overlay");
+if (await accountGate.count()) {
+  const continueLocally = accountGate.locator('[data-role="continue-local"]');
+  if (await continueLocally.count()) {
+    await continueLocally.click();
+    await page.waitForTimeout(300);
+  }
+}
+
 const byId = (id) => page.locator(`.mn-card[data-id="${id}"]`);
 const cardIds = async () => page.locator(".mn-card").evaluateAll((els) => els.map((el) => el.dataset.id));
 const selectedId = () => page.locator(".mn-card.is-selected").first().getAttribute("data-id");
@@ -258,6 +269,50 @@ check(
   (await page.locator("#share-btn").isVisible()) &&
     (await page.locator(".mn-topbar-right #share-btn").count()) === 1
 );
+const accountAfterShare = await page.evaluate(() => {
+  const share = document.getElementById("share-btn");
+  const account = document.getElementById("account-btn");
+  return Boolean(
+    share &&
+      account &&
+      share.parentElement === account.parentElement &&
+      share.nextElementSibling === account
+  );
+});
+check(
+  "Account avatar button follows Share in the header",
+  (await page.locator(".mn-topbar-right #account-btn").isVisible()) && accountAfterShare
+);
+const accountAvatar = await page.locator("#account-btn").evaluate((el) => {
+  const style = getComputedStyle(el);
+  const box = el.getBoundingClientRect();
+  return {
+    width: Math.round(box.width),
+    height: Math.round(box.height),
+    radius: style.borderRadius,
+    label: el.getAttribute("aria-label") || "",
+    text: el.textContent.trim(),
+  };
+});
+check(
+  "Account avatar is a 30px round labelled button",
+  accountAvatar.width === 30 &&
+    accountAvatar.height === 30 &&
+    (accountAvatar.radius === "50%" || Number.parseFloat(accountAvatar.radius) >= 15) &&
+    accountAvatar.label.length > 0 &&
+    accountAvatar.text.length > 0,
+  JSON.stringify(accountAvatar)
+);
+await page.click("#account-btn");
+await page.waitForTimeout(250);
+check("Account popover opens from the avatar", await page.locator(".mn-account-pop").isVisible());
+check(
+  "Guest account popover offers a sign-in action",
+  (await page.locator(".mn-account-pop").innerText()).toLowerCase().includes("sign in")
+);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+check("Account popover closes with Escape", (await page.locator(".mn-account-pop").count()) === 0);
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
 check(
   "Application menu bar has File, Edit, Tools, View and Help",

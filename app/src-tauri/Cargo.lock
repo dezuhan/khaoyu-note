@@ -1778,6 +1778,7 @@ version = "0.33.0"
 dependencies = [
  "base64 0.22.1",
  "reqwest 0.12.28",
+ "ring",
  "rusqlite",
  "serde",
  "serde_json",

@@ -56,6 +56,11 @@ try {
   });
   await page.goto(url, { waitUntil: "load" });
   await page.waitForTimeout(1800);
+  // A fresh database shows the local account setup gate. This suite checks the web host, not auth.
+  if ((await page.locator('[data-role="account-gate"]').count()) > 0) {
+    await page.locator('[data-role="continue-local"]').click();
+    await page.waitForTimeout(500);
+  }
 
   check("the app boots against the web backend", await page.locator("#app").isVisible());
   check(

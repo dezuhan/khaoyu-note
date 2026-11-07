@@ -97,6 +97,9 @@ jobs:
       - name: Web mode suite
         run: node tools/test-web-mode.mjs
 
+      - name: Local account suite
+        run: node tools/test-auth-web.mjs
+
       - name: Font suite
         run: node tools/test-fonts.mjs http://127.0.0.1:1430/
 
