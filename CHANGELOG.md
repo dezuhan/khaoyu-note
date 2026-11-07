@@ -12,6 +12,17 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.30.0] - 2026-11-07
+
+### Added
+
+- Video cards show a centered circular play button over the thumbnail. The embed, with autoplay,
+  is loaded only after the click.
+- Audio and video context menus expose Play, Pause and a Repeat checkbox.
+- Play is disabled while playing, Pause is disabled while paused, and Repeat toggles loop.
+- YouTube embeds use `enablejsapi` for play/pause messages and `loop` plus `playlist` for repeat.
+- UI checks for the video overlay, autoplay embed, playback menu states and repeat toggle.
+
 ## [0.29.2] - 2026-11-07
 
 ### Fixed
