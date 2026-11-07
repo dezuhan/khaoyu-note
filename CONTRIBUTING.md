@@ -37,8 +37,7 @@ Scopes:
 Examples:
 
 ```text
-feat(web): add direct tool drop into a column
-fix(sheet): allow scrollbar drags inside a column
+feat(web): add direct tool drop into a columnfix(sheet): allow scrollbar drags inside a column
 docs(roadmap): add AI chatbot milestone
 test(mcp): cover stale write rejection
 ```
@@ -65,6 +64,18 @@ cargo test
 
 Do not commit `dist/`, `target/`, `node_modules/` or editor backup files. They are ignored because
 they are generated locally.
+
+## Toolbar tools
+
+Every new tool added to the toolbar must also be added to **Settings > Tools**:
+
+- add the key to `DEFAULT_TOOL_ORDER` in `app/web/js/settings.js`,
+- add the label to `TOOL_LABELS`,
+- provide an icon under the same key,
+- verify the visibility toggle hides and restores the toolbar button.
+
+The UI suite checks that every toolbar key is represented in Settings > Tools. A tool that exists only
+in the toolbar or only in Settings is a failing change.
 
 ## Versioning
 

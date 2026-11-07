@@ -1748,6 +1748,7 @@ function renderToolsGrid(content) {
     card.type = "button";
     card.className =
       "mn-tool-card" + (disabledReason ? " is-disabled" : visible ? " is-visible" : "");
+    card.dataset.tool = key;
     card.setAttribute("aria-pressed", String(visible));
     if (disabledReason) {
       card.disabled = true;

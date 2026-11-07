@@ -2059,6 +2059,14 @@ check(
   toolLabels.includes("Section") && toolLabels.includes("Kanban") && toolLabels.length === 20,
   `${toolLabels.length} labels, section=${toolLabels.includes("Section")}, kanban=${toolLabels.includes("Kanban")}`
 );
+const settingsToolKeys = await page
+  .locator(".mn-tool-card")
+  .evaluateAll((els) => els.map((el) => el.dataset.tool));
+check(
+  "Every toolbar tool is listed in Settings > Tools",
+  railToolKeys.every((key) => settingsToolKeys.includes(key)),
+  `rail=${railToolKeys.join(",")}`
+);
 const toolsGridColumns = await page
   .locator(".mn-tools-grid")
   .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").filter(Boolean).length);
