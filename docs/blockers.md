@@ -45,7 +45,7 @@ gateway, browser isolation, audit and prompt-injection test design before any im
   0.33.0.
 - Linux and macOS: matrix workflow defined, never executed on this machine.
 
-## Next three items for the next session
+## Next items for the next session
 
 1. Add a Restore control to the Backup pane; the `stage_restore` command already validates and stages
    a backup.
@@ -53,3 +53,6 @@ gateway, browser isolation, audit and prompt-injection test design before any im
    copy.
 3. Run the Playwright suites and the MCP smoke suite on a machine with a browser and the built binary
    before tagging 0.33.0.
+4. Re-enable the Map, Video and Audio tools once their embed paths are reliable again. The policy
+   lives in `app/web/js/limits.js`; removing the entry restores the rail, palette, shortcuts and the
+   Settings status in one place.

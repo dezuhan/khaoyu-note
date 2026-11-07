@@ -337,10 +337,50 @@ function metaImage(html) {
   return null;
 }
 
+function youtubeVideoId(url) {
+  const host = String(url.hostname || "").toLowerCase().replace(/^www\./, "");
+  const path = url.pathname || "";
+  const segment = (prefix) => (path.startsWith(prefix) ? path.slice(prefix.length).split("/")[0] : "");
+  if (host === "youtu.be") return path.slice(1).split("/")[0] || null;
+  if (!["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(host)) {
+    return null;
+  }
+  const fromQuery = url.searchParams.get("v");
+  if (fromQuery) return fromQuery;
+  return segment("/shorts/") || segment("/embed/") || segment("/live/") || null;
+}
+
+function videoThumbnailUrls(url) {
+  const id = youtubeVideoId(url);
+  if (!id) return [];
+  return ["maxresdefault", "hqdefault"].map((name) => `https://img.youtube.com/vi/${id}/${name}.jpg`);
+}
+
+async function downloadPreviewImage(imageUrl) {
+  const image = await fetch(imageUrl, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(8000),
+    headers: { "user-agent": `KhaoyuNote/${VERSION} link preview` },
+  });
+  if (!image.ok) return null;
+  const mime = String(image.headers.get("content-type") || "image/png").split(";")[0];
+  if (!mime.startsWith("image/")) return null;
+  const bytes = Buffer.from(await image.arrayBuffer());
+  if (!bytes.length || bytes.length > 5_000_000) return null;
+  const extension = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : mime === "image/gif" ? "gif" : "png";
+  return { data: bytes.toString("base64"), name: `link-hero.${extension}`, mime };
+}
+
 async function fetchLinkPreview(url) {
   const parsed = new URL(String(url));
   if (!["http:", "https:"].includes(parsed.protocol) || blockedPreviewHost(parsed.hostname)) {
     return null;
+  }
+  // YouTube links resolve straight to their thumbnail; the watch page is often a consent page.
+  for (const candidate of videoThumbnailUrls(parsed)) {
+    if (blockedPreviewHost(new URL(candidate).hostname)) continue;
+    const preview = await downloadPreviewImage(candidate);
+    if (preview) return preview;
   }
   const page = await fetch(parsed, {
     redirect: "follow",
@@ -357,18 +397,7 @@ async function fetchLinkPreview(url) {
   if (!rawImage) return null;
   const imageUrl = new URL(rawImage, page.url);
   if (blockedPreviewHost(imageUrl.hostname)) return null;
-  const image = await fetch(imageUrl, {
-    redirect: "follow",
-    signal: AbortSignal.timeout(8000),
-    headers: { "user-agent": `KhaoyuNote/${VERSION} link preview` },
-  });
-  if (!image.ok) return null;
-  const mime = String(image.headers.get("content-type") || "image/png").split(";")[0];
-  if (!mime.startsWith("image/")) return null;
-  const bytes = Buffer.from(await image.arrayBuffer());
-  if (!bytes.length || bytes.length > 5_000_000) return null;
-  const extension = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : mime === "image/gif" ? "gif" : "png";
-  return { data: bytes.toString("base64"), name: `link-hero.${extension}`, mime };
+  return downloadPreviewImage(imageUrl.href);
 }
 
 function exportBackupZip() {

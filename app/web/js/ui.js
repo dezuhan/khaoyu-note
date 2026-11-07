@@ -2,6 +2,7 @@
 
 import { DOCUMENTATION_HTML } from "./documentation.js";
 import { openImageCrop } from "./image-crop.js";
+import { toolDisabledReason } from "./limits.js";
 import { openSharePanel } from "./share-ui.js";
 import * as bridge from "./bridge.js";
 import { closeDocumentEditor, documentEditorOpen, openDocumentEditor } from "./document-editor.js";
@@ -348,6 +349,11 @@ function showToolDragPreview(key, event) {
 function createToolFromDrop(key, clientX, clientY, columnId = null) {
   const tool = TOOLS.find((entry) => entry.key === key);
   if (!tool || !state.board) return;
+  const disabled = toolDisabledReason(key);
+  if (disabled) {
+    toast(disabled);
+    return;
+  }
   const viewport = document.getElementById("viewport");
   const rect = viewport.getBoundingClientRect();
   const point = {
@@ -425,7 +431,7 @@ function buildToolRail() {
   const hidden = new Set(getSettings().hiddenTools || []);
   draggingToolKey = null;
   for (const tool of orderedTools()) {
-    if (hidden.has(tool.key)) continue;
+    if (hidden.has(tool.key) || toolDisabledReason(tool.key)) continue;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "mn-tool";
@@ -544,6 +550,11 @@ function buildToolRail() {
 
 function runTool(tool) {
   if (!state.board) return;
+  const disabled = toolDisabledReason(tool.key);
+  if (disabled) {
+    toast(disabled);
+    return;
+  }
   if (tool.key === "line") {
     state.tool = state.tool === "line" ? "select" : "line";
     state.lineFrom = null;
@@ -760,6 +771,7 @@ async function restoreFromBackup() {
 function buildCommands() {
   const commands = [];
   for (const tool of TOOLS) {
+    if (toolDisabledReason(tool.key)) continue;
     const label =
       tool.key === "upload"
         ? "Upload file"

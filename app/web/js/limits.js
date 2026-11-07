@@ -26,3 +26,16 @@ export function isBlockedUpload(name) {
 export function reportUploadProblem(message) {
   window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message } }));
 }
+
+// Card tools that are temporarily disabled. Their cards still render, and local media is uploaded
+// through the Upload tool, but the rail, shortcuts, palette and drop handling stop creating new
+// ones. Settings lists them with a disabled status so the state is discoverable.
+export const TEMPORARILY_DISABLED_TOOLS = {
+  map: "Map is temporarily disabled.",
+  video: "Video links are temporarily disabled. Upload a local video instead.",
+  audio: "Audio links are temporarily disabled. Upload a local file instead.",
+};
+
+export function toolDisabledReason(key) {
+  return TEMPORARILY_DISABLED_TOOLS[key] || "";
+}

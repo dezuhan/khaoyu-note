@@ -1475,6 +1475,95 @@ fn meta_image_url(html: &str) -> Option<String> {
     None
 }
 
+const PREVIEW_USER_AGENT: &str = concat!("KhaoyuNote/", env!("CARGO_PKG_VERSION"), " link preview");
+
+/// Extract a video id from a YouTube URL. The watch page often answers a scraper with a consent or
+/// bot page instead of Open Graph tags, so the thumbnail is resolved from the id directly.
+fn youtube_video_id(url: &reqwest::Url) -> Option<String> {
+    let host = url.host_str()?.to_ascii_lowercase();
+    let host = host.strip_prefix("www.").unwrap_or(host.as_str()).to_string();
+    let first_segment = |prefix: &str| {
+        url.path()
+            .strip_prefix(prefix)
+            .map(|rest| rest.split('/').next().unwrap_or("").to_string())
+            .filter(|value| !value.is_empty())
+    };
+    match host.as_str() {
+        "youtu.be" => first_segment("/"),
+        "youtube.com" | "m.youtube.com" | "music.youtube.com" | "youtube-nocookie.com" => url
+            .query_pairs()
+            .find(|(key, _)| key == "v")
+            .map(|(_, value)| value.to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| first_segment("/shorts/"))
+            .or_else(|| first_segment("/embed/"))
+            .or_else(|| first_segment("/live/")),
+        _ => None,
+    }
+}
+
+fn video_thumbnail_urls(url: &reqwest::Url) -> Vec<reqwest::Url> {
+    let Some(id) = youtube_video_id(url) else {
+        return Vec::new();
+    };
+    ["maxresdefault", "hqdefault"]
+        .iter()
+        .filter_map(|name| {
+            reqwest::Url::parse(&format!("https://img.youtube.com/vi/{id}/{name}.jpg")).ok()
+        })
+        .collect()
+}
+
+async fn fetch_preview_image(
+    client: &reqwest::Client,
+    image_url: reqwest::Url,
+) -> Option<LinkPreviewPayload> {
+    if image_url
+        .host_str()
+        .map(blocked_preview_host)
+        .unwrap_or(true)
+    {
+        return None;
+    }
+    let image_response = client
+        .get(image_url)
+        .header(reqwest::header::USER_AGENT, PREVIEW_USER_AGENT)
+        .send()
+        .await
+        .ok()?;
+    if !image_response.status().is_success() {
+        return None;
+    }
+    let content_type = image_response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("image/png")
+        .split(';')
+        .next()
+        .unwrap_or("image/png")
+        .to_string();
+    if !content_type.starts_with("image/") {
+        return None;
+    }
+    let image_bytes = image_response.bytes().await.ok()?;
+    if image_bytes.is_empty() || image_bytes.len() > 5_000_000 {
+        return None;
+    }
+    let extension = match content_type.as_str() {
+        "image/jpeg" => "jpg",
+        "image/webp" => "webp",
+        "image/gif" => "gif",
+        _ => "png",
+    };
+    let name = format!("link-hero.{extension}");
+    Some(LinkPreviewPayload {
+        data: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &image_bytes),
+        name,
+        mime: content_type,
+    })
+}
+
 #[tauri::command]
 async fn fetch_link_preview(url: String) -> Result<Option<LinkPreviewPayload>, String> {
     let parsed = reqwest::Url::parse(&url).map_err(|_| "invalid link")?;
@@ -1489,9 +1578,15 @@ async fn fetch_link_preview(url: String) -> Result<Option<LinkPreviewPayload>, S
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .map_err(|e| e.to_string())?;
+    // YouTube links resolve straight to their thumbnail, without fetching the watch page.
+    for candidate in video_thumbnail_urls(&parsed) {
+        if let Some(payload) = fetch_preview_image(&client, candidate).await {
+            return Ok(Some(payload));
+        }
+    }
     let response = client
         .get(parsed)
-        .header(reqwest::header::USER_AGENT, "KhaoyuNote/0.26 link preview")
+        .header(reqwest::header::USER_AGENT, PREVIEW_USER_AGENT)
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -1508,51 +1603,13 @@ async fn fetch_link_preview(url: String) -> Result<Option<LinkPreviewPayload>, S
         return Ok(None);
     }
     let html = String::from_utf8_lossy(&bytes);
-    let Some(image_url) = meta_image_url(&html) else {
+    let Some(image_path) = meta_image_url(&html) else {
         return Ok(None);
     };
-    let image_url = final_url.join(&image_url).map_err(|_| "invalid image URL")?;
-    if image_url
-        .host_str()
-        .map(blocked_preview_host)
-        .unwrap_or(true)
-    {
+    let Ok(image_url) = final_url.join(&image_path) else {
         return Ok(None);
-    }
-    let image_response = client
-        .get(image_url.clone())
-        .header(reqwest::header::USER_AGENT, "KhaoyuNote/0.26 link preview")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let content_type = image_response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("image/png")
-        .split(';')
-        .next()
-        .unwrap_or("image/png")
-        .to_string();
-    if !content_type.starts_with("image/") {
-        return Ok(None);
-    }
-    let image_bytes = image_response.bytes().await.map_err(|e| e.to_string())?;
-    if image_bytes.is_empty() || image_bytes.len() > 5_000_000 {
-        return Ok(None);
-    }
-    let extension = match content_type.as_str() {
-        "image/jpeg" => "jpg",
-        "image/webp" => "webp",
-        "image/gif" => "gif",
-        _ => "png",
     };
-    let name = format!("link-hero.{extension}");
-    Ok(Some(LinkPreviewPayload {
-        data: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &image_bytes),
-        name,
-        mime: content_type,
-    }))
+    Ok(fetch_preview_image(&client, image_url).await)
 }
 
 #[tauri::command]
@@ -1753,6 +1810,28 @@ mod tests {
             "archive stores the CRC of the asset bytes"
         );
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn youtube_links_resolve_to_a_thumbnail_url() {
+        let watch =
+            reqwest::Url::parse("https://www.youtube.com/watch?v=dQw4w9WgXcQ").expect("watch url");
+        assert_eq!(youtube_video_id(&watch).as_deref(), Some("dQw4w9WgXcQ"));
+        let thumbnails = video_thumbnail_urls(&watch);
+        assert_eq!(thumbnails.len(), 2);
+        assert!(thumbnails[0]
+            .as_str()
+            .contains("/vi/dQw4w9WgXcQ/maxresdefault.jpg"));
+
+        let short = reqwest::Url::parse("https://youtu.be/dQw4w9WgXcQ?t=10").expect("short url");
+        assert_eq!(youtube_video_id(&short).as_deref(), Some("dQw4w9WgXcQ"));
+
+        let shorts = reqwest::Url::parse("https://youtube.com/shorts/abc123").expect("shorts url");
+        assert_eq!(youtube_video_id(&shorts).as_deref(), Some("abc123"));
+
+        let other = reqwest::Url::parse("https://example.com/watch?v=1").expect("other url");
+        assert!(youtube_video_id(&other).is_none());
+        assert!(video_thumbnail_urls(&other).is_empty());
     }
 
     #[test]

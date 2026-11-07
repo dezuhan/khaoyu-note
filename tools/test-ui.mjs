@@ -50,7 +50,20 @@ const fontsLoaded = await page.evaluate(async () => {
   return document.fonts.check('12px "Plus Jakarta Sans"') && document.fonts.check('12px "Space Mono"');
 });
 check("Google fonts are vendored and load locally", fontsLoaded);
-check("tool rail has 19 tools + trash", (await page.locator(".mn-tool").count()) === 20);
+const railToolKeys = await page
+  .locator(".mn-tool[data-tool]")
+  .evaluateAll((els) => els.map((el) => el.dataset.tool));
+check(
+  "tool rail hides the temporarily disabled tools",
+  railToolKeys.length === 16,
+  String(railToolKeys.length)
+);
+check(
+  "Map, Video and Audio are not offered by the rail",
+  !railToolKeys.includes("map") && !railToolKeys.includes("video") && !railToolKeys.includes("audio"),
+  railToolKeys.join(",")
+);
+check("tool rail keeps the trash button", (await page.locator(".mn-tool.mn-trash").count()) === 1);
 const welcomeTypes = await page.evaluate(() =>
   Array.from(new Set(Array.from(document.querySelectorAll(".mn-card")).map((card) => card.dataset.type)))
 );
@@ -975,9 +988,13 @@ await page.waitForTimeout(450);
 check("Kanban board can be deleted", (await byId(kanbanId).count()) === 0);
 
 // ---------------------------------------------------------------- embedded media previews
-await page.click('.mn-tool[data-tool="video"]');
+// The video, map and audio tools are temporarily disabled, so these cards are created through the
+// action layer to keep the existing-card behaviour covered.
+const videoId = await page.evaluate(async () => {
+  const actions = await import("/js/actions.js");
+  return actions.addCardAtCenter("video").id;
+});
 await page.waitForTimeout(300);
-const videoId = await selectedId();
 const videoCard = byId(videoId);
 const videoSubmit = await videoCard.locator(".mn-primary-soft").boundingBox();
 check(
@@ -1096,9 +1113,11 @@ await page.keyboard.press("Escape");
 await page.keyboard.press("Delete");
 await page.waitForTimeout(300);
 
-await page.click('.mn-tool[data-tool="map"]');
+const mapId = await page.evaluate(async () => {
+  const actions = await import("/js/actions.js");
+  return actions.addCardAtCenter("map").id;
+});
 await page.waitForTimeout(300);
-const mapId = await selectedId();
 const mapCard = byId(mapId);
 const mapQuery = mapCard.locator('[data-field="query"]');
 await mapQuery.fill("https://www.google.com/maps/@40.758,-73.985,15z");
@@ -1122,9 +1141,11 @@ await page.keyboard.press("Escape");
 await page.keyboard.press("Delete");
 await page.waitForTimeout(300);
 
-await page.click('.mn-tool[data-tool="audio"]');
+const audioId = await page.evaluate(async () => {
+  const actions = await import("/js/actions.js");
+  return actions.addCardAtCenter("audio").id;
+});
 await page.waitForTimeout(300);
-const audioId = await selectedId();
 const audioCard = byId(audioId);
 const audioBox = await audioCard.boundingBox();
 const audioIcon = await audioCard.locator(".mn-audio-empty > svg").boundingBox();
@@ -1304,7 +1325,10 @@ check(
 // ---------------------------------------------------------------- media placeholder sizing
 const emptyMediaBoxes = [];
 for (const type of ["video", "audio", "map"]) {
-  await page.click(`.mn-tool[data-tool="${type}"]`);
+  await page.evaluate(async (cardType) => {
+    const actions = await import("/js/actions.js");
+    actions.addCardAtCenter(cardType);
+  }, type);
   await page.waitForTimeout(350);
   emptyMediaBoxes.push(await page.locator(`.mn-card-${type}`).last().boundingBox());
 }
@@ -1775,6 +1799,26 @@ check("Tools are arranged in a two-column grid", toolsGridColumns === 2, String(
 check(
   "Each tool card shows an icon before its name",
   (await page.locator(".mn-tool-card-icon svg").count()) === 19
+);
+const disabledToolCards = await page.evaluate(() =>
+  [...document.querySelectorAll(".mn-tool-card.is-disabled")].map((card) => ({
+    label: card.querySelector(".mn-tool-card-label")?.textContent || "",
+    state: card.querySelector(".mn-tool-card-state")?.textContent || "",
+    disabled: card.disabled,
+  }))
+);
+check(
+  "Temporarily disabled tools stay listed with a disabled status",
+  disabledToolCards.length === 3 &&
+    ["Audio", "Map", "Video"].every((label) =>
+      disabledToolCards.some(
+        (entry) =>
+          entry.label === label &&
+          entry.state === "Disabled (temporarily)" &&
+          entry.disabled
+      )
+    ),
+  JSON.stringify(disabledToolCards)
 );
 const firstTool = page.locator(".mn-tool-card").first();
 await firstTool.click();

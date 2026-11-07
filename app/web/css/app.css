@@ -5671,6 +5671,19 @@ html[data-performance="true"] .mn-card {
 .mn-tool-card.is-visible .mn-tool-card-state {
   color: var(--ky-accent);
 }
+.mn-tool-card.is-disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+  opacity: 0.72;
+}
+.mn-tool-card.is-disabled:hover {
+  background: var(--ky-surface);
+}
+.mn-tool-card.is-disabled .mn-tool-card-state {
+  color: var(--ky-soft);
+  white-space: nowrap;
+  font-size: 9px;
+}
 @media (max-width: 720px) {
   .mn-account-grid { grid-template-columns: 1fr; }
 }

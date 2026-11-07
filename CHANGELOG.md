@@ -26,6 +26,15 @@ project uses Semantic Versioning.
 
 ### Changed
 
+- Map, Video and Audio are temporarily disabled as tools: they are hidden from the tool rail, the
+  drag-to-canvas path, the keyboard shortcuts and the command palette, and they stay listed in
+  Settings > Tools with a "Disabled (temporarily)" status. Their cards still render and play, so
+  existing boards are unchanged.
+- Local media now goes through the Upload tool, which already turns an image, audio or video file
+  into its card and any other file into a file card.
+- Link previews resolve YouTube links to their thumbnail directly instead of scraping the watch page,
+  which often answers with a consent page. Poster images for other pages still come from Open Graph
+  metadata.
 - The backup archive is written uncompressed (STORE). The payload is a SQLite snapshot plus images,
   audio and video that are already compressed, so it keeps the export free of an extra dependency.
 

@@ -2,6 +2,7 @@
 
 import * as bridge from "./bridge.js";
 import { icon } from "./icons.js";
+import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
 import { loadSyncConfig } from "./sync.js";
 import { openSyncDialog } from "./sync-ui.js";
@@ -715,6 +716,11 @@ function renderContent() {
     renderBackupPage(content);
   } else if (activePage === "tools") {
     content.append(heading("Tools"));
+    const note = document.createElement("p");
+    note.className = "mn-prefs-note";
+    note.textContent =
+      "Map, Video and Audio are temporarily disabled. Upload local images, audio, video and other files with the Upload tool. Link cards fetch a hero image, and YouTube links use their thumbnail directly.";
+    content.append(note);
     renderToolsGrid(content);
   } else if (page) {
     content.append(heading(page.title));
@@ -887,11 +893,18 @@ function renderToolsGrid(content) {
   const grid = document.createElement("div");
   grid.className = "mn-tools-grid";
   for (const [key, label] of TOOL_LABELS) {
+    const disabledReason = toolDisabledReason(key);
     const visible = !settings.hiddenTools.includes(key);
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "mn-tool-card" + (visible ? " is-visible" : "");
+    card.className =
+      "mn-tool-card" + (disabledReason ? " is-disabled" : visible ? " is-visible" : "");
     card.setAttribute("aria-pressed", String(visible));
+    if (disabledReason) {
+      card.disabled = true;
+      card.setAttribute("aria-disabled", "true");
+      card.title = disabledReason;
+    }
     const iconEl = document.createElement("span");
     iconEl.className = "mn-tool-card-icon";
     iconEl.innerHTML = icon(key, 18);
@@ -900,9 +913,14 @@ function renderToolsGrid(content) {
     labelEl.textContent = label;
     const stateEl = document.createElement("span");
     stateEl.className = "mn-tool-card-state";
-    stateEl.textContent = visible ? "On" : "Hidden";
+    stateEl.textContent = disabledReason
+      ? "Disabled (temporarily)"
+      : visible
+        ? "On"
+        : "Hidden";
     card.append(iconEl, labelEl, stateEl);
     card.addEventListener("click", () => {
+      if (disabledReason) return;
       settings.hiddenTools = visible
         ? [...settings.hiddenTools, key]
         : settings.hiddenTools.filter((entry) => entry !== key);
