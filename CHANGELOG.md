@@ -12,6 +12,16 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.32.0] - 2026-11-07
+
+### Fixed
+
+- Moving or resizing a card no longer rebuilds active audio, video or map elements. The rebuild keeps
+  those DOM nodes alive, so YouTube, Vimeo, audio and map playback does not reload or restart.
+- Added pause, mute and volume controls over playing video embeds.
+- Added a volume slider to the custom audio player.
+- UI checks for media controls, volume and iframe identity across a drag.
+
 ## [0.31.0] - 2026-11-07
 
 ### Added
