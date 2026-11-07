@@ -12,6 +12,15 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.17.0] - 2026-11-07
+
+### Added
+
+- Browser account page at `/account` for registration, verification, login, password reset, sessions,
+  logout everywhere and scoped API token management.
+- Account sessions response now includes the signed-in account identity.
+- Playwright account flow test and CI step.
+
 ## [0.16.0] - 2026-11-07
 
 ### Added
