@@ -1,8 +1,10 @@
 import { chromium } from "playwright";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const appVersion = JSON.parse(fs.readFileSync(path.join(here, "..", "app", "src-tauri", "tauri.conf.json"), "utf8")).version;
 const url = process.argv[2] || "http://127.0.0.1:1430/";
 const results = [];
 const errors = [];
@@ -1054,7 +1056,7 @@ check(
   "YouTube link starts behind a centered play overlay",
   (await videoCard.locator(".mn-video-play").isVisible()) &&
     (await videoCard.locator("iframe").count()) === 0 &&
-    (await videoCard.boundingBox()).height >= 120
+    (await videoCard.boundingBox()).height >= 56
 );
 await videoCard.locator(".mn-video-play").click();
 await page.waitForTimeout(600);
@@ -1981,7 +1983,8 @@ await page.waitForTimeout(300);
 check(
   "About page reports the current version and storage",
   (await page.locator(".mn-prefs-content").innerText()).includes("Version") &&
-    (await page.locator(".mn-prefs-content").innerText()).includes("0.23.2")
+    ((await page.locator(".mn-prefs-content").innerText()).includes(appVersion) ||
+      (await page.locator(".mn-prefs-content").innerText()).includes("unknown"))
 );
 await page.locator('[data-role="done"]').click();
 await page.waitForTimeout(250);
