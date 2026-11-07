@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Khaoyu Note account</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: #111; color: #eee; font-family: system-ui, sans-serif; display: grid; place-items: center; padding: 20px; }
+      main { width: min(680px, 100%); background: #1b1b1b; border: 1px solid #333; border-radius: 10px; padding: 24px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      h2 { font-size: 15px; margin: 0 0 10px; }
+      p { color: #aaa; font-size: 13px; line-height: 1.5; margin: 0 0 10px; }
+      section { border-top: 1px solid #333; margin-top: 16px; padding-top: 16px; }
+      .tabs, .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      label { display: block; color: #aaa; font-size: 12px; margin: 10px 0 4px; }
+      input, select { width: 100%; padding: 9px; border-radius: 6px; border: 1px solid #444; background: #111; color: #eee; }
+      button { margin-top: 10px; padding: 9px 12px; border-radius: 6px; border: 1px solid #555; background: #eee; color: #111; cursor: pointer; font-weight: 600; }
+      button.secondary { background: transparent; color: #eee; }
+      button.danger { background: transparent; color: #f88; border-color: #633; }
+      button[hidden], section[hidden] { display: none; }
+      #status { min-height: 18px; color: #9ad; font-size: 12px; margin-top: 10px; }
+      ul { list-style: none; margin: 10px 0 0; padding: 0; }
+      li { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid #333; border-radius: 6px; padding: 8px 10px; margin-top: 6px; font-size: 12px; color: #ccc; }
+      li button { margin: 0; padding: 5px 8px; font-size: 11px; }
+      .muted { color: #888; }
+      code { color: #ddd; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Khaoyu Note account</h1>
+      <p>Local-first boards never require login. This page manages the optional self-hosted service account.</p>
+
+      <div class="tabs">
+        <button id="tab-login" type="button">Sign in</button>
+        <button id="tab-register" type="button" class="secondary">Register</button>
+      </div>
+
+      <section id="login-section">
+        <h2>Sign in</h2>
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" autocomplete="username" />
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" />
+        <label for="login-totp">TOTP code (if enabled)</label>
+        <input id="login-totp" inputmode="numeric" autocomplete="one-time-code" />
+        <div class="row">
+          <button id="login" type="button">Sign in</button>
+          <button id="passkey-login" type="button" class="secondary">Use a passkey</button>
+        </div>
+        <p class="muted">Passkeys are managed on <a href="/passkeys">the passkeys page</a>.</p>
+      </section>
+
+      <section id="register-section" hidden>
+        <h2>Register</h2>
+        <label for="register-email">Email</label>
+        <input id="register-email" type="email" autocomplete="username" />
+        <label for="register-name">Display name</label>
+        <input id="register-name" autocomplete="name" />
+        <label for="register-password">Password (12+ characters)</label>
+        <input id="register-password" type="password" autocomplete="new-password" />
+        <button id="register" type="button">Create account</button>
+        <p class="muted">A verification token is sent by email. In local dev it goes to the service outbox.</p>
+      </section>
+
+      <section>
+        <h2>Verify email</h2>
+        <label for="verify-token">Verification token</label>
+        <input id="verify-token" />
+        <button id="verify" type="button">Verify email</button>
+      </section>
+
+      <section>
+        <h2>Reset password</h2>
+        <label for="reset-email">Account email</label>
+        <input id="reset-email" type="email" />
+        <button id="reset-request" type="button">Send reset token</button>
+        <label for="reset-token">Reset token</label>
+        <input id="reset-token" />
+        <label for="reset-password">New password</label>
+        <input id="reset-password" type="password" autocomplete="new-password" />
+        <button id="reset-confirm" type="button" class="secondary">Change password</button>
+      </section>
+
+      <section id="account-section" hidden>
+        <h2>Signed in</h2>
+        <p id="account-email" class="muted"></p>
+        <button id="logout" type="button" class="secondary">Sign out</button>
+        <button id="logout-all" type="button" class="danger">Sign out everywhere</button>
+
+        <h2 style="margin-top: 18px">Sessions</h2>
+        <ul id="sessions"></ul>
+
+        <h2 style="margin-top: 18px">API tokens for desktop sync</h2>
+        <label for="token-name">Token name</label>
+        <input id="token-name" value="Desktop sync" />
+        <button id="token-create" type="button">Create token</button>
+        <p id="token-result"></p>
+        <ul id="tokens"></ul>
+      </section>
+
+      <div id="status" role="status"></div>
+    </main>
+    <script type="module" src="/account.js"></script>
+  </body>
+</html>

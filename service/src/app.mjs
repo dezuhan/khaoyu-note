@@ -9,6 +9,8 @@ const PUBLIC_DIR = path.join(import.meta.dirname, "..", "public");
 const AUTH_PAGES = {
   "/passkeys": ["passkeys.html", "text/html; charset=utf-8"],
   "/passkeys.js": ["passkeys.js", "text/javascript; charset=utf-8"],
+  "/account": ["account.html", "text/html; charset=utf-8"],
+  "/account.js": ["account.js", "text/javascript; charset=utf-8"],
 };
 
 export function assertSchemaCurrent(db) {

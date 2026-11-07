@@ -1155,7 +1155,15 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       if (method === "GET" && url.pathname === "/api/v1/auth/sessions") {
         const auth = requireSessionAuth(request, response, db, config);
-        sendJson(response, 200, { sessions: listSessions(db, auth.account.id, auth.session.id) }, config);
+        sendJson(
+          response,
+          200,
+          {
+            account: publicAccount(auth.account),
+            sessions: listSessions(db, auth.account.id, auth.session.id),
+          },
+          config
+        );
         return true;
       }
 
