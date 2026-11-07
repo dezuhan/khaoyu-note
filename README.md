@@ -430,7 +430,7 @@ Built artifacts are copied to `dist/`. The files below are the last built releas
 | File | Size | Purpose |
 | --- | --- | --- |
 | `Khaoyu Note_0.33.0_x64-setup.exe` | 4.15 MiB | NSIS installer (app and MCP binary) |
-| `Khaoyu Note_0.33.0_x64_en-US.msi` | 6.75 MiB | MSI installer (app and MCP binary) |
+| `Khaoyu Note_0.33.0_x64_en-US.msi` | 6.76 MiB | MSI installer (app and MCP binary) |
 | `KhaoyuNote.exe` | 13.82 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.71 MiB | standalone MCP server for AI agents |
 
