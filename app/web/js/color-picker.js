@@ -1,5 +1,7 @@
 // Compact HSV colour picker used by the Color card. No title text: saturation/value square,
-// vertical hue slider, hex field, OK and Cancel.
+// vertical hue slider, hex field, eyedropper, OK and Cancel.
+
+import { icon } from "./icons.js";
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -88,6 +90,7 @@ export function openColorPicker({ color, anchor, onChange }) {
     </div>
     <div class="mn-color-bottom">
       <input class="mn-color-hex" data-role="hex" maxlength="7" spellcheck="false" />
+      <button type="button" class="mn-color-eyedrop" data-role="eyedrop" title="Pick a color from the screen" aria-label="Pick a color from the screen">${icon("eyedropper", 15)}</button>
     </div>`;
   document.body.append(backdrop, pop);
 
@@ -96,6 +99,8 @@ export function openColorPicker({ color, anchor, onChange }) {
   const svMarker = pop.querySelector('[data-role="sv-marker"]');
   const hueMarker = pop.querySelector('[data-role="hue-marker"]');
   const hexInput = pop.querySelector('[data-role="hex"]');
+  const eyedrop = pop.querySelector('[data-role="eyedrop"]');
+  if (!("EyeDropper" in window)) eyedrop.hidden = true;
 
   function hexValue() {
     return rgbToHex(...Object.values(hsvToRgb(hsv.h, hsv.s, hsv.v)));
@@ -190,6 +195,15 @@ export function openColorPicker({ color, anchor, onChange }) {
   });
   hexInput.addEventListener("blur", () => {
     if (!setFromHex(hexInput.value)) hexInput.value = current;
+  });
+  eyedrop.addEventListener("click", async () => {
+    if (!("EyeDropper" in window)) return;
+    try {
+      const result = await new window.EyeDropper().open();
+      if (setFromHex(result?.sRGBHex)) close();
+    } catch {
+      // The picker was cancelled or the platform does not expose the API.
+    }
   });
   backdrop.addEventListener("pointerdown", close);
   window.addEventListener("keydown", onKeyDown);

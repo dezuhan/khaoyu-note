@@ -27,6 +27,9 @@ export const ICONS = {
   color: P(
     '<rect x="3.5" y="3.5" width="11" height="11" rx="2"/><rect x="9.5" y="9.5" width="11" height="11" rx="2"/>'
   ),
+  eyedropper: P(
+    '<path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-6.4-6.4a2.1 2.1 0 0 1 0-3l.4-.4Z"/>'
+  ),
   document: P(
     '<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/><path d="M9 12h6M9 15.5h6"/>'
   ),

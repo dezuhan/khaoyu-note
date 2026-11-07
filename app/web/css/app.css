@@ -4033,6 +4033,40 @@ html[data-reduce-motion="true"] .mn-cards * {
   box-shadow: 0 0 0 1px var(--ky-accent);
 }
 
+.mn-color-eyedrop {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-muted);
+  cursor: pointer;
+}
+
+.mn-color-eyedrop:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.mn-color-eyedrop:focus-visible {
+  box-shadow: 0 0 0 1px var(--ky-accent);
+  outline: none;
+}
+
+.mn-color-eyedrop[hidden] {
+  display: none;
+}
+
+.mn-color-eyedrop svg {
+  width: 15px;
+  height: 15px;
+}
+
 /* Empty audio card: symmetric breathing room and a centered upload action. */
 .mn-audio-empty {
   gap: 8px;

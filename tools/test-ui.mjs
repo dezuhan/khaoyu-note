@@ -869,6 +869,13 @@ check(
   colorText.includes("HEX #") && colorText.includes("RGB ") && colorText.includes("CMYK "),
   colorText.slice(0, 90)
 );
+await page.evaluate(() => {
+  window.EyeDropper = class {
+    open() {
+      return Promise.resolve({ sRGBHex: "#123456" });
+    }
+  };
+});
 await colorCard.locator('[data-action="pick-color"]').click();
 await page.waitForTimeout(350);
 const colorPicker = page.locator(".mn-color-pop");
@@ -881,6 +888,12 @@ check(
     (await colorPicker.locator("[data-role='ok'], [data-role='cancel']").count()) === 0 &&
     !(await colorPicker.innerText()).toLowerCase().includes("box colour") &&
     !(await colorPicker.innerText()).toLowerCase().includes("box color")
+);
+check(
+  "Color picker exposes an eyedropper button next to the hex field",
+  (await colorPicker.locator('[data-role="eyedrop"]').count()) === 1 &&
+    (await colorPicker.locator('[data-role="eyedrop"]').isVisible()) &&
+    (await colorPicker.locator('[data-role="eyedrop"] svg').count()) === 1
 );
 const colorCardBox = await colorCard.boundingBox();
 const colorPickerBox = await colorPicker.boundingBox();
@@ -948,6 +961,15 @@ await colorCodeRows.first().locator(".mn-color-copy").click();
 await page.waitForTimeout(250);
 const copiedColorCode = await page.evaluate(() => navigator.clipboard.readText());
 check("Color code copy button copies the value", copiedColorCode === "#FF0000", copiedColorCode);
+await colorCard.locator('[data-action="pick-color"]').click();
+await page.waitForTimeout(250);
+await page.locator('[data-role="eyedrop"]').click();
+await page.waitForTimeout(350);
+check(
+  "Eyedropper applies the picked color and closes the picker",
+  (await page.locator(".mn-color-pop").count()) === 0 &&
+    (await colorCard.innerText()).includes("#123456")
+);
 await page.keyboard.press("Delete");
 await page.waitForTimeout(350);
 
