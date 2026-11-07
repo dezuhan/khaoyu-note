@@ -14,12 +14,29 @@ function invoke(cmd, args) {
 }
 
 export function convertFileSrc(path) {
-  if (!hasTauri || !path) return path;
-  try {
-    return tauri.core.convertFileSrc(path);
-  } catch {
-    return path;
+  if (hasTauri && path) {
+    try {
+      return tauri.core.convertFileSrc(path);
+    } catch {
+      return path;
+    }
   }
+  if (path && String(path).startsWith("mn.asset.")) {
+    const raw = localStorage.getItem(path);
+    if (raw) {
+      const extension = String(path).split(".").pop()?.toLowerCase();
+      const mime =
+        extension === "jpg" || extension === "jpeg"
+          ? "image/jpeg"
+          : extension === "webp"
+            ? "image/webp"
+            : extension === "gif"
+              ? "image/gif"
+              : "image/png";
+      return `data:${mime};base64,${raw}`;
+    }
+  }
+  return path;
 }
 
 // ------------------------------------------------------------------ boards

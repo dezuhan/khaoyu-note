@@ -1930,6 +1930,24 @@ check(
 );
 await page.locator(".mn-modal-close").click();
 check("Documentation page closes", (await page.locator(".mn-docs").count()) === 0);
+
+const linkCard = page.locator('.mn-card[data-type="link"]').first();
+if (await linkCard.count()) {
+  await linkCard.click({ button: "right" });
+  await page.waitForTimeout(250);
+  await page.locator(".mn-menu-item", { hasText: /header image/i }).first().click();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4YwAAAAASUVORK5CYII=",
+    "base64"
+  );
+  await page.locator('input[type="file"]').setInputFiles({ name: "header.png", mimeType: "image/png", buffer: png });
+  await page.waitForTimeout(800);
+  const headerImage = linkCard.locator(".mn-link-header img");
+  check(
+    "Link header image renders a visible preview",
+    (await headerImage.count()) === 1 && (await headerImage.isVisible()) && (await headerImage.boundingBox())?.height > 0
+  );
+}
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
 const failed = results.filter((entry) => !entry.ok);

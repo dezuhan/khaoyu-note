@@ -39,6 +39,7 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Comment</td><td>Threaded comments with checkboxes and replies.</td></tr>
     <tr><td>Table</td><td>Editable cells, rows and columns.</td></tr>
     <tr><td>Image / Upload</td><td>Local image or file asset stored with the board.</td></tr>
+    <tr><td>Link</td><td>URL card. Right-click and choose Add header image to show a preview image above the link, including in browser preview mode.</td></tr>
     <tr><td>Line</td><td>Connect two cards. Select the line to add a midpoint curve.</td></tr>
   </table>
 
