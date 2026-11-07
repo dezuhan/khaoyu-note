@@ -12,6 +12,15 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.29.2] - 2026-11-07
+
+### Fixed
+
+- Audio assets no longer fall back to an image MIME type in browser preview, which prevented playback.
+- Web host and preview now map MP3, WAV, M4A, AAC, OGG, Opus and FLAC to their audio MIME types.
+- Play failures surface a toast instead of failing silently.
+- Added a UI check that uploads a real WAV and verifies playback progress.
+
 ## [0.29.1] - 2026-11-07
 
 ### Fixed
