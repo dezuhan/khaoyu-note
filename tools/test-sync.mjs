@@ -22,6 +22,7 @@ let remote = { revision: 0, doc: null };
 let offline = false;
 let readyStatus = 200;
 let projectsStatus = 200;
+let readyFails = false;
 const id = "project-sync-test";
 
 globalThis.fetch = async (url, options = {}) => {
@@ -41,6 +42,7 @@ globalThis.fetch = async (url, options = {}) => {
     },
   });
   if (method === "GET" && path === "/readyz") {
+    if (readyFails) throw new Error("blocked by CORS");
     return reply(readyStatus, readyStatus === 200 ? { status: "ready" } : { status: "not_ready" });
   }
   if (method === "GET" && path === "/api/v1/projects") {
@@ -114,6 +116,12 @@ globalThis.fetch = async () => {
 connection = await sync.checkConnection();
 assert.equal(connection.state, "unreachable");
 globalThis.fetch = liveFetch;
+
+// An older service may not send CORS headers on /readyz; the authenticated call still decides.
+readyFails = true;
+connection = await sync.checkConnection();
+assert.equal(connection.state, "connected");
+readyFails = false;
 
 sync.saveSyncConfig({ url: "http://service.test", token: "" });
 connection = await sync.checkConnection();

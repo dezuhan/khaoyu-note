@@ -521,6 +521,14 @@ test("health endpoints expose no version, database or configuration", async () =
   assert.equal(health.headers.get("x-content-type-options"), "nosniff");
   const ready = await fetch(`http://127.0.0.1:${port}/readyz`);
   assert.deepEqual(await ready.json(), { status: "ready" });
+  const readyCors = await fetch(`http://127.0.0.1:${port}/readyz`, {
+    headers: { origin: "tauri://localhost" },
+  });
+  assert.equal(readyCors.headers.get("access-control-allow-origin"), "tauri://localhost");
+  const readyDenied = await fetch(`http://127.0.0.1:${port}/readyz`, {
+    headers: { origin: "http://evil.example" },
+  });
+  assert.equal(readyDenied.headers.get("access-control-allow-origin"), null);
   const missing = await fetch(`http://127.0.0.1:${port}/does-not-exist`);
   assert.equal(missing.status, 404);
   assert.deepEqual(await missing.json(), { error: "not found" });

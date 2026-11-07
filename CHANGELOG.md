@@ -51,6 +51,9 @@ project uses Semantic Versioning.
 - The sync dialog reports the real connection state. `Check connection and connect` runs `/readyz`
   and an authenticated project listing before connecting, and the Account pane shows the same result
   under Server, API token and Status.
+- Health and readiness responses now send CORS headers for allowed origins, so the connection check
+  works from the desktop webview and the local web host instead of reporting a false "unreachable".
+  When `/readyz` cannot be read, the client falls back to the authenticated project call to decide.
 
 ## [0.32.0] - 2026-11-07
 

@@ -137,17 +137,19 @@ export async function checkConnection({ timeoutMs = 8000 } = {}) {
   }
   if (!token) return recordConnection("unconfigured", "Set the server API token first", { url });
 
-  let ready;
+  // `/readyz` can be blocked by CORS on an older service, so a failed readiness call is not proof
+  // that the server is unreachable. The authenticated project call below is the deciding check.
+  let readiness = "ok";
   try {
-    ready = await fetch(`${url}/readyz`, {
+    const ready = await fetch(`${url}/readyz`, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(timeoutMs),
     });
+    if (!ready.ok) {
+      return recordConnection("not-ready", `The server answered ${ready.status}`, { url });
+    }
   } catch {
-    return recordConnection("unreachable", `No response from ${url}`, { url });
-  }
-  if (!ready.ok) {
-    return recordConnection("not-ready", `The server answered ${ready.status}`, { url });
+    readiness = "unknown";
   }
 
   let response;
@@ -170,7 +172,9 @@ export async function checkConnection({ timeoutMs = 8000 } = {}) {
   }
   const body = await response.json().catch(() => null);
   const projectCount = Array.isArray(body?.projects) ? body.projects.length : null;
-  return recordConnection("connected", "Connected and database ready", { url, projectCount });
+  const message =
+    readiness === "ok" ? "Connected and database ready" : "Connected and database answered";
+  return recordConnection("connected", message, { url, projectCount });
 }
 
 export function syncEnabled(board) {

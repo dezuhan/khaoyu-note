@@ -74,6 +74,13 @@ export function createService({ config, db, logger, mailer }) {
       response.end(body);
       return;
     }
+    // The desktop webview and the local web host call /readyz and /healthz cross-origin, so the
+    // allowed origins need CORS headers here too, not only on the /api/v1 routes.
+    const origin = request.headers.origin;
+    if (origin && config.corsOrigins?.includes(origin)) {
+      response.setHeader("Access-Control-Allow-Origin", origin);
+      response.setHeader("Vary", "Origin");
+    }
     response.on("finish", () => {
       if (url.pathname !== "/healthz" && url.pathname !== "/readyz") {
         logger.info("http.request", {
