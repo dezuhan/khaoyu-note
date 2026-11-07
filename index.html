@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en" data-ky-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111111" />
+    <title>Khaoyu Note · Local-first visual thinking</title>
+    <meta
+      name="description"
+      content="Khaoyu Note is a local-first board for notes, kanban, tables, documents and drawing. No account. No cloud. Your work stays on your machine."
+    />
+    <meta property="og:title" content="Khaoyu Note · Local-first visual thinking" />
+    <meta
+      property="og:description"
+      content="A quiet place to arrange ideas. Boards, cards and canvases that live in a local SQLite database."
+    />
+    <meta property="og:image" content="shots/board-dark.png" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="app/web/vendor/ky.css" />
+    <link rel="stylesheet" href="app/web/css/fonts.css" />
+    <link rel="stylesheet" href="landing.css" />
+  </head>
+  <body class="ky-scope lp">
+    <a class="lp-skip" href="#main">Skip to content</a>
+
+    <header class="lp-nav" id="top">
+      <div class="lp-nav-inner">
+        <a class="lp-brand" href="#top" aria-label="Khaoyu Note home">
+          <span class="lp-mark" aria-hidden="true">N</span>
+          <span>Khaoyu Note</span>
+        </a>
+
+        <nav class="lp-links" id="nav-links" aria-label="Landing page">
+          <a href="#features">Features</a>
+          <a href="#screens">Screens</a>
+          <a href="#local">Local-first</a>
+          <a href="#download">Download</a>
+        </nav>
+
+        <div class="lp-nav-actions">
+          <button type="button" class="lp-icon-button" id="theme-toggle" aria-label="Switch theme">
+            <span id="theme-label">Light</span>
+          </button>
+          <a class="lp-icon-button lp-github" href="https://github.com/dezuhan/khaoyu-note" target="_blank" rel="noreferrer">
+            GitHub <span aria-hidden="true">↗</span>
+          </a>
+          <a class="lp-button lp-button-small" href="#download">Download</a>
+          <button
+            type="button"
+            class="lp-menu-button"
+            id="menu-toggle"
+            aria-controls="nav-links"
+            aria-expanded="false"
+            aria-label="Open navigation"
+          >
+            <span></span><span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="lp-hero">
+        <div class="lp-hero-glow" aria-hidden="true"></div>
+        <p class="lp-eyebrow" data-reveal>
+          <span class="lp-dot"></span>
+          Khaoyu Note 0.33 · local-first
+        </p>
+        <h1 data-reveal>Think in boards.<br /><span>Keep it local.</span></h1>
+        <p class="lp-lede" data-reveal>
+          Notes, kanban, tables, documents and drawing on one quiet canvas. An account is optional
+          and disabled in this build. Your boards live in SQLite on this computer.
+        </p>
+        <div class="lp-hero-actions" data-reveal>
+          <a class="lp-button" href="#download">Download for Windows</a>
+          <a class="lp-button lp-button-quiet" href="#screens">See it in action</a>
+        </div>
+        <p class="lp-hero-meta" data-reveal>No sign-in · No cloud · Free for noncommercial use</p>
+
+        <div class="lp-window lp-hero-window" data-reveal>
+          <div class="lp-window-bar" aria-hidden="true">
+            <span class="lp-window-dots"><i></i><i></i><i></i></span>
+            <span>Khaoyu Note — Home</span>
+            <span class="lp-window-status">Saved</span>
+          </div>
+          <img src="shots/board-dark.png" alt="Khaoyu Note board in dark mode with notes, color swatches and comments" />
+        </div>
+      </section>
+
+      <section class="lp-stats" aria-label="At a glance">
+        <div><strong>100%</strong><span>local storage</span></div>
+        <div><strong>0</strong><span>accounts required</span></div>
+        <div><strong>16</strong><span>enabled board tools</span></div>
+        <div><strong>SQLite</strong><span>plain, portable data</span></div>
+      </section>
+
+      <section class="lp-section" id="features">
+        <div class="lp-section-head" data-reveal>
+          <p class="lp-kicker">Built for focus</p>
+          <h2>A clearer surface for messy thoughts.</h2>
+          <p>
+            Everything is a card on a canvas. Move it, group it, connect it, or open it into a
+            dedicated editor. The interface stays out of the way.
+          </p>
+        </div>
+
+        <div class="lp-feature-grid">
+          <article class="lp-feature-card" data-reveal>
+            <span class="lp-feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h13" /></svg>
+            </span>
+            <h3>Boards that breathe</h3>
+            <p>Infinite canvas, nested boards, columns and connections. Drag anything anywhere; undo is one keystroke.</p>
+          </article>
+          <article class="lp-feature-card" data-reveal>
+            <span class="lp-feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="7" height="16" rx="2" /><rect x="13.5" y="4" width="7" height="9" rx="2" /></svg>
+            </span>
+            <h3>Kanban without setup</h3>
+            <p>Drop a kanban card, add columns and move work between them. No project template, no configuration.</p>
+          </article>
+          <article class="lp-feature-card" data-reveal>
+            <span class="lp-feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" /></svg>
+            </span>
+            <h3>Writing room</h3>
+            <p>A document card opens into a focused page with formatting, lists, links and export. Word count included.</p>
+          </article>
+          <article class="lp-feature-card" data-reveal>
+            <span class="lp-feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 18c4 0 4-9 8-9s4 9 8 9M6 6l12 12" /></svg>
+            </span>
+            <h3>Draw on the canvas</h3>
+            <p>Sketch cards and a full-page drawing editor with pen, pencil, highlighter and eraser.</p>
+          </article>
+          <article class="lp-feature-card" data-reveal>
+            <span class="lp-feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="8.5" /></svg>
+            </span>
+            <h3>Notes, links, tables, color</h3>
+            <p>The small tools that make a board useful: URLs with hero images, editable tables, swatches with HEX/RGB/CMYK.</p>
+          </article>
+          <article class="lp-feature-card" data-reveal>
+            <span class="lp-feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" /><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" /></svg>
+            </span>
+            <h3>Local by architecture</h3>
+            <p>Rust and SQLite. No server round trip, no account gate, no telemetry. Backups are a single folder plus assets.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="lp-section lp-section-tight" id="screens">
+        <div class="lp-section-head lp-section-head-row" data-reveal>
+          <div>
+            <p class="lp-kicker">Screens</p>
+            <h2>One app, many surfaces.</h2>
+          </div>
+          <div class="lp-tabs" role="tablist" aria-label="Screenshots">
+            <button type="button" class="is-active" data-shot="boards" role="tab" aria-selected="true">Boards</button>
+            <button type="button" data-shot="welcome" role="tab" aria-selected="false">Welcome</button>
+            <button type="button" data-shot="settings" role="tab" aria-selected="false">Settings</button>
+            <button type="button" data-shot="writing" role="tab" aria-selected="false">Writing</button>
+            <button type="button" data-shot="drawing" role="tab" aria-selected="false">Drawing</button>
+          </div>
+        </div>
+
+        <div class="lp-window lp-showcase" data-reveal>
+          <div class="lp-window-bar" aria-hidden="true">
+            <span class="lp-window-dots"><i></i><i></i><i></i></span>
+            <span id="shot-title">Khaoyu Note — Boards</span>
+            <span class="lp-window-status">Preview</span>
+          </div>
+          <img
+            id="shot-image"
+            src="shots/board-light.png"
+            alt="Khaoyu Note board in light mode"
+            data-boards="shots/board-light.png"
+            data-welcome="shots/welcome-all-tools.png"
+            data-settings="shots/settings-general.png"
+            data-writing="shots/doc-editor.png"
+            data-drawing="shots/drawing-editor.png"
+          />
+        </div>
+        <p class="lp-caption" id="shot-caption">Light and dark themes share the same quiet token system.</p>
+      </section>
+
+      <section class="lp-section lp-local" id="local">
+        <div class="lp-local-copy" data-reveal>
+          <p class="lp-kicker">Local-first, by design</p>
+          <h2>Your work is not a service.</h2>
+          <p>
+            Khaoyu Note opens a SQLite database and an assets folder. That is the whole backend.
+            No account, no sync, no waiting for a network that is not there.
+          </p>
+          <ul class="lp-check-list">
+            <li><span aria-hidden="true">✓</span> Boards and cards are written locally after five seconds.</li>
+            <li><span aria-hidden="true">✓</span> Settings, backups and history live in the same data folder.</li>
+            <li><span aria-hidden="true">✓</span> The optional MCP server reads the same database.</li>
+            <li><span aria-hidden="true">✓</span> Share and Sync are disabled in this build; there is no login flow.</li>
+          </ul>
+          <a class="lp-text-link" href="https://github.com/dezuhan/khaoyu-note" target="_blank" rel="noreferrer">Read the source <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="lp-local-visual" data-reveal>
+          <img src="shots/welcome-all-tools.png" alt="Welcome board with the enabled Khaoyu Note card types" />
+        </div>
+      </section>
+
+      <section class="lp-section lp-download" id="download">
+        <div class="lp-download-card" data-reveal>
+          <p class="lp-kicker">Get the app</p>
+          <h2>Start with a blank board.</h2>
+          <p>Windows installers are built from this repository. No account is created, and nothing leaves the machine.</p>
+          <div class="lp-download-actions">
+            <a class="lp-button" href="https://github.com/dezuhan/khaoyu-note/releases/latest" target="_blank" rel="noreferrer">
+              Download for Windows
+            </a>
+            <a class="lp-button lp-button-quiet" href="https://github.com/dezuhan/khaoyu-note" target="_blank" rel="noreferrer">
+              View source
+            </a>
+          </div>
+          <div class="lp-download-meta">
+            <span>MSI + NSIS</span>
+            <span>Windows 10/11 x64</span>
+            <span>Source-available</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="lp-footer">
+      <div class="lp-footer-inner">
+        <div class="lp-footer-brand">
+          <span class="lp-mark" aria-hidden="true">N</span>
+          <div>
+            <strong>Khaoyu Note</strong>
+            <p>Local-first visual thinking.</p>
+          </div>
+        </div>
+        <div class="lp-footer-links">
+          <a href="#features">Features</a>
+          <a href="#screens">Screens</a>
+          <a href="#download">Download</a>
+          <a href="README.md">Documentation</a>
+          <a href="LICENSE">License</a>
+        </div>
+      </div>
+      <div class="lp-footer-bottom">
+        <span>© 2026 Khaoyu Note. Source-available, noncommercial use only.</span>
+        <span>Built with the Khaoyu design system.</span>
+      </div>
+    </footer>
+
+    <script src="landing.js"></script>
+  </body>
+</html>

@@ -3,7 +3,8 @@
 A local-first desktop app for visual notes, boards, kanban, tables and freehand drawing. Rust backend
 (Tauri v2) with a vanilla ES-module frontend. Boards live in a local SQLite database and need no
 network. This deploy is local-first: no login, signup, reset-password or account page is required.
-Optional account code remains in the database for future work but is disabled in the UI.
+Optional account code remains in the database for future work but is disabled in the UI. A standalone
+landing page is available at [`index.html`](index.html).
 
 ![Light theme](shots/board-light.png)
 
