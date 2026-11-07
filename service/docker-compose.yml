@@ -3,7 +3,7 @@ name: khaoyu-note-service
 services:
   khaoyu-note-service:
     build: .
-    image: khaoyu-note-service:0.23.1
+    image: khaoyu-note-service:0.23.2
     restart: unless-stopped
     init: true
     env_file:

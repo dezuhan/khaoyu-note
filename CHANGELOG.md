@@ -12,6 +12,13 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.23.2] - 2026-11-07
+
+### Added
+
+- Remove header image action in the link card context menu when a header image already exists.
+- Regression checks for the header image menu and removal.
+
 ## [0.23.1] - 2026-11-07
 
 ### Fixed
