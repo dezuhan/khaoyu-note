@@ -24,10 +24,10 @@ Document page editor and drawing page editor:
 
 ![Drawing editor](shots/drawing-editor.png)
 
-Status: working MVP. Every behavior below is covered by an automated Playwright suite
-(258/258 UI checks) and the MCP server has its own smoke suite (16/16 checks). The menu bar sits above
-the file header, its Share control manages per-board access, right-clicking a card offers Share link, and
-**Help > Documentation** opens the offline guide.
+Status: working MVP. Every behavior below is covered by an automated Playwright suite (263 checks
+defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (17 checks). Both run in
+CI. The menu bar sits above the file header, its Share control manages per-board access, right-clicking
+a card offers Share link, and **Help > Documentation** opens the offline guide.
 
 ## What is here
 
@@ -36,7 +36,7 @@ khaoyu-note/
   README.md                  this file
   package.json               localhost web host scripts
   server.mjs                 Node web host: static UI plus SQLite JSON bridge
-  service/                   self-hosted service foundation and accounts (Milestones 1 and 2)
+  service/                   self-hosted service: accounts, sharing, sync, admin (Milestones 1 to 5)
   app/                       the Tauri v2 application
     src-tauri/               Rust backend: SQLite storage, window, bundle config
       src/bin/khaoyu-note-mcp.rs  stdio MCP server binary (14 board tools)
@@ -59,7 +59,8 @@ khaoyu-note/
 
 ## Design approach
 
-The board is a world plane rendered as DOM, with CSS transforms for pan and zoom. Cards are plain
+The board is a world plane rendered as DOM, with the CSS `zoom` property for scale and a transform
+for pan. Cards are plain
 JSON objects in one document, so text editing, selection, accessibility and IME support come from the
 browser instead of a custom renderer. Columns keep their children through `parentId` and lay them out
 on every structural change. Connections are annotations stored next to the cards, not containers.
@@ -95,14 +96,14 @@ the app works offline; only optional video and map embeds need the internet.
 | Kanban board | implemented: auto width from the column count, 500 px minimum height (also inside a column), add/remove columns and cards, inline titles, pointer-drag cards to reorder inside a column or move between columns and other kanban boards |
 | Connections / lines | implemented: drag a line between cards, columns, boards or canvas points; endpoints snap to items, are draggable to reattach, and the midpoint can be dragged to curve the line; endpoint and midpoint handles appear only after the line is clicked, straight by default, purely a visual annotation that never groups or moves cards |
 | Board nesting | implemented, nested boards with breadcrumb navigation and a mini board thumbnail on the card |
-| Language | a disabled globe button in the top bar and a Language page in Settings that lists planned languages and a disabled Coming soon action; all UI copy is English |
+| Language | a disabled globe button in the top bar and a Display language row in Settings > General that lists planned languages and a disabled Coming soon action; all UI copy is English |
 | Design system states | audited: buttons use hover, focus, active and disabled states; inputs use the Khaoyu focus glow; menubar, header search and palette have complete keyboard states; remaining gaps are documented in docs/design-system-audit.md |
 | Single-file header | implemented: multi-project Home gallery is disabled for now; the app opens one active file, the menu-bar logo and Template button open a template library, and the breadcrumb shows only the current file path |
 | Menu bar and command palette | implemented: the fixed menu bar has three columns (logo and menus, centered Search commands, icon actions), grouped command menus, and the command palette with Recently used, Tools, File, Edit, View and Help groups plus arrow keys, Enter and Escape |
-| Data safety | implemented: backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups, integrity check runs PRAGMA integrity_check, restore stages a backup and restarts the app, and the schema version is checked on open |
+| Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color, column and kanban |
-| Settings | implemented: token-based styling with only the essentials (General, Appearance, Canvas, Tools, Performance, About, MCP), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done |
+| Settings | implemented: token-based styling with only the essentials (Account, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done |
 | Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts |
 | Tool drag to canvas | implemented: floating label plus dashed drop preview, card created at the pointer, works reliably in WebView2 because it does not depend on HTML5 drag (board/document/image keep their own flows) |
 | MCP server | implemented: `khaoyu-note-mcp.exe` with 14 board tools over the same SQLite database |
@@ -113,11 +114,12 @@ the app works offline; only optional video and map embeds need the internet.
 | Delete / trash | implemented: deleting cards moves them to a per-board Trash panel with Restore and Delete, plus Empty trash with confirmation; Cut removes without trashing |
 | Multi-select, marquee, drag, resize | implemented |
 | Keyboard shortcuts | implemented for canvas and cards |
-| Export | partial (JSON) |
-| Search | not yet |
+| Export | partial: JSON board file, plus HTML and Markdown from the document editor |
+| Search | command palette searches commands; searching card content is available through the MCP server only |
 | System file drop | implemented: native drag and drop stores dropped files as assets, images open as image cards, audio and video use their media cards, raw files and all other documents become file cards; a drop overlay appears while dragging |
 | Template library | implemented: Blank board, Welcome board, Project plan, Kanban board, Meeting notes and Moodboard starters replace the active file and can be undone; applying one to a non-empty board asks for overwrite confirmation first |
-| Labels, reactions, sharing, sync | out of scope for this local app |
+| Labels and reactions | out of scope for this local app |
+| Sharing and sync | optional: they need the self-hosted service in `service/` and are off by default |
 | Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, login and sharing architecture (planning only) |
 
 ### Settings, GPU and comments
@@ -193,7 +195,7 @@ npm run web
 Then open `http://127.0.0.1:1430`. The host serves the same frontend and uses the same SQLite
 database and asset folder as the desktop app, so a board edited in the browser is visible in the app.
 No browser install is needed beyond Node 24 or newer because the host uses the built-in `node:sqlite`
-module.
+module. Run `npm install` once so the backup archive can use `fflate`.
 
 - `KHAOYU_WEB_HOST` changes the bind address, default `127.0.0.1`.
 - `KHAOYU_WEB_PORT` changes the port, default `1430`.
@@ -274,9 +276,9 @@ cmd /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxili
 ```
 
 The binary lands in `C:\temp\mn-target\release\khaoyu-note-mcp.exe` and is also copied to `dist/`. The
-NSIS and MSI installers bundle it next to the app executable, so an installed copy is ready to
-register as well. For a path that survives `cargo clean` and rebuilds, copy it somewhere stable such
-as `%LOCALAPPDATA%\Khaoyu Note\khaoyu-note-mcp.exe` and point clients there.
+NSIS and MSI installers currently ship only the app executable, so copy `khaoyu-note-mcp.exe` beside
+it (or to a stable folder such as `%LOCALAPPDATA%\Khaoyu Note\`) and point clients there. Bundling it
+as a Tauri sidecar is still open; see `docs/packaging.md`.
 
 ### DeepSeek Harness
 
@@ -398,18 +400,19 @@ dispatch. The separate `desktop-release.yml` stays tag-only.
 The UI suite exercises: boot, tool rail, card creation, text editing, drag, resize, undo/redo,
 to-do items, comments, table cells, column drop, zoom, settings modal and custom select, theme
 switching, the disabled Home state, nested board breadcrumbs, document editor, drawing editor, context
-menu, and persistence (215 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
+menu, and persistence (263 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
 checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
-boards, connections and tree deletion (16 checks).
+boards, connections and tree deletion (17 checks).
 
-Built artifacts are copied to `dist/`:
+Built artifacts are copied to `dist/`. The files below are the last built release (0.32.0); run
+`npx tauri build` to produce the 0.33.0 installers:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.32.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
-| `Khaoyu Note_0.32.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
-| `KhaoyuNote.exe` | 10.79 MiB | standalone executable (SQLite bundled, GPU flag aware) |
-| `khaoyu-note-mcp.exe` | 2.38 MiB | standalone MCP server for AI agents |
+| `Khaoyu Note_0.32.0_x64-setup.exe` | 4.07 MiB | NSIS installer (app only; build the MCP binary separately) |
+| `Khaoyu Note_0.32.0_x64_en-US.msi` | 6.64 MiB | MSI installer (app only) |
+| `KhaoyuNote.exe` | 13.58 MiB | standalone executable (SQLite bundled, GPU flag aware) |
+| `khaoyu-note-mcp.exe` | 2.68 MiB | standalone MCP server for AI agents |
 
 Rebuild them with `npx tauri build` (with `CARGO_TARGET_DIR` set as above).
 
@@ -435,6 +438,9 @@ bundled Google families (Plus Jakarta Sans, DM Sans, Playfair Display, Space Mon
 the system Georgia serif.
 
 ## Roadmap
+
+This list is the product backlog for the local app. `ROADMAP.md` is the separate plan for the
+self-hosted service, accounts, sharing and the planned AI assistant.
 
 1. Export to Markdown and PDF.
 2. Board search and richer trash filters.

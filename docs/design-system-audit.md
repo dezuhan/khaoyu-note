@@ -61,7 +61,7 @@ Some app-specific geometry remains hardcoded, for example 20 to 26 px compact bu
 
 ## Verification
 
-- UI suite: 215/215.
+- UI suite: 263 checks.
 - Representative hover test: menubar background changes from transparent to `rgba(0, 0, 0, 0.055)`.
 - Keyboard focus: menubar button receives the Khaoyu 2 px accent outline.
 - No runtime errors in the audit run.

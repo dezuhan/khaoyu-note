@@ -6,23 +6,29 @@ Khaoyu Note uses one token vocabulary across the desktop app and the optional se
 
 | Token | Dark default | Use |
 | --- | --- | --- |
-| `--ky-bg` | `#111111` | Window and page background |
-| `--ky-surface` | `#1b1b1b` | Cards, dialogs, settings panes |
-| `--ky-surface-raised` | `#202020` | Rows and raised cards |
-| `--ky-control` | `#242424` | Icon wells, inactive controls |
-| `--ky-control-hover` | `#2c2c2c` | Hovered controls |
-| `--ky-text` | `#eeeeee` | Primary text |
-| `--ky-soft` | `#b3b3b3` | Secondary text |
-| `--ky-muted` | `#8a8a8a` | Captions and hints |
-| `--ky-stroke` | `#333333` | Normal borders and dividers |
-| `--ky-stroke-strong` | `#4a4a4a` | Input and focus borders |
-| `--ky-accent` | `#9ad4ff` | Links, active states, status |
-| `--ky-accent-strong` | `#c4e6ff` | Hover accent |
-| `--ky-danger` | `#ff8b8b` | Destructive actions |
-| `--ky-radius` | `10px` | Panels and dialogs |
-| `--ky-radius-control` | `6px` | Inputs and buttons |
-| `--ky-font` | Plus Jakarta Sans stack | UI text |
-| `--ky-font-code` | JetBrains Mono stack | Code and IDs |
+| `--ky-bg` | `#111111` (`--ph-chrome`) | Window and page background |
+| `--ky-surface` | `#151515` (`--ph-window`) | Cards, dialogs, settings panes |
+| `--ky-control` | `rgba(255, 255, 255, 0.055)` | Icon wells, inactive controls |
+| `--ky-control-hover` | `rgba(255, 255, 255, 0.1)` | Hovered controls |
+| `--ky-control-active` | `rgba(255, 255, 255, 0.14)` | Pressed controls |
+| `--ky-text` | `#f7f7f7` | Primary text |
+| `--ky-soft` | `#6b6b6b` | Secondary text |
+| `--ky-muted` | `#a4a4a4` | Captions and hints |
+| `--ky-stroke` | `rgba(255, 255, 255, 0.07)` | Normal borders and dividers |
+| `--ky-line-strong` | `rgba(255, 255, 255, 0.12)` | Input and focus borders |
+| `--ky-accent` | `#ecebe7` | Links, active states, status |
+| `--ky-accent-bright` | `#ffffff` | Hover accent |
+| `--ky-danger` | `#f5566f` | Destructive actions |
+| `--ky-raise` | vertical highlight gradient | Raised rows |
+| `--ky-radius-card` | `12px` | Panels and dialogs |
+| `--ky-radius-control` | `7px` | Inputs and buttons |
+| `--ky-control-height` | `24px` | Control height |
+| `--ky-font` | Inter stack, overridden to Plus Jakarta Sans by `app.css` | UI text |
+| `--ky-mono` | monospace stack, overridden to Space Mono by `app.css` | Code and IDs |
+
+`--ky-*` values are aliases into the per-skin `--ph-*` palette, so restyling a skin restyles every
+component. The table above resolves the dark fallback skin. There is no `--ky-surface-raised`,
+`--ky-accent-strong` or `--ky-font-code`; use `--ky-raise`, `--ky-accent-bright` and `--ky-mono`.
 
 The desktop app also exposes theme variants (`light`, `softLight`, `softDark`, `dark`) through its
 `ky.css` token layer. New UI must reference tokens, not literal colors.
@@ -30,12 +36,13 @@ The desktop app also exposes theme variants (`light`, `softLight`, `softDark`, `
 ## Components
 
 - Buttons: primary, secondary, quiet, danger.
-- Inputs and selects: 6px radius, strong border, accent focus ring.
-- Panels and dialogs: surface background, 10px radius, hairline stroke, popup shadow.
+- Inputs and selects: 7px radius (`--ky-radius-control`), strong border, accent focus ring.
+- Panels and dialogs: surface background, 12px radius (`--ky-radius-card`), hairline stroke, popup
+  shadow.
 - Overlay behind dialogs: dimmed background with `backdrop-filter: blur(10px)` for popups and
   notifications that use opacity.
 - Settings navigation: 13px labels, active accent background, 1px divider after the account group
-  and before MCP.
+  (Account and Backup) and before MCP.
 
 ## Service pages
 
@@ -52,7 +59,8 @@ for the stylesheet links and any page-level inline attributes.
 ## Settings structure
 
 ```
-Account
+Account        (service connection, account, passkeys, sharing pages)
+Backup         (back up now, export ZIP, open folder)
 ---
 General        (language + general preferences)
 Appearance     (theme, fonts, motion, canvas)
@@ -63,9 +71,10 @@ MCP
 About
 ```
 
-Account is the first pane. Language lives inside General and Canvas lives inside Appearance; both
-were removed as separate panes. Tools is a two-column grid with the tool icon on the left and the
-name on the right, and clicking a card toggles tool visibility.
+Account is the first pane. Backup is the second pane and owns the local backup controls that used to
+sit inside Account. Language lives inside General and Canvas lives inside Appearance; both were
+removed as separate panes. Tools is a two-column grid with the tool icon on the left and the name on
+the right, and clicking a card toggles tool visibility.
 
 ## Rules
 

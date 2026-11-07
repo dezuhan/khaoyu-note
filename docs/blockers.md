@@ -37,9 +37,19 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 
 ## Current evidence
 
-- Service tests: 39 passing.
+- Service tests: 47 passing (18 service checks plus 29 auth subtests).
 - Sync engine checks: passing.
-- UI suite: 218 passing.
-- Live security check: 19 passing.
-- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt`.
+- UI suite: 263 checks defined in `tools/test-ui.mjs`.
+- Live security check: 20 checks.
+- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt` for 0.32.0; rebuild for
+  0.33.0.
 - Linux and macOS: matrix workflow defined, never executed on this machine.
+
+## Next three items for the next session
+
+1. Add a Restore control to the Backup pane; the `stage_restore` command already validates and stages
+   a backup.
+2. Bundle `khaoyu-note-mcp` into the Tauri installers as a sidecar, or keep documenting the manual
+   copy.
+3. Run the Playwright suites and the MCP smoke suite on a machine with a browser and the built binary
+   before tagging 0.33.0.

@@ -1,12 +1,17 @@
 # Khaoyu Note Roadmap
 
-This roadmap covers the planned move from a local-first desktop app to an optional self-hosted
-service with accounts, sharing and collaboration, plus an optional AI assistant that can organise
-boards and research with explicit permissions. It is a planning document only: none of the server,
-login, sharing or AI assistant code described here exists yet.
+This roadmap covers the move from a local-first desktop app to an optional self-hosted service with
+accounts, sharing and collaboration, plus an optional AI assistant that can organise boards and
+research with explicit permissions.
 
 Status: `[x]` means done and verified in this repository. `[ ]` means planned, or partial with the
 remaining work named in the item.
+
+Where the plan stands: Milestones 1 to 5 are implemented in `service/` and the desktop sync client
+and are recorded in `CHANGELOG.md` from 0.2.0 onward. Milestone 6 is mostly done, with the external
+penetration test and production-scale load testing still open. Milestone 7 is limited by external
+credentials and native runners, not by missing code. Milestone 8, the AI assistant, has not been
+started and needs its own consent, tool-gateway and prompt-injection design first.
 
 ## Current state
 

@@ -1,6 +1,17 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.32.0.
+Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
+
+> Status at 0.33.0, which supersedes the numbers below where they disagree:
+>
+> - Backup has its own Settings pane with Back up now and Export ZIP. The restore command validates
+>   and stages a backup, but the Backup pane still has no Restore control.
+> - Schema versioning now has unit tests for idempotence and for rejecting a newer database.
+> - Automated checks: 263 UI checks, 17 MCP checks, 13 Rust library tests, 2 MCP unit tests, and the
+>   service suite.
+> - A threat model exists in `docs/threat-model.md`, so the "no threat model" gap below is outdated.
+> - Test counts, source sizes and artifact sizes below are the 0.32.0 snapshot; they are kept as
+>   history rather than restated every release.
 
 ## Technology
 
@@ -73,7 +84,7 @@ Verdict: **ready for internal alpha staging, not public stable**.
 | Core editing | Strong | Every card type, columns, tables, kanban, drawing, media, comments and undo are covered by the UI suite |
 | Automated tests | Good | 199/199 UI and 14/14 MCP checks pass at this snapshot |
 | Data integrity | Medium | SQLite works, but schema migrations are not versioned or covered by dedicated tests |
-| Backup and restore | Weak | No backup or restore UI, no scheduled backup, no restore verification |
+| Backup and restore | Partial | Backup has a Settings pane with Back up now and Export ZIP; the restore command validates and stages a backup but has no UI control yet |
 | Packaging | Medium | Windows verified; Linux and macOS CI exists but has not run; Flatpak and mobile not ready |
 | Signing | Not ready | Windows binaries are unsigned; macOS signing and notarisation are only prepared in CI secrets |
 | Auto-update | Not ready | No signed updater channel or rollback path |
@@ -115,7 +126,7 @@ Overall: **moderate for a single-user local app, low for multi-user or self-host
 - MCP over stdio has no authentication. Any local process that can start it could reach the database.
 - External video and map embeds are remote content.
 - No audit trail, crash reporting or tamper detection.
-- No threat model or penetration test for a future server.
+- No external penetration test. The local threat model is documented in `docs/threat-model.md`.
 
 Recommended security work before staging: set a CSP, cap upload size, validate MIME and extension, sign installers, add a signed updater, document the local threat model, and add a database backup with integrity check. The full self-hosted security plan is in `ROADMAP.md` and must be implemented before any account or sharing feature ships.
 

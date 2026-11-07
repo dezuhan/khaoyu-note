@@ -7,9 +7,9 @@ and the new share links.
 
 The service foundation and account core are usable for a single-tenant self-hosted deployment behind
 TLS. Authentication, session rotation, CSRF, share-token isolation and project authorization are
-covered by 23 automated service checks. The largest remaining risks are the absent desktop sync
-client, the file-based mail outbox instead of SMTP, and missing asset upload and download
-authorization.
+covered by 47 automated service checks. The largest remaining risks are the absence of an external
+penetration test, missing asset watermarking and signed download URLs, and the unauthenticated
+loopback web host described in `docs/threat-model.md`.
 
 ## Fixed during the audit
 
@@ -27,6 +27,31 @@ authorization.
   links and a notification email rate limit.
 - Backups can be encrypted with scrypt and AES-256-GCM; login blocks can post a structured alert to
   an operator webhook.
+
+## Fixed in 0.33.0
+
+A second review of the same code found these issues; each fix has a regression test in
+`service/test/`.
+
+- The Docker image did not copy `public/`, so every browser page failed in a container. The image now
+  copies it, and a failed static read returns a 500 instead of leaving the request open.
+- Share bearer tokens leaked into request logs for every subpath except `/access`. `logPath` now
+  redacts the token segment for all `/api/v1/share/<token>/...` paths.
+- Concurrent snapshot writes returned 500. Revision bumps are now `UPDATE ... WHERE revision = ?` and
+  return a 409 `revision_conflict` when the race is lost.
+- A successful login cleared the IP-wide throttle. Only the per-email counter is cleared now, and
+  registration, password reset, OTP request, share report and passkey login have bounded rate limits.
+- Registration returned different status codes for new and existing emails, and the unknown-email
+  login path skipped Argon2. Both now behave the same, with a dummy hash for the unknown path.
+- Item and column share downloads used a substring test on the shared payload. They now require a
+  structured asset reference on a card inside the share scope.
+- Non-image uploads accepted any content type. They use an explicit allowlist, are downloaded as
+  attachments and have CR/LF stripped from the filename.
+- Notification unsubscribe was a state-changing GET with a permanent token. GET shows a confirmation
+  page, POST applies it, and the signed token expires after 30 days.
+- Share reports ignored the public-sharing kill switch and link expiry.
+- Purging an account left its objects on disk. The worker now removes unreferenced objects, and the
+  admin rate map is pruned.
 
 ## Findings
 

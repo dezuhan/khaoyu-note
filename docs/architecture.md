@@ -36,8 +36,17 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `comments-panel.js` | top bar comments popup: collects threads across the board tree, navigates to cards |
 | `notifications.js` | top bar notification center: ingests comment activity, unread badge, read/unread/remove/delete-all actions, persists through app settings |
 | `context-toolbar.js` | floating bottom toolbar: markdown formatting for note/heading text, Move/Pen/Eraser for drawing |
-| `drawing` cards | vector freehand strokes stored as point arrays inside normal cards; selectable, movable and deletable, never reshaped |
-| ROADMAP.md | planned self-hosted service, login, sharing scopes and security architecture; planning only |
+| `settings.js` | preferences dialog: General, Appearance, Tools, Performance, Backup and the Account, MCP and About pages |
+| `sync.js` / `sync-ui.js` | opt-in per-board sync client, plus its dialog and status pill |
+| `share.js` / `share-ui.js` | service sharing API client and the board or card share panel |
+| `command-palette.js` | Ctrl+K command palette with recently used commands |
+| `color-picker.js` / `color-names.js` | HSV colour picker and the named-colour lookup |
+| `image-crop.js` | crop overlay for image cards and link header images |
+| `preview.js` | mini board painter used by home cards and board cards |
+| `limits.js` | upload size cap and blocked-extension policy |
+| `onboarding.js` | first-run service or account prompt |
+| `documentation.js` | offline Help > Documentation content |
+| `time.js` | absolute comment timestamps |
 | `icons.js` | inline SVG icon set |
 
 Dependency direction is one way: `model` <- `store` <- `actions` <- `render` / `interact` / `ui` <-
@@ -88,10 +97,10 @@ stray wheel event cannot silently scroll the canvas origin away from `view.pan`.
 ```
 
 Types: `note`, `heading`, `link`, `todo`, `document`, `comment`, `table`, `color`, `sketch`,
-`image`, `audio`, `video`, `map`, `file`, `board`, `column`, `kanban`. A column is a container whose
-children point at it through `parentId`; that link is cleared when a card is dragged out of a column.
-Link cards open through the Rust `open_external` command, which validates http(s) and launches the
-system default browser instead of a WebView2 child window.
+`drawing`, `image`, `audio`, `video`, `map`, `file`, `board`, `column`, `kanban`. A column is a
+container whose children point at it through `parentId`; that link is cleared when a card is dragged
+out of a column. Link cards open through the Rust `open_external` command, which validates http(s)
+and launches the system default browser instead of a WebView2 child window.
 
 New Kanban cards are created with `fullWidth: true` and a width of the visible canvas minus 96 px, and their columns use `flex: 1 1 168px` so they spread across the full card instead of leaving an empty strip. Adding a column only grows the card when the content minimum exceeds its current width. Kanban cards keep a `columns` array, each with an `id`, a `title` and an `items` array of `{id, text}`. The card has no fixed aspect: its width is recomputed on every add/remove column (`20 + n * 168 + gaps`) and its minimum height is 500 px, also when the card is a child of a column (the column then grows around it). Every mutation (add/remove column, add/remove card, edit title) runs through `checkpoint()`/`markDirty("save")`. Kanban items use a pointer drag (not HTML5 drag): grabbing the grip creates a floating ghost, `elementFromPoint` resolves the target column, the vertical midpoint of the remaining rows computes the insertion index, and a drop line previews the position. Dropping reorders inside the same column, moves between columns, or moves to a column of another kanban card; the mutation checkpoints and re-renders. The MCP `create_card` tool accepts `type: "kanban"` and seeds Backlog/In progress/Done columns.
 
@@ -227,11 +236,12 @@ same rule, so a trashed or nested board is never chosen just because it is newes
 Preferences are stored in the `meta` table (`ui_settings` as one JSON object, plus
 `gpu_acceleration` as its own key). The dialog borrows the Photon preferences structure (dark header,
 search field, category rail, scrolling content pane, Reset and Done) but keeps only what this app
-actually uses: General (autosave, clipboard export, image interpolation, board export),
-Appearance (theme, reduce motion plus Heading/Body/Code font), Canvas (grid size, grid visibility,
-zoom reset), Tools (show or hide rail tools), Performance (GPU acceleration), About (version, storage,
-data folder, board counts) and MCP (server path, transport, database, copyable client config). The
-cosmetic options from the reference window (account, integrations, scratch disks, plug-ins, units,
+actually uses: Account (service connection, account, passkeys and sharing pages), Backup (back up
+now, export ZIP, open folder), General (language, autosave, clipboard export, image interpolation,
+board export), Appearance (theme, reduce motion, Heading/Body/Code font, grid size, grid visibility,
+zoom reset), Tools (show or hide rail tools), Performance (GPU acceleration), MCP (server path,
+transport, database, copyable client config) and About (version, storage, data folder, board counts).
+The cosmetic options from the reference window (integrations, scratch disks, plug-ins, units,
 history log) were dropped.
 
 GPU acceleration is applied at window creation, not from JavaScript. `run()` reads
@@ -275,8 +285,9 @@ rail button reorders, dropping on the canvas creates.
 ## Web host
 
 `server.mjs` serves the same `app/web` frontend on `http://127.0.0.1:1430` and opens the same
-`khaoyu-note.db` and `assets/` folder as the desktop app. It needs only Node 24 or newer because it
-uses the built-in `node:sqlite` module, not a second database engine.
+`khaoyu-note.db` and `assets/` folder as the desktop app. It runs on Node 24 or newer because it uses
+the built-in `node:sqlite` module instead of a second database engine. Since the backup archive uses
+`fflate`, a checkout needs `npm install` once before `npm run web`.
 
 The host injects a small runtime into `index.html`: `window.__KHAOYU_WEB__` carries the mode, host,
 port, database path and version, while `window.__TAURI__` is a shim whose `core.invoke` forwards

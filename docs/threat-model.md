@@ -30,9 +30,10 @@ host.
 | Share link leakage | High entropy tokens, hash at rest, expiry, revocation, rotation, passphrase, noindex, neutral 404. | Links are bearer secrets once copied. |
 | XSS in shared content | Client escaping and sanitizer, JSON-only service responses, strict headers. | Server does not render rich text, so server-side sanitising is not applicable yet. |
 | CSRF and cross-origin writes | Same-origin checks, double-submit CSRF, CORS only for configured bearer origins without credentials. | Logout remains a cookie mutation without a CSRF header. |
-| Malicious upload | Size limit, filename sanitisation, extension blocklist, authenticated access. | No MIME sniffing, malware scan, watermark or signed URL. |
+| Malicious upload | Size limit, filename sanitisation, extension blocklist, image magic-byte sniffing, optional scanner hook, authenticated access. | No watermark or signed short-lived URL; non-image types are not sniffed. |
 | Abuse and spam | Public sharing kill switch, per-link reports, share password throttle, admin review. | No automated classification or global user suspension. |
 | Denial of service | Body limits, login throttle, share throttle, admin endpoint limit. | No dedicated load balancer or global rate limiter. |
+| Local web host abuse | Loopback bind by default; network exposure requires changing `KHAOYU_WEB_HOST` on purpose. | No authentication, origin check or rate limit on `POST /api/invoke`: any local process that can reach the port can read and rewrite boards. |
 | Supply chain | `npm audit`, Dependabot and Trivy image scanning in CI. | No reproducible binary signing or third-party review. |
 | Operator mistakes | Fail-closed config, migrations, backup/restore, release checklist. | No automated restore drill. |
 | Insider access | Least-privilege project roles, audit log, admin token separation. | SQLite file access is operator-level. |
@@ -50,7 +51,8 @@ host.
 ## Open risks
 
 1. No external penetration test or code-signing pipeline.
-2. Asset MIME/malware scanning, watermarking and signed download URLs are not implemented.
+2. Asset watermarking and signed download URLs are not implemented; image sniffing and an optional
+   scanner hook are.
 3. No global rate limiter, alert routing or incident paging.
 4. Mobile and macOS/iOS packaging is not built or signed.
-5. SSO and passkeys are not implemented.
+5. The local web host has no authentication or origin check and is safe only while bound to loopback.
