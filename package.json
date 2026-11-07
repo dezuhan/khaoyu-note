@@ -1,7 +1,7 @@
 {
   "name": "khaoyu-note-web",
   "private": true,
-  "version": "0.20.0",
+  "version": "0.21.0",
   "type": "module",
   "description": "Local web host for Khaoyu Note, backed by the same SQLite database as the desktop app",
   "engines": {
@@ -22,6 +22,7 @@
     "test:passkeys": "node tools/test-passkeys.mjs",
     "test:account-ui": "node tools/test-account-ui.mjs",
     "test:shares-ui": "node tools/test-shares-ui.mjs",
+    "test:share-view": "node tools/test-share-view.mjs",
     "dist:checksums": "node tools/checksums.mjs --dir dist"
   }
 }

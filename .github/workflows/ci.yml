@@ -112,6 +112,9 @@ jobs:
       - name: Browser sharing suite
         run: node tools/test-shares-ui.mjs
 
+      - name: Share viewer suite
+        run: node tools/test-share-view.mjs
+
       - name: Show preview server log on failure
         if: failure()
         run: cat /tmp/khaoyu-serve.log || true
