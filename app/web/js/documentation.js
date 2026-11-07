@@ -50,9 +50,9 @@ export const DOCUMENTATION_HTML = `
   <h3>Cropping images</h3>
   <p>Link cards fetch a hero image from the page metadata automatically. If the page has no hero image,
   a dotted globe fallback is shown. Right-click a header image and choose Crop header image, or
-  right-click an image card and choose Crop image. Drag the frame to move it and drag any edge or
-  corner for a free ratio. Fit to image resets the frame to the full image ratio. Apply crop stores the
-  region with the card.</p>
+  right-click an image card and choose Crop image. The crop editor fits the whole image inside the
+  dialog, then you can drag the frame to move it and drag any edge or corner for a free ratio. Fit to
+  image resets the frame to the full image ratio. Apply crop stores the region with the card.</p>
 
   <h3>Keyboard shortcuts</h3>
   <table>

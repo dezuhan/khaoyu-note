@@ -56,7 +56,10 @@ export function openImageCrop({ src, crop, onApply }) {
   let displayWidth = 0;
   let displayHeight = 0;
 
-  const close = () => overlay.remove();
+  const close = () => {
+    window.removeEventListener("resize", fitToStage);
+    overlay.remove();
+  };
   overlay.addEventListener("pointerdown", (event) => {
     if (event.target === overlay) close();
   });
@@ -79,15 +82,28 @@ export function openImageCrop({ src, crop, onApply }) {
     size.textContent = `${Math.round(current.w * 100)} × ${Math.round(current.h * 100)} % of the image`;
   }
 
-  image.addEventListener("load", () => {
-    const rect = image.getBoundingClientRect();
-    displayWidth = rect.width;
-    displayHeight = rect.height;
+  function fitToStage() {
+    if (!image.naturalWidth || !image.naturalHeight) return;
+    const panel = overlay.querySelector(".mn-crop-panel");
+    const availableWidth = Math.max(220, Math.min(panel.clientWidth - 36, window.innerWidth - 56));
+    const availableHeight = Math.max(160, Math.min(420, window.innerHeight - 260));
+    const scale = Math.min(
+      1,
+      availableWidth / image.naturalWidth,
+      availableHeight / image.naturalHeight
+    );
+    displayWidth = Math.round(image.naturalWidth * scale);
+    displayHeight = Math.round(image.naturalHeight * scale);
+    image.style.width = `${displayWidth}px`;
+    image.style.height = `${displayHeight}px`;
     stage.style.width = `${displayWidth}px`;
     stage.style.height = `${displayHeight}px`;
     paint();
-  });
+  }
+
+  image.addEventListener("load", fitToStage);
   image.src = src;
+  window.addEventListener("resize", fitToStage);
 
   overlay.querySelector('[data-role="fit"]').addEventListener("click", () => {
     current = { x: 0, y: 0, w: 1, h: 1, ratio: current.ratio };

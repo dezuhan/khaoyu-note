@@ -5728,6 +5728,7 @@ html[data-performance="true"] .mn-card {
 .mn-crop-stage {
   position: relative;
   display: inline-block;
+  flex: none;
   max-width: 100%;
   max-height: 62vh;
   line-height: 0;
@@ -5739,8 +5740,8 @@ html[data-performance="true"] .mn-card {
   display: block;
   width: auto;
   height: auto;
-  max-width: 80vw;
-  max-height: 62vh;
+  max-width: none;
+  max-height: none;
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -5810,4 +5811,8 @@ html[data-performance="true"] .mn-card {
   background-image: radial-gradient(var(--ky-muted) 1.2px, transparent 1.2px);
   background-size: 8px 8px;
   background-position: center;
+}
+
+.mn-audio-edit-actions .mn-primary-soft {
+  height: 30px;
 }
