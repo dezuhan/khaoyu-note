@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-ky-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sign in · Khaoyu Note</title>
+    <link rel="stylesheet" href="/ky.css" />
+    <link rel="stylesheet" href="/auth.css" />
+  </head>
+  <body class="auth-body">
+    <button type="button" class="auth-theme" id="auth-theme">Dark mode</button>
+    <main class="auth-card">
+      <div class="auth-brand"><span class="auth-logo" aria-hidden="true">K</span><span>Khaoyu Note</span></div>
+      <div class="auth-head">
+        <h1>Welcome back</h1>
+        <p class="auth-sub">Sign in to your Khaoyu Note service.</p>
+      </div>
+
+      <form class="auth-form" id="login-form" novalidate>
+        <label class="auth-field">
+          <span>Email</span>
+          <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Your password" required />
+        </label>
+        <div class="auth-field">
+          <details>
+            <summary>Use an authenticator code</summary>
+            <input id="totp" name="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
+          </details>
+        </div>
+        <p class="auth-status" id="status" role="status"></p>
+        <button class="auth-submit" id="login-submit" type="submit">Sign in</button>
+      </form>
+
+      <div class="auth-or">or</div>
+      <a class="auth-secondary" href="/passkeys">Use a passkey</a>
+
+      <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
+      <p class="auth-switch"><a href="/reset">Reset password</a></p>
+      <p class="auth-legal">Local-first and self-hosted. Your boards stay on your server.</p>
+    </main>
+    <script type="module" src="/login.js"></script>
+  </body>
+</html>

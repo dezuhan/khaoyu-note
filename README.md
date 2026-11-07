@@ -255,9 +255,11 @@ sharing endpoints, configuration, backup and upgrade steps are documented in
 [SECURITY.md](<SECURITY.md>).
 
 The service exposes project, item and column share links, passphrase and expiry controls, member
-roles, invitations and ownership transfer. The service account page is at `/account`, passkey
-management is at `/passkeys`, sharing is at `/shares`, the admin dashboard is at `<frontend URL>/admin`,
-and a shared link opens read-only at `/s/:token`. The first registered account (or the account created by
+roles, invitations and ownership transfer. The service pages are `/login`, `/register`, `/reset` and
+`/account` for auth and account management, `/passkeys`, `/shares`, the admin dashboard at
+`<frontend URL>/admin`, and a shared link opens read-only at `/s/:token`. Login, signup and reset use
+separate centred pages; password reset asks for the current password and never sends an email token.
+The first registered account (or the account created by
 `bootstrap`) is the service admin. `/admin` uses the same signed-in session and shows Overview,
 Accounts, Teams and Activity with light and dark themes; admins can create teams, inspect every
 audit row and change another account's role or status. Desktop boards can opt in to server sync from

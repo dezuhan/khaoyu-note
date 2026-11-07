@@ -45,7 +45,8 @@ mode `0600`; the SMTP adapter is not implemented.
 
 The service always opens two listeners on different free ports in the 5-digit range 20000 to 59999:
 
-- **Frontend** serves `/account`, `/passkeys`, `/shares`, `/s/:token`, `/admin` and the static assets.
+- **Frontend** serves `/login`, `/register`, `/reset`, `/account`, `/passkeys`, `/shares`, `/s/:token`,
+  `/admin` and the static assets.
 - **Backend** serves `/api/v1/*`, `/healthz` and `/readyz`; it refuses page requests.
 
 The browser only uses the frontend origin. The frontend proxies `/api`, `/healthz` and `/readyz` to
@@ -196,8 +197,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/logout-all` | Revoke every session for the account. |
 | `GET` | `/api/v1/auth/sessions` | List sessions with device, timestamps and current flag. |
 | `DELETE` | `/api/v1/auth/sessions/:id` | Revoke one session. |
-| `POST` | `/api/v1/auth/password-reset/request` | Queue a single-use reset token. |
-| `POST` | `/api/v1/auth/password-reset/confirm` | Set a new password and revoke sessions. |
+| `POST` | `/api/v1/auth/password-reset/request` | Legacy operator endpoint that queues a single-use reset token. The browser uses current-password reset instead. |
+| `POST` | `/api/v1/auth/password-reset/confirm` | Legacy operator endpoint that consumes a reset token. |
+| `POST` | `/api/v1/auth/reset-password` | Reset with email plus current password; no email token and every session is revoked. |
 | `POST` | `/api/v1/auth/totp/setup` | Create a TOTP secret and `otpauth` URI. |
 | `POST` | `/api/v1/auth/totp/enable` | Confirm a TOTP code and enable it. |
 | `POST` | `/api/v1/auth/totp/disable` | Disable TOTP with password and code. |
@@ -280,12 +282,16 @@ directly; add the origin when the web host runs on another port.
 
 ## Browser account pages
 
-`/account` provides registration and immediate sign-in, password login, password reset, session
-listing and revocation, logout everywhere, and creation or revocation of scoped API tokens for
-desktop sync. Email verification is disabled and its form is hidden. The page uses the same cookie
-and CSRF rules as the API and is served with a strict self-only CSP. `/passkeys` links from it for
-passkey login and registration. Both pages require a secure context for WebAuthn and are intended
-for localhost or HTTPS deployments.
+The service now has separate auth pages: `/login`, `/register` and `/reset` use a centred reference
+layout built on `ky.css` and `auth.css`. `/login` handles password and optional TOTP sign-in plus a
+passkey link. `/register` creates an account immediately; the first account becomes the admin.
+`/reset` asks for email, current password and a new password, then revokes every session. It never sends
+an email reset token because this service has no email confirmation flow.
+
+`/account` is the signed-in management page: session listing and revocation, logout everywhere, and
+creation or revocation of scoped API tokens for desktop sync. Unauthenticated visitors are sent to
+`/login`. `/passkeys` handles passkey login and registration. All pages use the same cookie and CSRF
+rules as the API and are served with a strict self-only CSP.
 
 ## Passkeys
 

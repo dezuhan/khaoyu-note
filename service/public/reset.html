@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-ky-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Reset password · Khaoyu Note</title>
+    <link rel="stylesheet" href="/ky.css" />
+    <link rel="stylesheet" href="/auth.css" />
+  </head>
+  <body class="auth-body">
+    <button type="button" class="auth-theme" id="auth-theme">Dark mode</button>
+    <main class="auth-card">
+      <div class="auth-brand"><span class="auth-logo" aria-hidden="true">K</span><span>Khaoyu Note</span></div>
+      <div class="auth-head">
+        <h1>Reset your password</h1>
+        <p class="auth-sub">Confirm your current password and choose a new one.</p>
+      </div>
+
+      <form class="auth-form" id="reset-form" novalidate>
+        <p class="auth-note">This service does not send reset emails. Email delivery is not configured, so reset uses your current password.</p>
+        <label class="auth-field">
+          <span>Email</span>
+          <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+        </label>
+        <label class="auth-field">
+          <span>Current password</span>
+          <input id="current-password" name="current-password" type="password" autocomplete="current-password" placeholder="Current password" required />
+        </label>
+        <label class="auth-field">
+          <span>New password</span>
+          <input id="password" name="password" type="password" autocomplete="new-password" placeholder="12 or more characters" required />
+        </label>
+        <label class="auth-field">
+          <span>Confirm new password</span>
+          <input id="confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Repeat the new password" required />
+        </label>
+        <p class="auth-status" id="status" role="status"></p>
+        <button class="auth-submit" id="reset-submit" type="submit">Reset password</button>
+      </form>
+
+      <p class="auth-switch">Remembered it? <a href="/login">Sign in</a></p>
+      <p class="auth-legal">Every existing session is revoked after a successful reset.</p>
+    </main>
+    <script type="module" src="/reset.js"></script>
+  </body>
+</html>

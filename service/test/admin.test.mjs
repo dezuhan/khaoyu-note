@@ -136,6 +136,19 @@ test("service admin dashboard API", async (t) => {
     assert.equal(script.status, 200);
     const style = await api.call("/admin.css");
     assert.equal(style.status, 200);
+    for (const [route, marker] of [
+      ["/", "login-form"],
+      ["/login", "login-form"],
+      ["/register", "register-form"],
+      ["/reset", "reset-form"],
+    ]) {
+      const response = await api.call(route);
+      assert.equal(response.status, 200, route);
+      assert.match(response.body, new RegExp(marker), route);
+    }
+    for (const asset of ["/auth.css", "/auth-common.js", "/login.js", "/register.js", "/reset.js"]) {
+      assert.equal((await api.call(asset)).status, 200, asset);
+    }
   });
 
   const registered = await api.register("admin@example.com");
@@ -229,5 +242,25 @@ test("service admin dashboard API", async (t) => {
     assert.equal(disabled.body.user.status, "disabled");
     const login = await api.login("member@example.com");
     assert.equal(login.status, 401);
+  });
+
+  await t.test("password reset works without an email token", async () => {
+    await api.register("reset@example.com");
+    const updated = await api.call("/api/v1/auth/reset-password", {
+      method: "POST",
+      body: {
+        email: "reset@example.com",
+        currentPassword: PASSWORD,
+        newPassword: "new-horse-battery-9",
+      },
+    });
+    assert.equal(updated.status, 204, JSON.stringify(updated.body));
+    const oldPassword = await api.login("reset@example.com");
+    assert.equal(oldPassword.status, 401);
+    const newPassword = await api.call("/api/v1/auth/login", {
+      method: "POST",
+      body: { email: "reset@example.com", password: "new-horse-battery-9" },
+    });
+    assert.equal(newPassword.status, 200, JSON.stringify(newPassword.body));
   });
 });

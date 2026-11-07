@@ -3,64 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Khaoyu Note account</title>
-      <link rel="stylesheet" href="/ky.css" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Account · Khaoyu Note</title>
+    <link rel="stylesheet" href="/ky.css" />
     <link rel="stylesheet" href="/ui.css" />
   </head>
   <body class="ky-scope">
     <main class="ky-panel ky-auth-panel">
       <h1 class="ky-title">Khaoyu Note account</h1>
-      <p>Local-first boards never require login. This page manages the optional self-hosted service account.</p>
-
-      <div class="tabs">
-        <button class="ky-button ky-button-primary" id="tab-login" type="button">Sign in</button>
-        <button id="tab-register" type="button" class="ky-button ky-button-quiet">Register</button>
-      </div>
-
-      <section id="login-section">
-        <h2>Sign in</h2>
-        <label class="ky-label" for="login-email">Email</label>
-        <input class="ky-input" id="login-email" type="email" autocomplete="username" />
-        <label class="ky-label" for="login-password">Password</label>
-        <input class="ky-input" id="login-password" type="password" autocomplete="current-password" />
-        <label class="ky-label" for="login-totp">TOTP code (if enabled)</label>
-        <input class="ky-input" id="login-totp" inputmode="numeric" autocomplete="one-time-code" />
-        <div class="row">
-          <button class="ky-button ky-button-primary" id="login" type="button">Sign in</button>
-          <button id="passkey-login" type="button" class="ky-button ky-button-quiet">Use a passkey</button>
-        </div>
-        <p class="muted">Passkeys are managed on <a href="/passkeys">the passkeys page</a>.</p>
-      </section>
-
-      <section id="register-section" hidden>
-        <h2>Register</h2>
-        <label class="ky-label" for="register-email">Email</label>
-        <input class="ky-input" id="register-email" type="email" autocomplete="username" />
-        <label class="ky-label" for="register-name">Display name</label>
-        <input class="ky-input" id="register-name" autocomplete="name" />
-        <label class="ky-label" for="register-password">Password (12+ characters)</label>
-        <input class="ky-input" id="register-password" type="password" autocomplete="new-password" />
-        <button class="ky-button ky-button-primary" id="register" type="button">Create account</button>
-        <p class="muted">No email verification step. You can sign in immediately after registering.</p>
-      </section>
-
-      <section class="ky-auth-section">
-        <h2>Reset password</h2>
-        <label class="ky-label" for="reset-email">Account email</label>
-        <input class="ky-input" id="reset-email" type="email" />
-        <button class="ky-button ky-button-primary" id="reset-request" type="button">Send reset token</button>
-        <label class="ky-label" for="reset-token">Reset token</label>
-        <input class="ky-input" id="reset-token" />
-        <label class="ky-label" for="reset-password">New password</label>
-        <input class="ky-input" id="reset-password" type="password" autocomplete="new-password" />
-        <button id="reset-confirm" type="button" class="ky-button ky-button-quiet">Change password</button>
-      </section>
+      <p>Manage the self-hosted service account on this device. Boards stay local-first.</p>
 
       <section id="account-section" hidden>
         <h2>Signed in</h2>
         <p id="account-email" class="muted"></p>
-        <button id="logout" type="button" class="ky-button ky-button-quiet">Sign out</button>
-        <button id="logout-all" type="button" class="ky-button ky-button-danger">Sign out everywhere</button>
+        <div class="row">
+          <a class="ky-button ky-button-quiet" href="/reset">Reset password</a>
+          <a class="ky-button ky-button-quiet" href="/passkeys">Passkeys</a>
+          <button id="logout" type="button" class="ky-button ky-button-quiet">Sign out</button>
+          <button id="logout-all" type="button" class="ky-button ky-button-danger">Sign out everywhere</button>
+        </div>
         <p class="muted"><a href="/admin">Open the service admin dashboard</a></p>
 
         <h2 style="margin-top: 18px">Sessions</h2>
@@ -74,6 +35,7 @@
         <ul id="tokens"></ul>
       </section>
 
+      <p id="redirect-note" hidden>Signing in is required. Redirecting to the login page...</p>
       <div id="status" role="status"></div>
     </main>
     <script type="module" src="/account.js"></script>

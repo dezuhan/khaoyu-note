@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-ky-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Create account · Khaoyu Note</title>
+    <link rel="stylesheet" href="/ky.css" />
+    <link rel="stylesheet" href="/auth.css" />
+  </head>
+  <body class="auth-body">
+    <button type="button" class="auth-theme" id="auth-theme">Dark mode</button>
+    <main class="auth-card">
+      <div class="auth-brand"><span class="auth-logo" aria-hidden="true">K</span><span>Khaoyu Note</span></div>
+      <div class="auth-head">
+        <h1>Create your account</h1>
+        <p class="auth-sub">One account is all you need for boards, sync and sharing.</p>
+      </div>
+
+      <form class="auth-form" id="register-form" novalidate>
+        <p class="auth-note">The first account on this service becomes the admin. Later accounts are members.</p>
+        <label class="auth-field">
+          <span>Display name</span>
+          <input id="name" name="name" type="text" autocomplete="name" placeholder="Your name" maxlength="80" />
+        </label>
+        <label class="auth-field">
+          <span>Email</span>
+          <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input id="password" name="password" type="password" autocomplete="new-password" placeholder="12 or more characters" required />
+        </label>
+        <label class="auth-field">
+          <span>Confirm password</span>
+          <input id="confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Repeat the password" required />
+        </label>
+        <p class="auth-status" id="status" role="status"></p>
+        <button class="auth-submit" id="register-submit" type="submit">Create account</button>
+      </form>
+
+      <p class="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
+      <p class="auth-legal">No email verification step. You can sign in immediately after registering.</p>
+    </main>
+    <script type="module" src="/register.js"></script>
+  </body>
+</html>

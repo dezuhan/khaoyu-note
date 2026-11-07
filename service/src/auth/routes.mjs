@@ -1710,6 +1710,49 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      if (method === "POST" && url.pathname === "/api/v1/auth/reset-password") {
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const throttle = loginBlocked(db, { email, ip, config });
+        if (throttle.blocked) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const account = db
+          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL AND status = 'active'")
+          .get(email);
+        const valid = await verifyPassword(
+          String(body.currentPassword || ""),
+          account?.password_hash || DUMMY_PASSWORD_HASH
+        );
+        if (!valid || !account) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or password" }, config);
+          return true;
+        }
+        const password = requirePassword(body.newPassword);
+        db.prepare("UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?").run(
+          await hashPassword(password),
+          now(),
+          account.id
+        );
+        revokeAllSessions(db, account.id);
+        clearLoginFailures(db, { email, ip, secret: config.secret });
+        writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.password_reset",
+          resourceType: "account",
+          resourceId: account.id,
+          ip,
+          secret: config.secret,
+        });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/auth/password-reset/request") {
         enforceRate(passwordResetRate, ipHash);
         const body = await readJson(request);

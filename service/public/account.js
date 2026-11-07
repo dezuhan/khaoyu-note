@@ -32,76 +32,6 @@ async function api(path, { method = "GET", body } = {}) {
   return parsed;
 }
 
-function showTab(tab) {
-  const register = tab === "register";
-  $("register-section").hidden = !register;
-  $("login-section").hidden = register;
-  $("tab-register").classList.toggle("secondary", !register);
-  $("tab-login").classList.toggle("secondary", register);
-}
-
-async function register() {
-  try {
-    await api("/api/v1/auth/register", {
-      method: "POST",
-      body: {
-        email: $("register-email").value.trim(),
-        displayName: $("register-name").value.trim() || undefined,
-        password: $("register-password").value,
-      },
-    });
-    setStatus("Account created. You can sign in now.");
-    showTab("login");
-  } catch (error) {
-    setStatus(error.message);
-  }
-}
-
-async function login() {
-  try {
-    await api("/api/v1/auth/login", {
-      method: "POST",
-      body: {
-        email: $("login-email").value.trim(),
-        password: $("login-password").value,
-        totp: $("login-totp").value.trim() || undefined,
-      },
-    });
-    setStatus("Signed in.");
-    await refresh();
-  } catch (error) {
-    setStatus(error.message);
-  }
-}
-
-async function requestReset() {
-  try {
-    await api("/api/v1/auth/password-reset/request", {
-      method: "POST",
-      body: { email: $("reset-email").value.trim() },
-    });
-    setStatus("If the account exists, a reset token is on the way.");
-  } catch (error) {
-    setStatus(error.message);
-  }
-}
-
-async function confirmReset() {
-  try {
-    await api("/api/v1/auth/password-reset/confirm", {
-      method: "POST",
-      body: {
-        token: $("reset-token").value.trim(),
-        password: $("reset-password").value,
-      },
-    });
-    setStatus("Password changed. All old sessions were revoked.");
-    await refresh();
-  } catch (error) {
-    setStatus(error.message);
-  }
-}
-
 function renderSessions(sessions) {
   const list = $("sessions");
   list.textContent = "";
@@ -175,8 +105,7 @@ async function createToken() {
 async function logoutAll() {
   try {
     await api("/api/v1/auth/logout-all", { method: "POST", body: {} });
-    setStatus("Signed out on every device.");
-    await refresh();
+    window.location.replace("/login?signedout=1");
   } catch (error) {
     setStatus(error.message);
   }
@@ -185,8 +114,7 @@ async function logoutAll() {
 async function logout() {
   try {
     await api("/api/v1/auth/logout", { method: "POST", body: {} });
-    setStatus("Signed out.");
-    await refresh();
+    window.location.replace("/login?signedout=1");
   } catch (error) {
     setStatus(error.message);
   }
@@ -202,19 +130,12 @@ async function refresh() {
     renderTokens(tokens.tokens);
   } catch {
     $("account-section").hidden = true;
+    $("redirect-note").hidden = false;
+    window.location.replace("/login");
   }
 }
 
-$("tab-login").addEventListener("click", () => showTab("login"));
-$("tab-register").addEventListener("click", () => showTab("register"));
-$("login").addEventListener("click", login);
-$("register").addEventListener("click", register);
-$("reset-request").addEventListener("click", requestReset);
-$("reset-confirm").addEventListener("click", confirmReset);
 $("token-create").addEventListener("click", createToken);
 $("logout").addEventListener("click", logout);
 $("logout-all").addEventListener("click", logoutAll);
-$("passkey-login").addEventListener("click", () => {
-  window.location.href = "/passkeys";
-});
 refresh();

@@ -102,7 +102,7 @@ function showAuth(message) {
     <div class="admin-auth">
       <h2>Admin sign in</h2>
       <p>${escapeHtml(message || "Sign in with an account that has the admin role.")}</p>
-      <a class="ky-button ky-button-primary" href="/account">Sign in to the service</a>
+      <a class="ky-button ky-button-primary" href="/login">Sign in to the service</a>
       <p class="admin-note">The dashboard reads the service account session and never asks for the operator token.</p>
     </div>`;
 }

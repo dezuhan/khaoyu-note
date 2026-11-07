@@ -7,6 +7,10 @@ project uses Semantic Versioning.
 
 ### Added
 
+- Separate service auth pages at `/login`, `/register` and `/reset`, using the reference centred card
+  layout with `ky.css` tokens and light/dark mode. Password reset requires the current password and
+  never sends an email token. `/account` is signed-in only and redirects to `/login`; the admin
+  dashboard auth card links to `/login`.
 - Settings > Account now has a Delete Account tab. After re-entering the current password and typing
   DELETE ALL, it deletes every local board, card, connection, asset, account, session, setting and
   activity row, vacuums the database, clears the saved desktop session or web cookies, and reloads into
