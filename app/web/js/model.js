@@ -349,7 +349,7 @@ export function welcomeBoard() {
   add(createCard("sketch", 920, 560, { strokes: [] }));
 
   const showcaseHeading = add(
-    createCard("heading", 180, 960, { text: "Every card type" })
+    createCard("heading", 180, 960, { text: "Enabled card types" })
   );
   showcaseHeading.w = 380;
 
@@ -371,11 +371,8 @@ export function welcomeBoard() {
     })
   );
 
-  add(createCard("video", 920, 960, { url: "" }));
-  add(createCard("audio", 1260, 960, { url: "", name: "" }));
-  add(createCard("map", 1580, 960, { query: "" }));
-  add(createCard("file", 1900, 960, { name: "Brand-assets.zip", path: "" }));
-  add(createCard("board", 2200, 960, { title: "Examples board" }));
+  add(createCard("file", 920, 960, { name: "Brand-assets.zip", path: "" }));
+  add(createCard("board", 1260, 960, { title: "Examples board" }));
 
   add(
     createCard("kanban", 620, 1260, {
