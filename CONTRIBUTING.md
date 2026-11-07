@@ -94,3 +94,9 @@ git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
    agrees.
 5. Working tree is clean before tagging.
 6. Tag points at the release commit.
+
+## License
+
+By contributing, you agree that your contribution is licensed under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use requires separate written permission
+from the copyright holder.

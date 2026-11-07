@@ -495,6 +495,20 @@ self-hosted service, accounts, sharing and the planned AI assistant.
 This is an independent local-first app for personal use. No third-party client code, assets, fonts or
 icons are included. The vendored token stylesheet is reused under its own repository license.
 
+## License
+
+Khaoyu Note is **source-available for noncommercial use only** under the
+[PolyForm Noncommercial License 1.0.0](LICENSE).
+
+- You may use, study, modify and share the source for personal, educational, research and other
+  noncommercial purposes.
+- You may not sell the software, bundle it into a paid product, or use it for commercial advantage.
+- Commercial use requires separate written permission from the copyright holder.
+- This is not OSI open source because the license restricts commercial use. It is source-available.
+
+The `Required Notice` in the license file must be kept with copies and substantial portions of the
+software.
+
 
 
 

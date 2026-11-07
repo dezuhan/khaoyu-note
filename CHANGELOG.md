@@ -7,6 +7,9 @@ project uses Semantic Versioning.
 
 ### Added
 
+- The project is licensed under the PolyForm Noncommercial License 1.0.0: source-available for
+  personal, educational and research use, with no commercial use without written permission. This is
+  not OSI open source because commercial use is restricted.
 - Local-first deploy mode: login, signup, reset-password, account page and Settings > Account are
   disabled. Boards and settings open without an account, the account avatar and Account settings page
   are hidden, desktop guest writes are accepted, and the web host no longer requires a session for the
