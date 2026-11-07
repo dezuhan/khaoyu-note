@@ -242,7 +242,7 @@
           <a href="#download">Download</a>
           <a href="README.md">Documentation</a>
           <a href="LICENSE" id="license-trigger">License</a>
-          <a href="TRADEMARK.md">Trademark</a>
+          <a href="TRADEMARK.md" id="trademark-trigger">Trademark</a>
         </div>
       </div>
       <div class="lp-footer-bottom">
@@ -298,8 +298,59 @@
         </p>
       </div>
       <footer class="lp-license-actions">
-        <a class="lp-button lp-button-quiet" href="TRADEMARK.md">Trademark policy</a>
+        <button type="button" class="lp-button lp-button-quiet" id="license-trademark">Trademark policy</button>
         <a class="lp-button" href="LICENSE" target="_blank" rel="noreferrer">Read full license</a>
+      </footer>
+    </dialog>
+
+    <dialog class="lp-license-dialog" id="trademark-dialog" aria-labelledby="trademark-title">
+      <header class="lp-license-head">
+        <div>
+          <p class="lp-kicker">Brand policy</p>
+          <h2 id="trademark-title">Khaoyu Note trademark</h2>
+        </div>
+        <button type="button" class="lp-icon-button" id="trademark-close">Close</button>
+      </header>
+      <div class="lp-license-body">
+        <p>
+          The Khaoyu Note name, logo and app icon are brand identifiers. The AGPL covers the source
+          code, but it does not grant permission to use the branding for a modified or third-party
+          distribution.
+        </p>
+        <div class="lp-license-grid">
+          <section>
+            <h3>Allowed</h3>
+            <ul>
+              <li>Accurate references to Khaoyu Note</li>
+              <li>Forks with a new name and logo</li>
+              <li>Statements like "based on Khaoyu Note"</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Required</h3>
+            <ul>
+              <li>Replace the name, logo and app icon in a fork</li>
+              <li>Keep attribution to Khaoyu Note</li>
+              <li>Link to the fork's AGPL source</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Not allowed</h3>
+            <ul>
+              <li>Modified builds using the Khaoyu Note name</li>
+              <li>The app icon for a fork</li>
+              <li>Official status or endorsement claims</li>
+            </ul>
+          </section>
+        </div>
+        <p class="lp-license-note">
+          Trademark rules are separate from the AGPL and do not reduce the code rights the license
+          grants. A commercial fork is allowed only with its own branding and its source available.
+        </p>
+      </div>
+      <footer class="lp-license-actions">
+        <button type="button" class="lp-button lp-button-quiet" id="trademark-license">View license</button>
+        <a class="lp-button" href="TRADEMARK.md" target="_blank" rel="noreferrer">Read full policy</a>
       </footer>
     </dialog>
 

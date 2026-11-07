@@ -122,19 +122,35 @@ if ("IntersectionObserver" in window && revealItems.length) {
   for (const item of revealItems) item.classList.add("is-visible");
 }
 
-// License dialog. Fall back to the raw license file when dialog is unavailable.
-const licenseDialog = document.getElementById("license-dialog");
-const licenseTrigger = document.getElementById("license-trigger");
-if (licenseDialog && licenseTrigger && typeof licenseDialog.showModal === "function") {
-  licenseTrigger.addEventListener("click", (event) => {
+// License and trademark dialogs. Fall back to the raw files when dialog is unavailable.
+function bindDialog(triggerId, dialogId, closeId) {
+  const dialog = document.getElementById(dialogId);
+  const trigger = document.getElementById(triggerId);
+  if (!dialog || !trigger || typeof dialog.showModal !== "function") return false;
+  trigger.addEventListener("click", (event) => {
     event.preventDefault();
-    licenseDialog.showModal();
+    dialog.showModal();
   });
-  document.getElementById("license-close")?.addEventListener("click", () => licenseDialog.close());
-  licenseDialog.addEventListener("click", (event) => {
-    if (event.target === licenseDialog) licenseDialog.close();
+  document.getElementById(closeId)?.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
   });
-  licenseDialog.addEventListener("close", () => licenseTrigger.focus());
+  dialog.addEventListener("close", () => trigger.focus());
+  return true;
+}
+
+const licenseReady = bindDialog("license-trigger", "license-dialog", "license-close");
+const trademarkReady = bindDialog("trademark-trigger", "trademark-dialog", "trademark-close");
+
+if (licenseReady && trademarkReady) {
+  document.getElementById("license-trademark")?.addEventListener("click", () => {
+    document.getElementById("license-dialog").close();
+    document.getElementById("trademark-dialog").showModal();
+  });
+  document.getElementById("trademark-license")?.addEventListener("click", () => {
+    document.getElementById("trademark-dialog").close();
+    document.getElementById("license-dialog").showModal();
+  });
 }
 
 // Small nav elevation once the hero starts scrolling.
