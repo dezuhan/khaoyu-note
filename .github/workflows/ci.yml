@@ -153,7 +153,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Service tests
-        run: node --test service/test/service.test.mjs service/test/auth.test.mjs
+        run: node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
 
       - name: Build service image
         run: docker build --tag khaoyu-note-service:ci service
@@ -169,7 +169,7 @@ jobs:
       - name: Service image ships the browser pages
         run: |
           docker run --rm khaoyu-note-service:ci sh -c \
-            'test -f /app/public/account.html && test -f /app/public/passkeys.html && test -f /app/public/share.html && test -f /app/public/ky.css'
+            'test -f /app/public/account.html && test -f /app/public/passkeys.html && test -f /app/public/share.html && test -f /app/public/ky.css && test -f /app/public/admin.html && test -f /app/public/admin.js && test -f /app/public/admin.css'
 
   rust:
     name: Rust checks and MCP suite

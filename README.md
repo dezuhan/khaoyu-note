@@ -319,7 +319,7 @@ Harness plugin manager adds the server to the current profile as `@local/note-st
       config:
         serverName: khaoyu-note
         transport: stdio
-        command: 'C:\Users\dezuhan\AppData\Local\Khaoyu Note\khaoyu-note-mcp.exe'
+        command: 'C:\Users\<you>\AppData\Local\Khaoyu Note\khaoyu-note-mcp.exe'
         failOnStartupError: true
 ```
 

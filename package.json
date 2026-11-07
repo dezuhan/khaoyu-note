@@ -4,6 +4,14 @@
   "version": "0.33.0",
   "type": "module",
   "description": "Local web host for Khaoyu Note, backed by the same SQLite database as the desktop app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dezuhan/khaoyu-note.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dezuhan/khaoyu-note/issues"
+  },
+  "homepage": "https://github.com/dezuhan/khaoyu-note#readme",
   "engines": {
     "node": ">=24"
   },
@@ -17,7 +25,7 @@
     "service:bootstrap": "node service/src/cli.mjs bootstrap",
     "service:backup": "node service/src/cli.mjs backup",
     "service:restore": "node service/src/cli.mjs restore",
-    "test:service": "node --test service/test/service.test.mjs service/test/auth.test.mjs",
+    "test:service": "node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs",
     "test:sync": "node --no-warnings tools/test-sync.mjs",
     "test:update": "node --no-warnings tools/test-update.mjs",
     "test:auto-backup": "node --no-warnings tools/test-auto-backup.mjs",
