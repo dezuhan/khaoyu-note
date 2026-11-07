@@ -1,6 +1,6 @@
 // Chrome UI: tool rail, top bar, modals, menus, toasts and shortcuts.
 
-import { DOCUMENTATION_HTML } from "./documentation.js";
+import { createDocumentation } from "./documentation.js";
 import { openImageCrop } from "./image-crop.js";
 import { toolDisabledReason } from "./limits.js";
 import { openSharePanel } from "./share-ui.js";
@@ -1685,9 +1685,9 @@ export function closeModal() {
 function openDocumentation() {
   openModal({
     title: "Documentation",
-    body: DOCUMENTATION_HTML,
+    body: createDocumentation(),
     footer: [{ label: "Close" }],
-    width: "min(760px, calc(100vw - 48px))",
+    width: "min(980px, calc(100vw - 48px))",
   });
 }
 

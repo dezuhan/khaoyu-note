@@ -2167,9 +2167,28 @@ await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
 await page.locator(".mn-menu-item", { hasText: "Documentation" }).click();
 await page.waitForTimeout(250);
 check(
-  "Help > Documentation opens the documentation page",
+  "Help > Documentation opens the tabbed documentation page",
   (await page.locator(".mn-modal-title").innerText()) === "Documentation" &&
-    (await page.locator(".mn-docs").innerText()).includes("Server sync")
+    (await page.locator(".mn-docs-nav-item").count()) >= 12 &&
+    (await page.locator(".mn-docs").innerText()).includes("local-first")
+);
+check(
+  "Documentation navigation includes MCP and API sections",
+  (await page.locator('.mn-docs-nav-item[data-doc="mcp"]').count()) === 1 &&
+    (await page.locator('.mn-docs-nav-item[data-doc="api"]').count()) === 1
+);
+await page.locator('.mn-docs-nav-item[data-doc="sync"]').click();
+await page.waitForTimeout(150);
+check(
+  "Documentation switches to the Server sync section",
+  (await page.locator(".mn-docs").innerText()).includes("Sign in and connect")
+);
+await page.locator('.mn-docs-nav-item[data-doc="mcp"]').click();
+await page.waitForTimeout(150);
+check(
+  "Documentation MCP section lists the board tools",
+  (await page.locator(".mn-docs").innerText()).includes("khaoyu-note-mcp") &&
+    (await page.locator(".mn-docs").innerText()).includes("create_card")
 );
 await page.locator(".mn-modal-close").click();
 check("Documentation page closes", (await page.locator(".mn-docs").count()) === 0);
