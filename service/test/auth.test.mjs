@@ -42,6 +42,8 @@ function configFor(dataDir) {
     ssoNameHeader: "x-auth-request-name",
     ssoAutoCreate: true,
     trustProxy: true,
+    passkeysEnabled: true,
+    rpId: "localhost",
     accessTtlMinutes: 15,
     refreshTtlDays: 7,
     deletionGraceDays: 30,
