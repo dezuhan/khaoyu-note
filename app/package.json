@@ -1,7 +1,7 @@
 {
   "name": "khaoyu-note",
   "private": true,
-  "version": "0.25.1",
+  "version": "0.26.0",
   "description": "Khaoyu Note: local-first visual notes and boards with Tauri v2 and Rust",
   "scripts": {
     "tauri": "tauri",

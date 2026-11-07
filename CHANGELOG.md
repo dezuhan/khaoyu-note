@@ -12,6 +12,15 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.26.0] - 2026-11-07
+
+### Fixed
+
+- Audio edit mode now shows a clip-only upload button without text and a Submit button.
+- Uploading a replacement audio file while editing updates the input source instead of leaving the
+  old selection in place; Submit closes editing and renders the new player.
+- Added UI checks for the audio edit controls, replacement upload and submit.
+
 ## [0.25.1] - 2026-11-07
 
 ### Changed
