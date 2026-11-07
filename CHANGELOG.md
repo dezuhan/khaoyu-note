@@ -12,6 +12,15 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.16.0] - 2026-11-07
+
+### Added
+
+- WebAuthn passkey registration, login, listing and removal with the `@simplewebauthn/server` library.
+- Single-use five minute challenges bound to the account email, counter updates, passkey audit
+  events and a last-credential guard for passwordless accounts.
+- `/passkeys` browser page and an end-to-end virtual-authenticator test.
+
 ## [0.15.0] - 2026-11-07
 
 ### Added
