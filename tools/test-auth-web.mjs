@@ -157,7 +157,8 @@ function inspectSchema(dataDir) {
       .map((row) => row.name);
     const boardColumns = database.prepare("PRAGMA table_info(boards)").all().map((row) => row.name);
     const cardColumns = database.prepare("PRAGMA table_info(cards)").all().map((row) => row.name);
-    return { version, tables, boardColumns, cardColumns };
+    const userColumns = database.prepare("PRAGMA table_info(users)").all().map((row) => row.name);
+    return { version, tables, boardColumns, cardColumns, userColumns };
   } finally {
     database.close();
   }
@@ -208,7 +209,7 @@ function makeNewerSchemaDatabase(dataDir) {
   const database = new DatabaseSync(path.join(dataDir, "khaoyu-note.db"));
   database.exec(`
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT INTO meta (key, value) VALUES ('schema_version', '3');
+INSERT INTO meta (key, value) VALUES ('schema_version', '4');
 `);
   database.close();
 }
@@ -324,6 +325,29 @@ try {
       profile.body.avatarColor === "#B262C0" &&
       profile.body.displayName === "Dezuhan Pratama",
     JSON.stringify(profile.body)
+  );
+
+  const avatarData =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=";
+  const avatarProfile = await api(instance, cookies, "/api/auth/profile", {
+    method: "PATCH",
+    csrf: true,
+    body: { avatarUrl: avatarData },
+  });
+  check(
+    "profile avatar is stored as a data URL",
+    avatarProfile.status === 200 && avatarProfile.body.avatarUrl === avatarData,
+    JSON.stringify({ status: avatarProfile.status })
+  );
+  const clearedAvatar = await api(instance, cookies, "/api/auth/profile", {
+    method: "PATCH",
+    csrf: true,
+    body: { avatarUrl: "" },
+  });
+  check(
+    "profile avatar can be removed",
+    clearedAvatar.status === 200 && clearedAvatar.body.avatarUrl === "",
+    JSON.stringify({ status: clearedAvatar.status })
   );
 
   const blockedProfile = await api(instance, cookies, "/api/auth/profile", {
@@ -569,14 +593,15 @@ try {
   await stopServer(instance);
   instance = null;
   const schema = inspectSchema(dataDir);
-  check("the database is migrated to schema 2", schema.version === "2", String(schema.version));
+  check("the database is migrated to schema 3", schema.version === "3", String(schema.version));
   check(
     "the auth tables and author columns exist",
     ["users", "sessions", "activity_log"].every((name) => schema.tables.includes(name)) &&
       schema.boardColumns.includes("created_by") &&
       schema.boardColumns.includes("updated_by") &&
       schema.cardColumns.includes("created_by") &&
-      schema.cardColumns.includes("updated_by")
+      schema.cardColumns.includes("updated_by") &&
+      schema.userColumns.includes("avatar_url")
   );
 
   const upgradeDir = tempDirectory("khaoyu-auth-upgrade-");
@@ -591,8 +616,8 @@ try {
   upgradeServer = null;
   const upgradedSchema = inspectSchema(upgradeDir);
   check(
-    "a schema 1 database is migrated to schema 2",
-    upgradedSchema.version === "2" && upgradedSchema.tables.includes("users"),
+    "a schema 1 database is migrated to schema 3",
+    upgradedSchema.version === "3" && upgradedSchema.tables.includes("users"),
     String(upgradedSchema.version)
   );
   let restarted = await startServer(upgradeDir);

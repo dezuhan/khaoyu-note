@@ -340,9 +340,24 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
     label: "Settings and backup",
     html: `
       <h3>Panes</h3>
-      <p>Settings opens with Account and Backup at the top, then a divider, General, Appearance, Tools
-      and Performance, then another divider, MCP and About. Language is part of General and Canvas is
-      part of Appearance. Tools is a two-column icon grid; Map, Video and Audio show a disabled status.</p>
+      <p>Settings opens with Account, Server and Backup at the top, then a divider, General,
+      Appearance, Tools and Performance, then another divider, MCP and About. Language is part of
+      General and Canvas is part of Appearance. Tools is a two-column icon grid; Map, Video and Audio
+      show a disabled status.</p>
+      <h3>Account</h3>
+      <ul>
+        <li>The Account pane is a profile page: profile picture, first and last name, email, and a
+        Change Password section, with Save and Cancel.</li>
+        <li>Upload Image accepts PNG, JPEG or GIF up to 10 MB and crops it to 256 px before saving.
+        Remove clears the picture and Save applies the change.</li>
+      </ul>
+      <h3>Server</h3>
+      <ul>
+        <li>Server shows the local runtime (mode, version, database folder) and, on the web host, the
+        host and port.</li>
+        <li>The same pane holds the self-hosted service connection, health status, account page,
+        passkeys, sharing and the sign-in or change-server action.</li>
+      </ul>
       <h3>Backup</h3>
       <ul>
         <li>Back up now writes a consistent SQLite snapshot plus assets to

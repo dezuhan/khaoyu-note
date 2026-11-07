@@ -6168,6 +6168,12 @@ html[data-performance="true"] .mn-card {
   line-height: 1;
   user-select: none;
 }
+.mn-account-btn.has-image,
+.mn-account-chip.has-image {
+  background-image: var(--mn-avatar-image);
+  background-position: center;
+  background-size: cover;
+}
 .mn-account-btn {
   flex: none;
   cursor: pointer;
@@ -6495,6 +6501,125 @@ html[data-performance="true"] .mn-card {
 }
 .mn-account-pane .mn-account-history {
   max-height: none;
+}
+/* Settings account profile */
+.mn-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.mn-profile-section {
+  padding: 0 0 18px;
+}
+.mn-profile-section + .mn-profile-section {
+  border-top: 1px solid var(--ky-border);
+  padding-top: 18px;
+}
+.mn-profile-picture {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+.mn-profile-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--ky-control-active);
+  background-position: center;
+  background-size: cover;
+  color: var(--ky-text);
+  box-shadow: var(--ky-hairline);
+  font-size: 28px;
+  font-weight: 700;
+}
+.mn-profile-avatar.has-image {
+  background-color: var(--ky-control);
+}
+.mn-profile-picture-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.mn-profile-picture-copy h3,
+.mn-profile-security h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.mn-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.mn-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mn-profile-field .ky-input {
+  height: 32px;
+  font-size: 12px;
+}
+.mn-profile-security {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mn-profile-security > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mn-profile-password {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+.mn-profile-password[hidden] {
+  display: none;
+}
+.mn-profile-password .ky-input {
+  height: 30px;
+  font-size: 11px;
+}
+.mn-profile-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ky-border);
+}
+.mn-profile-status {
+  min-height: 16px;
+  margin: 8px 0 0;
+  color: var(--ky-soft);
+  font-size: 11px;
+}
+.mn-profile-status.is-error {
+  color: var(--ky-danger);
+}
+.mn-server-runtime {
+  margin-bottom: 14px;
+}
+@media (max-width: 720px) {
+  .mn-profile-grid {
+    grid-template-columns: 1fr;
+  }
+  .mn-profile-picture {
+    flex-direction: column;
+  }
 }
 @media (max-width: 720px) {
   .mn-account-shell {

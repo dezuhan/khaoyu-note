@@ -174,16 +174,24 @@ function renderAvatar() {
   if (!avatarButton) return;
   const user = authState().user;
   const tone = toneFor(user);
-  avatarButton.textContent = initialsFor(user);
   avatarButton.dataset.tone = tone;
   avatarButton.classList.toggle("is-guest", !user);
+  if (user?.avatarUrl) {
+    avatarButton.textContent = "";
+    avatarButton.classList.add("has-image");
+    avatarButton.style.setProperty("--mn-avatar-image", `url("${user.avatarUrl}")`);
+  } else {
+    avatarButton.textContent = initialsFor(user);
+    avatarButton.classList.remove("has-image");
+    avatarButton.style.removeProperty("--mn-avatar-image");
+  }
   const label = user
     ? `Account menu for ${displayNameFor(user)}${user.role === "admin" ? ", admin" : ""}`
     : "Account menu, not signed in";
   avatarButton.setAttribute("aria-label", label);
   avatarButton.setAttribute("title", label);
   const color = String(user?.avatarColor || "");
-  if (/^#[0-9a-f]{6}$/i.test(color)) {
+  if (!user?.avatarUrl && /^#[0-9a-f]{6}$/i.test(color)) {
     avatarButton.style.setProperty(
       "--mn-avatar-bg",
       `color-mix(in srgb, ${color} 32%, var(--ky-control-active))`
@@ -294,9 +302,14 @@ function renderAccountPane() {
 }
 
 function identityHead(user) {
+  const image = user.avatarUrl
+    ? ` style="--mn-avatar-image: url('${escape(user.avatarUrl)}')"`
+    : avatarColorStyle(user);
+  const classes = `mn-account-chip is-large${user.avatarUrl ? " has-image" : ""}`;
+  const content = user.avatarUrl ? "" : escape(initialsFor(user));
   return `
     <div class="mn-account-identity-head">
-      <span class="mn-account-chip is-large" data-tone="${escape(toneFor(user))}"${avatarColorStyle(user)}>${escape(initialsFor(user))}</span>
+      <span class="${classes}" data-tone="${escape(toneFor(user))}"${image}>${content}</span>
       <span class="mn-account-identity-copy">
         <strong>${escape(displayNameFor(user))}</strong>
         <span>@${escape(user.username)} · ${escape(roleLabel(user))}</span>

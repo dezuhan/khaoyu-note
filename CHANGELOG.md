@@ -7,6 +7,11 @@ project uses Semantic Versioning.
 
 ### Added
 
+- Settings > Account is now a profile page with profile picture upload and removal, first and last
+  name, email and a Change Password section, plus Save and Cancel. Settings navigation adds Server
+  between Account and Backup for local runtime details and the self-hosted service connection.
+  Profile pictures are cropped to 256 px data URLs. The local schema moves to version 3 with
+  `users.avatar_url`.
 - Native desktop build matrix for Windows, Ubuntu and macOS that uploads unsigned bundles and
   checksums.
 - `tools/checksums.mjs` and `npm run dist:checksums`.

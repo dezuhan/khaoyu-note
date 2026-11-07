@@ -30,6 +30,7 @@ pub struct PublicUser {
     pub member_role: String,
     pub status: String,
     pub avatar_color: String,
+    pub avatar_url: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub last_login_at: Option<i64>,
@@ -257,13 +258,14 @@ fn user_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PublicUser> {
         member_role: row.get(7)?,
         status: row.get(8)?,
         avatar_color: row.get::<_, Option<String>>(9)?.unwrap_or_default(),
-        created_at: row.get(10)?,
-        updated_at: row.get(11)?,
-        last_login_at: row.get(12)?,
+        avatar_url: row.get::<_, Option<String>>(10)?.unwrap_or_default(),
+        created_at: row.get(11)?,
+        updated_at: row.get(12)?,
+        last_login_at: row.get(13)?,
     })
 }
 
-const USER_COLUMNS: &str = "id, username, email, first_name, last_name, display_name, role, member_role, status, avatar_color, created_at, updated_at, last_login_at";
+const USER_COLUMNS: &str = "id, username, email, first_name, last_name, display_name, role, member_role, status, avatar_color, avatar_url, created_at, updated_at, last_login_at";
 
 pub fn count_users(conn: &Connection) -> Result<i64, String> {
     conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
@@ -390,8 +392,8 @@ pub fn validate_session(conn: &Connection, token: &str) -> Result<Option<Session
     let row = conn
         .query_row(
             "SELECT s.id, u.id, u.username, u.email, u.first_name, u.last_name, u.display_name,
-                    u.role, u.member_role, u.status, u.avatar_color, u.created_at, u.updated_at,
-                    u.last_login_at
+                    u.role, u.member_role, u.status, u.avatar_color, u.avatar_url, u.created_at,
+                    u.updated_at, u.last_login_at
              FROM sessions s JOIN users u ON u.id = s.user_id
              WHERE s.token_hash = ?1 AND s.revoked_at IS NULL AND s.expires_at > ?2
                AND u.status = 'active'",
@@ -410,9 +412,10 @@ pub fn validate_session(conn: &Connection, token: &str) -> Result<Option<Session
                         member_role: row.get(8)?,
                         status: row.get(9)?,
                         avatar_color: row.get::<_, Option<String>>(10)?.unwrap_or_default(),
-                        created_at: row.get(11)?,
-                        updated_at: row.get(12)?,
-                        last_login_at: row.get(13)?,
+                        avatar_url: row.get::<_, Option<String>>(11)?.unwrap_or_default(),
+                        created_at: row.get(12)?,
+                        updated_at: row.get(13)?,
+                        last_login_at: row.get(14)?,
                     },
                 ))
             },
@@ -538,6 +541,34 @@ pub fn log_activity_throttled(
         Some(resource_id),
         metadata,
     )
+}
+
+pub fn validate_avatar_url(value: &str) -> Result<(), String> {
+    if value.is_empty() {
+        return Ok(());
+    }
+    if value.len() > 1_500_000 {
+        return Err("Profile image is too large".into());
+    }
+    let prefix: String = value
+        .chars()
+        .take(64)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let accepted = [
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,",
+        "data:image/jpg;base64,",
+        "data:image/gif;base64,",
+        "data:image/webp;base64,",
+    ]
+    .iter()
+    .any(|candidate| prefix.starts_with(candidate));
+    if accepted {
+        Ok(())
+    } else {
+        Err("Profile image must be a PNG, JPEG, GIF or WebP data URL".into())
+    }
 }
 
 pub fn claim_unattributed(conn: &Connection, user: &PublicUser) -> Result<(), String> {

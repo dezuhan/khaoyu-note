@@ -370,6 +370,7 @@ export async function authUpdateProfile(input) {
     lastName: input.lastName,
     email: input.email,
     avatarColor: input.avatarColor,
+    avatarUrl: input.avatarUrl,
   };
   if (hasWeb) return fetchAuth("/api/auth/profile", { method: "PATCH", body });
   if (hasTauri) return invoke("auth_update_profile", body);

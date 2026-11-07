@@ -1818,7 +1818,8 @@ check(
 const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
 check(
   "Settings navigation follows the requested order",
-  navLabels.join(",") === "Account,Backup,General,Appearance,Tools,Performance,MCP,About",
+  navLabels.join(",") ===
+    "Account,Server,Backup,General,Appearance,Tools,Performance,MCP,About",
   navLabels.join(", ")
 );
 check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
@@ -1826,9 +1827,17 @@ check(
   "Settings overlay uses a blurred glass backdrop",
   (await page.locator(".mn-prefs-overlay").evaluate((el) => getComputedStyle(el).backdropFilter)).includes("blur")
 );
+const accountPageText = await page.locator('[data-role="content"]').innerText();
 check(
-  "Account page links the service pages",
-  (await page.locator('[data-role="content"]').innerText()).includes("Server: not connected") &&
+  "Account page shows the local profile or the sign-in prompt",
+  accountPageText.includes("Profile Picture") || accountPageText.includes("Sign in to manage your local account")
+);
+await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
+await page.waitForTimeout(300);
+check(
+  "Server page shows runtime details and the service pages",
+  (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
+    (await page.locator('[data-role="content"]').innerText()).includes("Server: not connected") &&
     (await page.locator(".mn-account-grid").innerText()).includes("Passkeys") &&
     (await page.locator(".mn-account-grid").innerText()).includes("Sharing")
 );
@@ -1887,7 +1896,7 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 8, String(await page.locator(".mn-prefs-nav-item").count()));
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 9, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
   "Language and Canvas are merged away",
   !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),

@@ -238,8 +238,9 @@ same rule, so a trashed or nested board is never chosen just because it is newes
 Preferences are stored in the `meta` table (`ui_settings` as one JSON object, plus
 `gpu_acceleration` as its own key). The dialog borrows the Photon preferences structure (dark header,
 search field, category rail, scrolling content pane, Reset and Done) but keeps only what this app
-actually uses: Account (service connection, account, passkeys and sharing pages), Backup (back up
-now, export ZIP, open folder), General (language, autosave, clipboard export, image interpolation,
+actually uses: Account (profile picture, first and last name, email, password, Save and Cancel), Server
+(local runtime details plus service connection, passkeys and sharing pages), Backup (back up now,
+export ZIP, open folder), General (language, autosave, clipboard export, image interpolation,
 board export), Appearance (theme, reduce motion, Heading/Body/Code font, grid size, grid visibility,
 zoom reset), Tools (show or hide rail tools), Performance (GPU acceleration), MCP (server path,
 transport, database, copyable client config) and About (version, storage, data folder, board counts).
@@ -327,7 +328,7 @@ backup folders are not pruned yet; the Backup pane says so and retention is list
 
 ## Local accounts
 
-Milestone M1 adds local accounts to the app database, schema version 2. The new tables are `users`,
+Milestone M1 adds local accounts to the app database, schema version 3. The new tables are `users`,
 `sessions` and `activity_log`; `boards` and `cards` gain `created_by` and `updated_by` columns that
 hold `{"source":"local","id":"...","name":"..."}` snapshots. Existing databases are migrated with
 idempotent `ALTER TABLE` checks, and `server.mjs` applies the same migration so both hosts stay

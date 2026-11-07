@@ -1,7 +1,7 @@
 // Settings dialog in the Photon preferences style, plus persisted app preferences.
 
 import * as bridge from "./bridge.js";
-import { authState, subscribeAuth } from "./auth.js";
+import { authState, changePassword, subscribeAuth, updateProfile } from "./auth.js";
 import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } from "./auto-backup.js";
 import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
@@ -66,6 +66,7 @@ const HEADING_FONT_CHOICES = [["Georgia", "Georgia (system serif)"], ...FONT_CHO
 
 const NAV = [
   { id: "account", label: "Account" },
+  { id: "server", label: "Server" },
   { id: "backup", label: "Backup" },
   { divider: true },
   { id: "general", label: "General" },
@@ -323,6 +324,17 @@ function pages() {
         {
           type: "note",
           text: "Local account on this computer. Self-hosted service accounts and sharing arrive in M4.",
+        },
+      ],
+    },
+    {
+      id: "server",
+      title: "Server",
+      divider: false,
+      rows: () => [
+        {
+          type: "note",
+          text: "Local runtime details and the optional self-hosted service connection.",
         },
       ],
     },
@@ -730,6 +742,8 @@ function renderContent() {
   const page = pages().find((entry) => !entry.divider && entry.id === activePage);
   if (activePage === "account") {
     renderAccountPage(content);
+  } else if (activePage === "server") {
+    renderServerPage(content);
   } else if (activePage === "backup") {
     renderBackupPage(content);
   } else if (activePage === "tools") {
@@ -773,41 +787,343 @@ function serviceButton(label, path) {
   };
 }
 
+function renderServerRuntime(content) {
+  const box = document.createElement("div");
+  box.className = "mn-account-status mn-server-runtime";
+  const title = document.createElement("div");
+  title.className = "mn-account-server";
+  title.textContent = "This computer";
+  box.append(title);
+  const mode = bridge.webInfo
+    ? "Web host"
+    : bridge.hasTauri
+      ? "Desktop app"
+      : "Browser preview";
+  const rows = [
+    ["Mode", mode],
+    ["Version", currentVersion() || "unknown"],
+    ["Database", awaitPath()],
+  ];
+  if (bridge.webInfo) {
+    rows.push(["Host", `${bridge.webInfo.host}:${bridge.webInfo.port}`]);
+    rows.push(["URL", bridge.webInfo.url]);
+  }
+  for (const [label, value] of rows) {
+    const line = document.createElement("div");
+    line.className = "mn-account-server";
+    line.textContent = `${label}: ${value}`;
+    box.append(line);
+  }
+  content.append(box);
+}
+
+function resizeAvatarImage(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !String(file.type || "").startsWith("image/")) {
+      reject(new Error("Choose a PNG, JPEG or GIF image."));
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      reject(new Error("The image must be under 10 MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read the image."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Could not load the image."));
+      image.onload = () => {
+        const size = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        const scale = Math.max(size / image.width, size / image.height);
+        const width = image.width * scale;
+        const height = image.height * scale;
+        context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.86));
+      };
+      image.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function renderAccountPage(content) {
   content.append(heading("Account"));
+  const user = authState().user;
+  if (!user) {
+    const note = document.createElement("p");
+    note.className = "mn-prefs-note";
+    note.textContent = "Sign in to manage your local account.";
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "mn-btn";
+    open.textContent = "Open account menu";
+    open.addEventListener("click", () => {
+      closeSettingsPage();
+      window.dispatchEvent(new CustomEvent("mn:open-account"));
+    });
+    content.append(note, open);
+    return;
+  }
+
+  let avatarUrl = user.avatarUrl || "";
+  let statusText = "";
+  const page = document.createElement("div");
+  page.className = "mn-profile";
+
+  const status = document.createElement("p");
+  status.className = "mn-profile-status";
+  status.setAttribute("role", "status");
+  const setStatus = (message, isError = false) => {
+    statusText = message || "";
+    status.textContent = statusText;
+    status.classList.toggle("is-error", Boolean(isError));
+  };
+
+  // ---------------------------------------------------------------- picture
+  const picture = document.createElement("section");
+  picture.className = "mn-profile-section mn-profile-picture";
+  const preview = document.createElement("span");
+  preview.className = "mn-profile-avatar";
+  const paintAvatar = () => {
+    preview.classList.toggle("has-image", Boolean(avatarUrl));
+    preview.style.backgroundImage = avatarUrl ? `url("${avatarUrl}")` : "";
+    preview.textContent = avatarUrl
+      ? ""
+      : String(user.firstName || user.username || "?").trim().charAt(0).toUpperCase();
+  };
+  paintAvatar();
+  const pictureCopy = document.createElement("div");
+  pictureCopy.className = "mn-profile-picture-copy";
+  const pictureTitle = document.createElement("h3");
+  pictureTitle.textContent = "Profile Picture";
+  const pictureHint = document.createElement("p");
+  pictureHint.className = "mn-prefs-note";
+  pictureHint.textContent = "We support PNG, JPEG and GIF images under 10 MB. They are cropped to 256 px.";
+  const uploadInput = document.createElement("input");
+  uploadInput.type = "file";
+  uploadInput.accept = "image/png,image/jpeg,image/gif";
+  uploadInput.hidden = true;
+  const upload = document.createElement("button");
+  upload.type = "button";
+  upload.className = "mn-btn mn-btn-primary";
+  upload.innerHTML = `${icon("upload", 14)}<span>Upload Image</span>`;
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "mn-btn";
+  remove.textContent = "Remove";
+  const pictureActions = document.createElement("div");
+  pictureActions.className = "mn-account-actions";
+  pictureActions.append(upload, remove);
+  upload.addEventListener("click", () => uploadInput.click());
+  uploadInput.addEventListener("change", async () => {
+    const file = uploadInput.files && uploadInput.files[0];
+    uploadInput.value = "";
+    if (!file) return;
+    upload.disabled = true;
+    try {
+      avatarUrl = await resizeAvatarImage(file);
+      paintAvatar();
+      setStatus("Image ready. Choose Save to apply it.");
+    } catch (error) {
+      setStatus(error?.message || "Could not use that image.", true);
+    } finally {
+      upload.disabled = false;
+    }
+  });
+  remove.addEventListener("click", () => {
+    avatarUrl = "";
+    paintAvatar();
+    setStatus("Image removed. Choose Save to apply it.");
+  });
+  pictureCopy.append(pictureTitle, pictureActions, pictureHint);
+  picture.append(preview, pictureCopy);
+
+  // ---------------------------------------------------------------- details
+  const details = document.createElement("section");
+  details.className = "mn-profile-section";
+  const names = document.createElement("div");
+  names.className = "mn-profile-grid";
+  const makeField = (label, name, value, type = "text", autocomplete = "") => {
+    const field = document.createElement("label");
+    field.className = "mn-profile-field";
+    const text = document.createElement("span");
+    text.textContent = label;
+    const input = document.createElement("input");
+    input.className = "ky-input";
+    input.name = name;
+    input.type = type;
+    input.value = value;
+    if (autocomplete) input.autocomplete = autocomplete;
+    field.append(text, input);
+    return field;
+  };
+  names.append(
+    makeField("First Name", "firstName", user.firstName, "text", "given-name"),
+    makeField("Last Name", "lastName", user.lastName, "text", "family-name")
+  );
+  const emailField = makeField("Email", "email", user.email, "email", "email");
+  const emailHint = document.createElement("p");
+  emailHint.className = "mn-prefs-note";
+  emailHint.textContent = "Used to log in to your account.";
+  details.append(names, emailField, emailHint);
+
+  // ---------------------------------------------------------------- password
+  const security = document.createElement("section");
+  security.className = "mn-profile-section mn-profile-security";
+  const securityCopy = document.createElement("div");
+  const securityTitle = document.createElement("h3");
+  securityTitle.textContent = "Password";
+  const securityNote = document.createElement("p");
+  securityNote.className = "mn-prefs-note";
+  securityNote.textContent = "Log in with your password instead of a temporary code.";
+  securityCopy.append(securityTitle, securityNote);
+  const change = document.createElement("button");
+  change.type = "button";
+  change.className = "mn-btn";
+  change.textContent = "Change Password";
+  const passwordForm = document.createElement("form");
+  passwordForm.className = "mn-profile-password";
+  passwordForm.hidden = true;
+  const currentPassword = document.createElement("input");
+  currentPassword.className = "ky-input";
+  currentPassword.type = "password";
+  currentPassword.name = "currentPassword";
+  currentPassword.placeholder = "Current password";
+  currentPassword.autocomplete = "current-password";
+  const newPassword = document.createElement("input");
+  newPassword.className = "ky-input";
+  newPassword.type = "password";
+  newPassword.name = "newPassword";
+  newPassword.placeholder = "New password (12 or more characters)";
+  newPassword.autocomplete = "new-password";
+  const confirmPassword = document.createElement("input");
+  confirmPassword.className = "ky-input";
+  confirmPassword.type = "password";
+  confirmPassword.name = "confirmPassword";
+  confirmPassword.placeholder = "Confirm new password";
+  confirmPassword.autocomplete = "new-password";
+  const passwordStatus = document.createElement("p");
+  passwordStatus.className = "mn-profile-status";
+  passwordStatus.setAttribute("role", "status");
+  const passwordActions = document.createElement("div");
+  passwordActions.className = "mn-account-actions";
+  const updatePassword = document.createElement("button");
+  updatePassword.type = "submit";
+  updatePassword.className = "mn-btn mn-btn-primary";
+  updatePassword.textContent = "Update password";
+  const cancelPassword = document.createElement("button");
+  cancelPassword.type = "button";
+  cancelPassword.className = "mn-btn mn-btn-quiet";
+  cancelPassword.textContent = "Cancel";
+  passwordActions.append(updatePassword, cancelPassword);
+  passwordForm.append(currentPassword, newPassword, confirmPassword, passwordStatus, passwordActions);
+  change.addEventListener("click", () => {
+    passwordForm.hidden = !passwordForm.hidden;
+    if (!passwordForm.hidden) currentPassword.focus();
+  });
+  cancelPassword.addEventListener("click", () => {
+    passwordForm.hidden = true;
+    passwordForm.reset();
+    passwordStatus.textContent = "";
+  });
+  passwordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentPassword.value) {
+      passwordStatus.textContent = "Enter your current password.";
+      return;
+    }
+    if (newPassword.value.length < 12) {
+      passwordStatus.textContent = "Use at least 12 characters for the new password.";
+      return;
+    }
+    if (newPassword.value !== confirmPassword.value) {
+      passwordStatus.textContent = "The new passwords do not match.";
+      return;
+    }
+    updatePassword.disabled = true;
+    passwordStatus.textContent = "Changing password...";
+    try {
+      await changePassword({
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value,
+      });
+      passwordForm.reset();
+      passwordForm.hidden = true;
+      passwordStatus.textContent = "";
+      notify("Password changed");
+    } catch (error) {
+      passwordStatus.textContent = error?.message || "Could not change the password.";
+    } finally {
+      updatePassword.disabled = false;
+    }
+  });
+  security.append(securityCopy, change, passwordForm);
+
+  // ---------------------------------------------------------------- footer
+  const footer = document.createElement("div");
+  footer.className = "mn-profile-foot";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "mn-btn";
+  cancel.textContent = "Cancel";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "mn-btn mn-btn-primary";
+  save.textContent = "Save";
+  footer.append(cancel, save);
+  cancel.addEventListener("click", () => {
+    const current = authState().user;
+    if (!current) return;
+    names.querySelector('input[name="firstName"]').value = current.firstName;
+    names.querySelector('input[name="lastName"]').value = current.lastName;
+    emailField.querySelector('input[name="email"]').value = current.email;
+    avatarUrl = current.avatarUrl || "";
+    paintAvatar();
+    passwordForm.hidden = true;
+    passwordForm.reset();
+    setStatus("Changes discarded.");
+  });
+  save.addEventListener("click", async () => {
+    const firstName = names.querySelector('input[name="firstName"]').value.trim();
+    const lastName = names.querySelector('input[name="lastName"]').value.trim();
+    const email = emailField.querySelector('input[name="email"]').value.trim();
+    if (!firstName) {
+      setStatus("Enter your first name.", true);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
+      setStatus("Enter a valid email address.", true);
+      return;
+    }
+    save.disabled = true;
+    setStatus("Saving...");
+    try {
+      await updateProfile({ firstName, lastName, email, avatarUrl });
+      notify("Profile saved");
+    } catch (error) {
+      setStatus(error?.message || "Could not save the profile.", true);
+    } finally {
+      save.disabled = false;
+    }
+  });
+
+  page.append(picture, details, security, footer, status);
+  content.append(page);
+}
+
+function renderServerPage(content) {
+  content.append(heading("Server"));
   const config = loadSyncConfig();
   const intro = document.createElement("p");
   intro.className = "mn-prefs-note";
   intro.textContent =
-    "Accounts are optional. Local boards never require login. Connect the self-hosted service for passkeys, sharing and sync.";
+    "Local runtime details and the optional self-hosted service connection for passkeys, sharing and sync.";
   content.append(intro);
-
-  const local = authState();
-  const localBox = document.createElement("div");
-  localBox.className = "mn-account-status mn-account-local";
-  const localTitle = document.createElement("div");
-  localTitle.className = "mn-account-server";
-  localTitle.textContent = "This computer";
-  const localLine = document.createElement("div");
-  localLine.className = "mn-account-server";
-  localLine.textContent = local.user
-    ? `Local account: ${local.user.displayName || local.user.username} (${local.user.role})`
-    : "Local account: guest, not signed in";
-  const localNote = document.createElement("p");
-  localNote.className = "mn-prefs-note";
-  localNote.textContent = local.user
-    ? "Manage your profile, password and account history from the avatar menu."
-    : "Create a local admin account or sign in from the avatar menu in the top right.";
-  const localButton = document.createElement("button");
-  localButton.type = "button";
-  localButton.className = "mn-btn";
-  localButton.textContent = "Open account menu";
-  localButton.addEventListener("click", () => {
-    closeSettingsPage();
-    window.dispatchEvent(new CustomEvent("mn:open-account"));
-  });
-  localBox.append(localTitle, localLine, localNote, localButton);
-  content.append(localBox);
+  renderServerRuntime(content);
 
   const status = document.createElement("div");
   status.className = "mn-account-status";

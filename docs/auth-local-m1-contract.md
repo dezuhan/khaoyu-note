@@ -5,14 +5,14 @@ frontend must match it exactly so the desktop app and the web host stay compatib
 
 ## Scope of M1
 
-- Local accounts in the app SQLite database, schema version 2.
+- Local accounts in the app SQLite database, schema version 3.
 - First-run admin setup, mandatory login on desktop and web, logout, profile update, password change,
   logout all, basic account and board activity history.
 - Avatar button and account center in the app chrome.
 - Service accounts, roles enforcement and the Admin Panel are later milestones and are not part of
   this contract.
 
-## Schema version 2
+## Schema version 3
 
 New tables, created in both Rust (`app/src-tauri/src/lib.rs`) and `server.mjs`:
 
@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     member_role TEXT NOT NULL DEFAULT 'editor' CHECK (member_role IN ('editor', 'commenter', 'viewer')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
     avatar_color TEXT,
+    avatar_url TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     last_login_at INTEGER
@@ -72,9 +73,9 @@ ALTER TABLE cards ADD COLUMN updated_by TEXT;
 ```
 
 - Author columns hold a JSON snapshot: `{"source":"local","id":"...","name":"..."}`.
-- Migration from schema 1 to 2 is idempotent: create tables, add missing columns after checking
-  `PRAGMA table_info`, then set `meta.schema_version = 2`.
-- Restore accepts schema 1 backups and migrates them to 2.
+- Migration from older schemas to 3 is idempotent: create tables, add missing columns after checking
+  `PRAGMA table_info`, then set `meta.schema_version = 3`.
+- Restore accepts older backups and migrates them to 3.
 - Backup includes `users` and `activity_log`. It must NOT include `sessions`.
 - The old meta key `require_local_login` is ignored. Accounts are mandatory on both hosts.
 
@@ -120,6 +121,7 @@ Camel case, never includes the password hash or token:
   "memberRole": "editor",
   "status": "active",
   "avatarColor": "#B262C0",
+  "avatarUrl": "",
   "createdAt": 1760000000000,
   "updatedAt": 1760000000000,
   "lastLoginAt": 1760000000000
@@ -140,7 +142,7 @@ Desktop Rust commands, mirrored by web host endpoints:
 | `auth_logout` | `POST /api/auth/logout` | none | `null` |
 | `auth_logout_all` | `POST /api/auth/logout-all` | none | `null` |
 | `auth_me` | `GET /api/auth/me` | none | `user` or `null` |
-| `auth_update_profile` | `PATCH /api/auth/profile` | `{ firstName, lastName, email, avatarColor }` | `user` |
+| `auth_update_profile` | `PATCH /api/auth/profile` | `{ firstName, lastName, email, avatarColor, avatarUrl }` | `user` |
 | `auth_change_password` | `POST /api/auth/password` | `{ currentPassword, newPassword }` | `null` |
 | `auth_history` | `GET /api/auth/history?limit=20&offset=0` | none | `{ entries, hasMore }` |
 
@@ -177,6 +179,8 @@ Errors are plain messages. The web host returns `{ "error": "message" }`; Rust c
 - Password: 12 to 200 characters.
 - First name: required, max 80. Last name: optional, max 80.
 - `avatarColor`: optional `#RRGGBB`.
+- `avatarUrl`: optional image data URL (`data:image/png|jpeg|gif|webp;base64,...`), at most 1.5 MB in
+  the database. An empty string clears the picture. The Settings profile crops uploads to 256 px.
 - Duplicate username or email: message starts with `That username is already taken` or
   `That email is already registered`.
 

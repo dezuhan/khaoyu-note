@@ -17,7 +17,7 @@ struct AppDb(Mutex<Connection>);
 struct AuthState(Mutex<Option<auth::SessionUser>>);
 
 const MAX_ASSET_BYTES: u64 = 100 * 1024 * 1024;
-const CURRENT_SCHEMA_VERSION: i64 = 2;
+const CURRENT_SCHEMA_VERSION: i64 = 3;
 pub const DB_FILE: &str = "khaoyu-note.db";
 // Only used to find and migrate data written by releases before the rename. These values must keep
 // matching the identifiers those releases actually wrote, or the migration becomes a no-op and an
@@ -291,6 +291,7 @@ fn ensure_auth_schema(conn: &Connection) -> Result<(), String> {
     ensure_column(conn, "boards", "updated_by", "TEXT")?;
     ensure_column(conn, "cards", "created_by", "TEXT")?;
     ensure_column(conn, "cards", "updated_by", "TEXT")?;
+    ensure_column(conn, "users", "avatar_url", "TEXT")?;
     Ok(())
 }
 
@@ -543,6 +544,7 @@ CREATE TABLE IF NOT EXISTS users (
     member_role TEXT NOT NULL DEFAULT 'editor' CHECK (member_role IN ('editor', 'commenter', 'viewer')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
     avatar_color TEXT,
+    avatar_url TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     last_login_at INTEGER
@@ -2252,6 +2254,7 @@ fn auth_update_profile(
     last_name: String,
     email: String,
     avatar_color: Option<String>,
+    avatar_url: Option<String>,
 ) -> Result<Value, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let user = current_local_user(&conn, &auth_state)?.ok_or("Sign in required")?;
@@ -2267,16 +2270,34 @@ fn auth_update_profile(
     if !color.is_empty() && !is_hex_color(&color) {
         return Err("Avatar color must be a hex color".into());
     }
+    let next_avatar = match avatar_url {
+        Some(value) => {
+            auth::validate_avatar_url(&value)?;
+            if value.is_empty() {
+                None
+            } else {
+                Some(value)
+            }
+        }
+        None => {
+            if user.avatar_url.is_empty() {
+                None
+            } else {
+                Some(user.avatar_url.clone())
+            }
+        }
+    };
     let display = auth::display_name(first, &last_name, &user.username);
     conn.execute(
         "UPDATE users SET first_name = ?1, last_name = ?2, email = ?3, display_name = ?4,
-             avatar_color = ?5, updated_at = ?6 WHERE id = ?7",
+             avatar_color = ?5, avatar_url = ?6, updated_at = ?7 WHERE id = ?8",
         params![
             first,
             last_name.trim(),
             email.trim().to_lowercase(),
             display,
             if color.is_empty() { None } else { Some(color) },
+            next_avatar,
             now_ms(),
             user.id
         ],
@@ -2998,7 +3019,7 @@ mod tests {
             assert!(board_columns.iter().any(|name| name == column));
             assert!(card_columns.iter().any(|name| name == column));
         }
-        assert_eq!(schema_version(&conn).expect("version"), 2);
+        assert_eq!(schema_version(&conn).expect("version"), 3);
         let _ = fs::remove_dir_all(root);
     }
 

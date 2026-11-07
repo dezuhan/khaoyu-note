@@ -20,7 +20,7 @@ const UPDATE_REPO = "dezuhan/khaoyu-note";
 const BLOCKED_EXTENSIONS = new Set([
   "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
 ]);
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 const PASSWORD_SCHEME = "pbkdf2-sha256";
 const PASSWORD_ITERATIONS = 600000;
 const PASSWORD_KEY_BYTES = 32;
@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS users (
   member_role TEXT NOT NULL DEFAULT 'editor' CHECK (member_role IN ('editor', 'commenter', 'viewer')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
   avatar_color TEXT,
+  avatar_url TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   last_login_at INTEGER
@@ -124,8 +125,8 @@ CREATE INDEX IF NOT EXISTS activity_actor ON activity_log(actor_user_id, created
 CREATE INDEX IF NOT EXISTS activity_created ON activity_log(created_at);
 `);
 
-// Schema 2 added the auth tables and the author columns. Existing databases only need the columns;
-// the CREATE statements above already cover tables.
+// Schema 3 added local accounts, author columns and the avatar URL. Existing databases only need
+// the columns; the CREATE statements above already cover tables.
 function tableColumns(table) {
   return db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
 }
@@ -140,6 +141,7 @@ ensureColumn("boards", "created_by", "TEXT");
 ensureColumn("boards", "updated_by", "TEXT");
 ensureColumn("cards", "created_by", "TEXT");
 ensureColumn("cards", "updated_by", "TEXT");
+ensureColumn("users", "avatar_url", "TEXT");
 
 // Older desktop builds wrote seconds. Keep both hosts reading the same scale.
 for (const [table, column] of [
@@ -291,8 +293,28 @@ function validateAvatarColor(avatarColor) {
   return value;
 }
 
+function validateAvatarUrl(avatarUrl) {
+  if (avatarUrl === null || avatarUrl === undefined || avatarUrl === "") return "";
+  const value = String(avatarUrl);
+  if (value.length > 1_500_000) {
+    throw new RequestError("Profile image is too large", 400);
+  }
+  const prefix = value.slice(0, 64).toLowerCase();
+  const accepted = [
+    "data:image/png;base64,",
+    "data:image/jpeg;base64,",
+    "data:image/jpg;base64,",
+    "data:image/gif;base64,",
+    "data:image/webp;base64,",
+  ].some((candidate) => prefix.startsWith(candidate));
+  if (!accepted) {
+    throw new RequestError("Profile image must be a PNG, JPEG, GIF or WebP data URL", 400);
+  }
+  return value;
+}
+
 const USER_COLUMNS =
-  "id, username, email, first_name, last_name, display_name, role, member_role, status, avatar_color, created_at, updated_at, last_login_at";
+  "id, username, email, first_name, last_name, display_name, role, member_role, status, avatar_color, avatar_url, created_at, updated_at, last_login_at";
 
 function publicUser(row) {
   return {
@@ -306,6 +328,7 @@ function publicUser(row) {
     memberRole: row.member_role,
     status: row.status,
     avatarColor: row.avatar_color ?? "",
+    avatarUrl: row.avatar_url ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastLoginAt: row.last_login_at ?? null,
@@ -1383,15 +1406,21 @@ async function handleAuth(request, response, url) {
       const normalized = validateAvatarColor(body.avatarColor);
       avatarColor = normalized === "" ? null : normalized;
     }
+    let avatarUrl = current.avatar_url;
+    if (body.avatarUrl !== undefined) {
+      const normalized = validateAvatarUrl(body.avatarUrl);
+      avatarUrl = normalized === "" ? null : normalized;
+    }
     transaction(() => {
       db.prepare(
         `UPDATE users SET first_name = ?, last_name = ?, email = ?, avatar_color = ?,
-           display_name = ?, updated_at = ? WHERE id = ?`
+           avatar_url = ?, display_name = ?, updated_at = ? WHERE id = ?`
       ).run(
         firstName,
         lastName,
         email,
         avatarColor,
+        avatarUrl,
         displayName(firstName, lastName, current.username),
         Date.now(),
         current.id
