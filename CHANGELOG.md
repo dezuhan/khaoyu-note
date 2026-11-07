@@ -12,6 +12,13 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.25.1] - 2026-11-07
+
+### Changed
+
+- Swapped the chrome order: the application menu bar is on top and the Template / Home file header
+  sits below it, with the existing heights unchanged.
+
 ## [0.25.0] - 2026-11-07
 
 ### Added
