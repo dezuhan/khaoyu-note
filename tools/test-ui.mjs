@@ -1988,12 +1988,57 @@ if (await linkCard.count()) {
   await linkCard.click({ button: "right" });
   await page.waitForTimeout(250);
   check(
+    "Link menu offers free crop for the header image",
+    (await page.locator(".mn-menu-item", { hasText: "Crop header image" }).count()) === 1
+  );
+  await page.locator(".mn-menu-item", { hasText: "Crop header image" }).click();
+  await page.waitForTimeout(600);
+  check(
+    "Crop dialog exposes Fit to image and Apply crop",
+    (await page.locator(".mn-crop-panel").isVisible()) &&
+      (await page.locator('[data-role="fit"]').isVisible()) &&
+      (await page.locator('[data-role="apply"]').isVisible())
+  );
+  const cropBox = await page.locator(".mn-crop-box").boundingBox();
+  await page.mouse.move(cropBox.x + cropBox.width - 4, cropBox.y + cropBox.height - 4);
+  await page.mouse.down();
+  await page.mouse.move(cropBox.x + cropBox.width * 0.7, cropBox.y + cropBox.height * 0.75, { steps: 6 });
+  await page.mouse.up();
+  await page.locator('[data-role="apply"]').click();
+  await page.waitForTimeout(500);
+  check(
+    "Free crop updates the header image region",
+    (await linkCard.locator(".mn-link-header").getAttribute("class")).includes("is-cropped") &&
+      (await linkCard.locator(".mn-link-header img").getAttribute("style")).includes("width:")
+  );
+  await linkCard.click({ button: "right" });
+  await page.waitForTimeout(250);
+  check(
     "Link menu offers Remove header image when a header exists",
     (await page.locator(".mn-menu-item", { hasText: "Remove header image" }).count()) === 1
   );
   await page.locator(".mn-menu-item", { hasText: "Remove header image" }).click();
   await page.waitForTimeout(400);
   check("Remove header image clears the preview", (await linkCard.locator(".mn-link-header").count()) === 0);
+}
+const imageCard = page.locator('.mn-card[data-type="image"]').first();
+if (await imageCard.count()) {
+  await imageCard.click({ button: "right" });
+  await page.waitForTimeout(250);
+  check(
+    "Image card menu offers free crop",
+    (await page.locator(".mn-menu-item", { hasText: "Crop image" }).count()) === 1
+  );
+  await page.locator(".mn-menu-item", { hasText: "Crop image" }).click();
+  await page.waitForTimeout(600);
+  await page.locator('[data-role="fit"]').click();
+  await page.locator('[data-role="apply"]').click();
+  await page.waitForTimeout(500);
+  check(
+    "Image card stores and renders the crop",
+    (await imageCard.locator(".mn-image-crop.is-cropped").count()) === 1 &&
+      (await imageCard.locator(".mn-image-crop img").isVisible())
+  );
 }
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
