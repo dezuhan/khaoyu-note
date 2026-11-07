@@ -13,6 +13,7 @@ const AUTH_PAGES = {
   "/account.js": ["account.js", "text/javascript; charset=utf-8"],
   "/shares": ["shares.html", "text/html; charset=utf-8"],
   "/shares.js": ["shares.js", "text/javascript; charset=utf-8"],
+  "/share-view.js": ["share-view.js", "text/javascript; charset=utf-8"],
 };
 
 export function assertSchemaCurrent(db) {
@@ -25,10 +26,9 @@ export function assertSchemaCurrent(db) {
 }
 
 export function logPath(pathname) {
-  return pathname.replace(
-    /^\/api\/v1\/share\/[^/]+\/access$/,
-    "/api/v1/share/[redacted]/access"
-  );
+  return pathname
+    .replace(/^\/api\/v1\/share\/[^/]+\/access$/, "/api/v1/share/[redacted]/access")
+    .replace(/^\/s\/[^/]+$/, "/s/[redacted]");
 }
 
 export function createService({ config, db, logger, mailer }) {
@@ -42,13 +42,18 @@ export function createService({ config, db, logger, mailer }) {
       sendJson(response, 426, { error: "HTTPS required", code: "https_required" }, config);
       return;
     }
-    const authPage = request.method === "GET" ? AUTH_PAGES[url.pathname] : null;
+    const sharePage = /^\/s\/[^/]+$/.test(url.pathname);
+    const authPage =
+      request.method === "GET"
+        ? AUTH_PAGES[url.pathname] || (sharePage ? ["share.html", "text/html; charset=utf-8"] : null)
+        : null;
     if (authPage) {
       applySecurityHeaders(response, config);
       response.setHeader(
         "Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
       );
+      if (sharePage) response.setHeader("X-Robots-Tag", "noindex, nofollow");
       response.writeHead(200, { "Content-Type": authPage[1] });
       response.end(fs.readFileSync(path.join(PUBLIC_DIR, authPage[0])));
       return;

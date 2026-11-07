@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Shared Khaoyu Note</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #111; color: #eee; font-family: system-ui, sans-serif; padding: 24px; }
+      main { width: min(820px, 100%); margin: 0 auto; }
+      header { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+      h1 { font-size: 20px; margin: 0; }
+      h2 { font-size: 15px; margin: 20px 0 8px; }
+      h3 { font-size: 13px; margin: 0 0 6px; color: #9ad; text-transform: uppercase; letter-spacing: 0.04em; }
+      p { color: #bbb; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+      .badge { border: 1px solid #456; border-radius: 999px; padding: 3px 8px; font-size: 11px; color: #9ad; }
+      .panel { background: #1b1b1b; border: 1px solid #333; border-radius: 10px; padding: 18px; margin-top: 16px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      input { padding: 9px; border-radius: 6px; border: 1px solid #444; background: #111; color: #eee; }
+      button { padding: 9px 12px; border-radius: 6px; border: 1px solid #555; background: #eee; color: #111; font-weight: 600; cursor: pointer; }
+      .card { border: 1px solid #333; border-radius: 8px; padding: 12px; margin-top: 10px; background: #171717; }
+      .card ul { margin: 6px 0; padding-left: 20px; color: #ccc; font-size: 13px; }
+      .card a { color: #9ad; overflow-wrap: anywhere; }
+      .muted { color: #888; font-size: 12px; }
+      .comments { border-top: 1px dashed #333; margin-top: 8px; padding-top: 8px; font-size: 12px; color: #bbb; }
+      .column-title { color: #9ad; font-size: 12px; margin: 12px 0 4px; }
+      #status { min-height: 20px; color: #9ad; font-size: 13px; margin-top: 10px; }
+      #content { margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1 id="title">Shared Khaoyu Note</h1>
+        <span class="badge" id="permission">view</span>
+      </header>
+      <section class="panel" id="unlock">
+        <p>This link is protected by a passphrase. Enter it to continue.</p>
+        <div class="row">
+          <input id="passphrase" type="password" placeholder="Passphrase" autocomplete="current-password" />
+          <button id="open" type="button">Open</button>
+        </div>
+      </section>
+      <div id="status" role="status"></div>
+      <div id="content"></div>
+    </main>
+    <script type="module" src="/share-view.js"></script>
+  </body>
+</html>
