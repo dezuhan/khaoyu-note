@@ -9,9 +9,9 @@ Optional account code remains in the database for future work but is disabled in
 
 ![Dark theme](shots/board-dark.png)
 
-Creating the welcome board seeds one example of every card type, two connection arrows, a kanban with sample cards, a sketch with sample strokes and a nested board card:
+Creating the welcome board seeds one example of every enabled card type, two connection arrows, a kanban with sample cards, a sketch with sample strokes and a nested board card:
 
-![Welcome template with every tool](shots/welcome-all-tools.png)
+![Welcome template with every enabled tool](shots/welcome-all-tools.png)
 
 Nested board cards carry a mini thumbnail of the board content:
 
