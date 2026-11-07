@@ -200,7 +200,23 @@ export function openColorPicker({ color, anchor, onChange }) {
   });
   eyedrop.addEventListener("click", async () => {
     try {
-      if (hasTauri) {
+      if ("EyeDropper" in window) {
+        const result = await new window.EyeDropper().open();
+        if (setFromHex(result?.sRGBHex)) close();
+        return;
+      }
+      if (!hasTauri) return;
+      const capture = await captureWindow();
+      if (!capture?.data) return;
+      openAppScreenPicker({
+        capture,
+        onPick: (hex) => {
+          if (setFromHex(hex)) close();
+        },
+      });
+    } catch {
+      if (!hasTauri) return;
+      try {
         const capture = await captureWindow();
         if (!capture?.data) return;
         openAppScreenPicker({
@@ -209,13 +225,9 @@ export function openColorPicker({ color, anchor, onChange }) {
             if (setFromHex(hex)) close();
           },
         });
-        return;
+      } catch {
+        // The screen picker is not available on this platform.
       }
-      if (!("EyeDropper" in window)) return;
-      const result = await new window.EyeDropper().open();
-      if (setFromHex(result?.sRGBHex)) close();
-    } catch {
-      // The picker was cancelled or the platform does not expose the API.
     }
   });
   backdrop.addEventListener("pointerdown", close);

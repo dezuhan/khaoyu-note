@@ -8,8 +8,8 @@ project uses Semantic Versioning.
 ### Added
 
 - Color cards can pick a color directly from the screen with the eyedropper button beside the hex
-  field. The desktop app captures its client area and opens an in-app magnifier overlay; the browser
-  uses the EyeDropper API. The button is hidden when neither option is available.
+  field. The EyeDropper API is tried first in both the browser and the desktop webview; if the host
+  rejects it, the desktop falls back to an in-app magnifier over a client-area capture.
 - The project is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`).
   Commercial use and distribution are allowed, but modified versions and network services must keep
   their complete source available under the AGPL with attribution. The Khaoyu Note name, logo and app
