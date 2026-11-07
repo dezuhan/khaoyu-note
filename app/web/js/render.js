@@ -401,6 +401,19 @@ function contentFor(card) {
           <audio preload="metadata" src="${escapeHtml(imgSrc(card.url))}"></audio>
         </div>`;
       }
+      if (card.__editEmbed) {
+        return `<div class="mn-placeholder mn-audio-empty mn-embed-empty">
+          ${icon("audio", 22)}
+          <span>Replace the audio file or paste a link</span>
+          <input class="mn-field-input" data-field="url" value="${escapeHtml(
+            card.url || ""
+          )}" placeholder="https://audio..." />
+          <div class="mn-audio-edit-actions">
+            <button type="button" class="mn-audio-clip" data-action="upload-audio" title="Upload audio" aria-label="Upload audio">${icon("clip", 16)}</button>
+            <button type="button" class="mn-primary-soft" data-action="submit-embed">Submit</button>
+          </div>
+        </div>`;
+      }
       return `<div class="mn-placeholder mn-audio-empty mn-embed-empty">${icon("audio", 22)}<span>Upload an audio file or paste a link</span><input class="mn-field-input" data-field="url" value="${escapeHtml(
         card.url || ""
       )}" placeholder="https://audio..." /><button class="mn-primary-soft" data-action="upload-audio">Upload</button></div>`;

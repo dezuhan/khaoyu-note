@@ -82,6 +82,7 @@ export const ICONS = {
   listOrdered: P('<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5h1v5M4 10h2M4 16h2v3H4"/>'),
   code: P('<path d="m8.5 8-4 4 4 4M15.5 8l4 4-4 4"/>'),
   share: P('<circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.2 10.9 15.8 7.1M8.2 13.1l7.6 3.8"/>'),
+  clip: P('<path d="M20 11.5 12.3 19.2a4.6 4.6 0 0 1-6.5-6.5l8.2-8.2a3 3 0 0 1 4.2 4.2l-8.1 8.1a1.5 1.5 0 0 1-2.1-2.1l7.4-7.4"/>'),
   lock: P('<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 7 0v3.5"/>'),
 };
 

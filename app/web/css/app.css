@@ -5772,3 +5772,30 @@ html[data-performance="true"] .mn-card {
   font-family: var(--mn-font-code);
   font-size: 10px;
 }
+
+/* Audio edit actions */
+.mn-audio-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.mn-audio-clip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ky-stroke-strong);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  color: var(--ky-text);
+  cursor: pointer;
+}
+.mn-audio-clip:hover {
+  background: var(--ky-control-hover);
+}
+.mn-audio-edit-actions .mn-primary-soft {
+  flex: 1 1 auto;
+}

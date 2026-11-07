@@ -1090,6 +1090,35 @@ check(
   "Audio player uses custom themed controls",
   !customAudio.native && customAudio.play && customAudio.seek && customAudio.mute
 );
+await audioCard.locator('[data-action="edit-embed"]').click();
+await page.waitForTimeout(300);
+check(
+  "Editing audio shows a clip-only upload button and Submit",
+  (await audioCard.locator(".mn-audio-clip").isVisible()) &&
+    (await audioCard.locator(".mn-audio-clip").innerText()).trim() === "" &&
+    (await audioCard.locator('[data-action="submit-embed"]').isVisible())
+);
+const audioUrlBefore = await audioCard.locator('[data-field="url"]').inputValue();
+await audioCard.locator(".mn-audio-clip").click();
+await page.locator('input[type="file"]').setInputFiles({
+  name: "replacement.mp3",
+  mimeType: "audio/mpeg",
+  buffer: Buffer.from("ID3replacement-audio"),
+});
+await page.waitForTimeout(600);
+check(
+  "Uploading while editing updates the audio source",
+  (await audioCard.locator('[data-field="url"]').inputValue()) !== audioUrlBefore &&
+    (await audioCard.locator(".mn-audio-clip").isVisible()) &&
+    (await audioCard.locator('[data-action="submit-embed"]').isVisible())
+);
+await audioCard.locator('[data-action="submit-embed"]').click();
+await page.waitForTimeout(400);
+check(
+  "Submit closes audio editing with the new source",
+  (await audioCard.locator("audio").count()) === 1 &&
+    (await audioCard.locator('[data-action="edit-embed"]').count()) === 1
+);
 const audioCardBox = await audioCard.boundingBox();
 const audioWrapBox = await audioCard.locator(".mn-audio").boundingBox();
 check(
