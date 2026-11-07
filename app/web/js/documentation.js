@@ -39,7 +39,7 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Comment</td><td>Threaded comments with checkboxes and replies.</td></tr>
     <tr><td>Table</td><td>Editable cells, rows and columns.</td></tr>
     <tr><td>Image / Upload</td><td>Local image or file asset stored with the board. Right-click an image and choose Crop image for a free crop.</td></tr>
-    <tr><td>Link</td><td>URL card. Right-click and choose Add header image to show a preview image above the link. When a header exists, Change header image, Crop header image and Remove header image appear in the same menu.</td></tr>
+    <tr><td>Link</td><td>URL card. A hero image is fetched automatically from the page metadata when available. Links without a hero image show a dotted globe fallback. Right-click for Add, Change, Crop or Remove header image.</td></tr>
     <tr><td>Audio</td><td>Upload a file or paste a link. The edit action shows a clip-only upload button and Submit. Uploading again while editing replaces the source, then Submit returns to the player.</td></tr>
     <tr><td>Video</td><td>YouTube, Vimeo or a local video file.</td></tr>
     <tr><td>Map</td><td>Google Maps link or place query.</td></tr>
@@ -47,9 +47,11 @@ export const DOCUMENTATION_HTML = `
   </table>
 
   <h3>Cropping images</h3>
-  <p>Right-click a link header image and choose Crop header image, or right-click an image card and
-  choose Crop image. Drag the frame to move it and drag any edge or corner for a free ratio. Fit to
-  image resets the frame to the full image ratio. Apply crop stores the region with the card.</p>
+  <p>Link cards fetch a hero image from the page metadata automatically. If the page has no hero image,
+  a dotted globe fallback is shown. Right-click a header image and choose Crop header image, or
+  right-click an image card and choose Crop image. Drag the frame to move it and drag any edge or
+  corner for a free ratio. Fit to image resets the frame to the full image ratio. Apply crop stores the
+  region with the card.</p>
 
   <h3>Keyboard shortcuts</h3>
   <table>
