@@ -27,6 +27,7 @@ import {
   cardElement,
   connectionGeometry,
   refreshCard,
+  preserveMediaForNextRender,
   refreshColorPreview,
   render,
   renderConnections,
@@ -746,11 +747,13 @@ function onPointerUp(event) {
     return;
   }
   if (current.type === "col-resize") {
+    preserveMediaForNextRender();
     markDirty("board");
     return;
   }
   if (current.type === "resize") {
     layoutColumns(state.board);
+    preserveMediaForNextRender();
     markDirty("board");
   }
 }
@@ -809,6 +812,7 @@ function finishDrag(current) {
   }
 
   layoutColumns(state.board);
+  preserveMediaForNextRender();
   markDirty("board");
   animateSettle(before);
 }
@@ -1478,6 +1482,38 @@ function formatAudioTime(seconds) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
+function postVideoFrame(card, func, args = []) {
+  const frame = cardElement(card.id)?.querySelector("iframe");
+  if (!frame?.contentWindow) return false;
+  if (/vimeo\.com/i.test(card.url || "")) {
+    const method = func === "pauseVideo" ? "pause" : func === "playVideo" ? "play" : "setVolume";
+    frame.contentWindow.postMessage(
+      JSON.stringify({
+        method,
+        value: method === "setVolume" ? (func === "mute" ? 0 : func === "unMute" ? 1 : args[0]) : undefined,
+      }),
+      "*"
+    );
+  } else {
+    frame.contentWindow.postMessage(
+      JSON.stringify({ event: "command", func, args }),
+      "*"
+    );
+  }
+  return true;
+}
+
+function updateVideoUI(wrap, video = null) {
+  if (!wrap) return;
+  const playing = video ? !video.paused && !video.ended : wrap.classList.contains("is-playing");
+  wrap.classList.toggle("is-playing", playing);
+  wrap.classList.toggle("is-muted", video ? video.muted || video.volume === 0 : wrap.classList.contains("is-muted"));
+  const volume = wrap.querySelector("[data-video-volume]");
+  if (volume && video) {
+    volume.value = String(Math.round((video.muted ? 0 : video.volume) * 1000));
+  }
+}
+
 function updateAudioUI(audio) {
   const wrap = audio.closest(".mn-audio");
   if (!wrap) return;
@@ -1493,10 +1529,17 @@ function updateAudioUI(audio) {
     seek.value = String(duration ? Math.round((current / duration) * 1000) : 0);
   }
   seek.style.setProperty("--audio-progress", `${duration ? Math.min(100, (current / duration) * 100) : 0}%`);
+  const volume = wrap.querySelector("[data-audio-volume]");
+  if (volume && document.activeElement !== volume) {
+    volume.value = String(Math.round((audio.muted ? 0 : audio.volume) * 1000));
+  }
 }
 
 function onAudioMediaEvent(event) {
   if (event.target instanceof HTMLAudioElement) updateAudioUI(event.target);
+  if (event.target instanceof HTMLVideoElement) {
+    updateVideoUI(event.target.closest(".mn-video"), event.target);
+  }
 }
 
 function onImageLoad(event) {
@@ -1525,6 +1568,34 @@ function onInput(event) {
       const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
       audio.currentTime = (Number(target.value) / 1000) * duration;
       updateAudioUI(audio);
+    }
+    return;
+  }
+  if (target.matches("[data-audio-volume]")) {
+    const audio = cardElement(card.id)?.querySelector("audio");
+    if (audio) {
+      audio.volume = Number(target.value) / 1000;
+      audio.muted = false;
+      updateAudioUI(audio);
+    }
+    return;
+  }
+  if (target.matches("[data-video-volume]")) {
+    const wrap = cardElement(card.id)?.querySelector(".mn-video");
+    const video = wrap?.querySelector("video");
+    const volume = Number(target.value) / 1000;
+    if (video) {
+      video.volume = volume;
+      video.muted = false;
+    } else if (wrap) {
+      postVideoFrame(card, "setVolume", [
+        /vimeo\.com/i.test(card.url || "") ? volume : Math.round(volume * 100),
+      ]);
+    }
+    if (wrap) {
+      wrap.classList.toggle("is-muted", volume === 0);
+      card.__mediaVolume = volume;
+      card.__mediaMuted = volume === 0;
     }
     return;
   }
@@ -1838,6 +1909,34 @@ function onClick(event) {
         video.play().catch(() => toast("This video cannot be played."));
       } else {
         refreshCard(card.id);
+      }
+      break;
+    }
+    case "video-toggle": {
+      const wrap = cardElement(card.id)?.querySelector(".mn-video");
+      const video = wrap?.querySelector("video");
+      if (video) {
+        if (video.paused) video.play().catch(() => {});
+        else video.pause();
+        card.__mediaPlaying = !video.paused;
+      } else if (wrap) {
+        postVideoFrame(card, card.__mediaPlaying ? "pauseVideo" : "playVideo");
+        card.__mediaPlaying = !card.__mediaPlaying;
+      }
+      updateVideoUI(wrap, video);
+      break;
+    }
+    case "video-mute": {
+      const wrap = cardElement(card.id)?.querySelector(".mn-video");
+      const video = wrap?.querySelector("video");
+      if (video) {
+        video.muted = !video.muted;
+        card.__mediaMuted = video.muted;
+        updateVideoUI(wrap, video);
+      } else if (wrap) {
+        card.__mediaMuted = !card.__mediaMuted;
+        postVideoFrame(card, card.__mediaMuted ? "mute" : "unMute");
+        wrap.classList.toggle("is-muted", card.__mediaMuted);
       }
       break;
     }

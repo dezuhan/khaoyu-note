@@ -390,6 +390,7 @@ function contentFor(card) {
           </button>
           <span class="mn-audio-time">0:00 / 0:00</span>
           <input type="range" class="mn-audio-seek" data-audio-seek min="0" max="1000" value="0" aria-label="Seek audio" />
+          <input type="range" class="mn-audio-volume" data-audio-volume min="0" max="1000" value="1000" aria-label="Audio volume" />
           <button type="button" class="mn-audio-control mn-audio-mute" data-action="audio-mute" title="Mute or unmute">
             <span class="mn-audio-volume-icon">${icon("volume", 14)}</span>
             <span class="mn-audio-muted-icon">${icon("volumeOff", 14)}</span>
@@ -448,7 +449,22 @@ function contentFor(card) {
                 26
               )}</button>`
             : "";
-          return `<div class="mn-video${started ? " is-started" : ""}">${poster}${iframe}${playButton}${edit}</div>`;
+          const controls = started
+            ? `<div class="mn-video-controls">
+                <button type="button" class="mn-video-control mn-video-toggle" data-action="video-toggle" title="Play or pause">
+                  <span class="mn-video-play-icon">${icon("play", 14)}</span>
+                  <span class="mn-video-pause-icon">${icon("pause", 14)}</span>
+                </button>
+                <button type="button" class="mn-video-control mn-video-mute" data-action="video-mute" title="Mute or unmute">
+                  <span class="mn-video-volume-icon">${icon("volume", 14)}</span>
+                  <span class="mn-video-muted-icon">${icon("volumeOff", 14)}</span>
+                </button>
+                <input type="range" class="mn-video-volume" data-video-volume min="0" max="1000" value="1000" aria-label="Video volume" />
+              </div>`
+            : "";
+          return `<div class="mn-video${started ? " is-started" : ""}${
+            card.__mediaPlaying ? " is-playing" : ""
+          }${card.__mediaMuted ? " is-muted" : ""}">${poster}${iframe}${playButton}${controls}${edit}</div>`;
         }
         const playButton = !started
           ? `<button type="button" class="mn-video-play" data-action="start-video" title="Play video" aria-label="Play video">${icon(
@@ -815,6 +831,12 @@ export function render(kind = "board") {
   if (kind === "board" || !cardsEl.children.length) {
     rebuildCards();
   }
+  if (kind === "geometry") {
+    for (const card of state.board.cards) {
+      const el = cardElement(card.id);
+      if (el) el.classList.toggle("is-child", Boolean(card.parentId));
+    }
+  }
   measureHeights();
   layoutColumns(state.board);
   applyAllGeometry();
@@ -908,11 +930,38 @@ export function syncCardHeight(card) {
   }
 }
 
+let preserveMediaNext = false;
+
+export function preserveMediaForNextRender() {
+  preserveMediaNext = true;
+}
+
 function rebuildCards() {
-  cardsEl.innerHTML = "";
-  const fragment = document.createDocumentFragment();
-  for (const card of state.board.cards) fragment.append(buildCard(card));
-  cardsEl.append(fragment);
+  const preserved = new Map();
+  if (preserveMediaNext) {
+    for (const card of state.board.cards) {
+      if (!["audio", "video", "map"].includes(card.type)) continue;
+      const el = cardElement(card.id);
+      if (el?.querySelector("audio,video,iframe")) preserved.set(card.id, el);
+    }
+  }
+  preserveMediaNext = false;
+  const wanted = new Set(state.board.cards.map((card) => card.id));
+  for (const child of [...cardsEl.children]) {
+    if (!wanted.has(child.dataset.id)) child.remove();
+  }
+  for (const card of state.board.cards) {
+    const held = preserved.get(card.id);
+    if (held) {
+      held.classList.toggle("is-child", Boolean(card.parentId));
+      if (held.parentElement !== cardsEl) cardsEl.append(held);
+      continue;
+    }
+    const next = buildCard(card);
+    const old = cardElement(card.id);
+    if (old && old.parentElement === cardsEl) old.replaceWith(next);
+    else cardsEl.append(next);
+  }
   for (const card of state.board.cards) {
     if (card.type === "link" && !card.headerImage) {
       const el = cardElement(card.id);

@@ -625,7 +625,7 @@ export function playMedia(cardId) {
         new CustomEvent("mn:toast", { detail: { message: "This media cannot be played." } })
       );
     });
-    node.classList.add("is-started");
+    node.classList.add("is-started", "is-playing");
     return;
   }
   if (card.type === "video" && !card.__mediaStarted) {
@@ -634,7 +634,10 @@ export function playMedia(cardId) {
     refreshCard(card.id);
     return;
   }
-  if (mediaFrameCommand(card, "playVideo")) card.__mediaPlaying = true;
+  if (mediaFrameCommand(card, "playVideo")) {
+    card.__mediaPlaying = true;
+    node?.querySelector(".mn-video")?.classList.add("is-playing");
+  }
 }
 
 export function pauseMedia(cardId) {
@@ -644,8 +647,10 @@ export function pauseMedia(cardId) {
   const element = node?.querySelector("audio,video");
   if (element) {
     element.pause();
+    node?.classList.remove("is-playing");
   } else {
     mediaFrameCommand(card, "pauseVideo");
+    node?.querySelector(".mn-video")?.classList.remove("is-playing");
   }
   card.__mediaPlaying = false;
 }

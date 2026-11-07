@@ -41,8 +41,8 @@ export const DOCUMENTATION_HTML = `
     <tr><td>Table</td><td>Editable cells, rows and columns.</td></tr>
     <tr><td>Image / Upload</td><td>Local image or file asset stored with the board. Right-click an image and choose Crop image for a free crop.</td></tr>
     <tr><td>Link</td><td>URL card. A hero image is fetched automatically from the page metadata when available. Links without a hero image show a soft dotted globe fallback at the same 24px spacing as the board dots. Right-click for Add, Change, Crop or Remove header image.</td></tr>
-    <tr><td>Audio</td><td>Upload MP3, WAV, M4A, AAC, OGG, Opus or FLAC, or paste a link. The edit action shows a clip-only upload button and Submit. Right-click for Play, Pause and a Repeat checkbox.</td></tr>
-    <tr><td>Video</td><td>YouTube, Vimeo or a local video file. A centered circular play button starts the embed with autoplay. Right-click for Play, Pause and a Repeat checkbox.</td></tr>
+    <tr><td>Audio</td><td>Upload MP3, WAV, M4A, AAC, OGG, Opus or FLAC, or paste a link. The edit action shows a clip-only upload button and Submit. Right-click for Play, Pause and a Repeat checkbox. A volume slider sits beside the mute button.</td></tr>
+    <tr><td>Video</td><td>YouTube, Vimeo or a local video file. A centered circular play button starts the embed with autoplay. Playing embeds expose pause, mute and volume controls. Right-click for Play, Pause and a Repeat checkbox.</td></tr>
     <tr><td>Map</td><td>Google Maps link or place query.</td></tr>
     <tr><td>Line</td><td>Connect two cards. Select the line to add a midpoint curve.</td></tr>
   </table>
@@ -53,6 +53,11 @@ export const DOCUMENTATION_HTML = `
   right-click an image card and choose Crop image. The crop editor fits the whole image inside the
   dialog, then you can drag the frame to move it and drag any edge or corner for a free ratio. Fit to
   image resets the frame to the full image ratio. Apply crop stores the region with the card.</p>
+
+  <h3>Media playback</h3>
+  <p>Playing audio or video can be controlled from the right-click menu: Play, Pause and a Repeat
+  checkbox. Video embeds also show pause, mute and volume controls over the player. Moving or resizing
+  a card keeps an active YouTube, Vimeo, audio or map player alive instead of restarting it.</p>
 
   <h3>Keyboard shortcuts</h3>
   <table>

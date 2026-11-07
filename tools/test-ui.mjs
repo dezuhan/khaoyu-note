@@ -1002,6 +1002,19 @@ check(
     (await videoCard.locator("iframe").getAttribute("src")).includes("autoplay=1")
 );
 check(
+  "Playing video exposes pause, mute and volume controls",
+  (await videoCard.locator(".mn-video-controls").isVisible()) &&
+    (await videoCard.locator('[data-action="video-toggle"]').count()) === 1 &&
+    (await videoCard.locator('[data-action="video-mute"]').count()) === 1 &&
+    (await videoCard.locator("[data-video-volume]").count()) === 1
+);
+await videoCard.locator("[data-video-volume]").fill("400");
+await page.waitForTimeout(200);
+check(
+  "Video volume slider can be changed",
+  (await videoCard.locator("[data-video-volume]").inputValue()) === "400"
+);
+check(
   "Video embed is sandboxed and sends a strict referrer policy",
   (await videoCard.locator("iframe").getAttribute("sandbox")).includes("allow-scripts") &&
     (await videoCard.locator("iframe").getAttribute("sandbox")).includes("allow-same-origin") &&
@@ -1042,6 +1055,9 @@ check(
   "Loaded video iframe leaves the card draggable",
   (await videoCard.locator("iframe").evaluate((el) => getComputedStyle(el).pointerEvents)) === "none"
 );
+await videoCard.evaluate((el) => {
+  window.__videoFrameBeforeDrag = el.querySelector("iframe");
+});
 const videoDragBefore = await videoCard.boundingBox();
 await page.mouse.move(
   videoDragBefore.x + videoDragBefore.width / 2,
@@ -1058,6 +1074,10 @@ await page.waitForTimeout(400);
 check(
   "Video card drags from inside the preview",
   (await videoCard.boundingBox()).x > videoDragBefore.x + 20
+);
+check(
+  "Moving a video card keeps the same iframe instead of reloading",
+  await videoCard.evaluate((el) => el.querySelector("iframe") === window.__videoFrameBeforeDrag)
 );
 await videoCard.hover();
 await videoCard.locator(".mn-embed-edit").click();

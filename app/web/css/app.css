@@ -5876,3 +5876,58 @@ html[data-performance="true"] .mn-card {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Audio and video volume controls */
+.mn-audio-volume {
+  flex: none;
+  width: 58px;
+}
+.mn-video-controls {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--ky-radius-control);
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(4px);
+}
+.mn-video-control {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.mn-video-control:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.mn-video-volume {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 110px;
+}
+.mn-video-pause-icon,
+.mn-video.is-playing .mn-video-play-icon,
+.mn-video-muted-icon {
+  display: none;
+}
+.mn-video.is-playing .mn-video-pause-icon {
+  display: inline-flex;
+}
+.mn-video.is-muted .mn-video-volume-icon {
+  display: none;
+}
+.mn-video.is-muted .mn-video-muted-icon {
+  display: inline-flex;
+}
