@@ -7,6 +7,11 @@ project uses Semantic Versioning.
 
 ### Added
 
+- Full board URLs in the browser edition. The web host binds to `0.0.0.0` by default, reports its
+  LAN and optional public URLs, keeps `?board=<id>` in the address bar, and the Share panel copies a
+  full board link. Devices on the same network can open it while the host runs and sign in with an
+  account on that host. `KHAOYU_WEB_PUBLIC_URL` adds a reverse-proxy or DDNS origin, and
+  `KHAOYU_WEB_HOST=127.0.0.1` keeps the host local-only.
 - Settings > Account is now a profile page with profile picture upload and removal, first and last
   name, email and a Change Password section, plus Save and Cancel. Settings navigation adds Server
   between Account and Backup for local runtime details and the self-hosted service connection.

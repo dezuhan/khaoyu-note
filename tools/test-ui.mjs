@@ -2279,9 +2279,10 @@ check("Sync dialog closes without changing the board", (await page.locator(".mn-
 await page.click("#share-btn");
 await page.waitForTimeout(300);
 check(
-  "Header share control explains the server requirement before sharing",
+  "Header share control offers a board link and optional service sharing",
   (await page.locator(".mn-share-panel").isVisible()) &&
-    (await page.locator(".mn-share-panel").innerText()).includes("Connect a server")
+    (await page.locator(".mn-share-panel").innerText()).includes("Board link") &&
+    (await page.locator(".mn-share-panel").innerText()).toLowerCase().includes("self-hosted service")
 );
 await page.locator(".mn-share-panel .mn-modal-close").click();
 check("Share panel closes", (await page.locator(".mn-share-overlay").count()) === 0);

@@ -191,7 +191,7 @@ Data lives in `%APPDATA%\com.dezuhan.khaoyunote\`:
 - `assets\<uuid>-<name>`, uploaded images and files (served to the webview through the asset
   protocol, scoped to the app data directory)
 
-## Web mode (localhost)
+## Web mode (browser)
 
 ```powershell
 npm run web
@@ -202,14 +202,22 @@ database and asset folder as the desktop app, so a board edited in the browser i
 No browser install is needed beyond Node 24 or newer because the host uses the built-in `node:sqlite`
 module. Run `npm install` once so the backup archive can use `fflate`.
 
-- `KHAOYU_WEB_HOST` changes the bind address, default `127.0.0.1`.
+- The host binds to `0.0.0.0` by default so devices on the same network can open it. The address bar
+  stays on a full board URL such as `http://192.168.1.10:1430/?board=<board-id>`.
+- Share in the header shows that full board URL and a Copy board link action. The host must stay
+  running, and the viewer signs in with an account on this host.
+- `KHAOYU_WEB_HOST` changes the bind address. Set `127.0.0.1` to keep it local-only.
 - `KHAOYU_WEB_PORT` changes the port, default `1430`.
+- `KHAOYU_WEB_PUBLIC_URL` adds a public or DDNS origin (for example `https://notes.example.com`) to
+  the share URLs. WAN access still needs router port forwarding or a reverse proxy.
 - `KHAOYU_NOTE_DB_DIR` points at another data folder, useful for a separate demo database.
 - `http://127.0.0.1:1430/status` returns host, port, database path, uptime, version and Node version.
-- The menu bar shows a `host:port` badge, and Settings > About repeats the host, port and URL.
+- The menu bar shows a `host:port` badge, and Settings > Server repeats the host, port, database and
+  share URLs.
 
 Browser limitations: dropping a local file path from the OS is not available (upload through the file
-picker instead), and folder restore plus the stdio MCP server remain desktop-only.
+picker instead), and folder restore plus the stdio MCP server remain desktop-only. Windows may ask to
+allow Node through the firewall the first time another device connects.
 
 ## Self-hosted service foundation and accounts (Milestones 1 and 2)
 

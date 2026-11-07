@@ -1,5 +1,6 @@
 // Share panel for the desktop board UI. Access is configured from the header.
 
+import * as bridge from "./bridge.js";
 import { state } from "./store.js";
 import { loadSyncConfig } from "./sync.js";
 import * as sharing from "./share.js";
@@ -72,8 +73,88 @@ function button(label, className, handler) {
   return element;
 }
 
+function isLoopbackUrl(value) {
+  try {
+    const host = new URL(value).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return true;
+  }
+}
+
+async function boardShareUrl() {
+  if (!bridge.hasWeb || !state.board) return "";
+  const info = await bridge.shareInfo();
+  const origin = `${window.location.protocol}//${window.location.host}`;
+  const candidates = [...(info?.urls || []), origin].filter(Boolean);
+  const base = isLoopbackUrl(origin)
+    ? candidates.find((candidate) => !isLoopbackUrl(candidate)) || origin
+    : origin;
+  return `${String(base).replace(/\/+$/, "")}/?board=${encodeURIComponent(state.board.id)}`;
+}
+
+async function renderLocalShareSection(body) {
+  const section = document.createElement("div");
+  section.className = "mn-share-local";
+  const title = document.createElement("div");
+  title.className = "mn-share-local-title";
+  title.textContent = "Board link";
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  section.append(title, note);
+
+  if (!bridge.hasWeb) {
+    note.textContent =
+      "This desktop window is local to this computer. Run the browser edition with node server.mjs to share a board by IP while the host is running.";
+    body.append(section);
+    return;
+  }
+
+  note.textContent =
+    "Open this full URL from another device on the same network while this host is running. The viewer signs in with an account on this host.";
+  const input = document.createElement("input");
+  input.className = "ky-input mn-share-local-url";
+  input.readOnly = true;
+  input.value = "Loading...";
+  const actions = document.createElement("div");
+  actions.className = "mn-account-actions";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "mn-btn mn-btn-primary";
+  copy.textContent = "Copy board link";
+  copy.disabled = true;
+  const hint = document.createElement("p");
+  hint.className = "mn-account-note";
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(input.value);
+      toast("Board link copied");
+    } catch {
+      toast("Could not copy the board link");
+    }
+  });
+  actions.append(copy);
+  section.append(input, actions, hint);
+  body.append(section);
+
+  const url = await boardShareUrl();
+  if (!url) {
+    input.value = "Board link unavailable";
+    return;
+  }
+  input.value = url;
+  copy.disabled = false;
+  if (isLoopbackUrl(url)) {
+    hint.textContent =
+      "Only this computer can use this URL. Add a LAN address or set KHAOYU_WEB_PUBLIC_URL for other devices.";
+  } else {
+    hint.textContent = "Other devices on this network can open this link while the host stays running.";
+  }
+}
+
 async function renderPanel() {
   const body = panelShell();
+  await renderLocalShareSection(body);
   const board = state.board;
   const projectId = board.sync?.projectId;
   const sync = loadSyncConfig();
@@ -81,8 +162,8 @@ async function renderPanel() {
     const note = document.createElement("p");
     note.className = "mn-prefs-note";
     note.textContent = sync.url && sync.token
-      ? "Enable server sync for this board before sharing. Sharing is per board."
-      : "Connect a server URL and scoped API token in the Sync control before sharing.";
+      ? "Enable server sync for this board to create public share links. The board link above works without the service."
+      : "Optional: connect a self-hosted service in the Sync control for public share links with permissions and expiry.";
     body.append(note);
     body.append(button("Close", "mn-btn", closeSharePanel));
     return;

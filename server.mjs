@@ -11,8 +11,10 @@ import { zipSync } from "fflate";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.join(ROOT, "app", "web");
-const HOST = process.env.KHAOYU_WEB_HOST || "127.0.0.1";
+const BIND_HOST = process.env.KHAOYU_WEB_HOST || "0.0.0.0";
+const DISPLAY_HOST = BIND_HOST === "0.0.0.0" || BIND_HOST === "::" ? "127.0.0.1" : BIND_HOST;
 const PORT = Number(process.env.KHAOYU_WEB_PORT || process.env.PORT || 1430);
+const PUBLIC_URL = String(process.env.KHAOYU_WEB_PUBLIC_URL || "").replace(/\/+$/, "");
 const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 const DB_FILE = "khaoyu-note.db";
 const MAX_ASSET_BYTES = 100 * 1024 * 1024;
@@ -166,11 +168,32 @@ db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?
 );
 
 const startedAt = Date.now();
+function lanUrls(port) {
+  const urls = [];
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      if (entry.family !== "IPv4" || entry.internal) continue;
+      urls.push(`http://${entry.address}:${port}`);
+    }
+  }
+  return [...new Set(urls)];
+}
+
+const LOCAL_URL = `http://${DISPLAY_HOST}:${PORT}`;
+const SHARE_URLS = [
+  ...(PUBLIC_URL ? [PUBLIC_URL] : []),
+  ...lanUrls(PORT),
+  LOCAL_URL,
+];
+
 const webInfo = {
   mode: "web",
-  host: HOST,
+  host: DISPLAY_HOST,
+  bind: BIND_HOST,
   port: PORT,
-  url: `http://${HOST}:${PORT}`,
+  url: LOCAL_URL,
+  urls: SHARE_URLS,
+  publicUrl: PUBLIC_URL,
   database: DB_PATH,
   assets: ASSETS_DIR,
   version: VERSION,
@@ -1531,6 +1554,22 @@ const server = http.createServer(async (request, response) => {
       await handleAuth(request, response, url);
       return;
     }
+    if (request.method === "GET" && url.pathname === "/api/share-info") {
+      const session = currentSession(request);
+      if (!session) {
+        response.writeHead(401, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "Sign in required" }));
+        return;
+      }
+      sendJson(response, 200, {
+        urls: SHARE_URLS,
+        localUrl: LOCAL_URL,
+        bind: BIND_HOST,
+        publicUrl: PUBLIC_URL,
+        boardPath: "/?board=",
+      });
+      return;
+    }
     if (request.method === "POST" && url.pathname === "/api/invoke") {
       const session = currentSession(request);
       if (!session) {
@@ -1570,10 +1609,13 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`Khaoyu Note web: ${webInfo.url}`);
+server.listen(PORT, BIND_HOST, () => {
+  console.log(`Khaoyu Note web: ${LOCAL_URL}`);
+  for (const url of SHARE_URLS) {
+    if (url !== LOCAL_URL) console.log(`share URL:       ${url}`);
+  }
   console.log(`database: ${DB_PATH}`);
-  console.log(`status:   ${webInfo.url}/status`);
+  console.log(`status:   ${LOCAL_URL}/status`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

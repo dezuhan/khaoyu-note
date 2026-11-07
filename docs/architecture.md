@@ -364,16 +364,23 @@ endpoints on the web host.
 the built-in `node:sqlite` module instead of a second database engine. Since the backup archive uses
 `fflate`, a checkout needs `npm install` once before `npm run web`.
 
+The host binds to `0.0.0.0` by default so devices on the same network can reach it, while the local
+URL stays `http://127.0.0.1:<port>`. It collects the non-internal IPv4 addresses for the share list and
+accepts `KHAOYU_WEB_PUBLIC_URL` for a public or DDNS origin. The address bar keeps a full board URL
+(`/?board=<id>`), so copying it from the header or from the Share panel opens the same board after
+sign-in. `GET /api/share-info` returns the share URLs and board path to the authenticated frontend.
+
 The host injects a small runtime into `index.html`: `window.__KHAOYU_WEB__` carries the mode, host,
-port, database path and version, while `window.__TAURI__` is a shim whose `core.invoke` forwards
-commands to `POST /api/invoke` and whose `core.convertFileSrc` maps asset paths to
-`/api/asset?path=...`. The existing frontend therefore runs unchanged, with the same save guard,
+bind address, port, share URLs, database path and version, while `window.__TAURI__` is a shim whose
+`core.invoke` forwards commands to `POST /api/invoke` and whose `core.convertFileSrc` maps asset paths
+to `/api/asset?path=...`. The existing frontend therefore runs unchanged, with the same save guard,
 conflict handling and asset flow.
 
 Routes: `/` and the static frontend, `/api/invoke` for the whitelisted board, settings and asset
-commands, `/api/asset` and `/api/download` for validated files under `assets/`, and `/status` for
-host, port, database, uptime, version and Node version. The host binds to loopback by default; set
-`KHAOYU_WEB_HOST` only when the network exposure is intentional.
+commands, `/api/asset` and `/api/download` for validated files under `assets/`, `/api/share-info` for
+full board URLs, and `/status` for host, port, database, uptime, version and Node version. The command
+bridge, assets and downloads require a signed-in session. Set `KHAOYU_WEB_HOST=127.0.0.1` to keep the
+host local-only.
 
 The browser cannot receive absolute OS drop paths or start the stdio MCP binary. Both remain
 desktop-only; the browser uses the file picker for uploads.

@@ -88,6 +88,12 @@ export const DOCUMENTATION_SECTIONS = [
       access panel. Each board is not shared by default. Enable it after the warning, choose View only
       (default), Can comment or Can edit, and optionally add a password and an expiry. Revoke links from
       the same panel.</p>
+      <h3>Board link</h3>
+      <p>The browser edition keeps a full board URL such as
+      <code>http://192.168.1.10:1430/?board=&lt;id&gt;</code>. Share in the header shows that URL and
+      Copy board link. Other devices on the same network can open it while the host stays running; they
+      sign in with an account on this host. The desktop window is local to its computer, so run the
+      browser edition to share by IP.</p>
       <h3>Share links</h3>
       <ul>
         <li>Share a whole board from the header, or one item or column from the right-click menu.</li>

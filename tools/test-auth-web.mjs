@@ -308,6 +308,16 @@ try {
   const me = await api(instance, cookies, "/api/auth/me");
   check("me returns the current account", me.status === 200 && me.body?.id === setup.body.user.id);
 
+  const shareInfo = await api(instance, cookies, "/api/share-info");
+  check(
+    "share info returns full host URLs for board links",
+    shareInfo.status === 200 &&
+      Array.isArray(shareInfo.body?.urls) &&
+      shareInfo.body.urls.includes(instance.baseUrl) &&
+      shareInfo.body.boardPath === "/?board=",
+    JSON.stringify(shareInfo.body)
+  );
+
   const profile = await api(instance, cookies, "/api/auth/profile", {
     method: "PATCH",
     csrf: true,

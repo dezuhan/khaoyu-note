@@ -807,6 +807,9 @@ function renderServerRuntime(content) {
   if (bridge.webInfo) {
     rows.push(["Host", `${bridge.webInfo.host}:${bridge.webInfo.port}`]);
     rows.push(["URL", bridge.webInfo.url]);
+    if (Array.isArray(bridge.webInfo.urls) && bridge.webInfo.urls.length) {
+      rows.push(["Share URLs", bridge.webInfo.urls.join(", ")]);
+    }
   }
   for (const [label, value] of rows) {
     const line = document.createElement("div");

@@ -5602,6 +5602,21 @@ html[data-performance="true"] .mn-card {
   color: var(--ky-soft);
   overflow-wrap: anywhere;
 }
+.mn-share-local {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ky-border);
+}
+.mn-share-local-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+.mn-share-local-url {
+  font-family: var(--mn-font-code);
+  font-size: 11px;
+}
 .mn-share-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;

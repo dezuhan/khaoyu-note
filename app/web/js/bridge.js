@@ -391,3 +391,15 @@ export async function authHistory({ limit = 20, offset = 0 } = {}) {
   if (hasTauri) return invoke("auth_history", { limit, offset });
   return { entries: [], hasMore: false };
 }
+
+// Full URLs this host can be reached on. Only the browser edition has share URLs.
+export async function shareInfo() {
+  if (!hasWeb) return null;
+  try {
+    const response = await fetch("/api/share-info", { credentials: "include" });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}

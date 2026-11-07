@@ -53,6 +53,27 @@ const uiRefs = {
   homePage: document.getElementById("home-page"),
 };
 
+function requestedBoardId() {
+  try {
+    return new URLSearchParams(window.location.search).get("board") || "";
+  } catch {
+    return "";
+  }
+}
+
+// Keep the address bar on a full board URL while the app is served over HTTP.
+function syncBoardUrl() {
+  if (!/^https?:$/.test(window.location.protocol)) return;
+  try {
+    const url = new URL(window.location.href);
+    if (state.board?.id) url.searchParams.set("board", state.board.id);
+    else url.searchParams.delete("board");
+    window.history.replaceState(null, "", url);
+  } catch {
+    /* the address bar is optional */
+  }
+}
+
 async function boot() {
   initTheme();
   // Accounts are mandatory, so finish the setup or sign-in gate before any board or setting is read.
@@ -70,20 +91,30 @@ async function boot() {
     else if (kind === "view") renderView();
     else if (kind === "selection") renderSelection();
     if (kind === "board" || kind === "save" || kind === "history") refreshSync();
+    if (kind === "board") syncBoardUrl();
   });
 
   await refreshBoards();
+  const requested = requestedBoardId();
+  const requestedBoard = requested
+    ? state.boards.find(
+        (board) => board.id === requested && !board.trashedAt && !board.archivedAt
+      )
+    : null;
   const last = localStorage.getItem("mn.lastBoard");
   const remembered = state.boards.find(
     (board) => board.id === last && !board.trashedAt && !board.archivedAt
   );
-  if (remembered) {
+  if (requestedBoard) {
+    await openBoard(requestedBoard.id);
+  } else if (remembered) {
     await openBoard(remembered.id);
   } else {
     const next = firstOpenableBoard();
     if (next) await openBoard(next.id);
     else await createBoard("Home", { withWelcome: true });
   }
+  syncBoardUrl();
   render("board");
   renderView();
   refreshSync();
