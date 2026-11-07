@@ -204,6 +204,14 @@ bearer-token CORS preflight only from `KHAOYU_SERVICE_CORS_ORIGINS`; cookies and
 never allowed from those origins. Add the local web host origin manually if the browser build should
 sync directly.
 
+## Browser account pages
+
+`/account` provides registration, email verification, password login, password reset, session
+listing and revocation, logout everywhere, and creation or revocation of scoped API tokens for
+desktop sync. The page uses the same cookie and CSRF rules as the API and is served with a strict
+self-only CSP. `/passkeys` links from it for passkey login and registration. Both pages require a
+secure context for WebAuthn and are intended for localhost or HTTPS deployments.
+
 ## Passkeys
 
 `/passkeys` is a small browser page for password login, passkey registration, passkey login and
@@ -403,7 +411,7 @@ isolation, passphrase and expiry enforcement, abuse reports, invitation acceptan
 transfer, asset authorization, share download permission, share comments and edits, revision restore,
 authenticated SSE rooms, scoped notifications, SMTP delivery, email preferences, CORS preflight,
 encrypted backups, alert webhooks, trusted-proxy SSO, presence opt-in, comment mentions, HTTPS
-enforcement, upload signature scanning and WebAuthn passkeys.
+enforcement, upload signature scanning, WebAuthn passkeys and browser account pages.
 
 ## Milestone boundaries
 
