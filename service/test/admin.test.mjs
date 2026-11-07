@@ -149,6 +149,9 @@ test("service admin dashboard API", async (t) => {
     for (const asset of ["/auth.css", "/auth-common.js", "/login.js", "/register.js", "/reset.js"]) {
       assert.equal((await api.call(asset)).status, 200, asset);
     }
+    const accountRedirect = await api.call("/account");
+    assert.equal(accountRedirect.status, 302);
+    assert.equal(accountRedirect.response.headers.get("location"), "/admin");
   });
 
   const registered = await api.register("admin@example.com");
@@ -262,5 +265,21 @@ test("service admin dashboard API", async (t) => {
       body: { email: "reset@example.com", password: "new-horse-battery-9" },
     });
     assert.equal(newPassword.status, 200, JSON.stringify(newPassword.body));
+  });
+
+  await t.test("the dashboard can change its own password", async () => {
+    const changed = await api.call("/api/v1/account/password", {
+      method: "POST",
+      jar: admin.jar,
+      body: { currentPassword: PASSWORD, newPassword: "admin-horse-battery-9" },
+    });
+    assert.equal(changed.status, 204, JSON.stringify(changed.body));
+    const dashboard = await api.call("/api/v1/admin/dashboard", { jar: admin.jar });
+    assert.equal(dashboard.status, 200);
+    const newLogin = await api.call("/api/v1/auth/login", {
+      method: "POST",
+      body: { email: "admin@example.com", password: "admin-horse-battery-9" },
+    });
+    assert.equal(newLogin.status, 200);
   });
 });

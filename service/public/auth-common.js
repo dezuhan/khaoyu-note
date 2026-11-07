@@ -60,7 +60,7 @@ export async function hasSession() {
 
 export async function redirectIfSignedIn() {
   if (await hasSession()) {
-    window.location.replace("/account");
+    window.location.replace("/admin");
     return true;
   }
   return false;

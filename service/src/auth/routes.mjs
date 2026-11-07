@@ -1855,6 +1855,41 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      if (method === "POST" && url.pathname === "/api/v1/account/password") {
+        const auth = requireSessionAuth(request, response, db, config);
+        const body = await readJson(request);
+        const account = accountById(db, auth.account.id);
+        if (!(await verifyPassword(String(body.currentPassword || ""), account.password_hash))) {
+          throw new HttpError(400, "Current password is not correct", "invalid_password");
+        }
+        const password = requirePassword(body.newPassword);
+        db.prepare("UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?").run(
+          await hashPassword(password),
+          now(),
+          account.id
+        );
+        const keepSession = auth.session.id;
+        db.prepare(
+          "UPDATE sessions SET revoked_at = ? WHERE account_id = ? AND id <> ? AND revoked_at IS NULL"
+        ).run(now(), account.id, keepSession);
+        db.prepare(
+          "UPDATE access_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ? AND id <> ?) AND revoked_at IS NULL"
+        ).run(now(), account.id, keepSession);
+        db.prepare(
+          "UPDATE refresh_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ? AND id <> ?) AND revoked_at IS NULL"
+        ).run(now(), account.id, keepSession);
+        writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.password_changed",
+          resourceType: "account",
+          resourceId: account.id,
+          ip,
+          secret: config.secret,
+        });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/account/export") {
         const auth = requireSessionAuth(request, response, db, config);
         const account = accountById(db, auth.account.id);

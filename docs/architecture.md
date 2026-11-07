@@ -407,11 +407,11 @@ can be fixed with `KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_POR
 `npm run start:background` launches the pair detached with logs under `<data>/logs`; `npm run stop`
 uses the runtime PID.
 
-The service serves browser pages at `/login`, `/register`, `/reset`, `/account`, `/passkeys`, `/shares`,
+The service serves browser pages at `/login`, `/register`, `/reset`, `/passkeys`, `/shares`,
 `/s/:token` and `/admin`. Login, signup and reset are separate centred auth cards using `ky.css` and
-`auth.css`; reset uses the current password and has no email-token step. `/account` is signed-in only
-and redirects to `/login`. The admin page uses the normal account session, requires the global admin
-role and calls
+`auth.css`; reset uses the current password and has no email-token step. `/account` redirects to
+`/admin`, where the Account section handles password changes, sessions, API tokens and sign out. The
+admin page uses the normal account session, requires the global admin role and calls
 `/api/v1/admin/dashboard`, `/users`, `/teams` and `/activity`; every mutation goes through the same
 CSRF check and writes `admin.*` audit rows. The page has a left rail and content pane, uses `ky.css`
 tokens for light and dark themes, and shows profile pictures or initials, role and status. The

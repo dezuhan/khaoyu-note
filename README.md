@@ -255,9 +255,10 @@ sharing endpoints, configuration, backup and upgrade steps are documented in
 [SECURITY.md](<SECURITY.md>).
 
 The service exposes project, item and column share links, passphrase and expiry controls, member
-roles, invitations and ownership transfer. The service pages are `/login`, `/register`, `/reset` and
-`/account` for auth and account management, `/passkeys`, `/shares`, the admin dashboard at
-`<frontend URL>/admin`, and a shared link opens read-only at `/s/:token`. Login, signup and reset use
+roles, invitations and ownership transfer. The service pages are `/login`, `/register` and `/reset` for
+auth, `/passkeys`, `/shares`, the admin dashboard at `<frontend URL>/admin`, and a shared link opens
+read-only at `/s/:token`. `/account` redirects to the dashboard, which owns sessions, API tokens,
+password changes and sign out. Login, signup and reset use
 separate centred pages; password reset asks for the current password and never sends an email token.
 The first registered account (or the account created by
 `bootstrap`) is the service admin. `/admin` uses the same signed-in session and shows Overview,
@@ -268,7 +269,7 @@ enter the service URL and your account email and password, then choose Sign in a
 printed frontend URL, for example `http://127.0.0.1:29194`; a remote host defaults to `https`. The
 dialog calls `/readyz` (service and database),
 signs in, and receives a scoped project token that the client stores without showing it; the Account
-pane repeats Server, Account and Status. A new account is created on the service at `/account`, which
+pane repeats Server, Account and Status. A new account is created on the service at `/register`, which
 the dialog links to. The local board
 remains authoritative until the connection is confirmed. Verification is disabled: registration creates a usable account
 immediately, and the verify UI is hidden. Reset mail uses SMTP when configured and

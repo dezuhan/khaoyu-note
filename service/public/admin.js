@@ -485,6 +485,182 @@ async function renderActivity({ append = false } = {}) {
   }
 }
 
+async function renderAccount() {
+  pane.innerHTML = `<div class="admin-loading">Loading account...</div>`;
+  let sessionData;
+  let tokensData;
+  try {
+    [sessionData, tokensData] = await Promise.all([
+      api("/api/v1/auth/sessions"),
+      api("/api/v1/account/tokens"),
+    ]);
+  } catch (error) {
+    if (error instanceof AuthError) return showAuth();
+    pane.innerHTML = "";
+    return showError(error);
+  }
+  const account = sessionData.account;
+  const admin = dashboard?.admin || {};
+  const sessions = (sessionData.sessions || []).filter((entry) => !entry.revoked);
+  const tokens = (tokensData.tokens || []).filter((entry) => !entry.revoked);
+  pane.innerHTML = `
+    <div class="admin-section">
+      <div class="admin-section-head"><div><h2>Profile</h2><p>The account used by this dashboard.</p></div></div>
+      <div class="admin-user">
+        ${avatarHtml({ displayName: admin.displayName || account.displayName, email: account.email, avatarUrl: admin.avatarUrl })}
+        <span class="admin-user-copy"><strong>${escapeHtml(account.displayName || account.email)}</strong><span>${escapeHtml(account.email)} · Admin</span></span>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-head"><div><h2>Password</h2><p>Changing it signs out every other session.</p></div></div>
+      <form data-role="password-form" novalidate>
+        <div class="admin-form-grid">
+          <label class="admin-field"><span>Current password</span><input class="admin-search" name="currentPassword" type="password" autocomplete="current-password" /></label>
+          <label class="admin-field"><span>New password</span><input class="admin-search" name="newPassword" type="password" autocomplete="new-password" /></label>
+          <label class="admin-field"><span>Confirm new password</span><input class="admin-search" name="confirmPassword" type="password" autocomplete="new-password" /></label>
+        </div>
+        <div class="admin-actions" style="margin-top: 8px">
+          <button class="ky-button ky-button-primary" type="submit">Update password</button>
+          <span class="admin-time" data-role="password-status" role="status"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-head"><div><h2>Sessions</h2><p>${sessions.length} active session${sessions.length === 1 ? "" : "s"}.</p></div></div>
+      ${
+        sessions.length
+          ? `<table class="admin-table"><thead><tr><th>Device</th><th>Created</th><th>Last seen</th><th></th></tr></thead><tbody>${sessions
+              .map(
+                (session) => `<tr>
+                  <td>${escapeHtml(session.device)}${session.current ? ' <span class="admin-badge is-active">Current</span>' : ""}</td>
+                  <td class="admin-time">${escapeHtml(formatTime(session.createdAt))}</td>
+                  <td class="admin-time">${escapeHtml(formatTime(session.lastSeenAt))}</td>
+                  <td><button class="admin-danger-button" type="button" data-role="revoke-session" data-id="${escapeHtml(
+                    session.id
+                  )}"${session.current ? " disabled" : ""}>Revoke</button></td>
+                </tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<div class="admin-empty">No active sessions.</div>`
+      }
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-head"><div><h2>API tokens</h2><p>Scoped tokens for desktop sync.</p></div></div>
+      <form class="admin-toolbar" data-role="token-form">
+        <input class="admin-search" name="name" value="Desktop sync" maxlength="80" />
+        <button class="ky-button ky-button-primary" type="submit">Create token</button>
+      </form>
+      <p class="admin-note" data-role="token-result"></p>
+      ${
+        tokens.length
+          ? `<table class="admin-table"><thead><tr><th>Name</th><th>Scopes</th><th>Expires</th><th></th></tr></thead><tbody>${tokens
+              .map(
+                (token) => `<tr>
+                  <td>${escapeHtml(token.name)}</td>
+                  <td class="admin-time">${escapeHtml((token.scopes || []).join(", "))}</td>
+                  <td class="admin-time">${token.expiresAt ? escapeHtml(formatTime(token.expiresAt)) : "Never"}</td>
+                  <td><button class="admin-danger-button" type="button" data-role="revoke-token" data-id="${escapeHtml(
+                    token.id
+                  )}">Revoke</button></td>
+                </tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<div class="admin-empty">No API tokens.</div>`
+      }
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-head"><div><h2>Sign out</h2><p>End this session or every session on the service.</p></div></div>
+      <div class="admin-actions">
+        <button class="ky-button" type="button" data-role="logout">Sign out</button>
+        <button class="ky-button ky-button-quiet" type="button" data-role="logout-all">Sign out everywhere</button>
+      </div>
+    </div>`;
+
+  const passwordStatus = pane.querySelector('[data-role="password-status"]');
+  pane.querySelector('[data-role="password-form"]').addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const password = form.newPassword.value;
+    if (!form.currentPassword.value) {
+      passwordStatus.textContent = "Enter your current password.";
+      return;
+    }
+    if (password.length < 12) {
+      passwordStatus.textContent = "Use at least 12 characters.";
+      return;
+    }
+    if (password !== form.confirmPassword.value) {
+      passwordStatus.textContent = "The new passwords do not match.";
+      return;
+    }
+    try {
+      await api("/api/v1/account/password", {
+        method: "POST",
+        body: { currentPassword: form.currentPassword.value, newPassword: password },
+      });
+      form.reset();
+      passwordStatus.textContent = "Password updated. Other sessions were signed out.";
+      dashboard = await api("/api/v1/admin/dashboard");
+    } catch (error) {
+      passwordStatus.textContent = error.message;
+    }
+  });
+
+  for (const button of pane.querySelectorAll('[data-role="revoke-session"]')) {
+    button.addEventListener("click", async () => {
+      try {
+        await api(`/api/v1/auth/sessions/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+        await renderAccount();
+      } catch (error) {
+        if (error instanceof AuthError) return showAuth();
+        showError(error);
+      }
+    });
+  }
+
+  pane.querySelector('[data-role="token-form"]').addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const created = await api("/api/v1/account/tokens", {
+        method: "POST",
+        body: {
+          name: event.target.name.value.trim() || "Desktop sync",
+          scopes: ["projects:read", "projects:write"],
+          expiresInDays: 365,
+        },
+      });
+      await renderAccount();
+      pane.querySelector('[data-role="token-result"]').textContent = `Copy this token now: ${created.token}`;
+    } catch (error) {
+      showError(error);
+    }
+  });
+
+  for (const button of pane.querySelectorAll('[data-role="revoke-token"]')) {
+    button.addEventListener("click", async () => {
+      try {
+        await api(`/api/v1/account/tokens/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+        await renderAccount();
+      } catch (error) {
+        showError(error);
+      }
+    });
+  }
+
+  pane.querySelector('[data-role="logout"]').addEventListener("click", async () => {
+    await api("/api/v1/auth/logout", { method: "POST" });
+    window.location.replace("/login?signedout=1");
+  });
+  pane.querySelector('[data-role="logout-all"]').addEventListener("click", async () => {
+    await api("/api/v1/auth/logout-all", { method: "POST" });
+    window.location.replace("/login?signedout=1");
+  });
+}
+
 async function go(next) {
   page = next;
   for (const item of navItems) item.classList.toggle("is-active", item.dataset.page === next);
@@ -502,6 +678,7 @@ async function go(next) {
   }
   if (next === "accounts") return renderAccounts();
   if (next === "teams") return renderTeams();
+  if (next === "account") return renderAccount();
   return renderActivity();
 }
 

@@ -65,6 +65,7 @@ on a fresh database, becomes an admin; migration 13 also promotes the oldest exi
 The dashboard has a left rail and a content pane with Overview, Accounts, Teams and Activity:
 
 - Overview shows account, team, share-link and audit counts plus recent activity and signups.
+- Account holds the signed-in password form, session revocation, scoped API tokens and sign out.
 - Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
   team count, last activity and last update. Admins can change another account's role or status; an
   account cannot demote or disable itself, and the last active admin cannot be removed.
@@ -288,10 +289,9 @@ passkey link. `/register` creates an account immediately; the first account beco
 `/reset` asks for email, current password and a new password, then revokes every session. It never sends
 an email reset token because this service has no email confirmation flow.
 
-`/account` is the signed-in management page: session listing and revocation, logout everywhere, and
-creation or revocation of scoped API tokens for desktop sync. Unauthenticated visitors are sent to
-`/login`. `/passkeys` handles passkey login and registration. All pages use the same cookie and CSRF
-rules as the API and are served with a strict self-only CSP.
+`/account` redirects to `/admin`; the dashboard has an Account section for password changes, sessions,
+API tokens and sign out. `/passkeys` handles passkey login and registration. All pages use the same
+cookie and CSRF rules as the API and are served with a strict self-only CSP.
 
 ## Passkeys
 

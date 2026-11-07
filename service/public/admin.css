@@ -523,6 +523,32 @@ html[data-ky-theme="softLight"] {
 .admin-form-row .admin-search {
   flex: 1 1 180px;
 }
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ky-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+.admin-field .admin-search {
+  height: 24px;
+  font-weight: 400;
+}
+.admin-danger-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 @media (max-width: 900px) {
   .admin-shell {

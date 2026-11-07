@@ -39,7 +39,7 @@ form.addEventListener("submit", async (event) => {
         totp: $("totp").value.trim() || undefined,
       },
     });
-    window.location.replace("/account");
+    window.location.replace("/admin");
   } catch (error) {
     setStatus(error.message || "Could not sign in.", "error");
     setBusy(submit, false);

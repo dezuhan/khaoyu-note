@@ -63,6 +63,11 @@ export function createServiceHandler({ config, db, logger, mailer }) {
       return;
     }
     const sharePage = /^\/s\/[^/]+$/.test(url.pathname);
+    if (request.method === "GET" && url.pathname === "/account") {
+      response.writeHead(302, { Location: "/admin" });
+      response.end();
+      return;
+    }
     const authPage =
       request.method === "GET"
         ? AUTH_PAGES[url.pathname] || (sharePage ? ["share.html", "text/html; charset=utf-8"] : null)
