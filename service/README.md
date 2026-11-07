@@ -105,6 +105,11 @@ required, renders only the shared scope, shows nested projects allowed by policy
 neutral message for invalid, expired, revoked or wrong-passphrase links. The page is `noindex`, has a
 self-only CSP, and tokens are redacted from request logs.
 
+All service pages load `/ui.css`, the shared design token stylesheet. It defines the same
+`--ky-bg`, `--ky-surface`, `--ky-text`, `--ky-soft`, `--ky-stroke`, `--ky-accent` and radius tokens
+used by the desktop app. The CSP allows `style-src 'self' 'unsafe-inline'` so the shared stylesheet
+and page layout blocks coexist. See `docs/design-system.md`.
+
 ## Operator admin
 
 Set `KHAOYU_SERVICE_ADMIN_TOKEN` to enable `/api/v1/admin/*`. These endpoints require
