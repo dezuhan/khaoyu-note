@@ -28,7 +28,14 @@ html[data-ky-theme="light"] {
 
 body.lp {
   margin: 0;
-  background: var(--ky-bg);
+  background-color: var(--ky-bg);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ky-text) 7%, transparent) 0.9px,
+    transparent 1.2px
+  );
+  background-size: 26px 26px;
+  background-attachment: fixed;
   color: var(--ky-text);
   font-family: "Plus Jakarta Sans", var(--ky-font, Inter, "Segoe UI", system-ui, sans-serif);
   font-size: 14px;
