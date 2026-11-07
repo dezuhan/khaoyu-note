@@ -2,6 +2,7 @@
 
 import * as bridge from "./bridge.js";
 import { isBlockedUpload, MAX_UPLOAD_BYTES, reportUploadProblem } from "./limits.js";
+import { refreshCard } from "./render.js";
 import { createCard, columnChildren, getCard, layoutColumns, maxZ, newBoardDoc, uid } from "./model.js";
 import {
   checkpoint,
@@ -593,6 +594,72 @@ export function applyImageCrop(cardId, crop) {
   const ratio = (crop.w / crop.h) * (crop.ratio || 1);
   card.h = Math.max(120, Math.round(card.w / ratio) + 24);
   markDirty("board");
+}
+
+function mediaNode(cardId) {
+  return document.querySelector(`.mn-card[data-id="${CSS.escape(cardId)}"]`);
+}
+
+function mediaFrameCommand(card, func) {
+  const frame = mediaNode(card.id)?.querySelector("iframe");
+  if (!frame?.contentWindow) return false;
+  if (/vimeo\.com/i.test(card.url || "")) {
+    frame.contentWindow.postMessage(JSON.stringify({ method: func === "pauseVideo" ? "pause" : "play" }), "*");
+  } else {
+    frame.contentWindow.postMessage(
+      JSON.stringify({ event: "command", func, args: [] }),
+      "*"
+    );
+  }
+  return true;
+}
+
+export function playMedia(cardId) {
+  const card = getCard(state.board, cardId);
+  if (!card || !["audio", "video"].includes(card.type) || !card.url) return;
+  const node = mediaNode(cardId);
+  const element = node?.querySelector("audio,video");
+  if (element) {
+    element.play().catch(() => {
+      window.dispatchEvent(
+        new CustomEvent("mn:toast", { detail: { message: "This media cannot be played." } })
+      );
+    });
+    node.classList.add("is-started");
+    return;
+  }
+  if (card.type === "video" && !card.__mediaStarted) {
+    card.__mediaStarted = true;
+    card.__mediaPlaying = true;
+    refreshCard(card.id);
+    return;
+  }
+  if (mediaFrameCommand(card, "playVideo")) card.__mediaPlaying = true;
+}
+
+export function pauseMedia(cardId) {
+  const card = getCard(state.board, cardId);
+  if (!card || !["audio", "video"].includes(card.type)) return;
+  const node = mediaNode(cardId);
+  const element = node?.querySelector("audio,video");
+  if (element) {
+    element.pause();
+  } else {
+    mediaFrameCommand(card, "pauseVideo");
+  }
+  card.__mediaPlaying = false;
+}
+
+export function toggleMediaRepeat(cardId) {
+  const card = getCard(state.board, cardId);
+  if (!card || !["audio", "video"].includes(card.type)) return;
+  card.repeat = !card.repeat;
+  const element = mediaNode(cardId)?.querySelector("audio,video");
+  if (element) element.loop = Boolean(card.repeat);
+  if (card.type === "video" && card.__mediaStarted && mediaNode(cardId)?.querySelector("iframe")) {
+    refreshCard(card.id);
+  }
+  markDirty("save");
 }
 
 export async function attachAudio(cardId, file) {

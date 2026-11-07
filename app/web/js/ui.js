@@ -32,12 +32,15 @@ import {
   duplicateSelected,
   emptyTrashEntries,
   openBoardCard,
+  pauseMedia,
   pasteCards,
+  playMedia,
   restoreTrashEntry,
   selectAllCards,
   sendToBack,
   setBoardTitle,
   setCardsLocked,
+  toggleMediaRepeat,
   wrapInColumn,
 } from "./actions.js";
 import { closeSettingsPage, getSettings, openSettingsPage, saveToolOrder } from "./settings.js";
@@ -1753,6 +1756,27 @@ window.addEventListener("mn:open-menu", (event) => {
       const ids = [...state.selection];
       const isBoard = card.type === "board";
       const items = [{ type: "label", text: TYPE_LABELS[card.type] || card.type }];
+      if ((card.type === "audio" || card.type === "video") && card.url) {
+        const mediaEl = cardElement(card.id)?.querySelector("audio,video");
+        const playing = mediaEl
+          ? !mediaEl.paused && !mediaEl.ended
+          : Boolean(card.__mediaPlaying);
+        items.push({
+          text: "Play",
+          disabled: playing,
+          onClick: () => playMedia(card.id),
+        });
+        items.push({
+          text: "Pause",
+          disabled: !playing,
+          onClick: () => pauseMedia(card.id),
+        });
+        items.push({
+          text: `${card.repeat ? "☑" : "☐"} Repeat`,
+          onClick: () => toggleMediaRepeat(card.id),
+        });
+        items.push({ type: "sep" });
+      }
       items.push({ text: "Share link", onClick: () => openSharePanel(card) });
       items.push({ type: "sep" });
       if (isBoard) {

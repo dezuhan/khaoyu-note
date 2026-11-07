@@ -398,7 +398,7 @@ function contentFor(card) {
             "edit",
             12
           )}</button>
-          <audio preload="metadata" src="${escapeHtml(imgSrc(card.url))}"></audio>
+          <audio preload="metadata" src="${escapeHtml(imgSrc(card.url))}"${card.repeat ? " loop" : ""}></audio>
         </div>`;
       }
       if (card.__editEmbed) {
@@ -421,16 +421,44 @@ function contentFor(card) {
 
     case "video": {
       if (card.url && !card.__editEmbed) {
-        const embed = embedUrl(card.url);
-        const media = embed
-          ? `<iframe src="${escapeHtml(
-              embed
-            )}" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`
-          : `<video controls src="${escapeHtml(imgSrc(card.url))}"></video>`;
-        return `<div class="mn-video">${media}<button type="button" class="mn-embed-edit" data-action="edit-embed" title="Change video link">${icon(
+        const started = Boolean(card.__mediaStarted);
+        const embed = videoEmbedInfo(card.url, {
+          autoplay: started,
+          loop: Boolean(card.repeat),
+        });
+        const edit = `<button type="button" class="mn-embed-edit" data-action="edit-embed" title="Change video link">${icon(
           "edit",
           12
-        )}</button></div>`;
+        )}</button>`;
+        if (embed) {
+          const iframe = started
+            ? `<iframe class="mn-video-frame" src="${escapeHtml(
+                embed.src
+              )}" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`
+            : "";
+          const poster =
+            embed.poster && !started
+              ? `<div class="mn-video-poster" style="background-image:url('${escapeHtml(
+                  embed.poster
+                )}')"></div>`
+              : "";
+          const playButton = !started
+            ? `<button type="button" class="mn-video-play" data-action="start-video" title="Play video" aria-label="Play video">${icon(
+                "play",
+                26
+              )}</button>`
+            : "";
+          return `<div class="mn-video${started ? " is-started" : ""}">${poster}${iframe}${playButton}${edit}</div>`;
+        }
+        const playButton = !started
+          ? `<button type="button" class="mn-video-play" data-action="start-video" title="Play video" aria-label="Play video">${icon(
+              "play",
+              26
+            )}</button>`
+          : "";
+        return `<div class="mn-video${started ? " is-started" : ""}"><video controls preload="metadata" src="${escapeHtml(
+          imgSrc(card.url)
+        )}"${card.repeat ? " loop" : ""}></video>${playButton}${edit}</div>`;
       }
       return `<div class="mn-placeholder mn-embed-empty">${icon("video", 22)}<span>Paste a link from YouTube or Vimeo</span><input class="mn-field-input" data-field="url" value="${escapeHtml(
         card.url || ""
@@ -573,31 +601,47 @@ function mapEmbedUrl(query) {
   return `https://maps.google.com/maps?q=${encodeURIComponent(location)}&z=14&output=embed`;
 }
 
-function embedUrl(url) {
+function videoEmbedInfo(url, { autoplay = false, loop = false } = {}) {
   try {
     const u = new URL(url);
     if (/youtube\.com$|youtu\.be$/.test(u.hostname)) {
+      let id = "";
       if (u.hostname === "youtu.be") {
-        const id = u.pathname.slice(1).split("/")[0];
-        return id ? `https://www.youtube.com/embed/${id}` : null;
+        id = u.pathname.slice(1).split("/")[0];
+      } else if (u.pathname.startsWith("/shorts/")) {
+        id = u.pathname.split("/")[2];
+      } else {
+        id = u.searchParams.get("v") || "";
       }
-      if (u.pathname.startsWith("/shorts/")) {
-        const id = u.pathname.split("/")[2];
-        return id ? `https://www.youtube.com/embed/${id}` : null;
-      }
-      const id = u.searchParams.get("v");
-      return id ? `https://www.youtube.com/embed/${id}` : null;
+      if (!id) return null;
+      const params = new URLSearchParams({
+        autoplay: autoplay ? "1" : "0",
+        loop: loop ? "1" : "0",
+        playlist: id,
+        enablejsapi: "1",
+        playsinline: "1",
+        rel: "0",
+      });
+      return {
+        src: `https://www.youtube.com/embed/${id}?${params.toString()}`,
+        poster: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+      };
     }
     if (/vimeo\.com$/.test(u.hostname)) {
       const id = u.pathname.split("/").filter(Boolean)[0];
-      return id ? `https://player.vimeo.com/video/${id}` : null;
+      if (!id) return null;
+      return {
+        src: `https://player.vimeo.com/video/${id}?autoplay=${autoplay ? "1" : "0"}&loop=${
+          loop ? "1" : "0"
+        }&api=1`,
+        poster: "",
+      };
     }
   } catch {
     /* not a url */
   }
   return null;
 }
-
 function initials(name) {
   return name
     .split(/\s+/)

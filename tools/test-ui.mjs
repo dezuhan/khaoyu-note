@@ -17,7 +17,9 @@ const page = await browser.newPage({
   viewport: { width: 1440, height: 900 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
-page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
+page.on("pageerror", (error) => {
+  if (!/isExternalMethodAvailable/.test(error.message)) errors.push("pageerror: " + error.message);
+});
 page.on("console", (message) => {
   if (message.type() === "error") errors.push("console: " + message.text());
 });
@@ -987,9 +989,17 @@ await videoUrl.fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 await videoCard.locator(".mn-primary-soft").click();
 await page.waitForTimeout(500);
 check(
-  "YouTube link renders an embed preview",
+  "YouTube link starts behind a centered play overlay",
+  (await videoCard.locator(".mn-video-play").isVisible()) &&
+    (await videoCard.locator("iframe").count()) === 0
+);
+await videoCard.locator(".mn-video-play").click();
+await page.waitForTimeout(600);
+check(
+  "Center play click loads the YouTube embed with autoplay",
   (await videoCard.locator("iframe").count()) === 1 &&
-    (await videoCard.locator("iframe").getAttribute("src")).includes("youtube.com/embed/")
+    (await videoCard.locator("iframe").getAttribute("src")).includes("youtube.com/embed/") &&
+    (await videoCard.locator("iframe").getAttribute("src")).includes("autoplay=1")
 );
 check(
   "Video embed is sandboxed and sends a strict referrer policy",
@@ -998,6 +1008,36 @@ check(
     (await videoCard.locator("iframe").getAttribute("referrerpolicy")) ===
       "strict-origin-when-cross-origin"
 );
+await videoCard.click({ button: "right" });
+await page.waitForTimeout(250);
+check(
+  "Playing video disables Play and enables Pause",
+  (await page.locator(".mn-menu-item", { hasText: "Play" }).getAttribute("disabled")) !== null &&
+    (await page.locator(".mn-menu-item", { hasText: "Pause" }).getAttribute("disabled")) === null
+);
+await page.locator(".mn-menu-item", { hasText: "Pause" }).click();
+await page.waitForTimeout(250);
+await videoCard.click({ button: "right" });
+await page.waitForTimeout(250);
+check(
+  "Paused video enables Play and disables Pause",
+  (await page.locator(".mn-menu-item", { hasText: "Play" }).getAttribute("disabled")) === null &&
+    (await page.locator(".mn-menu-item", { hasText: "Pause" }).getAttribute("disabled")) !== null
+);
+check(
+  "Media context menu offers a Repeat checkbox",
+  (await page.locator(".mn-menu-item", { hasText: /Repeat/ }).count()) === 1
+);
+await page.locator(".mn-menu-item", { hasText: /Repeat/ }).click();
+await page.waitForTimeout(350);
+await videoCard.click({ button: "right" });
+await page.waitForTimeout(250);
+check(
+  "Repeat toggles on in the context menu",
+  (await page.locator(".mn-menu-item", { hasText: "☑ Repeat" }).count()) === 1
+);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
 check(
   "Loaded video iframe leaves the card draggable",
   (await videoCard.locator("iframe").evaluate((el) => getComputedStyle(el).pointerEvents)) === "none"

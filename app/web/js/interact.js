@@ -1828,6 +1828,19 @@ function onClick(event) {
     case "upload-audio":
       window.dispatchEvent(new CustomEvent("mn:pick-audio", { detail: { cardId: card.id } }));
       break;
+    case "start-video": {
+      card.__mediaStarted = true;
+      card.__mediaPlaying = true;
+      const wrap = cardElement(card.id);
+      const video = wrap?.querySelector("video");
+      if (video) {
+        wrap.classList.add("is-started");
+        video.play().catch(() => toast("This video cannot be played."));
+      } else {
+        refreshCard(card.id);
+      }
+      break;
+    }
     case "audio-toggle": {
       const audio = cardElement(card.id)?.querySelector("audio");
       if (!audio) break;

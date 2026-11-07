@@ -5816,3 +5816,40 @@ html[data-performance="true"] .mn-card {
 .mn-audio-edit-actions .mn-primary-soft {
   height: 30px;
 }
+
+/* Video poster and center play */
+.mn-video-poster {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+.mn-video-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(10, 10, 10, 0.62);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.mn-video-play svg {
+  margin-left: 3px;
+}
+.mn-video-play:hover {
+  background: rgba(10, 10, 10, 0.82);
+}
+.mn-video.is-started .mn-video-play {
+  display: none;
+}
