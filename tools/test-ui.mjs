@@ -216,9 +216,9 @@ const chromeOrder = await page.evaluate(() =>
   [...document.getElementById("app").children].slice(0, 2).map((el) => el.id || el.className)
 );
 check(
-  "Header sits above the menu bar and search stays in the header area",
-  chromeOrder[0] === "mn-topbar" &&
-    chromeOrder[1] === "menubar" &&
+  "Menu bar sits above the file header and search lives in the menu bar",
+  chromeOrder[0] === "menubar" &&
+    chromeOrder[1] === "mn-topbar" &&
     (await page.locator("#command-search-btn").isVisible())
 );
 check(

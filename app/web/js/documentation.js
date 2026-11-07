@@ -16,7 +16,7 @@ export const DOCUMENTATION_HTML = `
   </ul>
 
   <h3>Board access and sharing</h3>
-  <p>The header sits above the menu bar. The Share control in the header right corner opens the
+  <p>The menu bar sits above the file header. The Share control in the header right corner opens the
   per-board access panel. Each board is not shared by default. Enable it with the warning, choose
   View only (default), Can comment or Can edit, and optionally add a password and expiry. Revoke links
   from the same panel. Right-click any card and choose Share link to share that item or column.</p>
