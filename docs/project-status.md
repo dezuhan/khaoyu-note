@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.23.1.
+Snapshot date: 2026-11-07. Version: 0.23.2.
 
 ## Technology
 
@@ -191,7 +191,7 @@ Still blocked by the environment or missing credentials:
 - Backup, export and pre-restore names are collision-free within the same millisecond.
 - A failed legacy JSON import keeps the folder and retries on the next launch.
 - MCP search snippets preserve Unicode, `create_card` cannot override id/type through `fields`, and deleting a card removes its full descendant subtree.
-- Verification: 224/224 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 41/41 service foundation, auth, SSO, passkeys, sharing, nested shares, assets, collaboration, notifications, email, admin, backup, transport hardening and email queue, sync engine checks, 8/8 passkey browser checks, 10/10 browser account checks, 8/8 browser sharing checks, 8/8 share viewer checks, 4/4 first-run checks, 10 Rust library tests and 2 MCP unit tests.
+- Verification: 226/226 UI, 11/11 conflict, 4/4 save retry, 4/4 board selection, 8/8 rename, 5/5 board card title, 9/9 column layout, 7/7 column title, 5/5 kanban scroll, 6/6 tool drop, 5/5 wrap selection, 7/7 tooltips, 6/6 line area, 24/24 card features, 10/10 localhost web, 5/5 font weights, 16/16 MCP, 41/41 service foundation, auth, SSO, passkeys, sharing, nested shares, assets, collaboration, notifications, email, admin, backup, transport hardening and email queue, sync engine checks, 8/8 passkey browser checks, 10/10 browser account checks, 8/8 browser sharing checks, 8/8 share viewer checks, 4/4 first-run checks, 10 Rust library tests and 2 MCP unit tests.
 - A localhost web host (`server.mjs`) now serves the same frontend against the same SQLite database and assets, with `/status`, a menu-bar host badge and Settings > About details.
 - A self-hosted service foundation (`service/`) now provides fail-closed configuration, explicit reversible migrations, account/project/membership/audit/object tables, content-addressed object storage, a maintenance worker, health endpoints, backup/restore and Docker Compose deployment.
 - The service account core now adds Argon2id registration, email verification, rotating refresh tokens with reuse detection, session revocation, password reset, TOTP, account deletion grace, CSRF/cookie hardening, project role checks and scoped API tokens.
