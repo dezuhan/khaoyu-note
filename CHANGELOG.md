@@ -7,6 +7,10 @@ project uses Semantic Versioning.
 
 ### Added
 
+- Section surface cards: a pastel background with a small editable title, always below regular cards,
+  freely resizable, excluded from columns and layer controls. Selecting a Section opens a bottom
+  toolbar with pastel swatches and a position-only lock that stops movement while title and color
+  edits stay available.
 - Color cards can pick a color directly from the screen with the eyedropper button beside the hex
   field. The EyeDropper API is tried first in both the browser and the desktop webview; if the host
   rejects it, the desktop falls back to an in-app magnifier over a client-area capture.

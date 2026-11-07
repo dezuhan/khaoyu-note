@@ -254,6 +254,14 @@ function onPointerDown(event) {
       event.preventDefault();
       return;
     }
+    if (
+      card.type === "section" &&
+      card.positionLocked &&
+      (isResize || !interactive)
+    ) {
+      event.preventDefault();
+      return;
+    }
     if (event.target.closest("[data-sheet-add-column]")) {
       event.preventDefault();
       beginSheetAdd(card, "column", event);
@@ -571,7 +579,7 @@ function onPointerMove(event) {
       if (!card) return;
       const world = worldOf(event);
       const dx = world.x - gesture.start.x;
-      if (card.type === "column") {
+      if (card.type === "column" || card.type === "section") {
         card.w = Math.max(gesture.minW, gesture.startW + dx);
         const dy = world.y - gesture.start.y;
         card.h = Math.max(gesture.minH, gesture.startH + dy);
@@ -770,7 +778,7 @@ function finishDrag(current) {
     const column = getCard(state.board, target.columnId);
     if (column) {
       const moving = state.board.cards.filter(
-        (card) => dragged.has(card.id) && card.type !== "column"
+        (card) => dragged.has(card.id) && card.type !== "column" && card.type !== "section"
       );
       if (moving.length) {
         const rest = columnChildren(state.board, column.id).filter(

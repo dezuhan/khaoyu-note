@@ -18,6 +18,7 @@ export const ICONS = {
   column: P(
     '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M5 8.5h14M5 13.5h14M5 18.5h14"/>'
   ),
+  section: P('<rect x="3.5" y="4.5" width="17" height="15" rx="2" stroke-dasharray="3 3"/><path d="M8 9h8M8 13h5"/>'),
   comment: P('<path d="M20.5 12a8 8 0 0 1-8 8H5.5l-2 2V12a8 8 0 0 1 8-8h1a8 8 0 0 1 8 8Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/>'),
   bell: P('<path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5S6.5 14 6.5 10Z"/><path d="M10 18.5a2.2 2.2 0 0 0 4 0"/>'),
   table: P(

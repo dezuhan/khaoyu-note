@@ -42,6 +42,7 @@ import {
   sendToBack,
   setBoardTitle,
   setCardsLocked,
+  setSectionPositionLocked,
   toggleMediaRepeat,
   wrapInColumn,
 } from "./actions.js";
@@ -83,6 +84,7 @@ const TOOLS = [
   { key: "line", label: "Line", shortcut: "A" },
   { key: "board", label: "Board", shortcut: "G" },
   { key: "column", type: "column", label: "Column", shortcut: "C" },
+  { key: "section", type: "section", label: "Section", focus: '[data-field="title"]', shortcut: "E" },
   { key: "kanban", type: "kanban", label: "Kanban", shortcut: "K" },
   { key: "comment", type: "comment", label: "Comment", focus: '[data-field="comment-draft"]', shortcut: "M" },
   { key: "table", type: "table", label: "Table", shortcut: "X" },
@@ -399,6 +401,10 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
   if (!type) return;
   if (parentColumn && type === "column") {
     toast("Columns cannot be placed inside another column.");
+    return;
+  }
+  if (parentColumn && type === "section") {
+    toast("Sections stay on the board surface, not inside a column.");
     return;
   }
   const extra = { ...parentFields };
@@ -1801,6 +1807,7 @@ window.addEventListener("mn:open-menu", (event) => {
       if (!state.selection.has(card.id)) setSelection([card.id]);
       const ids = [...state.selection];
       const isBoard = card.type === "board";
+      const isSection = card.type === "section";
       const items = [{ type: "label", text: TYPE_LABELS[card.type] || card.type }];
       if ((card.type === "audio" || card.type === "video") && card.url) {
         const mediaEl = cardElement(card.id)?.querySelector("audio,video");
@@ -1892,13 +1899,24 @@ window.addEventListener("mn:open-menu", (event) => {
         { text: "Copy", kbd: "Ctrl+C", onClick: () => copySelected() },
         { text: "Paste", kbd: "Ctrl+V", onClick: () => pasteCards() },
         { text: "Duplicate", kbd: "Ctrl+D", onClick: () => duplicateSelected() },
-        { type: "sep" },
-        { text: "Bring to front", onClick: () => bringToFront(card, ids) },
-        { text: "Send to back", onClick: () => sendToBack(card, ids) },
-        {
-          text: card.locked ? "Unlock position" : "Lock position",
-          onClick: () => setCardsLocked(ids, !card.locked),
-        },
+        { type: "sep" }
+      );
+      if (!isSection) {
+        items.push(
+          { text: "Bring to front", onClick: () => bringToFront(card, ids) },
+          { text: "Send to back", onClick: () => sendToBack(card, ids) }
+        );
+      }
+      items.push(
+        isSection
+          ? {
+              text: card.positionLocked ? "Unlock position" : "Lock position",
+              onClick: () => setSectionPositionLocked(card.id, !card.positionLocked),
+            }
+          : {
+              text: card.locked ? "Unlock position" : "Lock position",
+              onClick: () => setCardsLocked(ids, !card.locked),
+            },
         { type: "sep" }
       );
       if (canWrapInColumn(ids)) {

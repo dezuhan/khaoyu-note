@@ -1,7 +1,8 @@
 // Contextual bottom toolbar: formatting for text cards, pen/eraser/move for the Draw tool.
 
 import { icon } from "./icons.js";
-import { notify, state, subscribe } from "./store.js";
+import { getCard, SECTION_COLORS } from "./model.js";
+import { checkpoint, markDirty, notify, state, subscribe } from "./store.js";
 
 let bar = null;
 let renderTimer = 0;
@@ -55,6 +56,26 @@ function editableTarget() {
 
 function renderBar() {
   if (!bar) return;
+  const sectionSelected = document.querySelector('.mn-card.is-selected[data-type="section"]');
+  if (sectionSelected) {
+    const card = getCard(state.board, sectionSelected.dataset.id);
+    if (card) {
+      bar.hidden = false;
+      bar.innerHTML = `<span class="mn-context-group mn-section-colors">${SECTION_COLORS.map(
+        (entry) =>
+          `<button type="button" class="mn-context-btn mn-section-swatch${
+            (card.sectionColor || "") === entry.color ? " is-active" : ""
+          }" data-section-color="${entry.color}" title="${entry.name}" aria-label="${entry.name}" style="--section-swatch:${entry.color}"><span></span></button>`
+      ).join("")}</span>
+      <span class="mn-context-sep"></span>
+      <button type="button" class="mn-context-btn mn-section-lock${
+        card.positionLocked ? " is-active" : ""
+      }" data-section-lock title="${card.positionLocked ? "Unlock position" : "Lock position"}" aria-label="${
+        card.positionLocked ? "Unlock position" : "Lock position"
+      }">${icon("lock", 16)}</button>`;
+      return;
+    }
+  }
   const drawingSelected = document.querySelector('.mn-card.is-selected[data-type="drawing"]');
   if (state.tool === "draw" || drawingSelected) {
     bar.hidden = false;
@@ -85,6 +106,30 @@ function renderBar() {
 }
 
 function onClick(event) {
+  const sectionColor = event.target.closest("[data-section-color]");
+  if (sectionColor) {
+    const sectionEl = document.querySelector('.mn-card.is-selected[data-type="section"]');
+    const card = sectionEl ? getCard(state.board, sectionEl.dataset.id) : null;
+    if (card) {
+      checkpoint();
+      card.sectionColor = sectionColor.dataset.sectionColor;
+      markDirty("board");
+      renderBar();
+    }
+    return;
+  }
+  const sectionLock = event.target.closest("[data-section-lock]");
+  if (sectionLock) {
+    const sectionEl = document.querySelector('.mn-card.is-selected[data-type="section"]');
+    const card = sectionEl ? getCard(state.board, sectionEl.dataset.id) : null;
+    if (card) {
+      checkpoint();
+      card.positionLocked = !card.positionLocked;
+      markDirty("board");
+      renderBar();
+    }
+    return;
+  }
   const drawButton = event.target.closest("[data-draw-mode]");
   if (drawButton) {
     if (state.tool !== "draw") {

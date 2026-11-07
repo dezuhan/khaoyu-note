@@ -39,6 +39,7 @@ export const DOCUMENTATION_SECTIONS = [
         <tr><td>Comment</td><td>Threaded comments with per-message done state and delete.</td></tr>
         <tr><td>Table</td><td>Editable cells, resizable columns, Add row and Add column.</td></tr>
         <tr><td>Column</td><td>Groups cards; drag cards in and out, collapse and expand.</td></tr>
+        <tr><td>Section</td><td>Pastel background surface with a small title. Always below cards, not a column, with a bottom swatch and position-lock toolbar.</td></tr>
         <tr><td>Board</td><td>Nested board card with a mini preview, opened in place.</td></tr>
         <tr><td>Kanban</td><td>Columns and cards with pointer drag between columns.</td></tr>
         <tr><td>Color</td><td>HSV picker with HEX, RGB, CMYK and an automatic color name.</td></tr>

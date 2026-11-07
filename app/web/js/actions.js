@@ -113,7 +113,7 @@ export function canWrapInColumn(ids = []) {
   if (!state.board || !Array.isArray(ids) || ids.length < 2) return false;
   return ids.every((id) => {
     const card = getCard(state.board, id);
-    return card && card.type !== "column" && !card.locked;
+    return card && card.type !== "column" && card.type !== "section" && !card.locked;
   });
 }
 
@@ -358,7 +358,7 @@ export function bringToFront(card, ids = [card.id]) {
   let z = maxZ(state.board);
   for (const id of ids) {
     const target = getCard(state.board, id);
-    if (target) target.z = ++z;
+    if (target && target.type !== "section") target.z = ++z;
   }
   markDirty("board");
 }
@@ -370,7 +370,7 @@ export function sendToBack(card, ids = [card.id]) {
   let z = min - 1;
   for (const id of ids) {
     const target = getCard(state.board, id);
-    if (target) target.z = z--;
+    if (target && target.type !== "section") target.z = z--;
   }
   markDirty("board");
 }
@@ -454,6 +454,15 @@ export function setCardsLocked(ids, locked) {
   checkpoint();
   for (const card of cards) card.locked = Boolean(locked);
   document.activeElement?.blur?.();
+  markDirty("board");
+}
+
+export function setSectionPositionLocked(cardId, locked) {
+  if (!state.board) return;
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "section") return;
+  checkpoint();
+  card.positionLocked = Boolean(locked);
   markDirty("board");
 }
 

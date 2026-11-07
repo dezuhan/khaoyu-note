@@ -23,6 +23,7 @@ export const CARD_SIZES = {
   file: [260, 70],
   board: [260, 70],
   column: [280, 220],
+  section: [620, 420],
   kanban: [560, 500],
 };
 
@@ -87,9 +88,23 @@ export const MIN_SIZES = {
   file: [180, 66],
   board: [180, 90],
   column: [220, 120],
+  section: [260, 160],
   kanban: [320, 500],
   drawing: [160, 100],
 };
+
+// Pastel section backgrounds. Section cards are visual wrappers: they sit below every other card
+// and never become a parent, unlike a column.
+export const SECTION_COLORS = [
+  { name: "Rose", color: "#F8D7DA" },
+  { name: "Peach", color: "#FCE4D6" },
+  { name: "Butter", color: "#FFF2CC" },
+  { name: "Mint", color: "#D9EAD3" },
+  { name: "Sky", color: "#DDEBF7" },
+  { name: "Lavender", color: "#E4DFEC" },
+  { name: "Sand", color: "#F4E7D3" },
+  { name: "Mist", color: "#E7E6E6" },
+];
 
 // Named swatches used by the Color card.
 export const SWATCHES = [
@@ -147,6 +162,8 @@ export function defaultContent(type) {
       return { boardId: "", title: "Board" };
     case "column":
       return { title: "Column" };
+    case "section":
+      return { title: "Section", sectionColor: SECTION_COLORS[0].color };
     case "kanban":
       return {
         title: "Kanban",
@@ -165,7 +182,7 @@ export function createCard(type, x, y, extra = {}) {
   const [w, h] = CARD_SIZES[type] || [240, MIN_CARD_H];
   const aspect = CARD_ASPECTS[type];
   const minimum = type === "audio" ? AUDIO_CARD_H : MIN_CARD_H;
-  const height = aspect ? Math.round(w / aspect) : minimum;
+  const height = type === "section" ? h : aspect ? Math.round(w / aspect) : minimum;
   return {
     id: uid(type),
     type,
@@ -276,6 +293,7 @@ export const TYPE_LABELS = {
   file: "File",
   board: "Board",
   column: "Column",
+  section: "Section",
   kanban: "Kanban",
   drawing: "Drawing",
 };

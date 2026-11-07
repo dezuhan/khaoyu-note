@@ -75,7 +75,7 @@ const railToolKeys = await page
   .evaluateAll((els) => els.map((el) => el.dataset.tool));
 check(
   "tool rail hides the temporarily disabled tools",
-  railToolKeys.length === 16,
+  railToolKeys.length === 17,
   String(railToolKeys.length)
 );
 check(
@@ -972,6 +972,80 @@ check(
 );
 await page.keyboard.press("Delete");
 await page.waitForTimeout(350);
+
+// ---------------------------------------------------------------- section
+await page.click('.mn-tool[data-tool="section"]');
+await page.waitForTimeout(450);
+const sectionId = await selectedId();
+const sectionCard = byId(sectionId);
+check(
+  "Section tool creates a pastel background with a small title",
+  (await sectionCard.locator(".mn-section-title").count()) === 1 &&
+    (await sectionCard.locator(".mn-section-title").inputValue()) === "Section" &&
+    (await sectionCard.evaluate((el) => getComputedStyle(el).backgroundColor)) !== "rgba(0, 0, 0, 0)"
+);
+check(
+  "Selecting a Section opens pastel swatches and a position lock",
+  (await page.locator("[data-section-color]").count()) === 8 &&
+    (await page.locator("[data-section-lock]").count()) === 1
+);
+await page.locator('[data-section-color="#D9EAD3"]').click();
+await page.waitForTimeout(300);
+check(
+  "Section swatch changes the background",
+  (await sectionCard.evaluate((el) => el.style.getPropertyValue("--section-color"))) === "#D9EAD3"
+);
+const sectionTitle = sectionCard.locator(".mn-section-title");
+await sectionTitle.fill("Test section");
+await sectionTitle.press("Tab");
+await page.waitForTimeout(300);
+check(
+  "Section title persists after editing",
+  (await sectionCard.locator(".mn-section-title").inputValue()) === "Test section"
+);
+await page.locator("[data-section-lock]").click();
+await page.waitForTimeout(300);
+check(
+  "Section position lock hides resize and keeps the card selected",
+  (await sectionCard.getAttribute("class")).includes("is-position-locked") &&
+    (await sectionCard.locator(".mn-resize").evaluate((el) => getComputedStyle(el).display)) === "none"
+);
+await page.evaluate((id) => {
+  const el = document.querySelector(`.mn-card[data-id="${id}"]`);
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  el.dispatchEvent(
+    new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + 30,
+      clientY: rect.top + 70,
+    })
+  );
+}, sectionId);
+await page.waitForTimeout(250);
+check(
+  "Section menu omits layer controls",
+  !(await page.locator(".mn-menu").innerText()).toLowerCase().includes("bring to front")
+);
+await page.keyboard.press("Escape");
+await page.locator("[data-section-lock]").click();
+await page.waitForTimeout(250);
+const sectionZ = Number(await sectionCard.evaluate((el) => el.style.zIndex));
+await page.click('.mn-tool[data-tool="note"]');
+await page.waitForTimeout(300);
+const sectionNoteId = await selectedId();
+const sectionNoteZ = Number(await byId(sectionNoteId).evaluate((el) => el.style.zIndex));
+check("Sections stay below regular cards", sectionZ < sectionNoteZ, `${sectionZ} < ${sectionNoteZ}`);
+await page.evaluate(async (ids) => {
+  const store = await import("/js/store.js");
+  const actions = await import("/js/actions.js");
+  for (const id of ids) {
+    store.setSelection([id]);
+    actions.deleteSelected();
+  }
+}, [sectionId, sectionNoteId]);
+await page.waitForTimeout(300);
 
 // ---------------------------------------------------------------- kanban
 await page.click('.mn-tool[data-tool="kanban"]');

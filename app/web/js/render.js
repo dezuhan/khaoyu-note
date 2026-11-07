@@ -526,6 +526,16 @@ function contentFor(card) {
       </div>`;
     }
 
+    case "section":
+      return `<div class="mn-section" style="--section-color:${escapeHtml(
+        card.sectionColor || "#F8D7DA"
+      )}">
+        <div class="mn-section-head">
+          <span class="mn-section-mark">${icon("section", 12)}</span>
+          ${fieldInput("title", card.title || "Section", "Section", "mn-section-title")}
+        </div>
+      </div>`;
+
     case "column": {
       const summary = columnSummary(state.board, card);
       const collapsed = Boolean(card.collapsed);
@@ -674,6 +684,8 @@ function initials(name) {
 // ------------------------------------------------------------------ build
 
 export function zIndexFor(card) {
+  // Sections are visual wrappers: keep them below every regular card, even after a drag raises z.
+  if (card.type === "section") return 1 + Math.min(998, card.z || 1);
   // Integer z-index only: CSS ignores fractional values, which used to hide column children.
   if (card.parentId) {
     const column = getCard(state.board, card.parentId);
@@ -690,7 +702,7 @@ function applyGeometry(el, card) {
     const parent = getCard(state.board, card.parentId);
     el.style.display = parent?.collapsed ? "none" : "";
   }
-  if (card.type === "column") {
+  if (card.type === "column" || card.type === "section") {
     el.style.height = `${card.h}px`;
   } else if (CARD_ASPECTS[card.type] || card.aspect) {
     card.h = cardHeightFor(card);
@@ -788,13 +800,18 @@ export function buildCard(card) {
   const el = document.createElement("div");
   el.className = `mn-card mn-card-${card.type}${card.parentId ? " is-child" : ""}${
     card.type === "column" && card.collapsed ? " is-collapsed" : ""
-  }${card.locked ? " is-locked" : ""}`;
+  }${card.locked ? " is-locked" : ""}${
+    card.type === "section" && card.positionLocked ? " is-position-locked" : ""
+  }`;
   el.dataset.id = card.id;
   el.dataset.type = card.type;
+  if (card.type === "section") {
+    el.style.setProperty("--section-color", card.sectionColor || "#F8D7DA");
+  }
   applyGeometry(el, card);
   el.innerHTML =
     contentFor(card) +
-    (card.locked
+    (card.locked || (card.type === "section" && card.positionLocked)
       ? `<span class="mn-lock-badge" title="Position locked">${icon("lock", 12)}</span>`
       : "") +
     `<div class="mn-resize" data-role="resize" title="Resize"></div>`;
@@ -965,8 +982,16 @@ function rebuildCards() {
     }
     const next = buildCard(card);
     const old = cardElement(card.id);
-    if (old && old.parentElement === cardsEl) old.replaceWith(next);
-    else cardsEl.append(next);
+    if (old && old.parentElement === cardsEl) {
+      try {
+        old.replaceWith(next);
+      } catch {
+        // A blur handler can trigger a re-render while this card is being replaced.
+        cardsEl.append(next);
+      }
+    } else {
+      cardsEl.append(next);
+    }
   }
   for (const card of cards) {
     if (card.type === "link" && !card.headerImage) {
