@@ -1239,6 +1239,143 @@ fn restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
+#[derive(serde::Serialize)]
+struct LinkPreviewPayload {
+    data: String,
+    name: String,
+    mime: String,
+}
+
+fn blocked_preview_host(host: &str) -> bool {
+    let host = host.trim_matches(['[', ']']).to_ascii_lowercase();
+    if host == "localhost" || host.ends_with(".local") || host.is_empty() {
+        return true;
+    }
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return match ip {
+            std::net::IpAddr::V4(ip) => {
+                ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified()
+            }
+            std::net::IpAddr::V6(ip) => ip.is_loopback() || ip.is_unspecified(),
+        };
+    }
+    false
+}
+
+fn meta_image_url(html: &str) -> Option<String> {
+    let lower = html.to_ascii_lowercase();
+    for key in ["og:image:url", "og:image", "twitter:image"] {
+        let mut from = 0;
+        while let Some(pos) = lower[from..].find(key) {
+            let start = from + pos + key.len();
+            let end = (start + 400).min(lower.len());
+            let window = &lower[start..end];
+            if let Some(content) = window.find("content") {
+                let after = &html[start + content..end];
+                if let Some(eq) = after.find('=') {
+                    let rest = after[eq + 1..].trim_start();
+                    let quote = rest.chars().next()?;
+                    if quote == '"' || quote == '\'' {
+                        if let Some(close) = rest[1..].find(quote) {
+                            let value = rest[1..1 + close].trim();
+                            if !value.is_empty() {
+                                return Some(
+                                    value
+                                        .replace("&amp;", "&")
+                                        .replace("&#39;", "'")
+                                        .replace("&quot;", "\""),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            from = start;
+        }
+    }
+    None
+}
+
+#[tauri::command]
+async fn fetch_link_preview(url: String) -> Result<Option<LinkPreviewPayload>, String> {
+    let parsed = reqwest::Url::parse(&url).map_err(|_| "invalid link")?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("only http and https links can be previewed".into());
+    }
+    if parsed.host_str().map(blocked_preview_host).unwrap_or(true) {
+        return Err("that host cannot be previewed".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .get(parsed)
+        .header(reqwest::header::USER_AGENT, "KhaoyuNote/0.26 link preview")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let final_url = response.url().clone();
+    if final_url
+        .host_str()
+        .map(blocked_preview_host)
+        .unwrap_or(true)
+    {
+        return Ok(None);
+    }
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() > 2_000_000 {
+        return Ok(None);
+    }
+    let html = String::from_utf8_lossy(&bytes);
+    let Some(image_url) = meta_image_url(&html) else {
+        return Ok(None);
+    };
+    let image_url = final_url.join(&image_url).map_err(|_| "invalid image URL")?;
+    if image_url
+        .host_str()
+        .map(blocked_preview_host)
+        .unwrap_or(true)
+    {
+        return Ok(None);
+    }
+    let image_response = client
+        .get(image_url.clone())
+        .header(reqwest::header::USER_AGENT, "KhaoyuNote/0.26 link preview")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let content_type = image_response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("image/png")
+        .split(';')
+        .next()
+        .unwrap_or("image/png")
+        .to_string();
+    if !content_type.starts_with("image/") {
+        return Ok(None);
+    }
+    let image_bytes = image_response.bytes().await.map_err(|e| e.to_string())?;
+    if image_bytes.is_empty() || image_bytes.len() > 5_000_000 {
+        return Ok(None);
+    }
+    let extension = match content_type.as_str() {
+        "image/jpeg" => "jpg",
+        "image/webp" => "webp",
+        "image/gif" => "gif",
+        _ => "png",
+    };
+    let name = format!("link-hero.{extension}");
+    Ok(Some(LinkPreviewPayload {
+        data: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &image_bytes),
+        name,
+        mime: content_type,
+    }))
+}
+
 #[tauri::command]
 fn app_data_dir(app: tauri::AppHandle) -> Result<String, String> {
     let dir = root_dir(&app)?;
@@ -1331,6 +1468,7 @@ pub fn run() {
             app_data_dir,
             mcp_server_path,
             open_external,
+            fetch_link_preview,
             open_path,
             download_asset,
             get_setting,

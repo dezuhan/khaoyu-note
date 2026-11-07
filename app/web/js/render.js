@@ -161,8 +161,8 @@ function contentFor(card) {
               ? ` style="position:absolute;width:${100 / crop.w}%;height:${100 / crop.h}%;left:${(-crop.x / crop.w) * 100}%;top:${(-crop.y / crop.h) * 100}%;max-width:none;object-fit:fill"`
               : ""
           } /></div>`
-        : "";
-      return `<div class="mn-link${header ? " has-header" : ""}">${header}
+        : `<div class="mn-link-header mn-link-header-default">${icon("globe", 28)}</div>`;
+      return `<div class="mn-link has-header">${header}
         <div class="mn-link-row">
           <span class="mn-link-icon">${icon("link", 18)}</span>
           <div class="mn-link-body">
@@ -870,6 +870,17 @@ function rebuildCards() {
   for (const card of state.board.cards) fragment.append(buildCard(card));
   cardsEl.append(fragment);
   for (const card of state.board.cards) {
+    if (card.type === "link" && !card.headerImage) {
+      const el = cardElement(card.id);
+      if (!el) continue;
+      const height = Math.round(el.scrollHeight / (state.view.zoom || 1));
+      if (height > 0 && Math.abs((card.h || 0) - height) > 2) {
+        card.h = Math.max(MIN_CARD_H, height);
+        applyGeometry(el, card);
+        markDirty("save");
+      }
+      continue;
+    }
     if (!card.headerImage) continue;
     const image = cardElement(card.id)?.querySelector(".mn-link-header img");
     if (!image) continue;

@@ -310,6 +310,66 @@ function backupData() {
   return target;
 }
 
+function blockedPreviewHost(host) {
+  const value = String(host || "").toLowerCase().replace(/^\[|\]$/g, "");
+  if (!value || value === "localhost" || value.endsWith(".local")) return true;
+  return /^(127\.|10\.|192\.168\.|169\.254\.|0\.|::1$|172\.(1[6-9]|2\d|3[01])\.)/.test(value);
+}
+
+function metaImage(html) {
+  const lower = html.toLowerCase();
+  for (const key of ["og:image:url", "og:image", "twitter:image"]) {
+    let from = 0;
+    while (true) {
+      const pos = lower.indexOf(key, from);
+      if (pos < 0) break;
+      const rawWindow = html.slice(pos + key.length, pos + key.length + 400);
+      const lowerWindow = lower.slice(pos + key.length, pos + key.length + 400);
+      const content = lowerWindow.indexOf("content");
+      if (content >= 0) {
+        const match = rawWindow.slice(content).match(/content\s*=\s*["']([^"']+)["']/i);
+        if (match?.[1]) return match[1].replaceAll("&amp;", "&");
+      }
+      from = pos + key.length;
+    }
+  }
+  return null;
+}
+
+async function fetchLinkPreview(url) {
+  const parsed = new URL(String(url));
+  if (!["http:", "https:"].includes(parsed.protocol) || blockedPreviewHost(parsed.hostname)) {
+    return null;
+  }
+  const page = await fetch(parsed, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(8000),
+    headers: { "user-agent": `KhaoyuNote/${VERSION} link preview` },
+  });
+  if (!page.ok) return null;
+  if (blockedPreviewHost(new URL(page.url).hostname)) return null;
+  const length = Number(page.headers.get("content-length") || 0);
+  if (length > 2_000_000) return null;
+  const html = await page.text();
+  if (html.length > 2_000_000) return null;
+  const rawImage = metaImage(html);
+  if (!rawImage) return null;
+  const imageUrl = new URL(rawImage, page.url);
+  if (blockedPreviewHost(imageUrl.hostname)) return null;
+  const image = await fetch(imageUrl, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(8000),
+    headers: { "user-agent": `KhaoyuNote/${VERSION} link preview` },
+  });
+  if (!image.ok) return null;
+  const mime = String(image.headers.get("content-type") || "image/png").split(";")[0];
+  if (!mime.startsWith("image/")) return null;
+  const bytes = Buffer.from(await image.arrayBuffer());
+  if (!bytes.length || bytes.length > 5_000_000) return null;
+  const extension = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : mime === "image/gif" ? "gif" : "png";
+  return { data: bytes.toString("base64"), name: `link-hero.${extension}`, mime };
+}
+
 async function invoke(cmd, args = {}) {
   switch (cmd) {
     case "list_boards":
@@ -350,6 +410,8 @@ async function invoke(cmd, args = {}) {
       return null;
     case "store_asset":
       return storeAsset(args.name, args.data);
+    case "fetch_link_preview":
+      return fetchLinkPreview(args.url);
     case "store_asset_from_path":
       throw new Error("Dropping local paths is only available in the desktop app");
     case "get_setting": {

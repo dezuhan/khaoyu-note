@@ -131,6 +131,15 @@ export async function storeAssetFromPath(path) {
   return null;
 }
 
+export async function fetchLinkPreview(url) {
+  if (!hasTauri) return null;
+  try {
+    return await invoke("fetch_link_preview", { url });
+  } catch {
+    return null;
+  }
+}
+
 export async function appDataDir() {
   if (hasTauri) return invoke("app_data_dir");
   return "localStorage (browser preview)";

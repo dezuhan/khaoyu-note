@@ -6,6 +6,7 @@ import {
   downloadCardAsset,
   attachImage,
   attachAudio,
+  maybeAutoLinkHeader,
   openLink,
   openBoardCard,
 } from "./actions.js";
@@ -1603,7 +1604,10 @@ function onChange(event) {
   const field = target.closest("[data-field]");
   if (field) {
     card[field.dataset.field] = target.value;
-    if (card.type === "link" && field.dataset.field === "url") normalizeLink(card);
+    if (card.type === "link" && field.dataset.field === "url") {
+      normalizeLink(card);
+      maybeAutoLinkHeader(card.id);
+    }
     if (
       ["video", "map"].includes(card.type) &&
       ["url", "query"].includes(field.dataset.field)

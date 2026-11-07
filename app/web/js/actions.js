@@ -512,7 +512,30 @@ export function removeLinkHeader(cardId) {
   markDirty("board");
 }
 
-export function applyLinkHeaderCrop(cardId, crop) {
+const autoHeaderFetches = new Set();
+
+export async function maybeAutoLinkHeader(cardId) {
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "link" || card.headerImage || !card.url) return;
+  if (autoHeaderFetches.has(cardId)) return;
+  if (!/^https?:\/\//i.test(card.url)) return;
+  autoHeaderFetches.add(cardId);
+  try {
+    const preview = await bridge.fetchLinkPreview(card.url);
+    if (!preview?.data) return;
+    if (card.headerImage) return;
+    const name = preview.name || "link-hero.png";
+    card.headerImage = await bridge.storeAsset(name, preview.data);
+    card.headerImageAuto = true;
+    markDirty("board");
+  } catch {
+    /* no hero image available */
+  } finally {
+    autoHeaderFetches.delete(cardId);
+  }
+}
+
+export async function applyLinkHeaderCrop(cardId, crop) {
   const card = getCard(state.board, cardId);
   if (!card || card.type !== "link" || !card.headerImage) return;
   card.headerImageCrop = crop;

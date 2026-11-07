@@ -5799,3 +5799,15 @@ html[data-performance="true"] .mn-card {
 .mn-audio-edit-actions .mn-primary-soft {
   flex: 1 1 auto;
 }
+
+/* Default link hero */
+.mn-link-header-default {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 6;
+  color: var(--ky-soft);
+  background-color: var(--ky-control);
+  background-image: radial-gradient(var(--ky-muted) 1.2px, transparent 1.2px);
+  background-size: 8px 8px;
+  background-position: center;
+}
