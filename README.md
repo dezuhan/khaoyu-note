@@ -498,17 +498,19 @@ icons are included. The vendored token stylesheet is reused under its own reposi
 
 ## License
 
-Khaoyu Note is **source-available for noncommercial use only** under the
-[PolyForm Noncommercial License 1.0.0](LICENSE).
+Khaoyu Note is **open source** under the
+[GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`).
 
-- You may use, study, modify and share the source for personal, educational, research and other
-  noncommercial purposes.
-- You may not sell the software, bundle it into a paid product, or use it for commercial advantage.
-- Commercial use requires separate written permission from the copyright holder.
-- This is not OSI open source because the license restricts commercial use. It is source-available.
+- You may use, study, modify, distribute and commercialize the software.
+- If you distribute a modified version or run one as a network service, you must publish the complete
+  corresponding source under the AGPL and keep the copyright and license notices.
+- Forks must give attribution to Khaoyu Note. The name, logo and app icon are not licensed for
+  modified distributions; see [TRADEMARK.md](TRADEMARK.md).
+- A fork may be sold only under the AGPL terms, with its source available. It may not be presented as
+  the official Khaoyu Note app or use the Khaoyu Note branding.
 
-The `Required Notice` in the license file must be kept with copies and substantial portions of the
-software.
+Open source licenses cannot prohibit resale of the code. AGPL plus the trademark policy is the closest
+match for "commercial use allowed, clones must stay open and must not be sold as Khaoyu Note".
 
 
 

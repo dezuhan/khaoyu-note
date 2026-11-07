@@ -98,5 +98,5 @@ git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 ## License
 
 By contributing, you agree that your contribution is licensed under the
-[PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use requires separate written permission
-from the copyright holder.
+[GNU Affero General Public License v3.0 only](LICENSE). The Khaoyu Note name and logo remain subject to
+[TRADEMARK.md](TRADEMARK.md).

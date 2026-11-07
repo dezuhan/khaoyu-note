@@ -51,31 +51,31 @@ const shots = {
   boards: {
     src: "shots/board-light.png",
     alt: "Khaoyu Note board in light mode with cards and comments",
-    title: "Khaoyu Note — Boards",
+    title: "Khaoyu Note - Boards",
     caption: "Light and dark themes share the same quiet token system.",
   },
   welcome: {
     src: "shots/welcome-all-tools.png",
     alt: "Welcome board with the enabled Khaoyu Note card types",
-    title: "Khaoyu Note — Welcome",
+    title: "Khaoyu Note - Welcome",
     caption: "A fresh board seeds the enabled tools without the three disabled card types.",
   },
   settings: {
     src: "shots/settings-general.png",
     alt: "Khaoyu Note Settings on the General page",
-    title: "Khaoyu Note — Settings",
+    title: "Khaoyu Note - Settings",
     caption: "Server, Backup, General, Appearance, Tools, Performance, MCP and About.",
   },
   writing: {
     src: "shots/doc-editor.png",
     alt: "Khaoyu Note document editor",
-    title: "Khaoyu Note — Writing",
+    title: "Khaoyu Note - Writing",
     caption: "A document card opens into a focused writing page with export.",
   },
   drawing: {
     src: "shots/drawing-editor.png",
     alt: "Khaoyu Note drawing editor",
-    title: "Khaoyu Note — Drawing",
+    title: "Khaoyu Note - Drawing",
     caption: "Sketch cards open into a full-page drawing editor.",
   },
 };
