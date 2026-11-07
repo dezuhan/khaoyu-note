@@ -2365,6 +2365,84 @@ fn auth_change_password(
 }
 
 #[tauri::command]
+fn auth_reset_database(
+    app: tauri::AppHandle,
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    password: String,
+    confirmation: String,
+) -> Result<Value, String> {
+    if confirmation.trim() != "DELETE ALL" {
+        return Err("Type DELETE ALL to confirm".into());
+    }
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let user = current_local_user(&conn, &auth_state)?.ok_or("Sign in required")?;
+    let stored = auth::password_hash_for(&conn, &user.id)?.ok_or("could not read the account")?;
+    if !auth::verify_password(&password, &stored) {
+        return Err("Current password is not correct".into());
+    }
+
+    let tables: Vec<String> = {
+        let mut statement = conn
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            )
+            .map_err(|error| error.to_string())?;
+        let names = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| error.to_string())?;
+        names
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|error| error.to_string())?
+    };
+
+    conn.execute_batch("PRAGMA foreign_keys = OFF; BEGIN IMMEDIATE;")
+        .map_err(|error| error.to_string())?;
+    let cleared = (|| -> Result<(), String> {
+        for table in &tables {
+            let quoted = table.replace('"', "\"\"");
+            conn.execute(&format!("DELETE FROM \"{quoted}\""), [])
+                .map_err(|error| error.to_string())?;
+        }
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
+            params![CURRENT_SCHEMA_VERSION.to_string()],
+        )
+        .map_err(|error| error.to_string())?;
+        conn.execute_batch("COMMIT;")
+            .map_err(|error| error.to_string())?;
+        Ok(())
+    })();
+
+    if let Err(error) = cleared {
+        let _ = conn.execute_batch("ROLLBACK; PRAGMA foreign_keys = ON;");
+        return Err(error);
+    }
+    let _ = conn.execute_batch("VACUUM;");
+    let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
+
+    if let Ok(directory) = assets_dir(&app) {
+        if let Ok(entries) = fs::read_dir(&directory) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let _ = fs::remove_dir_all(path);
+                } else {
+                    let _ = fs::remove_file(path);
+                }
+            }
+        }
+    }
+    if let Ok(path) = session_file_path(&app) {
+        let _ = fs::remove_file(path);
+    }
+    if let Ok(mut guard) = auth_state.0.lock() {
+        *guard = None;
+    }
+    Ok(json!({ "reset": true }))
+}
+
+#[tauri::command]
 fn auth_history(
     db: State<'_, AppDb>,
     auth_state: State<'_, AuthState>,
@@ -2555,6 +2633,7 @@ pub fn run() {
             auth_me,
             auth_update_profile,
             auth_change_password,
+            auth_reset_database,
             auth_history,
             auth_restore_session,
             auth_log_activity,

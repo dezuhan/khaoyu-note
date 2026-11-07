@@ -6653,6 +6653,72 @@ html[data-performance="true"] .mn-card {
   color: var(--ky-text);
   font-weight: 600;
 }
+.mn-account-tab.is-danger {
+  color: var(--ky-danger);
+}
+.mn-account-tab.is-danger.is-active {
+  background: color-mix(in srgb, var(--ky-danger) 14%, var(--ky-control-active));
+  color: var(--ky-danger);
+}
+.mn-account-danger {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--ky-danger) 38%, var(--ky-border));
+  border-radius: var(--ky-radius-card, 10px);
+  background: color-mix(in srgb, var(--ky-danger) 5%, var(--ky-surface));
+}
+.mn-account-danger h3 {
+  margin: 0;
+  color: var(--ky-danger);
+  font-size: 14px;
+  font-weight: 600;
+}
+.mn-account-danger .mn-prefs-note {
+  margin: 0;
+}
+.mn-account-danger-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  line-height: 1.65;
+}
+.mn-account-danger-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.mn-account-danger-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ky-muted);
+  font-size: 11px;
+}
+.mn-account-danger-form .ky-input {
+  height: 30px;
+  font-size: 11px;
+}
+.mn-btn-danger {
+  align-self: flex-start;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ky-danger);
+  border-radius: var(--ky-radius-control, 7px);
+  background: var(--ky-danger);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mn-btn-danger:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .mn-account-tab-pane {
   min-height: 260px;
 }

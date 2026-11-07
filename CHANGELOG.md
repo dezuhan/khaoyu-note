@@ -7,6 +7,10 @@ project uses Semantic Versioning.
 
 ### Added
 
+- Settings > Account now has a Delete Account tab. After re-entering the current password and typing
+  DELETE ALL, it deletes every local board, card, connection, asset, account, session, setting and
+  activity row, vacuums the database, clears the saved desktop session or web cookies, and reloads into
+  first-run setup for a new user. GitHub and the self-hosted service are not touched.
 - The self-hosted service now starts two listeners automatically: a frontend port for pages and a
   backend port for the API. Both use free 5-digit ports in 20000-59999, are guaranteed distinct,
   can be pinned with `KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_PORT`, and are written

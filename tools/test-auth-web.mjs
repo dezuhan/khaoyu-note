@@ -600,6 +600,24 @@ try {
     JSON.stringify(limited.body)
   );
 
+  const resetJar = cookieJar();
+  const resetLogin = await api(instance, resetJar, "/api/auth/login", {
+    method: "POST",
+    body: { identifier: "owner", password: "an even better password" },
+  });
+  const reset = await api(instance, resetJar, "/api/auth/reset", {
+    method: "POST",
+    csrf: true,
+    body: { password: "an even better password", confirmation: "DELETE ALL" },
+  });
+  check("the local database can be reset after re-authentication", reset.status === 200 && reset.body?.reset === true);
+  const resetStatus = await api(instance, cookieJar(), "/api/auth/status");
+  check(
+    "a reset database returns to first-run setup",
+    resetLogin.status === 200 && resetStatus.status === 200 && resetStatus.body?.userCount === 0,
+    JSON.stringify(resetStatus.body)
+  );
+
   await stopServer(instance);
   instance = null;
   const schema = inspectSchema(dataDir);

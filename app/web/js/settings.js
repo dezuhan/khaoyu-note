@@ -1076,6 +1076,107 @@ function accountAdminTab(pane) {
   pane.append(grid, actions, status, note);
 }
 
+function accountDeleteTab(pane) {
+  const user = authState().user;
+  if (!user) return;
+  const box = document.createElement("div");
+  box.className = "mn-account-danger";
+
+  const title = document.createElement("h3");
+  title.textContent = "Delete account and reset data";
+  const warning = document.createElement("p");
+  warning.className = "mn-prefs-note";
+  warning.textContent =
+    "This permanently deletes every local board, card, connection, asset, account, session, setting and activity entry in the database on this computer. The app then returns to first-run setup for a new user. This cannot be undone.";
+
+  const list = document.createElement("ul");
+  list.className = "mn-account-danger-list";
+  for (const item of [
+    "All boards, cards and connections",
+    "All uploaded images and files",
+    "All local accounts and sessions",
+    "All settings, history and activity",
+  ]) {
+    const entry = document.createElement("li");
+    entry.textContent = item;
+    list.append(entry);
+  }
+
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent =
+    "GitHub releases and the separate self-hosted service are not affected; this only resets the local database.";
+
+  const form = document.createElement("form");
+  form.className = "mn-account-danger-form";
+  const passwordLabel = document.createElement("label");
+  passwordLabel.textContent = "Current password";
+  const password = document.createElement("input");
+  password.className = "ky-input";
+  password.type = "password";
+  password.name = "password";
+  password.autocomplete = "current-password";
+  password.placeholder = "Current account password";
+  passwordLabel.append(password);
+
+  const confirmLabel = document.createElement("label");
+  confirmLabel.textContent = "Type DELETE ALL to confirm";
+  const confirmation = document.createElement("input");
+  confirmation.className = "ky-input";
+  confirmation.type = "text";
+  confirmation.name = "confirmation";
+  confirmation.autocomplete = "off";
+  confirmation.spellcheck = false;
+  confirmation.placeholder = "DELETE ALL";
+  confirmLabel.append(confirmation);
+
+  const status = document.createElement("p");
+  status.className = "mn-profile-status";
+  status.setAttribute("role", "status");
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "mn-btn mn-btn-danger";
+  submit.textContent = "Delete account and reset";
+
+  form.append(passwordLabel, confirmLabel, status, submit);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!password.value) {
+      status.textContent = "Enter your current password.";
+      return;
+    }
+    if (confirmation.value.trim() !== "DELETE ALL") {
+      status.textContent = "Type DELETE ALL exactly as shown.";
+      return;
+    }
+    submit.disabled = true;
+    password.disabled = true;
+    confirmation.disabled = true;
+    status.textContent = "Deleting the local database...";
+    try {
+      await bridge.authResetDatabase({
+        password: password.value,
+        confirmation: "DELETE ALL",
+      });
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith("mn.")) localStorage.removeItem(key);
+      }
+      sessionStorage.clear();
+      status.textContent = "Done. Starting fresh...";
+      window.location.reload();
+    } catch (error) {
+      status.textContent = error?.message || "Could not reset the database.";
+      submit.disabled = false;
+      password.disabled = false;
+      confirmation.disabled = false;
+    }
+  });
+
+  box.append(title, warning, list, note, form);
+  pane.append(box);
+}
+
 async function performAccountLogout(all = false) {
   try {
     if (all) await logoutAll();
@@ -1104,7 +1205,8 @@ function renderAccountPage(content) {
   tabs.push(
     ["information", "Account Information"],
     ["settings", "Account Settings"],
-    ["history", "History Activity"]
+    ["history", "History Activity"],
+    ["delete", "Delete Account"]
   );
   if (!tabs.some(([id]) => id === accountTab)) accountTab = "information";
 
@@ -1116,6 +1218,7 @@ function renderAccountPage(content) {
   if (accountTab === "admin" && user.role === "admin") accountAdminTab(pane);
   else if (accountTab === "settings") renderAccountSettingsTab(pane);
   else if (accountTab === "history") accountHistoryTab(pane);
+  else if (accountTab === "delete") accountDeleteTab(pane);
   else accountInformationTab(pane);
   content.append(pane);
 
@@ -1137,7 +1240,9 @@ function renderAccountTabs(tabs) {
   for (const [id, label] of tabs) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `mn-account-tab${id === accountTab ? " is-active" : ""}`;
+    button.className = `mn-account-tab${id === accountTab ? " is-active" : ""}${
+      id === "delete" ? " is-danger" : ""
+    }`;
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(id === accountTab));
     button.textContent = label;

@@ -392,6 +392,12 @@ export async function authHistory({ limit = 20, offset = 0 } = {}) {
   return { entries: [], hasMore: false };
 }
 
+export async function authResetDatabase(input) {
+  if (hasWeb) return fetchAuth("/api/auth/reset", { method: "POST", body: input });
+  if (hasTauri) return invoke("auth_reset_database", input);
+  return accountsUnavailable();
+}
+
 // Full URLs this host can be reached on. Only the browser edition has share URLs.
 export async function shareInfo() {
   if (!hasWeb) return null;

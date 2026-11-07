@@ -351,10 +351,11 @@ the database and assets but delete `sessions` from the snapshot with `secure_del
 
 The frontend keeps auth state in `auth.js`, shows the first-run setup or login gate in `account-ui.js`,
 and renders the avatar after Share. Clicking it opens Settings > Account, which uses tabs for Admin
-Dashboard (admins only), Account Information, Account Settings and History Activity, with Log Out in
-the footer. The account UI is not a separate modal. The gate waits for setup or sign-in before any
-board or setting is read, and both hosts keep the session so a reload does not ask again. `bridge.js`
-calls Tauri commands on the desktop and the HTTP
+Dashboard (admins only), Account Information, Account Settings, History Activity and Delete Account,
+with Log Out in the footer. Delete Account re-authenticates, clears every local table, uploaded asset
+and saved session, vacuums the database and reloads into first-run setup. The account UI is not a
+separate modal. The gate waits for setup or sign-in before any board or setting is read, and both hosts
+keep the session so a reload does not ask again. `bridge.js` calls Tauri commands on the desktop and the HTTP
 endpoints on the web host.
 
 ## Web host

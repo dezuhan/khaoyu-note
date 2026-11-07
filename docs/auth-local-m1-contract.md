@@ -144,6 +144,7 @@ Desktop Rust commands, mirrored by web host endpoints:
 | `auth_me` | `GET /api/auth/me` | none | `user` or `null` |
 | `auth_update_profile` | `PATCH /api/auth/profile` | `{ firstName, lastName, email, avatarColor, avatarUrl }` | `user` |
 | `auth_change_password` | `POST /api/auth/password` | `{ currentPassword, newPassword }` | `null` |
+| `auth_reset_database` | `POST /api/auth/reset` | `{ password, confirmation: "DELETE ALL" }` | `{ reset: true }` |
 | `auth_history` | `GET /api/auth/history?limit=20&offset=0` | none | `{ entries, hasMore }` |
 
 Notes:
@@ -210,9 +211,13 @@ Errors are plain messages. The web host returns `{ "error": "message" }`; Rust c
   the first name or username, soft background derived from a deterministic hash into the theme
   palette, readable text.
 - Account UI: the avatar opens Settings > Account. The page has tabs for Admin Dashboard (admins
-  only), Account Information, Account Settings and History Activity, plus a Log Out button in the
-  footer. There is no separate account modal. `settings.js` owns the account content; `account-ui.js`
-  only renders the avatar and the first-run gate.
+  only), Account Information, Account Settings, History Activity and Delete Account, plus a Log Out
+  button in the footer. There is no separate account modal. `settings.js` owns the account content;
+  `account-ui.js` only renders the avatar and the first-run gate.
+- Delete Account requires the current password and the exact phrase `DELETE ALL`. It deletes every
+  local table row, uploaded asset and the saved desktop session, vacuums the database, clears the web
+  cookies and reloads into first-run setup. It never touches GitHub releases or the separate
+  self-hosted service.
 - Logout reloads the app so the login gate returns and no board data stays visible. Guest attribution
   no longer exists; every row is written by the signed-in account.
 

@@ -607,6 +607,40 @@ function transaction(callback) {
   }
 }
 
+function wipeDatabase() {
+  db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .all();
+    for (const { name } of tables) {
+      db.exec(`DELETE FROM "${String(name).replace(/"/g, '""')}"`);
+    }
+    db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)").run(
+      String(CURRENT_SCHEMA_VERSION)
+    );
+    db.exec("COMMIT");
+    db.exec("VACUUM");
+  } catch (error) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      /* no transaction left to roll back */
+    }
+    throw error;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+function clearAssetsDirectory() {
+  if (!fs.existsSync(ASSETS_DIR)) return;
+  for (const entry of fs.readdirSync(ASSETS_DIR)) {
+    fs.rmSync(path.join(ASSETS_DIR, entry), { recursive: true, force: true });
+  }
+}
+
 function historyEntry(row) {
   return {
     id: row.id,
@@ -1484,6 +1518,26 @@ async function handleAuth(request, response, url) {
       logActivity(session.user, "auth.password_changed", "user", current.id, {});
     });
     sendJson(response, 200, null);
+    return;
+  }
+
+  if (pathname === "/api/auth/reset") {
+    if (method !== "POST") throw new RequestError("method not allowed", 405);
+    const session = requireSession(request);
+    requireCsrf(request, session);
+    const body = await jsonBody(request);
+    if (String(body.confirmation || "").trim() !== "DELETE ALL") {
+      throw new RequestError("Type DELETE ALL to confirm", 400);
+    }
+    const current = userRowById(session.user.id);
+    if (!current) throw new RequestError("Sign in required", 401);
+    if (!verifyPassword(String(body.password || ""), current.password_hash)) {
+      throw new RequestError("Current password is not correct", 400);
+    }
+    wipeDatabase();
+    clearAssetsDirectory();
+    clearSessionCookies(request, response);
+    sendJson(response, 200, { reset: true });
     return;
   }
 
