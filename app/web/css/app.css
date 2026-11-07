@@ -5410,6 +5410,11 @@ html[data-performance="true"] .mn-card {
   color: var(--ky-soft);
   overflow-wrap: anywhere;
 }
+.mn-sync-signed-in {
+  font-size: 11px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+}
 .mn-sync-connection[data-status="connected"] {
   color: var(--ky-accent);
 }

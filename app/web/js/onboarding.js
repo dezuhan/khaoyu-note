@@ -1,7 +1,7 @@
 // First-run account or server setup. Local-only use is always available.
 
 import * as bridge from "./bridge.js";
-import { loadSyncConfig, saveSyncConfig } from "./sync.js";
+import { checkServerReachable, describeConnection, normalizeServerUrl, signIn } from "./sync.js";
 
 const SEEN_KEY = "mn.onboarded";
 
@@ -22,13 +22,16 @@ function show() {
         <label class="mn-onboard-field">Server URL
           <input class="ky-input" data-role="url" value="http://127.0.0.1:8080" />
         </label>
-        <label class="mn-onboard-field">API token (for an existing account)
-          <input class="ky-input" data-role="token" type="password" autocomplete="off" placeholder="projects:read and projects:write" />
+        <label class="mn-onboard-field">Email
+          <input class="ky-input" data-role="email" type="email" autocomplete="username" placeholder="you@example.com" />
+        </label>
+        <label class="mn-onboard-field">Password
+          <input class="ky-input" data-role="password" type="password" autocomplete="current-password" placeholder="Account password" />
         </label>
         <p class="mn-onboard-status" data-role="status"></p>
         <div class="mn-onboard-actions">
           <button type="button" class="mn-btn mn-btn-primary" data-role="create">Create account</button>
-          <button type="button" class="mn-btn" data-role="connect">Connect server</button>
+          <button type="button" class="mn-btn" data-role="connect">Sign in and connect</button>
           <button type="button" class="mn-btn mn-btn-quiet" data-role="local">Continue locally</button>
         </div>
       </div>
@@ -37,29 +40,53 @@ function show() {
 
   const status = overlay.querySelector('[data-role="status"]');
   const url = overlay.querySelector('[data-role="url"]');
-  const token = overlay.querySelector('[data-role="token"]');
+  const email = overlay.querySelector('[data-role="email"]');
+  const password = overlay.querySelector('[data-role="password"]');
+  const connectButton = overlay.querySelector('[data-role="connect"]');
   const finish = () => {
     localStorage.setItem(SEEN_KEY, "1");
     overlay.remove();
   };
   overlay.querySelector('[data-role="local"]').addEventListener("click", finish);
   overlay.querySelector('[data-role="create"]').addEventListener("click", () => {
-    const target = String(url.value || "").replace(/\/+$/, "") + "/account";
-    window.open(target, "_blank", "noopener");
-    status.textContent = "Account page opened. After verification, connect here with an API token.";
-  });
-  overlay.querySelector('[data-role="connect"]').addEventListener("click", () => {
-    const server = String(url.value || "").trim();
-    const apiToken = String(token.value || "").trim();
-    if (!server || !apiToken) {
-      status.textContent = "Enter both the server URL and an API token.";
+    let base;
+    try {
+      base = normalizeServerUrl(url.value);
+    } catch (error) {
+      status.textContent = error.message || "Enter a valid server URL.";
       return;
     }
-    saveSyncConfig({ url: server, token: apiToken });
-    loadSyncConfig();
-    finish();
-    window.dispatchEvent(
-      new CustomEvent("mn:toast", { detail: { message: "Server connected. Sync a board when ready." } })
-    );
+    window.open(`${base}/account`, "_blank", "noopener");
+    status.textContent = "Account page opened. Create an account there, then sign in here.";
+  });
+  connectButton.addEventListener("click", async () => {
+    const server = String(url.value || "").trim();
+    const address = String(email.value || "").trim();
+    const secret = String(password.value || "");
+    if (!server || !address || !secret) {
+      status.textContent = "Enter the server URL, email and password.";
+      return;
+    }
+    connectButton.disabled = true;
+    try {
+      status.textContent = "Checking connection...";
+      const reachable = await checkServerReachable(server);
+      if (!reachable.ok) {
+        status.textContent = describeConnection(reachable);
+        return;
+      }
+      status.textContent = "Signing in...";
+      await signIn({ url: server, email: address, password: secret });
+      finish();
+      window.dispatchEvent(
+        new CustomEvent("mn:toast", {
+          detail: { message: "Signed in. Sync a board when ready." },
+        })
+      );
+    } catch (error) {
+      status.textContent = error.message || "Could not sign in";
+    } finally {
+      connectButton.disabled = false;
+    }
   });
 }

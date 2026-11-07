@@ -1147,6 +1147,74 @@ export function createApiRouter({ db, config, logger, mailer }) {
         return true;
       }
 
+      // Email and password sign-in for the desktop sync client. The client never shows a token:
+      // this endpoint verifies the password and returns a scoped project token instead.
+      if (method === "POST" && url.pathname === "/api/v1/auth/sync-token") {
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const password = typeof body.password === "string" ? body.password : "";
+        if (!password || password.length > 200) {
+          throw new HttpError(400, "password is required", "invalid_input");
+        }
+        const throttle = loginBlocked(db, { email, ip, config });
+        if (throttle.blocked) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          logger.warn("auth.login_blocked", {
+            attempts: throttle.attempts,
+            retryAfter: throttle.retryAfter,
+          });
+          void sendAlert(config, logger, {
+            event: "auth.login_blocked",
+            method: "sync-token",
+            attempts: throttle.attempts,
+            retryAfter: throttle.retryAfter,
+            ipHash,
+          });
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const account = db.prepare("SELECT * FROM accounts WHERE email = ?").get(email);
+        const valid = await verifyPassword(
+          password,
+          account?.password_hash || DUMMY_PASSWORD_HASH
+        );
+        if (!valid || !account || account.deleted_at) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or password" }, config);
+          return true;
+        }
+        if (account.totp_enabled_at && !verifyTotp(account.totp_secret, body.totp)) {
+          recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or password" }, config);
+          return true;
+        }
+        clearLoginFailures(db, { email });
+        const scopes = ["projects:read", "projects:write"];
+        const expiresAt = now() + 365 * 86_400_000;
+        db.prepare(
+          "UPDATE api_tokens SET revoked_at = ? WHERE account_id = ? AND name = ? AND revoked_at IS NULL"
+        ).run(now(), account.id, "app-sync");
+        const created = createApiToken(db, account.id, { name: "app-sync", scopes, expiresAt });
+        writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.sync_token_issued",
+          resourceType: "account",
+          resourceId: account.id,
+          ip,
+          secret: config.secret,
+          metadata: { scopes },
+        });
+        sendJson(
+          response,
+          201,
+          { token: created.token, email: account.email, scopes, expiresAt },
+          config
+        );
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/auth/refresh") {
         const cookies = parseCookies(request.headers.cookie);
         const rotated = rotateRefresh(db, config, cookies.khaoyu_refresh, {

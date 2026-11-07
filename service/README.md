@@ -133,6 +133,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/register` | Create an immediately usable account (no email verification). |
 | `POST` | `/api/v1/auth/verify-email` | Disabled; returns 410 `verification_disabled`. |
 | `POST` | `/api/v1/auth/login` | Password login, optional TOTP, sets session cookies. |
+| `POST` | `/api/v1/auth/sync-token` | Exchange email and password for a scoped project token for desktop sync; each sign-in revokes the previous app-sync token. |
 | `POST` | `/api/v1/auth/otp/request` | Queue a one-time login code by email. |
 | `POST` | `/api/v1/auth/otp/login` | Login with a one-time code; TOTP still applies. |
 | `POST` | `/api/v1/auth/passkeys/register/options` | Start passkey registration for the signed-in account. |
@@ -217,7 +218,9 @@ Email verification is disabled. Password reset tokens are single use, short live
 hashes. The development mailer writes reset and invitation messages to the outbox instead of sending
 SMTP; treat that directory as sensitive and add an SMTP adapter before production use.
 
-Desktop sync uses a scoped API token with `projects:read` and `projects:write`. The same token can
+Desktop sync signs in with the account email and password. `POST /api/v1/auth/sync-token` returns a
+scoped project token, revoking the previous `app-sync` token on each sign-in, and the client stores it
+without showing it. The token grants `projects:read` and `projects:write`. The same token can
 manage share links for projects the account can edit, so the desktop header Share panel and the
 right-click Share link action do not need a browser session. When a synced local board has a parent
 board that is already synced, the new server project is created with `parentProjectId`, so nested

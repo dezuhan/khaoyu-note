@@ -21,24 +21,30 @@ function storage() {
 export function loadSyncConfig() {
   try {
     const raw = storage().getItem(CONFIG_KEY);
-    if (!raw) return { url: "", token: "" };
+    if (!raw) return { url: "", email: "", token: "" };
     const parsed = JSON.parse(raw);
-    return { url: String(parsed.url || ""), token: String(parsed.token || "") };
+    return {
+      url: String(parsed.url || ""),
+      email: String(parsed.email || ""),
+      token: String(parsed.token || ""),
+    };
   } catch {
-    return { url: "", token: "" };
+    return { url: "", email: "", token: "" };
   }
 }
 
 export function saveSyncConfig(config) {
   const url = normalizeServerUrl(config.url);
+  const email = String(config.email || "").trim();
   const token = String(config.token || "").trim();
-  storage().setItem(CONFIG_KEY, JSON.stringify({ url, token }));
+  storage().setItem(CONFIG_KEY, JSON.stringify({ url, email, token }));
   connectionStatus.state = "unknown";
   connectionStatus.message = "Not checked";
   connectionStatus.url = "";
+  connectionStatus.email = "";
   connectionStatus.projectCount = null;
   connectionStatus.checkedAt = 0;
-  return { url, token };
+  return { url, email, token };
 }
 
 // A local service usually runs on http://localhost:PORT, so a bare host or host:port is accepted.
@@ -83,6 +89,7 @@ export const connectionStatus = {
   state: "unknown",
   message: "Not checked",
   url: "",
+  email: "",
   projectCount: null,
   checkedAt: 0,
 };
@@ -91,9 +98,10 @@ function recordConnection(state, message, extra = {}) {
   connectionStatus.state = state;
   connectionStatus.message = message;
   connectionStatus.url = extra.url || "";
+  connectionStatus.email = extra.email || "";
   connectionStatus.projectCount = extra.projectCount ?? null;
   connectionStatus.checkedAt = Date.now();
-  return { ok: state === "connected", ...connectionStatus };
+  return { ok: state === "connected" || state === "reachable", ...connectionStatus };
 }
 
 const CONNECTION_LABELS = {
@@ -101,9 +109,10 @@ const CONNECTION_LABELS = {
   checking: "Checking connection...",
   unconfigured: "Connection not configured",
   unreachable: "Server unreachable",
+  reachable: "Server reachable, database ready",
   "not-ready": "Server reachable, database not ready",
-  unauthorized: "API token rejected",
-  forbidden: "Token lacks projects:read",
+  unauthorized: "Sign in rejected",
+  forbidden: "Account lacks project access",
   error: "Connection error",
   connected: "Connected",
 };
@@ -111,15 +120,88 @@ const CONNECTION_LABELS = {
 export function describeConnection(status) {
   if (!status || status.state === "unknown") return CONNECTION_LABELS.unknown;
   if (status.state === "checking") return CONNECTION_LABELS.checking;
+  if (status.state === "reachable") return `${CONNECTION_LABELS.reachable} · ${status.url}`;
   if (status.state === "connected") {
+    const who = status.email ? ` as ${status.email}` : "";
     const projects =
       status.projectCount === null
         ? ""
         : `, ${status.projectCount} project${status.projectCount === 1 ? "" : "s"}`;
-    return `Connected to ${status.url} · database ready${projects}`;
+    return `Connected to ${status.url}${who} · database ready${projects}`;
   }
   const label = CONNECTION_LABELS[status.state] || "Connection not checked";
   return `${label}: ${status.message}`;
+}
+
+// Reachability check used before signing in: it proves the service and its database answer without
+// needing credentials.
+export async function checkServerReachable(url, { timeoutMs = 8000 } = {}) {
+  let serverUrl;
+  try {
+    serverUrl = normalizeServerUrl(url);
+  } catch (error) {
+    return recordConnection("unconfigured", error.message || "Enter the server URL");
+  }
+  try {
+    const ready = await fetch(`${serverUrl}/readyz`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!ready.ok) {
+      return recordConnection("not-ready", `The server answered ${ready.status}`, { url: serverUrl });
+    }
+    return recordConnection("reachable", "Server reachable and database ready", { url: serverUrl });
+  } catch {
+    return recordConnection("unreachable", `No response from ${serverUrl}`, { url: serverUrl });
+  }
+}
+
+// Sign in with email and password. The server returns a scoped project token; it is stored locally
+// and never shown, so the board sync keeps using bearer auth without the user handling tokens.
+export async function signIn({ url, email, password, timeoutMs = 10000 } = {}) {
+  const serverUrl = normalizeServerUrl(url);
+  const address = String(email || "").trim();
+  if (!address) throw new Error("Enter the account email");
+  if (!password) throw new Error("Enter the account password");
+  let response;
+  try {
+    response = await fetch(`${serverUrl}/api/v1/auth/sync-token`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ email: address, password }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    throw new Error(`No response from ${serverUrl}`);
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("Wrong email or password");
+    if (response.status === 429) throw new Error("Too many attempts, wait a moment and try again");
+    throw new Error(body?.error || `Sign in failed (${response.status})`);
+  }
+  if (!body?.token) throw new Error("The server did not return a sync token");
+  storage().setItem(
+    CONFIG_KEY,
+    JSON.stringify({
+      url: serverUrl,
+      email: String(body.email || address),
+      token: body.token,
+    })
+  );
+  return loadSyncConfig();
+}
+
+export function signOut() {
+  const config = loadSyncConfig();
+  storage().setItem(CONFIG_KEY, JSON.stringify({ url: config.url, email: "", token: "" }));
+  connectionStatus.state = "unknown";
+  connectionStatus.message = "Not checked";
+  connectionStatus.url = "";
+  connectionStatus.email = "";
+  connectionStatus.projectCount = null;
+  connectionStatus.checkedAt = 0;
+  return loadSyncConfig();
 }
 
 // Check the server and the token against the real API. `/readyz` proves the service and its
@@ -127,15 +209,19 @@ export function describeConnection(status) {
 // database round trip works for this account.
 export async function checkConnection({ timeoutMs = 8000 } = {}) {
   let url;
+  let email;
   let token;
   try {
     const config = loadSyncConfig();
     url = normalizeServerUrl(config.url);
+    email = String(config.email || "").trim();
     token = String(config.token || "").trim();
   } catch (error) {
-    return recordConnection("unconfigured", error.message || "Set the server URL and API token first");
+    return recordConnection("unconfigured", error.message || "Enter the server URL first");
   }
-  if (!token) return recordConnection("unconfigured", "Set the server API token first", { url });
+  if (!token) {
+    return recordConnection("unconfigured", "Sign in with your email and password", { url, email });
+  }
 
   // `/readyz` can be blocked by CORS on an older service, so a failed readiness call is not proof
   // that the server is unreachable. The authenticated project call below is the deciding check.
@@ -174,7 +260,7 @@ export async function checkConnection({ timeoutMs = 8000 } = {}) {
   const projectCount = Array.isArray(body?.projects) ? body.projects.length : null;
   const message =
     readiness === "ok" ? "Connected and database ready" : "Connected and database answered";
-  return recordConnection("connected", message, { url, projectCount });
+  return recordConnection("connected", message, { url, email, projectCount });
 }
 
 export function syncEnabled(board) {
@@ -197,7 +283,7 @@ export function syncStatusFor(board) {
 function requireConfig() {
   const config = loadSyncConfig();
   if (!config.token) {
-    throw new Error("Set the sync server API token first");
+    throw new Error("Sign in to the sync server first");
   }
   return { url: normalizeServerUrl(config.url), token: config.token };
 }

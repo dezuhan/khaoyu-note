@@ -1,5 +1,6 @@
 // Minimal sync dialog and status indicator for opt-in project sync.
 
+import * as bridge from "./bridge.js";
 import { adoptRemoteBoard, persistBoardSnapshot, state } from "./store.js";
 import * as sync from "./sync.js";
 
@@ -57,7 +58,11 @@ export function openSyncDialog() {
   document.body.append(overlay);
   renderDialog();
   const config = sync.loadSyncConfig();
-  if (config.url && config.token) void updateConnection();
+  if (config.token) {
+    void updateConnection();
+  } else if (config.url) {
+    void sync.checkServerReachable(config.url).then((result) => renderConnection(result));
+  }
 }
 
 function closeDialog() {
@@ -111,17 +116,47 @@ function renderDialog() {
   url.value = config.url;
   urlLabel.append(url);
 
-  const tokenLabel = document.createElement("label");
-  tokenLabel.className = "mn-sync-field";
-  tokenLabel.textContent = "API token";
-  const token = document.createElement("input");
-  token.className = "ky-input";
-  token.type = "password";
-  token.autocomplete = "off";
-  token.placeholder = "projects:read and projects:write";
-  token.value = config.token;
-  tokenLabel.append(token);
-  body.append(urlLabel, tokenLabel);
+  const emailLabel = document.createElement("label");
+  emailLabel.className = "mn-sync-field";
+  emailLabel.textContent = "Email";
+  const email = document.createElement("input");
+  email.className = "ky-input";
+  email.type = "email";
+  email.autocomplete = "username";
+  email.placeholder = "you@example.com";
+  email.value = config.email;
+  emailLabel.append(email);
+
+  const passwordLabel = document.createElement("label");
+  passwordLabel.className = "mn-sync-field";
+  passwordLabel.textContent = "Password";
+  const password = document.createElement("input");
+  password.className = "ky-input";
+  password.type = "password";
+  password.autocomplete = "current-password";
+  password.placeholder = config.token ? "Leave empty to stay signed in" : "Account password";
+  passwordLabel.append(password);
+
+  body.append(urlLabel, emailLabel, passwordLabel);
+
+  const signedIn = document.createElement("div");
+  signedIn.className = "mn-sync-signed-in";
+  signedIn.textContent = config.token
+    ? `Signed in as ${config.email || "this account"}`
+    : "Not signed in yet. Use your account email and password.";
+  body.append(signedIn);
+
+  if (!config.token) {
+    body.append(
+      button("Create an account on this server", "mn-btn mn-btn-quiet", () => {
+        try {
+          bridge.openExternal(`${sync.normalizeServerUrl(url.value)}/account`).catch(() => {});
+        } catch (error) {
+          toast(error.message || "Enter the server URL first");
+        }
+      })
+    );
+  }
 
   const statusLine = document.createElement("div");
   statusLine.className = "mn-sync-status";
@@ -169,57 +204,107 @@ function renderDialog() {
 
   const foot = document.createElement("footer");
   foot.className = "mn-modal-foot mn-sync-foot";
-  const applyConfig = () => {
-    const saved = sync.saveSyncConfig({ url: url.value, token: token.value });
+  const applyFields = () => {
+    const current = sync.loadSyncConfig();
+    const saved = sync.saveSyncConfig({
+      url: url.value,
+      email: email.value,
+      token: current.token,
+    });
     url.value = saved.url;
     return saved;
   };
-  const save = button("Save connection", "mn-btn", () => {
-    try {
-      applyConfig();
-      toast("Sync connection saved");
-      refresh();
-      renderConnection(sync.connectionStatus);
-    } catch (error) {
-      toast(error.message || "Could not save the connection");
-    }
-  });
   const checkButton = button("Check connection", "mn-btn", async () => {
+    const current = sync.loadSyncConfig();
+    if (!current.token) {
+      renderConnection(await sync.checkServerReachable(url.value));
+      return;
+    }
     try {
-      applyConfig();
+      applyFields();
     } catch (error) {
       renderConnection({ state: "unconfigured", message: error.message, projectCount: null });
-      toast(error.message || "Could not save the connection");
+      toast(error.message || "Could not use that server URL");
       return;
     }
     await updateConnection();
   });
   const primary = button(
-    enabled ? "Sync now" : "Check connection and connect",
+    enabled ? "Sync now" : config.token ? "Check connection and connect" : "Sign in and connect",
     "mn-btn mn-btn-primary",
     async () => {
+      const before = sync.loadSyncConfig();
+      let saved;
       try {
-        applyConfig();
+        saved = applyFields();
       } catch (error) {
         renderConnection({ state: "unconfigured", message: error.message, projectCount: null });
-        toast(error.message || "Could not save the connection");
+        toast(error.message || "Could not use that server URL");
         return;
       }
       if (enabled) {
         await runSync();
         return;
       }
+      const emailChanged = Boolean(before.email) && before.email !== saved.email;
+      const needsSignIn = !saved.token || password.value.length > 0 || emailChanged;
       primary.disabled = true;
-      const result = await updateConnection();
-      primary.disabled = false;
-      if (!result.ok) {
-        toast(connectionText(result));
-        return;
+      try {
+        if (needsSignIn) {
+          if (!password.value) {
+            const message = saved.token
+              ? "Enter the password to sign in with this email"
+              : "Enter the account password";
+            renderConnection({ state: "unconfigured", message, projectCount: null });
+            toast(message);
+            return;
+          }
+          const reachable = await sync.checkServerReachable(saved.url);
+          renderConnection(reachable);
+          if (!reachable.ok) {
+            toast(connectionText(reachable));
+            return;
+          }
+          renderConnection({ state: "checking", message: "Signing in...", projectCount: null });
+          try {
+            await sync.signIn({
+              url: saved.url,
+              email: saved.email,
+              password: password.value,
+            });
+          } catch (error) {
+            renderConnection({
+              state: "unauthorized",
+              message: error.message || "Sign in failed",
+              projectCount: null,
+            });
+            toast(error.message || "Sign in failed");
+            return;
+          }
+          password.value = "";
+          email.value = sync.loadSyncConfig().email;
+        }
+        const result = await updateConnection();
+        if (!result.ok) {
+          toast(connectionText(result));
+          return;
+        }
+        await runSync();
+      } finally {
+        primary.disabled = false;
       }
-      await runSync();
     }
   );
-  foot.append(save, checkButton, primary);
+  foot.append(checkButton, primary);
+  if (config.token && !enabled) {
+    foot.append(
+      button("Sign out", "mn-btn mn-btn-quiet", () => {
+        sync.signOut();
+        toast("Signed out of the sync server");
+        renderDialog();
+      })
+    );
+  }
   if (enabled) {
     foot.append(
       button("Disable for this board", "mn-btn mn-btn-quiet", async () => {

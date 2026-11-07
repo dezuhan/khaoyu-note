@@ -7,7 +7,7 @@ export const DOCUMENTATION_HTML = `
 
   <h3>Getting started</h3>
   <ul>
-    <li>On first run choose Continue locally, Create account on your server, or Connect server with an API token.</li>
+    <li>On first run choose Continue locally, Create account on your server, or sign in with your email and password.</li>
     <li>Double-click empty canvas to create a note.</li>
     <li>Pick a tool from the left rail, then click the canvas to place a card.</li>
     <li>Drag cards to move them. Shift-click or drag a marquee to select several cards.</li>
@@ -85,12 +85,15 @@ export const DOCUMENTATION_HTML = `
   translucent backdrop also blur the content behind them.</p>
 
   <h3>Server sync</h3>
-  <p>Sync is opt-in per board. Open the Sync control in the topbar, enter the service URL and a scoped
-  API token, then choose Enable for this board. The local board remains authoritative. Conflicts show
-  a choice between keeping the local version or adopting the server version. Unsent changes wait in a
-  local offline queue. Disabling sync never deletes server data.</p>
-  <p>Create a token at <code>/account</code> in the service or run
-  <code>node tools/create-service-token.mjs</code>.</p>
+  <p>Sync is opt-in per board. Open the Sync control in the topbar, enter the service URL and your
+  account email and password, then choose Sign in and connect. The app checks that the server and its
+  database answer, signs in, and keeps a scoped token in the background, so you never create or paste
+  a token. The Account pane shows Server, Account and Status. The local board remains authoritative.
+  Conflicts show a choice between keeping the local version or adopting the server version. Unsent
+  changes wait in a local offline queue. Disabling sync never deletes server data.</p>
+  <p>Create an account on the service at <code>/account</code>; the sync dialog and first-run screen
+  both link to it. An API token is still available at <code>/account</code> for scripted clients, and
+  <code>node tools/create-service-token.mjs</code> can create one from a terminal.</p>
 
   <h3>Accounts, passkeys and sharing</h3>
   <ul>

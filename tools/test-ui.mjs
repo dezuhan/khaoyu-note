@@ -2147,10 +2147,10 @@ check("Sync state is explicit and off by default", (await page.locator("#sync-st
 await page.click("#sync-state");
 await page.waitForTimeout(250);
 check(
-  "Sync dialog exposes server URL, API token and opt-in action",
+  "Sync dialog exposes server URL, email, password and sign-in action",
   (await page.locator(".mn-sync-panel").isVisible()) &&
-    (await page.locator(".mn-sync-field").count()) === 2 &&
-    (await page.locator(".mn-sync-foot").innerText()).includes("Enable for this board")
+    (await page.locator(".mn-sync-field").count()) === 3 &&
+    (await page.locator(".mn-sync-foot").innerText()).includes("Sign in and connect")
 );
 await page.locator(".mn-sync-panel .mn-modal-close").click();
 check("Sync dialog closes without changing the board", (await page.locator(".mn-sync-overlay").count()) === 0);

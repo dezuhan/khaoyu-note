@@ -23,6 +23,10 @@ project uses Semantic Versioning.
 - Video cards gain a seek bar, a current and total time label, back 5 and forward 5 buttons, and a
   volume slider that slides out above the mute button.
 - Context menus can render a native checkbox row on the right; the media Repeat action uses it.
+- Server sync signs in with the account email and password instead of an API token. The service
+  exchanges the credentials for a scoped project token, revokes the previous sync token on each
+  sign-in, and the client stores it without showing it. The sync dialog, the first-run screen and the
+  Account pane share the flow, and they link to the server account page to create an account.
 
 ### Changed
 

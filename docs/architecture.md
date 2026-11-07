@@ -381,18 +381,22 @@ exist.
 ## Desktop sync
 
 `app/web/js/sync.js` keeps the local board authoritative until the user enables sync for that board.
-The sync control stores a service URL and scoped API token, creates a server project on first enable,
-pushes snapshots with the server revision and pulls when the server is ahead. Both local and remote
+The sync control stores a service URL and a signed-in account, creates a server project on first
+enable, pushes snapshots with the server revision and pulls when the server is ahead. Signing in uses
+`POST /api/v1/auth/sync-token` with the account email and password; the service returns a scoped
+project token that the client stores and never shows, revoking the previous sync token on each
+sign-in. Both local and remote
 changes produce an explicit conflict with Use server and Keep local choices. Failed pushes enter a
 local queue and retry when online. Deleting or disabling a local board never deletes server data;
 there is no server project delete call in the sync client.
 
 `normalizeServerUrl` accepts a bare host or `host:port`, so a local service can be entered as
 `127.0.0.1:8080` or `localhost:8080`. Loopback and private addresses get an `http` scheme; any other
-host defaults to `https`, and credentials in the URL are rejected. Before the first push,
-`checkConnection` calls `/readyz` to prove the service and its database answer, then an authenticated
-`GET /api/v1/projects` to prove the token and the database round trip. The sync dialog and the Account
-pane both render that state (connected, unreachable, database not ready, token rejected, missing scope).
+host defaults to `https`, and credentials in the URL are rejected. `checkServerReachable` calls
+`/readyz` before credentials are sent, then `signIn` exchanges the email and password for the token,
+and `checkConnection` uses an authenticated `GET /api/v1/projects` to prove the account and the
+database round trip. The sync dialog, the first-run screen and the Account pane all render that state
+(connected, unreachable, database not ready, sign in rejected, missing project access).
 The desktop CSP allows `http://localhost:*` and `http://127.0.0.1:*` in `connect-src` for this path,
 and the service snapshot route accepts documents up to 8 MB so real boards fit, while the smaller
 account endpoints keep the 64 KB JSON body limit.

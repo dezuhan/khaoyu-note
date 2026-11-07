@@ -241,11 +241,12 @@ The service exposes project, item and column share links, passphrase and expiry 
 roles, invitations and ownership transfer. The service account page is at `/account`, passkey
 management is at `/passkeys`, sharing is at `/shares`, and a shared link opens read-only at
 `/s/:token`. Desktop boards can opt in to server sync from the Sync control in the topbar: open it,
-enter the service URL and a scoped API token, then choose Check connection and connect. A local
+enter the service URL and your account email and password, then choose Sign in and connect. A local
 service needs no domain: `127.0.0.1:8080`, `localhost:8080` and `http://localhost:8080` are all
-accepted, while a remote host defaults to `https`. Before connecting, the dialog calls `/readyz`
-(service and database) and an authenticated project listing (token and database round trip), shows the
-result, and the Account pane repeats that check under Server, API token and Status. The local board
+accepted, while a remote host defaults to `https`. The dialog calls `/readyz` (service and database),
+signs in, and receives a scoped project token that the client stores without showing it; the Account
+pane repeats Server, Account and Status. A new account is created on the service at `/account`, which
+the dialog links to. The local board
 remains authoritative until the connection is confirmed. Verification is disabled: registration creates a usable account
 immediately, and the verify UI is hidden. Reset mail uses SMTP when configured and
 otherwise the outbox. The service tests run with:

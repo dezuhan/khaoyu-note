@@ -4,7 +4,7 @@ import * as bridge from "./bridge.js";
 import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
-import { checkConnection, describeConnection, loadSyncConfig } from "./sync.js";
+import { checkConnection, describeConnection, loadSyncConfig, signOut } from "./sync.js";
 import { openSyncDialog } from "./sync-ui.js";
 
 export const DEFAULT_TOOL_ORDER = [
@@ -771,7 +771,9 @@ function renderAccountPage(content) {
   server.textContent = config.url ? `Server: ${config.url}` : "Server: not connected";
   const token = document.createElement("div");
   token.className = "mn-account-server";
-  token.textContent = config.token ? "API token: set" : "API token: not set";
+  token.textContent = config.token
+    ? `Account: ${config.email || "signed in"}`
+    : "Account: not signed in";
   const connection = document.createElement("div");
   connection.className = "mn-account-server mn-account-connection";
   connection.dataset.role = "account-connection";
@@ -809,7 +811,7 @@ function renderAccountPage(content) {
   const connect = document.createElement("button");
   connect.type = "button";
   connect.className = "mn-btn mn-btn-primary";
-  connect.textContent = "Connect or change server";
+  connect.textContent = config.token ? "Account or change server" : "Sign in or change server";
   connect.addEventListener("click", () => {
     closeSettingsPage();
     openSyncDialog();
@@ -827,6 +829,20 @@ function renderAccountPage(content) {
     setStatus(result ? describeConnection(result) : "Connection not configured");
   });
   content.append(recheck);
+
+  if (config.token) {
+    const out = document.createElement("button");
+    out.type = "button";
+    out.className = "mn-btn mn-btn-quiet";
+    out.textContent = "Sign out";
+    out.addEventListener("click", () => {
+      signOut();
+      closeSettingsPage();
+      openSettingsPage();
+      setStatus("Signed out of the sync server");
+    });
+    content.append(out);
+  }
 
   const docs = document.createElement("button");
   docs.type = "button";

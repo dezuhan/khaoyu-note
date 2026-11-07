@@ -23,6 +23,7 @@ let offline = false;
 let readyStatus = 200;
 let projectsStatus = 200;
 let readyFails = false;
+let syncLoginStatus = 201;
 const id = "project-sync-test";
 
 globalThis.fetch = async (url, options = {}) => {
@@ -44,6 +45,17 @@ globalThis.fetch = async (url, options = {}) => {
   if (method === "GET" && path === "/readyz") {
     if (readyFails) throw new Error("blocked by CORS");
     return reply(readyStatus, readyStatus === 200 ? { status: "ready" } : { status: "not_ready" });
+  }
+  if (method === "POST" && path === "/api/v1/auth/sync-token") {
+    if (syncLoginStatus !== 201) {
+      return reply(syncLoginStatus, { error: "Invalid email or password" });
+    }
+    return reply(201, {
+      token: "khn_sync_test",
+      email: "owner@example.com",
+      scopes: ["projects:read", "projects:write"],
+      expiresAt: Date.now() + 86_400_000,
+    });
   }
   if (method === "GET" && path === "/api/v1/projects") {
     return reply(
@@ -129,6 +141,40 @@ assert.equal(connection.state, "unconfigured");
 
 sync.saveSyncConfig({ url: "http://service.test", token: "token-value" });
 assert.equal((await sync.checkConnection()).state, "connected");
+
+// Email and password sign-in stores a scoped token without exposing it to the user.
+sync.signOut();
+assert.equal(sync.loadSyncConfig().token, "");
+await assert.rejects(
+  () => sync.signIn({ url: "localhost:8080", email: "owner@example.com" }),
+  /password/i
+);
+const signedIn = await sync.signIn({
+  url: "localhost:8080",
+  email: "owner@example.com",
+  password: "secret-pass",
+});
+assert.equal(signedIn.url, "http://localhost:8080");
+assert.equal(signedIn.email, "owner@example.com");
+assert.equal(signedIn.token, "khn_sync_test");
+assert.equal(sync.loadSyncConfig().token, "khn_sync_test");
+assert.equal(sync.loadSyncConfig().email, "owner@example.com");
+assert.equal((await sync.checkConnection()).state, "connected");
+assert.match(sync.describeConnection(sync.connectionStatus), /owner@example\.com/);
+
+syncLoginStatus = 401;
+await assert.rejects(
+  () => sync.signIn({ url: "localhost:8080", email: "owner@example.com", password: "wrong" }),
+  /Wrong email or password/
+);
+syncLoginStatus = 201;
+
+sync.signOut();
+assert.equal(sync.loadSyncConfig().token, "");
+assert.equal(sync.loadSyncConfig().email, "");
+assert.equal(sync.loadSyncConfig().url, "http://localhost:8080");
+
+sync.saveSyncConfig({ url: "http://service.test", token: "token-value" });
 
 const board = {
   id: "b1",

@@ -298,6 +298,48 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.deepEqual(first.body, second.body);
   });
 
+  await t.test("sync sign-in issues a scoped token for email and password", async () => {
+    const email = `sync-${crypto.randomUUID()}@example.com`;
+    const password = "sync-password-123";
+    await api.register(email, password);
+
+    const wrong = await api.call("/api/v1/auth/sync-token", {
+      method: "POST",
+      body: { email, password: "wrong-password" },
+    });
+    assert.equal(wrong.status, 401, JSON.stringify(wrong.body));
+
+    const signed = await api.call("/api/v1/auth/sync-token", {
+      method: "POST",
+      body: { email, password },
+    });
+    assert.equal(signed.status, 201, JSON.stringify(signed.body));
+    assert.equal(signed.body.email, email);
+    assert.ok(String(signed.body.token).startsWith("khn_"));
+    assert.deepEqual(signed.body.scopes, ["projects:read", "projects:write"]);
+
+    const token = signed.body.token;
+    const projects = await api.call("/api/v1/projects", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(projects.status, 200);
+
+    // Signing in again rotates the stored sync token, so an old copy stops working.
+    const second = await api.call("/api/v1/auth/sync-token", {
+      method: "POST",
+      body: { email, password },
+    });
+    assert.equal(second.status, 201);
+    const stale = await api.call("/api/v1/projects", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(stale.status, 401);
+    const fresh = await api.call("/api/v1/projects", {
+      headers: { authorization: `Bearer ${second.body.token}` },
+    });
+    assert.equal(fresh.status, 200);
+  });
+
   await t.test("trusted-proxy SSO requires a signed email and can auto-create", async () => {
     const email = `sso-${crypto.randomUUID()}@example.com`;
     const signature = crypto
