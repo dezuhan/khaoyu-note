@@ -84,7 +84,7 @@ export const DOCUMENTATION_HTML = `
 
   <h3>Accounts, passkeys and sharing</h3>
   <ul>
-    <li><code>/account</code>: register, verify email, reset password, manage sessions and API tokens.</li>
+    <li><code>/account</code>: register and sign in immediately, reset password, manage sessions and API tokens. Email verification is disabled and hidden.</li>
     <li><code>/passkeys</code>: register or use a WebAuthn passkey on a localhost or HTTPS deployment.</li>
     <li><code>/shares</code>: enable public sharing after an explicit warning, create project, card or
     column links, choose permission, expiry, passphrase and asset download permission.</li>

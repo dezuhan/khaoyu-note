@@ -1,6 +1,6 @@
 # Khaoyu Note project status
 
-Snapshot date: 2026-11-07. Version: 0.28.2.
+Snapshot date: 2026-11-07. Version: 0.29.0.
 
 ## Technology
 
@@ -226,6 +226,7 @@ Still blocked by the environment or missing credentials:
 - Link cards fetch an Open Graph hero image automatically in the desktop and web host, with SSRF host guards, a size cap and a dotted globe fallback when no image is available.
 - Duplicate, copy, cut and paste include a column subtree, remap parent IDs and select only the copied roots.
 - Malformed request targets such as `//` return a 400 response instead of throwing and terminating the service.
+- Registration creates a verified account immediately; email verification is disabled, its endpoint returns 410 and its form is hidden from `/account`.
 - External video and map iframes now run in a sandbox with a strict referrer policy.
 - The Milestones 1 to 3 audit is recorded in `docs/security-audit.md`; the largest open risks are desktop sync, SMTP delivery, service asset authorization and a global sharing kill switch.
 - Sharing, SMTP delivery, SSO, passkeys, scoped API tokens, a browser login UI and desktop sync remain pending.

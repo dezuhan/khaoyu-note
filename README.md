@@ -209,7 +209,7 @@ picker instead), and folder restore plus the stdio MCP server remain desktop-onl
 The `service/` directory contains the self-hosted service: one Node 24 HTTP process, a relational
 SQLite schema for accounts, sessions, projects, memberships, snapshots and audit rows, opaque object
 storage, a maintenance worker, reversible migrations, backup and restore, and a minimal health
-endpoint. The account core includes email verification, Argon2id passwords, rotating refresh tokens
+endpoint. The account core includes Argon2id passwords, rotating refresh tokens
 with reuse detection, session management, password reset, TOTP, email one-time codes, WebAuthn
 passkeys, account deletion grace, project role checks and scoped API tokens. Project assets have
 authenticated upload, member-only download and share download enforcement.
@@ -239,7 +239,8 @@ roles, invitations and ownership transfer. The service account page is at `/acco
 management is at `/passkeys`, sharing is at `/shares`, and a shared link opens read-only at
 `/s/:token`. Desktop boards can opt in to server sync from the Sync control in the topbar: open it,
 enter the service URL and a scoped API token, then choose Enable for this board. The local board
-remains authoritative until that action. Verification and reset mail uses SMTP when configured and
+remains authoritative until that action. Verification is disabled: registration creates a usable account
+immediately, and the verify UI is hidden. Reset mail uses SMTP when configured and
 otherwise the outbox. The service tests run with:
 
 ```powershell
@@ -405,8 +406,8 @@ Built artifacts are copied to `dist/`:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.28.2_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
-| `Khaoyu Note_0.28.2_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.29.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.29.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
 | `KhaoyuNote.exe` | 10.79 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.38 MiB | standalone MCP server for AI agents |
 
