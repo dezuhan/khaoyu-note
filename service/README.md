@@ -100,6 +100,11 @@ links. The public-sharing API enforces the same acknowledgement with
 `{"enabled":true,"acknowledge":true}`; omitting it returns 400 `acknowledgement_required`. Disabling
 public sharing revokes every link for that project.
 
+`/s/:token` is the public read-only viewer for a share link. It asks for the passphrase when one is
+required, renders only the shared scope, shows nested projects allowed by policy, and returns a
+neutral message for invalid, expired, revoked or wrong-passphrase links. The page is `noindex`, has a
+self-only CSP, and tokens are redacted from request logs.
+
 ## Operator admin
 
 Set `KHAOYU_SERVICE_ADMIN_TOKEN` to enable `/api/v1/admin/*`. These endpoints require
