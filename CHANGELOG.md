@@ -12,6 +12,17 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.27.0] - 2026-11-07
+
+### Added
+
+- Link cards fetch an Open Graph or Twitter hero image automatically when the URL is committed.
+- Desktop fetch runs through a Rust command with scheme and private-host guards, a 2 MB HTML cap and
+  a 5 MB image cap; the local web host implements the same preview with its bridge.
+- Links without a hero image show a dotted globe fallback header.
+- Automatic card height fitting for the fallback header.
+- UI checks for the fallback hero and default header restoration.
+
 ## [0.26.0] - 2026-11-07
 
 ### Fixed
