@@ -1095,10 +1095,7 @@ function renderAccountPage(content) {
   content.append(heading("Account"));
   const user = authState().user;
   if (!user) {
-    const note = document.createElement("p");
-    note.className = "mn-prefs-note";
-    note.textContent = "Sign in to manage your local account.";
-    content.append(note);
+    renderSignedOutAccount(content);
     return;
   }
 
@@ -1111,22 +1108,7 @@ function renderAccountPage(content) {
   );
   if (!tabs.some(([id]) => id === accountTab)) accountTab = "information";
 
-  const tabbar = document.createElement("div");
-  tabbar.className = "mn-account-tabs";
-  tabbar.setAttribute("role", "tablist");
-  for (const [id, label] of tabs) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `mn-account-tab${id === accountTab ? " is-active" : ""}`;
-    button.setAttribute("role", "tab");
-    button.setAttribute("aria-selected", String(id === accountTab));
-    button.textContent = label;
-    button.addEventListener("click", () => {
-      accountTab = id;
-      renderContent();
-    });
-    tabbar.append(button);
-  }
+  const tabbar = renderAccountTabs(tabs);
   content.append(tabbar);
 
   const pane = document.createElement("div");
@@ -1146,6 +1128,69 @@ function renderAccountPage(content) {
   out.addEventListener("click", () => void performAccountLogout(false));
   footer.append(out);
   content.append(footer);
+}
+
+function renderAccountTabs(tabs) {
+  const tabbar = document.createElement("div");
+  tabbar.className = "mn-account-tabs";
+  tabbar.setAttribute("role", "tablist");
+  for (const [id, label] of tabs) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `mn-account-tab${id === accountTab ? " is-active" : ""}`;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(id === accountTab));
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      accountTab = id;
+      renderContent();
+    });
+    tabbar.append(button);
+  }
+  return tabbar;
+}
+
+function renderSignedOutAccount(content) {
+  const tabs = [
+    ["information", "Account Information"],
+    ["settings", "Account Settings"],
+    ["history", "History Activity"],
+  ];
+  if (!tabs.some(([id]) => id === accountTab)) accountTab = "information";
+  content.append(renderAccountTabs(tabs));
+
+  const pane = document.createElement("div");
+  pane.className = "mn-account-tab-pane";
+  const box = document.createElement("div");
+  box.className = "mn-account-guest";
+  const title = document.createElement("h3");
+  title.textContent =
+    accountTab === "history"
+      ? "Sign in to see activity"
+      : accountTab === "settings"
+        ? "Sign in to edit your account"
+        : "You are not signed in";
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent =
+    "Account Information, Account Settings and History Activity are available after sign in on this computer.";
+  const signIn = document.createElement("button");
+  signIn.type = "button";
+  signIn.className = "mn-btn mn-btn-primary";
+  signIn.textContent = "Sign In";
+  signIn.addEventListener("click", () => {
+    window.dispatchEvent(new CustomEvent("mn:open-login"));
+  });
+  box.append(title, note, signIn);
+  if (!bridge.hasTauri && !bridge.hasWeb) {
+    const preview = document.createElement("p");
+    preview.className = "mn-prefs-note";
+    preview.textContent =
+      "This browser preview has no account backend. Run the desktop app or the web host to sign in.";
+    box.append(preview);
+  }
+  pane.append(box);
+  content.append(pane);
 }
 
 function renderAccountSettingsTab(container) {

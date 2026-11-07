@@ -6656,6 +6656,25 @@ html[data-performance="true"] .mn-card {
 .mn-account-tab-pane {
   min-height: 260px;
 }
+.mn-account-guest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 440px;
+  padding: 18px;
+  border: 1px solid var(--ky-border);
+  border-radius: var(--ky-radius-card, 10px);
+  background: var(--ky-surface);
+}
+.mn-account-guest h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.mn-account-guest .mn-prefs-note {
+  margin: 0;
+}
 .mn-account-tab-foot {
   display: flex;
   justify-content: flex-end;

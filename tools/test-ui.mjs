@@ -318,10 +318,10 @@ check(
     (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Account"
 );
 check(
-  "Account page shows the sign-in prompt without an account",
-  (await page.locator('[data-role="content"]').innerText()).includes(
-    "Sign in to manage your local account"
-  )
+  "Account page shows the account tabs and sign-in prompt without an account",
+  (await page.locator(".mn-account-tabs .mn-account-tab").count()) === 3 &&
+    (await page.locator('[data-role="content"]').innerText()).includes("You are not signed in") &&
+    (await page.locator(".mn-account-guest .mn-btn", { hasText: "Sign In" }).count()) === 1
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);
@@ -1829,7 +1829,8 @@ check(
 const accountPageText = await page.locator('[data-role="content"]').innerText();
 check(
   "Account page shows the local profile or the sign-in prompt",
-  accountPageText.includes("Profile Picture") || accountPageText.includes("Sign in to manage your local account")
+  accountPageText.includes("Profile Picture") ||
+  accountPageText.includes("You are not signed in")
 );
 await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
 await page.waitForTimeout(300);

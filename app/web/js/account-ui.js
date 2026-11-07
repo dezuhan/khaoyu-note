@@ -75,6 +75,7 @@ export function initAccountUI(elements = {}) {
     openSettingsPage("account");
   });
   window.addEventListener("mn:open-account", () => openSettingsPage("account"));
+  window.addEventListener("mn:open-login", () => openLoginOverlay());
   subscribeAuth(() => renderAvatar());
   renderAvatar();
 }
