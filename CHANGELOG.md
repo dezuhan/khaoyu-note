@@ -12,6 +12,14 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.30.1] - 2026-11-07
+
+### Changed
+
+- The default link hero now uses the board dot pattern: 24px spacing, 1px soft stroke and a centered
+  globe, instead of the denser 8px muted dots.
+- Added a UI check for the fallback dot spacing.
+
 ## [0.30.0] - 2026-11-07
 
 ### Added
