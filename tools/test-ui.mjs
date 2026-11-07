@@ -1556,6 +1556,41 @@ check(
   `${notesBeforeDrop} -> ${notesAfterDrop} at ${Math.round(droppedBox.x)},${Math.round(droppedBox.y)}`
 );
 
+// ---------------------------------------------------------------- duplicate and copy a column tree
+await page.reload({ waitUntil: "load" });
+await page.waitForTimeout(1300);
+const firstColumn = page.locator(".mn-card-column").first();
+const columnChildCount = Number((await firstColumn.locator(".mn-column-summary").innerText()).match(/\d+/)?.[0] || 0);
+const columnsBeforeTree = await page.locator(".mn-card-column").count();
+const childrenBeforeTree = await page.locator(".mn-card.is-child").count();
+await firstColumn.locator(".mn-column-head").click();
+await page.waitForTimeout(200);
+await page.keyboard.press("Control+d");
+await page.waitForTimeout(500);
+const columnsAfterDuplicate = await page.locator(".mn-card-column").count();
+const childrenAfterDuplicate = await page.locator(".mn-card.is-child").count();
+check(
+  "Duplicate a column copies its child items",
+  columnsAfterDuplicate === columnsBeforeTree + 1 &&
+    childrenAfterDuplicate === childrenBeforeTree + columnChildCount &&
+    columnChildCount > 0,
+  `${columnsBeforeTree}->${columnsAfterDuplicate} columns, ${childrenBeforeTree}->${childrenAfterDuplicate} children, childCount=${columnChildCount}`
+);
+check(
+  "Duplicated column keeps the same child count",
+  Number((await page.locator(".mn-card-column").last().locator(".mn-column-summary").innerText()).match(/\d+/)?.[0] || 0) ===
+    columnChildCount
+);
+await page.keyboard.press("Control+c");
+await page.waitForTimeout(150);
+await page.keyboard.press("Control+v");
+await page.waitForTimeout(500);
+check(
+  "Copy and paste of a column copies its children",
+  (await page.locator(".mn-card-column").count()) === columnsBeforeTree + 2 &&
+    (await page.locator(".mn-card.is-child").count()) === childrenBeforeTree + columnChildCount * 2
+);
+
 // ---------------------------------------------------------------- settings dialog
 await page.click("#settings-btn");
 await page.waitForTimeout(400);

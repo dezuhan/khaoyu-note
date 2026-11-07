@@ -2,14 +2,13 @@
 
 import * as bridge from "./bridge.js";
 import { isBlockedUpload, MAX_UPLOAD_BYTES, reportUploadProblem } from "./limits.js";
-import { createCard, getCard, layoutColumns, maxZ, newBoardDoc, uid } from "./model.js";
+import { createCard, columnChildren, getCard, layoutColumns, maxZ, newBoardDoc, uid } from "./model.js";
 import {
   checkpoint,
   markDirty,
   openBoard,
   refreshBoards,
   saveNow,
-  selectedCards,
   setSelection,
   state,
 } from "./store.js";
@@ -273,25 +272,70 @@ export function deleteSelected() {
   deleteCards([...state.selection]);
 }
 
-export function duplicateCards(ids) {
-  if (!state.board || !ids.length) return;
-  checkpoint();
-  const copies = [];
-  for (const id of ids) {
+function selectionGraph(ids) {
+  const selected = new Set(ids);
+  const hasSelectedAncestor = (card) => {
+    let parentId = card.parentId;
+    while (parentId) {
+      if (selected.has(parentId)) return true;
+      parentId = getCard(state.board, parentId)?.parentId;
+    }
+    return false;
+  };
+  const roots = ids.filter((id) => {
     const card = getCard(state.board, id);
-    if (!card) continue;
-    if (card.type === "column") continue;
+    return card && !hasSelectedAncestor(card);
+  });
+  const included = new Set(roots);
+  const addChildren = (columnId) => {
+    for (const child of columnChildren(state.board, columnId)) {
+      if (included.has(child.id)) continue;
+      included.add(child.id);
+      if (child.type === "column") addChildren(child.id);
+    }
+  };
+  for (const id of roots) {
+    const card = getCard(state.board, id);
+    if (card?.type === "column") addChildren(id);
+  }
+  return {
+    roots,
+    cards: state.board.cards
+      .filter((card) => included.has(card.id))
+      .map((card) => JSON.parse(JSON.stringify(card))),
+  };
+}
+
+function cloneGraph(graph, offset) {
+  const idMap = new Map();
+  const copies = graph.cards.map((card) => {
     const clone = JSON.parse(JSON.stringify(card));
     clone.id = uid(clone.type);
-    clone.x += 24;
-    clone.y += 24;
-    clone.z = maxZ(state.board) + 1;
-    clone.parentId = null;
-    state.board.cards.push(clone);
-    copies.push(clone.id);
+    idMap.set(card.id, clone.id);
+    return clone;
+  });
+  const roots = new Set(graph.roots.map((id) => idMap.get(id)));
+  let z = maxZ(state.board);
+  for (const copy of copies) {
+    const isRoot = roots.has(copy.id);
+    copy.parentId = isRoot ? null : idMap.get(copy.parentId) || null;
+    if (isRoot) {
+      copy.x += offset;
+      copy.y += offset;
+    }
+    copy.z = ++z;
+    state.board.cards.push(copy);
   }
+  return [...roots];
+}
+
+export function duplicateCards(ids) {
+  if (!state.board || !ids.length) return 0;
+  checkpoint();
+  const copies = cloneGraph(selectionGraph(ids), 24);
   if (copies.length) setSelection(copies);
   markDirty("board");
+  return copies.length;
 }
 
 export function duplicateSelected() {
@@ -628,12 +672,14 @@ export function editCard(cardId) {
 
 // ------------------------------------------------------------------ clipboard
 
-let cardClipboard = [];
+let cardClipboard = null;
+let pasteOffset = 0;
 
 export function copySelected() {
   if (!state.board) return 0;
-  cardClipboard = selectedCards().map((card) => JSON.parse(JSON.stringify(card)));
-  return cardClipboard.length;
+  cardClipboard = selectionGraph([...state.selection]);
+  pasteOffset = 0;
+  return cardClipboard.cards.length;
 }
 
 export function cutSelected() {
@@ -643,21 +689,10 @@ export function cutSelected() {
 }
 
 export function pasteCards() {
-  if (!state.board || !cardClipboard.length) return 0;
+  if (!state.board || !cardClipboard?.cards.length) return 0;
   checkpoint();
-  const ids = [];
-  for (const source of cardClipboard) {
-    const copy = JSON.parse(JSON.stringify(source));
-    copy.id = uid(copy.type);
-    copy.x += 28;
-    copy.y += 28;
-    copy.z = maxZ(state.board) + 1;
-    copy.parentId = null;
-    copy.order = 0;
-    state.board.cards.push(copy);
-    ids.push(copy.id);
-  }
-  cardClipboard = cardClipboard.map((card) => ({ ...card, x: card.x + 28, y: card.y + 28 }));
+  pasteOffset += 1;
+  const ids = cloneGraph(cardClipboard, 28 * pasteOffset);
   setSelection(ids);
   markDirty("board");
   return ids.length;

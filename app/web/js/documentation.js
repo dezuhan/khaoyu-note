@@ -11,6 +11,7 @@ export const DOCUMENTATION_HTML = `
     <li>Double-click empty canvas to create a note.</li>
     <li>Pick a tool from the left rail, then click the canvas to place a card.</li>
     <li>Drag cards to move them. Shift-click or drag a marquee to select several cards.</li>
+    <li>Duplicating or copying a column also copies the cards inside it, with parent links remapped.</li>
     <li>Use the toolbar above a selected card to style text, change color or convert a note to a document.</li>
     <li>Files are saved automatically after five seconds of inactivity.</li>
   </ul>
