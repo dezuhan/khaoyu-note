@@ -106,6 +106,9 @@ jobs:
       - name: Passkey virtual-authenticator suite
         run: node tools/test-passkeys.mjs
 
+      - name: Browser account suite
+        run: node tools/test-account-ui.mjs
+
       - name: Show preview server log on failure
         if: failure()
         run: cat /tmp/khaoyu-serve.log || true
