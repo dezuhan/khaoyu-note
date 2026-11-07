@@ -55,6 +55,13 @@ export const CARD_ASPECTS = {
 
 export function cardHeightFor(card) {
   if (card.type === "column") return card.h;
+  if (card.type === "image" && card.imageCrop) {
+    const crop = card.imageCrop;
+    const ratio = (crop.w / crop.h) * (crop.ratio || 1);
+    if (Number.isFinite(ratio) && ratio > 0) {
+      return Math.max(MIN_CARD_H, Math.round(card.w / ratio) + 24);
+    }
+  }
   const aspect = card.aspect || CARD_ASPECTS[card.type];
   if (aspect) {
     const imageCaption = card.type === "image" ? 24 : 0;
