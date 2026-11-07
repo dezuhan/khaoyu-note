@@ -16,7 +16,7 @@ export function projectRole(db, projectId, accountId) {
 
 export function projectSnapshot(db, projectId) {
   const project = db
-    .prepare("SELECT id, name, revision, public_sharing_enabled FROM projects WHERE id = ? AND deleted_at IS NULL")
+    .prepare("SELECT id, name, revision, public_sharing_enabled, owner_account_id FROM projects WHERE id = ? AND deleted_at IS NULL")
     .get(projectId);
   if (!project) return null;
   const snapshot = db
@@ -63,21 +63,76 @@ function sanitizedCards(cards) {
   return (cards || []).map(stripLocalAssetPaths);
 }
 
+function sanitizedDoc(doc) {
+  return {
+    id: doc.id,
+    title: doc.title,
+    cards: sanitizedCards(doc.cards),
+    connections: doc.connections || [],
+  };
+}
+
+function nestedProjectDocs(db, project, depth = 0, seen = new Set()) {
+  if (depth >= 5) return { nested: [], excluded: 0 };
+  const children = db
+    .prepare(
+      "SELECT id, name, revision, owner_account_id FROM projects WHERE parent_project_id = ? AND deleted_at IS NULL ORDER BY created_at"
+    )
+    .all(project.id);
+  const nested = [];
+  let excluded = 0;
+  for (const child of children) {
+    if (seen.has(child.id)) continue;
+    seen.add(child.id);
+    const members = db
+      .prepare("SELECT COUNT(*) AS count, SUM(CASE WHEN account_id != ? THEN 1 ELSE 0 END) AS others FROM project_members WHERE project_id = ?")
+      .get(project.owner_account_id, child.id);
+    const eligible =
+      child.owner_account_id === project.owner_account_id &&
+      Number(members.count) === 1 &&
+      Number(members.others) === 0;
+    if (!eligible) {
+      excluded += 1;
+      continue;
+    }
+    const snapshot = db
+      .prepare("SELECT doc FROM project_snapshots WHERE project_id = ?")
+      .get(child.id);
+    let doc;
+    try {
+      doc = JSON.parse(snapshot?.doc || "{}");
+    } catch {
+      continue;
+    }
+    const deeper = nestedProjectDocs(db, child, depth + 1, seen);
+    nested.push({
+      id: child.id,
+      name: child.name,
+      revision: child.revision,
+      doc: sanitizedDoc(doc),
+      nestedProjects: deeper.nested,
+    });
+    excluded += deeper.excluded;
+    if (nested.length >= 20) break;
+  }
+  return { nested, excluded };
+}
+
 export function sharedPayload(db, share) {
   const snapshot = projectSnapshot(db, share.project_id);
   if (!snapshot) return null;
   const { project, doc } = snapshot;
   if (share.scope === "project") {
+    const nested = nestedProjectDocs(db, project);
     return {
       scope: "project",
       permission: share.permission,
       project: { id: project.id, name: project.name, revision: project.revision },
-      doc: {
-        id: doc.id,
-        title: doc.title,
-        cards: sanitizedCards(doc.cards),
-        connections: doc.connections || [],
-      },
+      doc: sanitizedDoc(doc),
+      nestedProjects: nested.nested,
+      excludedNestedProjects: nested.excluded,
+      nestedPolicy:
+        "Nested boards are included only when they have the same owner and no additional members.",
     };
   }
   if (share.scope === "item") {

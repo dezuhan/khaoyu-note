@@ -1,6 +1,8 @@
 // Opt-in project sync between a local board and the self-hosted service.
 // The local board remains authoritative unless sync is enabled for it.
 
+import * as bridge from "./bridge.js";
+
 const CONFIG_KEY = "mn.sync.config";
 const QUEUE_KEY = "mn.sync.queue";
 const MAX_QUEUE = 20;
@@ -130,9 +132,19 @@ export async function enableBoardSync(board) {
   const config = requireConfig();
   void config;
   if (!board.sync?.projectId) {
+    let parentProjectId = null;
+    if (board.parentId) {
+      try {
+        const parentRaw = await bridge.loadBoard(board.parentId);
+        const parent = parentRaw ? JSON.parse(parentRaw) : null;
+        parentProjectId = parent?.sync?.projectId || null;
+      } catch {
+        parentProjectId = null;
+      }
+    }
     const created = await api("/api/v1/projects", {
       method: "POST",
-      body: { title: board.title || "Untitled board" },
+      body: { title: board.title || "Untitled board", parentProjectId },
     });
     board.sync = {
       projectId: created.id,

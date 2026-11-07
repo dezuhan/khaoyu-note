@@ -1827,7 +1827,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
         requireScope(auth, "projects:read");
         const projects = db
           .prepare(
-            `SELECT p.id, p.name, p.revision, p.created_at, p.updated_at, m.role
+            `SELECT p.id, p.name, p.revision, p.created_at, p.updated_at, p.parent_project_id, m.role
              FROM projects p JOIN project_members m ON m.project_id = p.id
              WHERE m.account_id = ? AND p.deleted_at IS NULL ORDER BY p.updated_at DESC`
           )
@@ -1838,14 +1838,23 @@ export function createApiRouter({ db, config, logger, mailer }) {
 
       if (method === "POST" && url.pathname === "/api/v1/projects") {
         const auth = requireAuth(request, response, db, config);
-        requireScope(auth, "projects:write");        const body = await readJson(request);
+        requireScope(auth, "projects:write");
+        const body = await readJson(request);
         const title = requireString(body.title, "title", 120);
+        let parentProjectId = null;
+        if (body.parentProjectId !== undefined && body.parentProjectId !== null) {
+          parentProjectId = requireString(body.parentProjectId, "parentProjectId", 200);
+          const parentRole = projectRole(db, parentProjectId, auth.account.id);
+          if (!parentRole || !hasRole(parentRole, "editor")) {
+            throw new HttpError(404, "parent project not found", "not_found");
+          }
+        }
         const projectId = crypto.randomUUID();
         db.exec("BEGIN IMMEDIATE");
         try {
           db.prepare(
-            "INSERT INTO projects (id, owner_account_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
-          ).run(projectId, auth.account.id, title, now(), now());
+            "INSERT INTO projects (id, owner_account_id, name, parent_project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+          ).run(projectId, auth.account.id, title, parentProjectId, now(), now());
           db.prepare(
             "INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'owner', ?)"
           ).run(projectId, auth.account.id, now());
@@ -1865,7 +1874,12 @@ export function createApiRouter({ db, config, logger, mailer }) {
           ip,
           secret: config.secret,
         });
-        sendJson(response, 201, { id: projectId, title, revision: 1, role: "owner" }, config);
+        sendJson(
+          response,
+          201,
+          { id: projectId, title, revision: 1, role: "owner", parentProjectId },
+          config
+        );
         return true;
       }
 
@@ -2190,7 +2204,16 @@ export function createApiRouter({ db, config, logger, mailer }) {
         const snapshot = db
           .prepare("SELECT revision, doc, updated_at FROM project_snapshots WHERE project_id = ?")
           .get(project.id);
-        sendJson(response, 200, { project: { id: project.id, name: project.name, revision: project.revision, role }, snapshot }, config);
+        sendJson(response, 200, {
+          project: {
+            id: project.id,
+            name: project.name,
+            revision: project.revision,
+            role,
+            parentProjectId: project.parent_project_id,
+          },
+          snapshot,
+        }, config);
         return true;
       }
 
