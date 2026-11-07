@@ -42,12 +42,12 @@ function bootstrap(config, db, password) {
     account = { id: crypto.randomUUID(), email };
     const now = Date.now();
     db.prepare(
-      "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'admin', ?, ?)"
     ).run(account.id, email, name, password.hash, now, now, now);
     createdAccount = true;
   } else {
     db.prepare(
-      "UPDATE accounts SET password_hash = COALESCE(password_hash, ?), email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?"
+      "UPDATE accounts SET password_hash = COALESCE(password_hash, ?), email_verified_at = COALESCE(email_verified_at, ?), role = 'admin', updated_at = ? WHERE id = ?"
     ).run(password.hash, Date.now(), Date.now(), account.id);
   }
   let project = db.prepare("SELECT id, name FROM projects WHERE owner_account_id = ? AND name = ?").get(

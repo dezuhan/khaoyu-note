@@ -3,8 +3,8 @@
 This is the self-hosted service foundation plus the core account and login model: one standalone
 HTTP process, a relational SQLite database for accounts, sessions, projects, memberships, snapshots
 and audit rows, opaque object storage, a maintenance worker, explicit reversible migrations, and
-backup/restore. Sharing, accounts, desktop sync and encrypted backups are documented below; a browser
-login UI is not included.
+backup/restore. Sharing, accounts, desktop sync and encrypted backups are documented below. Browser
+pages are included for account login, passkeys, share links and the admin dashboard.
 
 ## Requirements
 
@@ -30,6 +30,29 @@ node src/server.mjs
 `POST /api/v1/auth/register` creates an immediately usable verified account; email verification is
 disabled and its form is hidden. Password reset messages are written to `<data>/outbox/*.json` with
 mode `0600`; the SMTP adapter is not implemented.
+
+## Admin dashboard
+
+Open `http://127.0.0.1:8080/admin`. The page uses the normal service session and requires an account
+with the global `admin` role. The first account created by `bootstrap`, or the first account registered
+on a fresh database, becomes an admin; migration 13 also promotes the oldest existing account.
+
+The dashboard has a left rail and a content pane with Overview, Accounts, Teams and Activity:
+
+- Overview shows account, team, share-link and audit counts plus recent activity and signups.
+- Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
+  team count, last activity and last update. Admins can change another account's role or status; an
+  account cannot demote or disable itself, and the last active admin cannot be removed.
+- Teams lists projects with their owner, member count, revision and last update. Create team adds a
+  project with a fresh snapshot and the signed-in admin as owner. Members expands the member list.
+- Activity reads every audit row with actor, action, resource and time, filterable by text and action
+  prefix, with Load more pagination.
+
+Disabled accounts cannot sign in with a password, email OTP or SSO, cannot rotate a refresh token and
+cannot use scoped API tokens. Admin mutations use the normal CSRF cookie and `x-csrf-token` header and
+write `admin.*` audit rows. The optional `KHAOYU_SERVICE_ADMIN_TOKEN` still exists for scripted access
+to `/api/v1/admin/audit`, `/api/v1/admin/abuse-reports` and `/api/v1/admin/stats`; it is not used by the
+dashboard.
 
 ## Docker Compose
 

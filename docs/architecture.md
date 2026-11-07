@@ -393,9 +393,18 @@ missing, short, repetitive or a placeholder, and fails when a migration is pendi
 
 The SQLite schema covers accounts, sessions, projects, project memberships, project snapshots, audit
 rows and content-addressed objects. Migrations live in `service/src/migrations` as paired up and down
-SQL files and are recorded in `schema_migrations`; the server never migrates automatically. An
-optional bootstrap command creates the first account and project without a password; login is
-Milestone 2.
+SQL files and are recorded in `schema_migrations`; the server never migrates automatically. Accounts
+carry a global `role` (`admin` or `member`), `status` (`active` or `disabled`), optional names and an
+avatar. Migration 13 promotes the oldest account to admin; a fresh database makes the first registered
+account or bootstrap account admin.
+
+The service serves browser pages at `/account`, `/passkeys`, `/shares`, `/s/:token` and `/admin`. The
+admin page uses the normal account session, requires the global admin role and calls
+`/api/v1/admin/dashboard`, `/users`, `/teams` and `/activity`; every mutation goes through the same
+CSRF check and writes `admin.*` audit rows. The page has a left rail and content pane, uses `ky.css`
+tokens for light and dark themes, and shows profile pictures or initials, role and status. The
+operator `KHAOYU_SERVICE_ADMIN_TOKEN` remains only for scripted access to the legacy JSON admin
+endpoints.
 
 Object storage writes `sha256` content under opaque two-level paths and deduplicates by hash. Audit
 rows store an HMAC of the IP address, never the raw address. The worker prunes old temp files and

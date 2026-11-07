@@ -188,6 +188,52 @@ function requireSessionAuth(request, response, db, config) {
   return auth;
 }
 
+function requireAdminAccount(request, response, db, config) {
+  const auth = requireSessionAuth(request, response, db, config);
+  if (auth.account.role !== "admin" || auth.account.status !== "active") {
+    throw new HttpError(403, "admin access required", "admin_required");
+  }
+  return auth;
+}
+
+function adminAccount(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    username: row.username || "",
+    firstName: row.first_name || "",
+    lastName: row.last_name || "",
+    avatarColor: row.avatar_color || "",
+    avatarUrl: row.avatar_url || "",
+    role: row.role || "member",
+    status: row.status || "active",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lastSeenAt: row.last_seen_at ?? null,
+    projectCount: Number(row.project_count ?? 0),
+  };
+}
+
+const ADMIN_ACCOUNT_COLUMNS =
+  "a.id, a.email, a.display_name, a.username, a.first_name, a.last_name, a.avatar_color, a.avatar_url, a.role, a.status, a.created_at, a.updated_at";
+
+function validateAdminAvatar(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const text = String(value);
+  if (text.length > 1_500_000) throw new HttpError(400, "avatar is too large", "invalid_avatar");
+  const prefix = text.slice(0, 64).toLowerCase();
+  const accepted = [
+    "data:image/png;base64,",
+    "data:image/jpeg;base64,",
+    "data:image/jpg;base64,",
+    "data:image/gif;base64,",
+    "data:image/webp;base64,",
+  ].some((candidate) => prefix.startsWith(candidate));
+  if (!accepted) throw new HttpError(400, "avatar must be a PNG, JPEG, GIF or WebP data URL", "invalid_avatar");
+  return text;
+}
+
 function requireScope(auth, scope) {
   if (auth.method === "api" && !auth.scopes?.includes(scope)) {
     throw new HttpError(403, `scope ${scope} required`, "insufficient_scope");
@@ -419,6 +465,352 @@ export function createApiRouter({ db, config, logger, mailer }) {
           },
           config
         );
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/dashboard") {
+        const auth = requireAdminAccount(request, response, db, config);
+        const count = (sql, ...args) => Number(db.prepare(sql).get(...args)?.count || 0);
+        const recentActivity = db
+          .prepare(
+            `SELECT l.id, l.action, l.resource_type, l.resource_id, l.created_at,
+                    a.email, a.display_name, a.avatar_color, a.avatar_url
+             FROM audit_log l LEFT JOIN accounts a ON a.id = l.actor_account_id
+             ORDER BY l.created_at DESC LIMIT 8`
+          )
+          .all();
+        const recentAccounts = db
+          .prepare(
+            `SELECT id, email, display_name, username, avatar_color, avatar_url, role, status,
+                    created_at, updated_at FROM accounts
+             WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 5`
+          )
+          .all();
+        sendJson(
+          response,
+          200,
+          {
+            admin: {
+              id: auth.account.id,
+              email: auth.account.email,
+              displayName: auth.account.display_name,
+              avatarUrl: auth.account.avatar_url || "",
+            },
+            counts: {
+              accounts: count("SELECT COUNT(*) AS count FROM accounts WHERE deleted_at IS NULL"),
+              activeAccounts: count(
+                "SELECT COUNT(*) AS count FROM accounts WHERE deleted_at IS NULL AND status = 'active'"
+              ),
+              teams: count("SELECT COUNT(*) AS count FROM projects WHERE deleted_at IS NULL"),
+              auditEntries: count("SELECT COUNT(*) AS count FROM audit_log"),
+              shareLinks: count("SELECT COUNT(*) AS count FROM share_links WHERE revoked_at IS NULL"),
+            },
+            recentActivity: recentActivity.map((entry) => ({
+              id: entry.id,
+              action: entry.action,
+              resourceType: entry.resource_type,
+              resourceId: entry.resource_id,
+              createdAt: entry.created_at,
+              actorEmail: entry.email || "",
+              actorName: entry.display_name || "",
+              avatarColor: entry.avatar_color || "",
+              avatarUrl: entry.avatar_url || "",
+            })),
+            recentAccounts: recentAccounts.map((row) => ({
+              id: row.id,
+              email: row.email,
+              displayName: row.display_name,
+              username: row.username || "",
+              avatarColor: row.avatar_color || "",
+              avatarUrl: row.avatar_url || "",
+              role: row.role,
+              status: row.status,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+            })),
+          },
+          config
+        );
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/users") {
+        requireAdminAccount(request, response, db, config);
+        const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
+        const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit")) || 50));
+        const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+        const clauses = ["a.deleted_at IS NULL"];
+        const params = [];
+        if (q) {
+          const like = `%${q}%`;
+          clauses.push(
+            "(lower(a.email) LIKE ? OR lower(a.display_name) LIKE ? OR lower(COALESCE(a.username, '')) LIKE ?)"
+          );
+          params.push(like, like, like);
+        }
+        const where = clauses.join(" AND ");
+        const total = Number(
+          db.prepare(`SELECT COUNT(*) AS count FROM accounts a WHERE ${where}`).get(...params).count
+        );
+        const users = db
+          .prepare(
+            `SELECT ${ADMIN_ACCOUNT_COLUMNS},
+                    (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS last_seen_at,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.account_id = a.id) AS project_count
+             FROM accounts a WHERE ${where}
+             ORDER BY a.updated_at DESC LIMIT ? OFFSET ?`
+          )
+          .all(...params, limit, offset)
+          .map(adminAccount);
+        sendJson(response, 200, { users, total, limit, offset }, config);
+        return true;
+      }
+
+      const adminUserMatch = url.pathname.match(/^\/api\/v1\/admin\/users\/([^/]+)$/);
+      if (method === "PATCH" && adminUserMatch) {
+        const auth = requireAdminAccount(request, response, db, config);
+        const targetId = decodeURIComponent(adminUserMatch[1]);
+        const current = db
+          .prepare(`SELECT ${ADMIN_ACCOUNT_COLUMNS} FROM accounts a WHERE a.id = ? AND a.deleted_at IS NULL`)
+          .get(targetId);
+        if (!current) throw new HttpError(404, "account not found", "not_found");
+        const body = await readJson(request);
+        const role = body.role === undefined ? current.role : String(body.role);
+        const status = body.status === undefined ? current.status : String(body.status);
+        if (!["admin", "member"].includes(role)) {
+          throw new HttpError(400, "role is invalid", "invalid_role");
+        }
+        if (!["active", "disabled"].includes(status)) {
+          throw new HttpError(400, "status is invalid", "invalid_status");
+        }
+        if (targetId === auth.account.id && (role !== "admin" || status !== "active")) {
+          throw new HttpError(400, "you cannot demote or disable your own account", "self_lockout");
+        }
+        if (
+          (role !== "admin" || status !== "active") &&
+          current.role === "admin" &&
+          current.status === "active"
+        ) {
+          const adminCount = Number(
+            db
+              .prepare(
+                "SELECT COUNT(*) AS count FROM accounts WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL"
+              )
+              .get().count
+          );
+          if (adminCount <= 1) {
+            throw new HttpError(400, "at least one active admin is required", "last_admin");
+          }
+        }
+        const displayName =
+          body.displayName === undefined
+            ? current.display_name
+            : requireString(body.displayName, "displayName", 120);
+        const firstName =
+          body.firstName === undefined ? current.first_name : String(body.firstName).trim().slice(0, 80);
+        const lastName =
+          body.lastName === undefined ? current.last_name : String(body.lastName).trim().slice(0, 80);
+        let avatarColor =
+          body.avatarColor === undefined ? current.avatar_color : String(body.avatarColor || "").trim();
+        if (avatarColor && !/^#[0-9a-f]{6}$/i.test(avatarColor)) {
+          throw new HttpError(400, "avatarColor must be a hex color", "invalid_avatar");
+        }
+        const avatarUrl =
+          body.avatarUrl === undefined ? current.avatar_url : validateAdminAvatar(body.avatarUrl);
+        db.prepare(
+          `UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, avatar_color = ?,
+             avatar_url = ?, role = ?, status = ?, updated_at = ? WHERE id = ?`
+        ).run(
+          displayName,
+          firstName || null,
+          lastName || null,
+          avatarColor || null,
+          avatarUrl || null,
+          role,
+          status,
+          now(),
+          targetId
+        );
+        if (status === "disabled" && current.status !== "disabled") {
+          db.prepare("UPDATE sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL").run(
+            now(),
+            targetId
+          );
+          db.prepare(
+            "UPDATE access_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ?) AND revoked_at IS NULL"
+          ).run(now(), targetId);
+          db.prepare(
+            "UPDATE refresh_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ?) AND revoked_at IS NULL"
+          ).run(now(), targetId);
+        }
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.user_updated",
+          resourceType: "account",
+          resourceId: targetId,
+          metadata: { role, status },
+          ip,
+          secret: config.secret,
+        });
+        const updated = db
+          .prepare(
+            `SELECT ${ADMIN_ACCOUNT_COLUMNS},
+                    (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS last_seen_at,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.account_id = a.id) AS project_count
+             FROM accounts a WHERE a.id = ?`
+          )
+          .get(targetId);
+        sendJson(response, 200, { user: adminAccount(updated) }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/teams") {
+        requireAdminAccount(request, response, db, config);
+        const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
+        const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit")) || 50));
+        const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+        const clauses = ["p.deleted_at IS NULL"];
+        const params = [];
+        if (q) {
+          const like = `%${q}%`;
+          clauses.push("(lower(p.name) LIKE ? OR lower(a.email) LIKE ? OR lower(a.display_name) LIKE ?)");
+          params.push(like, like, like);
+        }
+        const where = clauses.join(" AND ");
+        const total = Number(
+          db
+            .prepare(`SELECT COUNT(*) AS count FROM projects p JOIN accounts a ON a.id = p.owner_account_id WHERE ${where}`)
+            .get(...params).count
+        );
+        const teams = db
+          .prepare(
+            `SELECT p.id, p.name, p.revision, p.sync_enabled, p.created_at, p.updated_at,
+                    a.id AS owner_id, a.email AS owner_email, a.display_name AS owner_name,
+                    a.avatar_color AS owner_avatar_color, a.avatar_url AS owner_avatar_url,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.project_id = p.id) AS member_count,
+                    (SELECT COUNT(*) FROM project_snapshots s WHERE s.project_id = p.id) AS snapshot_count
+             FROM projects p JOIN accounts a ON a.id = p.owner_account_id
+             WHERE ${where} ORDER BY p.updated_at DESC LIMIT ? OFFSET ?`
+          )
+          .all(...params, limit, offset);
+        sendJson(response, 200, { teams, total, limit, offset }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/admin/teams") {
+        const auth = requireAdminAccount(request, response, db, config);
+        const body = await readJson(request);
+        const name = requireString(body.name ?? body.title, "name", 120);
+        const ownerId =
+          body.ownerAccountId === undefined
+            ? auth.account.id
+            : requireString(body.ownerAccountId, "ownerAccountId", 200);
+        const owner = db
+          .prepare("SELECT id FROM accounts WHERE id = ? AND deleted_at IS NULL AND status = 'active'")
+          .get(ownerId);
+        if (!owner) throw new HttpError(404, "owner account not found", "not_found");
+        const projectId = crypto.randomUUID();
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          db.prepare(
+            "INSERT INTO projects (id, owner_account_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+          ).run(projectId, ownerId, name, now(), now());
+          db.prepare(
+            "INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'owner', ?)"
+          ).run(projectId, ownerId, now());
+          db.prepare(
+            "INSERT INTO project_snapshots (project_id, revision, doc, updated_by, updated_at) VALUES (?, 1, ?, ?, ?)"
+          ).run(
+            projectId,
+            JSON.stringify({ id: projectId, title: name, cards: [], connections: [], trash: [] }),
+            auth.account.id,
+            now()
+          );
+          db.exec("COMMIT");
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
+        }
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.team_created",
+          resourceType: "project",
+          resourceId: projectId,
+          metadata: { name, ownerId },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { id: projectId, name, ownerId, revision: 1 }, config);
+        return true;
+      }
+
+      const adminTeamMembersMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)\/members$/);
+      if (method === "GET" && adminTeamMembersMatch) {
+        requireAdminAccount(request, response, db, config);
+        const projectId = decodeURIComponent(adminTeamMembersMatch[1]);
+        const project = db
+          .prepare("SELECT id, name FROM projects WHERE id = ? AND deleted_at IS NULL")
+          .get(projectId);
+        if (!project) throw new HttpError(404, "team not found", "not_found");
+        const members = db
+          .prepare(
+            `SELECT a.id, a.email, a.display_name, a.username, a.avatar_color, a.avatar_url,
+                    a.status, m.role, m.created_at
+             FROM project_members m JOIN accounts a ON a.id = m.account_id
+             WHERE m.project_id = ? AND a.deleted_at IS NULL
+             ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 WHEN 'commenter' THEN 2 ELSE 3 END,
+                      a.display_name`
+          )
+          .all(projectId);
+        sendJson(response, 200, { project, members }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/admin/activity") {
+        requireAdminAccount(request, response, db, config);
+        const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit")) || 50));
+        const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+        const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
+        const action = String(url.searchParams.get("action") || "").trim().toLowerCase();
+        const actor = String(url.searchParams.get("actor") || "").trim();
+        const clauses = ["1 = 1"];
+        const params = [];
+        if (q) {
+          const like = `%${q}%`;
+          clauses.push(
+            "(lower(l.action) LIKE ? OR lower(COALESCE(l.resource_id, '')) LIKE ? OR lower(COALESCE(a.email, '')) LIKE ? OR lower(COALESCE(a.display_name, '')) LIKE ?)"
+          );
+          params.push(like, like, like, like);
+        }
+        if (action) {
+          clauses.push("lower(l.action) LIKE ?");
+          params.push(`${action}%`);
+        }
+        if (actor) {
+          clauses.push("l.actor_account_id = ?");
+          params.push(actor);
+        }
+        const where = clauses.join(" AND ");
+        const total = Number(
+          db
+            .prepare(`SELECT COUNT(*) AS count FROM audit_log l LEFT JOIN accounts a ON a.id = l.actor_account_id WHERE ${where}`)
+            .get(...params).count
+        );
+        const entries = db
+          .prepare(
+            `SELECT l.id, l.actor_account_id, l.action, l.resource_type, l.resource_id, l.ip_hash,
+                    l.metadata, l.created_at,
+                    a.email AS actor_email, a.display_name AS actor_name,
+                    a.avatar_color AS actor_avatar_color, a.avatar_url AS actor_avatar_url
+             FROM audit_log l LEFT JOIN accounts a ON a.id = l.actor_account_id
+             WHERE ${where} ORDER BY l.created_at DESC LIMIT ? OFFSET ?`
+          )
+          .all(...params, limit, offset)
+          .map((entry) => ({
+            ...entry,
+            metadata: entry.metadata ? JSON.parse(entry.metadata) : null,
+          }));
+        sendJson(response, 200, { entries, total, limit, offset }, config);
         return true;
       }
 
@@ -792,13 +1184,17 @@ export function createApiRouter({ db, config, logger, mailer }) {
             request.headers[config.ssoNameHeader] || email.split("@")[0]
           ).slice(0, 120);
           const id = crypto.randomUUID();
+          const firstAccount = Number(db.prepare("SELECT COUNT(*) AS count FROM accounts").get().count) === 0;
           db.prepare(
-            "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)"
-          ).run(id, email, displayName, now(), now(), now());
+            "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)"
+          ).run(id, email, displayName, now(), firstAccount ? "admin" : "member", now(), now());
           account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(id);
         }
         if (account.deleted_at) {
           throw new HttpError(403, "account is pending deletion", "account_deleted");
+        }
+        if (account.status === "disabled") {
+          throw new HttpError(403, "account is disabled", "account_disabled");
         }
         const session = createSession(db, config, account, {
           ipHash,
@@ -956,9 +1352,19 @@ export function createApiRouter({ db, config, logger, mailer }) {
             deletion_requested_at: null,
             deleted_at: null,
           };
+          const firstAccount = Number(db.prepare("SELECT COUNT(*) AS count FROM accounts").get().count) === 0;
           db.prepare(
-            "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-          ).run(account.id, email, displayName, await hashPassword(password), now(), now(), now());
+            "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(
+            account.id,
+            email,
+            displayName,
+            await hashPassword(password),
+            now(),
+            firstAccount ? "admin" : "member",
+            now(),
+            now()
+          );
         } catch (error) {
           if (!/UNIQUE/.test(error.message)) throw error;
           sendJson(response, 202, { status: "registered" }, config);
@@ -977,7 +1383,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
         const body = await readJson(request);
         const email = normalizeEmail(body.email);
         const account = db
-          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL")
+          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL AND status = 'active'")
           .get(email);
         if (account && account.email_verified_at) {
           const recent = db
@@ -1025,7 +1431,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
           return true;
         }
         const account = db
-          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL")
+          .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL AND status = 'active'")
           .get(email);
         const otp = account
           ? db
@@ -1110,7 +1516,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
           body.password,
           account?.password_hash || DUMMY_PASSWORD_HASH
         );
-        if (!valid || !account || account.deleted_at) {
+        if (!valid || !account || account.deleted_at || account.status === "disabled") {
           recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
           sendJson(response, 401, { error: "Invalid email or password" }, config);
           return true;
@@ -1180,7 +1586,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
           password,
           account?.password_hash || DUMMY_PASSWORD_HASH
         );
-        if (!valid || !account || account.deleted_at) {
+        if (!valid || !account || account.deleted_at || account.status === "disabled") {
           recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
           sendJson(response, 401, { error: "Invalid email or password" }, config);
           return true;

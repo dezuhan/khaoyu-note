@@ -124,6 +124,7 @@ the app works offline; only optional video and map embeds need the internet.
 | System file drop | implemented: native drag and drop stores dropped files as assets, images open as image cards, audio and video use their media cards, raw files and all other documents become file cards; a drop overlay appears while dragging |
 | Template library | implemented: Blank board, Welcome board, Project plan, Kanban board, Meeting notes and Moodboard starters replace the active file and can be undone; applying one to a non-empty board asks for overwrite confirmation first |
 | Labels and reactions | out of scope for this local app |
+| Service admin dashboard | implemented at `/admin` on the self-hosted service: left rail with Overview, Accounts, Teams and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, team creation and members, and the full audit feed. The first service account is admin. |
 | Sharing and sync | optional: they need the self-hosted service in `service/` and are off by default |
 | Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, login and sharing architecture (planning only) |
 
@@ -251,8 +252,12 @@ sharing endpoints, configuration, backup and upgrade steps are documented in
 
 The service exposes project, item and column share links, passphrase and expiry controls, member
 roles, invitations and ownership transfer. The service account page is at `/account`, passkey
-management is at `/passkeys`, sharing is at `/shares`, and a shared link opens read-only at
-`/s/:token`. Desktop boards can opt in to server sync from the Sync control in the topbar: open it,
+management is at `/passkeys`, sharing is at `/shares`, the admin dashboard is at `/admin`, and a shared
+link opens read-only at `/s/:token`. The first registered account (or the account created by
+`bootstrap`) is the service admin. `/admin` uses the same signed-in session and shows Overview,
+Accounts, Teams and Activity with light and dark themes; admins can create teams, inspect every
+audit row and change another account's role or status. Desktop boards can opt in to server sync from
+the Sync control in the topbar: open it,
 enter the service URL and your account email and password, then choose Sign in and connect. A local
 service needs no domain: `127.0.0.1:8080`, `localhost:8080` and `http://localhost:8080` are all
 accepted, while a remote host defaults to `https`. The dialog calls `/readyz` (service and database),
@@ -264,7 +269,7 @@ immediately, and the verify UI is hidden. Reset mail uses SMTP when configured a
 otherwise the outbox. The service tests run with:
 
 ```powershell
-node --test service/test/service.test.mjs service/test/auth.test.mjs
+node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
 node tools/test-sync.mjs
 ```
 
@@ -410,7 +415,7 @@ node tools/test-disabled-cards.mjs
 node tools/test-auth-web.mjs
 
 # self-hosted service and account tests (Node 24, temp databases)
-node --test service/test/service.test.mjs service/test/auth.test.mjs
+node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
 
 # live security smoke check against a running service
 node tools/check-service-security.mjs --base http://127.0.0.1:8080 --credentials target/service-dev-credentials.json

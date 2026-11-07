@@ -73,13 +73,16 @@ export function authenticateAccess(db, token) {
     .prepare(
       `SELECT at.id AS access_id, at.expires_at AS access_expires_at,
               s.id AS session_id, s.family_id, s.csrf_hash, s.last_seen_at,
-              a.id, a.email, a.display_name, a.email_verified_at, a.deletion_requested_at,
+              a.id, a.email, a.display_name, a.username, a.first_name, a.last_name,
+              a.avatar_color, a.avatar_url, a.role, a.status,
+              a.email_verified_at, a.deletion_requested_at,
               a.deleted_at, a.totp_secret, a.totp_enabled_at
        FROM access_tokens at
        JOIN sessions s ON s.id = at.session_id
        JOIN accounts a ON a.id = s.account_id
        WHERE at.token_hash = ? AND at.revoked_at IS NULL AND at.expires_at > ?
-         AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL`
+         AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL
+         AND a.status = 'active'`
     )
     .get(hashToken(token), Date.now(), Date.now());
   if (!row) return null;
@@ -91,6 +94,13 @@ export function authenticateAccess(db, token) {
       id: row.id,
       email: row.email,
       display_name: row.display_name,
+      username: row.username,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      avatar_color: row.avatar_color,
+      avatar_url: row.avatar_url,
+      role: row.role,
+      status: row.status,
       email_verified_at: row.email_verified_at,
       deletion_requested_at: row.deletion_requested_at,
       totp_secret: row.totp_secret,
@@ -132,7 +142,8 @@ export function rotateRefresh(db, config, refreshToken, { ipHash, userAgent } = 
          JOIN sessions s ON s.id = rt.session_id
          JOIN accounts a ON a.id = s.account_id
          WHERE rt.token_hash = ? AND rt.used_at IS NULL AND rt.revoked_at IS NULL
-           AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL`
+           AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL
+           AND a.status = 'active'`
       )
       .get(tokenHash, Date.now());
     if (!current) {
@@ -257,11 +268,13 @@ export function authenticateApiToken(db, token) {
   const row = db
     .prepare(
       `SELECT t.id AS token_id, t.scopes, t.expires_at,
-              a.id, a.email, a.display_name, a.email_verified_at, a.deletion_requested_at,
+              a.id, a.email, a.display_name, a.username, a.avatar_color, a.avatar_url,
+              a.role, a.status, a.email_verified_at, a.deletion_requested_at,
               a.deleted_at
        FROM api_tokens t JOIN accounts a ON a.id = t.account_id
        WHERE t.token_hash = ? AND t.revoked_at IS NULL
-         AND (t.expires_at IS NULL OR t.expires_at > ?) AND a.deleted_at IS NULL`
+         AND (t.expires_at IS NULL OR t.expires_at > ?) AND a.deleted_at IS NULL
+         AND a.status = 'active'`
     )
     .get(hashToken(token), Date.now());
   if (!row) return null;
@@ -276,6 +289,11 @@ export function authenticateApiToken(db, token) {
       id: row.id,
       email: row.email,
       display_name: row.display_name,
+      username: row.username,
+      avatar_color: row.avatar_color,
+      avatar_url: row.avatar_url,
+      role: row.role,
+      status: row.status,
       email_verified_at: row.email_verified_at,
       deletion_requested_at: row.deletion_requested_at,
     },

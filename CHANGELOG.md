@@ -7,6 +7,11 @@ project uses Semantic Versioning.
 
 ### Added
 
+- Self-hosted service admin dashboard at `/admin`: left rail and content pane with Overview,
+  Accounts, Teams and Activity, light and dark themes, profile pictures or initials, user role and
+  active/disabled status, team creation and members, and the full audit activity feed. The first
+  service account becomes admin, migration 13 adds the profile and role columns, and disabled
+  accounts are blocked from password, OTP, SSO, refresh and API-token authentication.
 - Full board URLs in the browser edition. The web host binds to `0.0.0.0` by default, reports its
   LAN and optional public URLs, keeps `?board=<id>` in the address bar, and the Share panel copies a
   full board link. Devices on the same network can open it while the host runs and sign in with an
