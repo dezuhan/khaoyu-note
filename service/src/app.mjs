@@ -1,7 +1,15 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import { createApiRouter } from "./auth/routes.mjs";
 import { migrationStatus } from "./db.mjs";
-import { sendJson } from "./http.mjs";
+import { applySecurityHeaders, sendJson } from "./http.mjs";
+
+const PUBLIC_DIR = path.join(import.meta.dirname, "..", "public");
+const AUTH_PAGES = {
+  "/passkeys": ["passkeys.html", "text/html; charset=utf-8"],
+  "/passkeys.js": ["passkeys.js", "text/javascript; charset=utf-8"],
+};
 
 export function assertSchemaCurrent(db) {
   const pending = migrationStatus(db).filter((migration) => !migration.applied);
@@ -28,6 +36,17 @@ export function createService({ config, db, logger, mailer }) {
     const secure = request.socket.encrypted || (config.trustProxy && forwardedProto === "https");
     if (config.requireHttps && !secure) {
       sendJson(response, 426, { error: "HTTPS required", code: "https_required" }, config);
+      return;
+    }
+    const authPage = request.method === "GET" ? AUTH_PAGES[url.pathname] : null;
+    if (authPage) {
+      applySecurityHeaders(response, config);
+      response.setHeader(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
+      );
+      response.writeHead(200, { "Content-Type": authPage[1] });
+      response.end(fs.readFileSync(path.join(PUBLIC_DIR, authPage[0])));
       return;
     }
     response.on("finish", () => {

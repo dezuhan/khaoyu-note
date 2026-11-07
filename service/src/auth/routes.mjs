@@ -6,6 +6,14 @@ import { bearerToken, hashToken, parseCookies, randomToken, serializeCookie } fr
 import { createTotpSecret, generateTotp, totpUri, verifyTotp } from "./totp.mjs";
 import { clearLoginFailures, loginBlocked, recordLoginAttempt } from "./throttle.mjs";
 import {
+  authenticationOptions,
+  deletePasskey,
+  listPasskeys,
+  registrationOptions,
+  verifyAuthentication,
+  verifyRegistration,
+} from "./passkeys.mjs";
+import {
   acceptInvitation,
   cardInShareScope,
   createInvitation,
@@ -746,6 +754,115 @@ export function createApiRouter({ db, config, logger, mailer }) {
           },
           config
         );
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/register/options") {
+        if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        const auth = requireSessionAuth(request, response, db, config);
+        const options = await registrationOptions(db, config, auth.account);
+        sendJson(response, 200, { options }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/register/verify") {
+        if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        const auth = requireSessionAuth(request, response, db, config);
+        const body = await readJson(request);
+        try {
+          const id = await verifyRegistration(db, config, auth.account, body.response, body.name);
+          writeAudit(db, {
+            actorAccountId: auth.account.id,
+            action: "auth.passkey_added",
+            resourceType: "passkey",
+            resourceId: id,
+            ip,
+            secret: config.secret,
+          });
+          sendJson(response, 201, { id }, config);
+        } catch (error) {
+          throw new HttpError(400, error.message || "passkey registration failed", "passkey_failed");
+        }
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/login/options") {
+        if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const options = await authenticationOptions(db, config, email);
+        sendJson(response, 200, { options }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/login/verify") {
+        if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        try {
+          const account = await verifyAuthentication(db, config, email, body.response);
+          const session = createSession(db, config, account, {
+            ipHash,
+            userAgent: request.headers["user-agent"],
+          });
+          setSessionCookies(response, config, session);
+          writeAudit(db, {
+            actorAccountId: account.id,
+            action: "auth.passkey_login",
+            resourceType: "session",
+            resourceId: session.sessionId,
+            ip,
+            secret: config.secret,
+          });
+          sendJson(
+            response,
+            200,
+            {
+              account: publicAccount(account),
+              csrfToken: session.csrfToken,
+              accessExpiresAt: session.accessExpiresAt,
+            },
+            config
+          );
+        } catch (error) {
+          writeAudit(db, {
+            action: "auth.passkey_failed",
+            resourceType: "account",
+            ip,
+            secret: config.secret,
+          });
+          throw new HttpError(401, "passkey authentication failed", "invalid_credentials");
+        }
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/auth/passkeys") {
+        if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        const auth = requireSessionAuth(request, response, db, config);
+        sendJson(response, 200, { passkeys: listPasskeys(db, auth.account.id) }, config);
+        return true;
+      }
+
+      const passkeyMatch = url.pathname.match(/^\/api\/v1\/auth\/passkeys\/([^/]+)$/);
+      if (method === "DELETE" && passkeyMatch) {
+        if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
+        const auth = requireSessionAuth(request, response, db, config);
+        let removed;
+        try {
+          removed = deletePasskey(db, auth.account.id, decodeURIComponent(passkeyMatch[1]));
+        } catch (error) {
+          throw new HttpError(409, error.message, "passkey_last_credential");
+        }
+        if (!removed) throw new HttpError(404, "passkey not found", "not_found");
+        writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "auth.passkey_removed",
+          resourceType: "passkey",
+          resourceId: decodeURIComponent(passkeyMatch[1]),
+          ip,
+          secret: config.secret,
+        });
+        sendNoContent(response, 204, config);
         return true;
       }
 

@@ -66,8 +66,7 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
   }
 
   const trustProxy = boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false);
-  const ssoEnabled = boolean(env.KHAOYU_SERVICE_SSO_ENABLED, false);
-  const ssoSecret = env.KHAOYU_SERVICE_SSO_SECRET || "";
+  const ssoEnabled = boolean(env.KHAOYU_SERVICE_SSO_ENABLED, false);  const ssoSecret = env.KHAOYU_SERVICE_SSO_SECRET || "";
   const ssoHeader = (env.KHAOYU_SERVICE_SSO_HEADER || "x-auth-request-email").toLowerCase();
   const ssoNameHeader = (env.KHAOYU_SERVICE_SSO_NAME_HEADER || "x-auth-request-name").toLowerCase();
   if (!/^x-[a-z0-9-]+$/.test(ssoHeader) || !/^x-[a-z0-9-]+$/.test(ssoNameHeader)) {
@@ -78,6 +77,12 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     if (Buffer.byteLength(ssoSecret, "utf8") < 32) {
       throw new Error("KHAOYU_SERVICE_SSO_SECRET must be at least 32 characters when SSO is enabled");
     }
+  }
+
+  const passkeysEnabled = boolean(env.KHAOYU_SERVICE_PASSKEYS_ENABLED, true);
+  const rpId = (env.KHAOYU_SERVICE_RP_ID || new URL(publicUrl).hostname).toLowerCase();
+  if (!/^[a-z0-9.-]+$/.test(rpId)) {
+    throw new Error("KHAOYU_SERVICE_RP_ID must be a hostname");
   }
 
   const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
@@ -112,6 +117,8 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     ssoHeader,
     ssoNameHeader,
     ssoAutoCreate: boolean(env.KHAOYU_SERVICE_SSO_AUTO_CREATE, false),
+    passkeysEnabled,
+    rpId,
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
     adminToken,
     backupPassphrase,

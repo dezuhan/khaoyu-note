@@ -72,6 +72,9 @@ function pruneTokens(db) {
   const notifications = db
     .prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND read_at < ?")
     .run(now - 90 * 86_400_000).changes;
+  const passkeyChallenges = db
+    .prepare("DELETE FROM passkey_challenges WHERE expires_at < ?")
+    .run(now).changes;
   return {
     access: Number(access),
     email: Number(email),
@@ -80,6 +83,7 @@ function pruneTokens(db) {
     otp: Number(otp),
     versions,
     notifications: Number(notifications),
+    passkeyChallenges: Number(passkeyChallenges),
   };
 }
 
