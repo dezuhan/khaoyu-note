@@ -14,6 +14,7 @@ import {
   attachImage,
   attachFile,
   attachLinkHeader,
+  removeLinkHeader,
   assetPathForCard,
   bringToFront,
   canWrapInColumn,
@@ -1767,6 +1768,12 @@ window.addEventListener("mn:open-menu", (event) => {
           text: card.headerImage ? "Change header image" : "Add header image",
           onClick: () => pickFile("image/*", (file) => attachLinkHeader(card.id, file)),
         });
+        if (card.headerImage) {
+          items.push({
+            text: "Remove header image",
+            onClick: () => removeLinkHeader(card.id),
+          });
+        }
         items.push({ type: "sep" });
       }
       const assetPath = assetPathForCard(card);

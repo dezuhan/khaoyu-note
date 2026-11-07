@@ -504,6 +504,13 @@ export async function attachLinkHeader(cardId, file) {
   }
 }
 
+export function removeLinkHeader(cardId) {
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "link" || card.locked || !card.headerImage) return;
+  delete card.headerImage;
+  markDirty("board");
+}
+
 export async function attachAudio(cardId, file) {
   const card = getCard(state.board, cardId);
   if (!card || !uploadAllowed(file)) return;

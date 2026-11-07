@@ -1947,6 +1947,15 @@ if (await linkCard.count()) {
     "Link header image renders a visible preview",
     (await headerImage.count()) === 1 && (await headerImage.isVisible()) && (await headerImage.boundingBox())?.height > 0
   );
+  await linkCard.click({ button: "right" });
+  await page.waitForTimeout(250);
+  check(
+    "Link menu offers Remove header image when a header exists",
+    (await page.locator(".mn-menu-item", { hasText: "Remove header image" }).count()) === 1
+  );
+  await page.locator(".mn-menu-item", { hasText: "Remove header image" }).click();
+  await page.waitForTimeout(400);
+  check("Remove header image clears the preview", (await linkCard.locator(".mn-link-header").count()) === 0);
 }
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
