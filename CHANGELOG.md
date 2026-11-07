@@ -12,6 +12,14 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.28.2] - 2026-11-07
+
+### Fixed
+
+- A malformed request target such as `//` no longer throws `ERR_INVALID_URL` and terminates the
+  service; it now returns 400 `bad_request`, and the service stays ready.
+- Added a raw-socket regression test that verifies the 400 response and a healthy `/readyz` afterward.
+
 ## [0.28.1] - 2026-11-07
 
 ### Fixed
