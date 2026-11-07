@@ -15,8 +15,8 @@ uploads unsigned bundles. It is defined but has not been executed in this worksp
 | Android | APK/AAB | Not started, requires mobile port |
 | iOS | TestFlight | Not started, requires macOS, Xcode and Apple account |
 
-The local MCP server (`khaoyu-note-mcp`) is built and uploaded beside the desktop app. It is not yet embedded
-as a Tauri sidecar inside the installers.
+The local MCP server (`khaoyu-note-mcp`) is built and both Windows installers include it beside the
+desktop executable.
 
 ## Windows
 
@@ -29,8 +29,8 @@ cmd /c "call ""C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxili
 
 Outputs:
 
-- `src-tauri/target/release/bundle/nsis/Khaoyu Note_0.32.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/Khaoyu Note_0.32.0_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/Khaoyu Note_0.33.0_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/Khaoyu Note_0.33.0_x64_en-US.msi`
 - `src-tauri/target/release/khaoyu-note.exe`
 - `src-tauri/target/release/khaoyu-note-mcp.exe`
 

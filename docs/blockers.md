@@ -41,16 +41,16 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 - Sync engine checks: passing.
 - UI suite: 263 checks defined in `tools/test-ui.mjs`.
 - Live security check: 20 checks.
-- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt` for 0.32.0; rebuild for
-  0.33.0.
+- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt` for 0.33.0; signing is
+  still pending.
 - Linux and macOS: matrix workflow defined, never executed on this machine.
 
 ## Next items for the next session
 
 1. Add a Restore control to the Backup pane; the `stage_restore` command already validates and stages
    a backup.
-2. Bundle `khaoyu-note-mcp` into the Tauri installers as a sidecar, or keep documenting the manual
-   copy.
+2. Document that both installers include `khaoyu-note-mcp.exe` beside the desktop executable; the
+   portable build ships both files. Remove the old manual-copy instruction from release notes.
 3. Run the Playwright suites and the MCP smoke suite on a machine with a browser and the built binary
    before tagging 0.33.0.
 4. Re-enable the Map, Video and Audio tools once their embed paths are reliable again. The policy

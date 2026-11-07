@@ -425,15 +425,14 @@ menu, and persistence (263 checks). The MCP suite spawns `khaoyu-note-mcp.exe` a
 checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
 boards, connections and tree deletion (17 checks).
 
-Built artifacts are copied to `dist/`. The files below are the last built release (0.32.0); run
-`npx tauri build` to produce the 0.33.0 installers:
+Built artifacts are copied to `dist/`. The files below are the last built release (0.33.0):
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.32.0_x64-setup.exe` | 4.07 MiB | NSIS installer (app only; build the MCP binary separately) |
-| `Khaoyu Note_0.32.0_x64_en-US.msi` | 6.64 MiB | MSI installer (app only) |
-| `KhaoyuNote.exe` | 13.58 MiB | standalone executable (SQLite bundled, GPU flag aware) |
-| `khaoyu-note-mcp.exe` | 2.68 MiB | standalone MCP server for AI agents |
+| `Khaoyu Note_0.33.0_x64-setup.exe` | 4.15 MiB | NSIS installer (app and MCP binary) |
+| `Khaoyu Note_0.33.0_x64_en-US.msi` | 6.75 MiB | MSI installer (app and MCP binary) |
+| `KhaoyuNote.exe` | 13.82 MiB | standalone executable (SQLite bundled, GPU flag aware) |
+| `khaoyu-note-mcp.exe` | 2.71 MiB | standalone MCP server for AI agents |
 
 Rebuild them with `npx tauri build` (with `CARGO_TARGET_DIR` set as above).
 
