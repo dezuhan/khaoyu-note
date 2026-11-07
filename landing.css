@@ -600,39 +600,40 @@ body.lp {
 
 .lp-license-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 22px 16px;
+  padding: 18px 22px 14px;
   border-bottom: 1px solid var(--lp-line);
 }
 
 .lp-license-head h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 21px;
   letter-spacing: -0.035em;
+  line-height: 1.15;
 }
 
 .lp-license-head .lp-kicker {
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .lp-license-body {
-  padding: 18px 22px;
+  padding: 18px 22px 16px;
 }
 
 .lp-license-body > p {
   margin: 0;
   color: var(--ky-muted);
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
 .lp-license-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
-  margin: 18px 0;
+  margin: 16px 0 14px;
   overflow: hidden;
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-control);
@@ -640,15 +641,16 @@ body.lp {
 }
 
 .lp-license-grid section {
-  padding: 12px;
+  padding: 12px 14px 14px;
   background: var(--ky-bg);
 }
 
 .lp-license-grid h3 {
-  margin: 0 0 8px;
+  margin: 0 0 7px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
+  line-height: 1.4;
   text-transform: uppercase;
 }
 
@@ -658,33 +660,35 @@ body.lp {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .lp-license-grid li {
   color: var(--ky-muted);
   font-size: 10.5px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .lp-license-grid li::before {
   content: "·";
-  margin-right: 6px;
+  margin-right: 5px;
   color: var(--ky-soft);
 }
 
 .lp-license-note {
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--lp-line);
   color: var(--ky-soft) !important;
   font-size: 10px !important;
+  line-height: 1.6 !important;
 }
 
 .lp-license-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 14px 22px 20px;
+  padding: 14px 22px 16px;
   border-top: 1px solid var(--lp-line);
 }
 
