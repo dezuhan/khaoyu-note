@@ -14,7 +14,9 @@ struct AppDb(Mutex<Connection>);
 const MAX_ASSET_BYTES: u64 = 100 * 1024 * 1024;
 const CURRENT_SCHEMA_VERSION: i64 = 1;
 pub const DB_FILE: &str = "khaoyu-note.db";
-// Only used to find and migrate data written by releases before the rename.
+// Only used to find and migrate data written by releases before the rename. These values must keep
+// matching the identifiers those releases actually wrote, or the migration becomes a no-op and an
+// upgraded install starts on an empty database.
 const LEGACY_APP_IDENTIFIER: &str = "com.dezuhan.milanoteclone";
 const LEGACY_DB_FILE: &str = "milanote.db";
 const BLOCKED_ASSET_EXTENSIONS: &[&str] = &[
@@ -44,6 +46,166 @@ fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<(), String> {
             fs::copy(&path, &target).map_err(|e| e.to_string())?;
         }
     }
+    Ok(())
+}
+
+/// CRC-32 (IEEE 802.3) for the ZIP container. The backup export writes an uncompressed (STORE)
+/// archive on purpose: the payload is a SQLite snapshot plus media assets that are already
+/// compressed, so deflate would add a dependency and save almost nothing.
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut table = [0u32; 256];
+    for (index, slot) in table.iter_mut().enumerate() {
+        let mut value = index as u32;
+        for _ in 0..8 {
+            value = if value & 1 == 1 {
+                0xEDB8_8320 ^ (value >> 1)
+            } else {
+                value >> 1
+            };
+        }
+        *slot = value;
+    }
+    let mut crc = 0xFFFF_FFFFu32;
+    for byte in bytes {
+        crc = table[((crc ^ *byte as u32) & 0xFF) as usize] ^ (crc >> 8);
+    }
+    !crc
+}
+
+fn push_u16(buffer: &mut Vec<u8>, value: u16) {
+    buffer.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_u32(buffer: &mut Vec<u8>, value: u32) {
+    buffer.extend_from_slice(&value.to_le_bytes());
+}
+
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    (if month <= 2 { year + 1 } else { year }, month as u32, day as u32)
+}
+
+/// DOS date and time fields used by the ZIP local and central headers.
+fn dos_datetime(time: SystemTime) -> (u16, u16) {
+    let seconds = time
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_secs() as i64)
+        .unwrap_or(0);
+    let days = seconds.div_euclid(86_400);
+    let remaining = seconds.rem_euclid(86_400);
+    let (year, month, day) = civil_from_days(days);
+    let year = year.clamp(1980, 2107);
+    let date = (((year - 1980) as u16) << 9) | ((month as u16) << 5) | day as u16;
+    let clock = (((remaining / 3_600) as u16) << 11)
+        | (((remaining % 3_600) / 60) as u16) << 5
+        | ((remaining % 60) / 2) as u16;
+    (clock, date)
+}
+
+fn collect_zip_entries(
+    root: &Path,
+    directory: &Path,
+    entries: &mut Vec<(String, PathBuf)>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(directory).map_err(|e| e.to_string())?.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_zip_entries(root, &path, entries)?;
+        } else if path.is_file() {
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            entries.push((relative, path));
+        }
+    }
+    Ok(())
+}
+
+/// Write every file under `source` into an uncompressed ZIP archive at `zip_path`.
+fn write_zip_directory(source: &Path, zip_path: &Path) -> Result<(), String> {
+    let mut entries = Vec::new();
+    collect_zip_entries(source, source, &mut entries)?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    if entries.len() > u16::MAX as usize {
+        return Err("the backup has too many files for a ZIP archive".into());
+    }
+    let (dos_time, dos_date) = dos_datetime(SystemTime::now());
+    let file = fs::File::create(zip_path).map_err(|e| e.to_string())?;
+    let mut writer = std::io::BufWriter::new(file);
+    let mut central: Vec<u8> = Vec::new();
+    let mut offset: u64 = 0;
+    for (name, path) in &entries {
+        if name.len() > u16::MAX as usize {
+            return Err(format!("{name} is too long for a ZIP archive"));
+        }
+        let data = fs::read(path).map_err(|e| format!("could not read {}: {e}", path.display()))?;
+        if data.len() > u32::MAX as usize {
+            return Err(format!("{name} is too large for a ZIP archive"));
+        }
+        let crc = crc32(&data);
+        let mut header = Vec::with_capacity(30 + name.len());
+        push_u32(&mut header, 0x0403_4b50);
+        push_u16(&mut header, 20);
+        push_u16(&mut header, 0x0800);
+        push_u16(&mut header, 0);
+        push_u16(&mut header, dos_time);
+        push_u16(&mut header, dos_date);
+        push_u32(&mut header, crc);
+        push_u32(&mut header, data.len() as u32);
+        push_u32(&mut header, data.len() as u32);
+        push_u16(&mut header, name.len() as u16);
+        push_u16(&mut header, 0);
+        header.extend_from_slice(name.as_bytes());
+        std::io::Write::write_all(&mut writer, &header).map_err(|e| e.to_string())?;
+        std::io::Write::write_all(&mut writer, &data).map_err(|e| e.to_string())?;
+
+        push_u32(&mut central, 0x0201_4b50);
+        push_u16(&mut central, 20);
+        push_u16(&mut central, 20);
+        push_u16(&mut central, 0x0800);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, dos_time);
+        push_u16(&mut central, dos_date);
+        push_u32(&mut central, crc);
+        push_u32(&mut central, data.len() as u32);
+        push_u32(&mut central, data.len() as u32);
+        push_u16(&mut central, name.len() as u16);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, 0);
+        push_u32(&mut central, offset as u32);
+        central.extend_from_slice(name.as_bytes());
+
+        offset += (header.len() + data.len()) as u64;
+    }
+    if offset > u32::MAX as u64 {
+        return Err("the backup is larger than a ZIP archive can address".into());
+    }
+    let central_offset = offset;
+    std::io::Write::write_all(&mut writer, &central).map_err(|e| e.to_string())?;
+    let mut end = Vec::with_capacity(22);
+    push_u32(&mut end, 0x0605_4b50);
+    push_u16(&mut end, 0);
+    push_u16(&mut end, 0);
+    push_u16(&mut end, entries.len() as u16);
+    push_u16(&mut end, entries.len() as u16);
+    push_u32(&mut end, central.len() as u32);
+    push_u32(&mut end, central_offset as u32);
+    push_u16(&mut end, 0);
+    std::io::Write::write_all(&mut writer, &end).map_err(|e| e.to_string())?;
+    std::io::Write::flush(&mut writer).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1184,6 +1346,18 @@ fn backup_data(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn export_backup_zip(app: tauri::AppHandle) -> Result<String, String> {
+    let source = backup_data(app)?;
+    let source_path = PathBuf::from(&source);
+    let zip_path = source_path.with_extension("zip");
+    if let Err(error) = write_zip_directory(&source_path, &zip_path) {
+        let _ = fs::remove_file(&zip_path);
+        return Err(error);
+    }
+    Ok(zip_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn db_integrity(db: State<'_, AppDb>) -> Result<String, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))
@@ -1462,6 +1636,7 @@ pub fn run() {
             store_asset,
             store_asset_from_path,
             backup_data,
+            export_backup_zip,
             db_integrity,
             stage_restore,
             export_board,
@@ -1532,6 +1707,38 @@ mod tests {
                 CURRENT_SCHEMA_VERSION
             );
         }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn backup_zip_is_a_valid_store_archive() {
+        assert_eq!(crc32(b""), 0);
+        assert_eq!(crc32(b"hello"), 0x3610_A686);
+
+        let root = test_root("zip-export");
+        let source = root.join("khaoyu-note-1");
+        fs::create_dir_all(source.join("assets")).expect("backup folders");
+        fs::write(source.join(DB_FILE), b"database").expect("backup database");
+        fs::write(source.join("assets").join("catatan.txt"), b"hello").expect("backup asset");
+
+        let zip_path = source.with_extension("zip");
+        write_zip_directory(&source, &zip_path).expect("write zip");
+        let archive = fs::read(&zip_path).expect("read zip");
+
+        assert_eq!(&archive[0..4], b"PK\x03\x04", "local file header signature");
+        let end = archive.len() - 22;
+        assert_eq!(&archive[end..end + 4], b"PK\x05\x06", "end of central directory");
+        assert_eq!(u16::from_le_bytes([archive[end + 10], archive[end + 11]]), 2);
+        let text = String::from_utf8_lossy(&archive);
+        assert!(text.contains(DB_FILE), "archive keeps the database name");
+        assert!(
+            text.contains("assets/catatan.txt"),
+            "archive uses forward slashes for nested assets"
+        );
+        assert!(
+            archive.windows(4).any(|window| window == [0x86, 0xA6, 0x10, 0x36]),
+            "archive stores the CRC of the asset bytes"
+        );
         let _ = fs::remove_dir_all(root);
     }
 

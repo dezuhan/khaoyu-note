@@ -991,7 +991,8 @@ await page.waitForTimeout(500);
 check(
   "YouTube link starts behind a centered play overlay",
   (await videoCard.locator(".mn-video-play").isVisible()) &&
-    (await videoCard.locator("iframe").count()) === 0
+    (await videoCard.locator("iframe").count()) === 0 &&
+    (await videoCard.boundingBox()).height >= 120
 );
 await videoCard.locator(".mn-video-play").click();
 await page.waitForTimeout(600);
@@ -1002,10 +1003,14 @@ check(
     (await videoCard.locator("iframe").getAttribute("src")).includes("autoplay=1")
 );
 check(
-  "Playing video exposes pause, mute and volume controls",
+  "Playing video exposes pause, mute, seek, time and volume controls",
   (await videoCard.locator(".mn-video-controls").isVisible()) &&
     (await videoCard.locator('[data-action="video-toggle"]').count()) === 1 &&
     (await videoCard.locator('[data-action="video-mute"]').count()) === 1 &&
+    (await videoCard.locator('[data-action="video-back5"]').count()) === 1 &&
+    (await videoCard.locator('[data-action="video-forward5"]').count()) === 1 &&
+    (await videoCard.locator("[data-video-seek]").count()) === 1 &&
+    (await videoCard.locator("[data-video-time]").count()) === 1 &&
     (await videoCard.locator("[data-video-volume]").count()) === 1
 );
 await videoCard.locator("[data-video-volume]").fill("400");
@@ -1038,16 +1043,17 @@ check(
     (await page.locator(".mn-menu-item", { hasText: "Pause" }).getAttribute("disabled")) !== null
 );
 check(
-  "Media context menu offers a Repeat checkbox",
-  (await page.locator(".mn-menu-item", { hasText: /Repeat/ }).count()) === 1
+  "Media context menu offers a native Repeat checkbox on the right",
+  (await page.locator(".mn-menu-item", { hasText: /Repeat/ }).locator('input[type="checkbox"]').count()) === 1 &&
+    !(await page.locator(".mn-menu-item", { hasText: /Repeat/ }).locator('input[type="checkbox"]').isChecked())
 );
 await page.locator(".mn-menu-item", { hasText: /Repeat/ }).click();
 await page.waitForTimeout(350);
 await videoCard.click({ button: "right" });
 await page.waitForTimeout(250);
 check(
-  "Repeat toggles on in the context menu",
-  (await page.locator(".mn-menu-item", { hasText: "☑ Repeat" }).count()) === 1
+  "Repeat toggles the native checkbox on",
+  await page.locator(".mn-menu-item", { hasText: /Repeat/ }).locator('input[type="checkbox"]').isChecked()
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(150);
@@ -1688,7 +1694,7 @@ check(
 const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
 check(
   "Settings navigation follows the requested order",
-  navLabels.join(",") === "Account,General,Appearance,Tools,Performance,MCP,About",
+  navLabels.join(",") === "Account,Backup,General,Appearance,Tools,Performance,MCP,About",
   navLabels.join(", ")
 );
 check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
@@ -1702,10 +1708,14 @@ check(
     (await page.locator(".mn-account-grid").innerText()).includes("Passkeys") &&
     (await page.locator(".mn-account-grid").innerText()).includes("Sharing")
 );
+check("Account no longer contains the backup controls", (await page.locator(".mn-account-backup").count()) === 0);
+await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();
+await page.waitForTimeout(300);
 check(
-  "Account page exposes local backup controls",
+  "Backup page exposes backup, ZIP export and open folder controls",
   (await page.locator(".mn-account-backup").isVisible()) &&
-    (await page.locator(".mn-account-backup-actions .mn-btn", { hasText: "Back up now" }).count()) === 1
+    (await page.locator(".mn-account-backup-actions .mn-btn", { hasText: "Back up now" }).count()) === 1 &&
+    (await page.locator(".mn-account-backup-actions .mn-btn", { hasText: "Export ZIP" }).count()) === 1
 );
 await page.locator(".mn-prefs-nav-item", { hasText: "General" }).click();
 await page.waitForTimeout(300);
@@ -1740,7 +1750,7 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 7, String(await page.locator(".mn-prefs-nav-item").count()));
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 8, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
   "Language and Canvas are merged away",
   !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),

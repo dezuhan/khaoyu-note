@@ -7,6 +7,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { zipSync } from "fflate";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.join(ROOT, "app", "web");
@@ -370,6 +371,26 @@ async function fetchLinkPreview(url) {
   return { data: bytes.toString("base64"), name: `link-hero.${extension}`, mime };
 }
 
+function exportBackupZip() {
+  const source = backupData();
+  const entries = {};
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const target = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(target);
+      } else {
+        const relative = path.relative(source, target).split(path.sep).join("/");
+        entries[relative] = new Uint8Array(fs.readFileSync(target));
+      }
+    }
+  };
+  walk(source);
+  const zipPath = `${source}.zip`;
+  fs.writeFileSync(zipPath, Buffer.from(zipSync(entries, { level: 6 })));
+  return zipPath;
+}
+
 async function invoke(cmd, args = {}) {
   switch (cmd) {
     case "list_boards":
@@ -430,6 +451,8 @@ async function invoke(cmd, args = {}) {
       return "";
     case "backup_data":
       return backupData();
+    case "export_backup_zip":
+      return exportBackupZip();
     case "db_integrity":
       return db.prepare("PRAGMA integrity_check").get().integrity_check;
     case "export_board":

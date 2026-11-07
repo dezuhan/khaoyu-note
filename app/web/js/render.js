@@ -451,15 +451,21 @@ function contentFor(card) {
             : "";
           const controls = started
             ? `<div class="mn-video-controls">
+                <button type="button" class="mn-video-control mn-video-back" data-action="video-back5" title="Back 5 seconds" aria-label="Back 5 seconds">−5</button>
                 <button type="button" class="mn-video-control mn-video-toggle" data-action="video-toggle" title="Play or pause">
                   <span class="mn-video-play-icon">${icon("play", 14)}</span>
                   <span class="mn-video-pause-icon">${icon("pause", 14)}</span>
                 </button>
-                <button type="button" class="mn-video-control mn-video-mute" data-action="video-mute" title="Mute or unmute">
-                  <span class="mn-video-volume-icon">${icon("volume", 14)}</span>
-                  <span class="mn-video-muted-icon">${icon("volumeOff", 14)}</span>
-                </button>
-                <input type="range" class="mn-video-volume" data-video-volume min="0" max="1000" value="1000" aria-label="Video volume" />
+                <button type="button" class="mn-video-control mn-video-forward" data-action="video-forward5" title="Forward 5 seconds" aria-label="Forward 5 seconds">+5</button>
+                <input type="range" class="mn-video-seek" data-video-seek min="0" max="1000" value="0" aria-label="Seek video" />
+                <span class="mn-video-time" data-video-time>0:00</span>
+                <div class="mn-video-volume-wrap">
+                  <button type="button" class="mn-video-control mn-video-mute" data-action="video-mute" title="Mute or unmute">
+                    <span class="mn-video-volume-icon">${icon("volume", 14)}</span>
+                    <span class="mn-video-muted-icon">${icon("volumeOff", 14)}</span>
+                  </button>
+                  <input type="range" class="mn-video-volume" data-video-volume min="0" max="1000" value="1000" aria-label="Video volume" />
+                </div>
               </div>`
             : "";
           return `<div class="mn-video${started ? " is-started" : ""}${

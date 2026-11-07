@@ -91,6 +91,7 @@ export function initInteractions(refs) {
   for (const eventName of ["timeupdate", "durationchange", "play", "pause", "ended", "volumechange"]) {
     cardsEl.addEventListener(eventName, onAudioMediaEvent, true);
   }
+  window.addEventListener("message", onMediaFrameMessage);
 
   window.addEventListener("keydown", onWindowKeyDown);
   window.addEventListener("keyup", onWindowKeyUp);
@@ -1486,11 +1487,27 @@ function postVideoFrame(card, func, args = []) {
   const frame = cardElement(card.id)?.querySelector("iframe");
   if (!frame?.contentWindow) return false;
   if (/vimeo\.com/i.test(card.url || "")) {
-    const method = func === "pauseVideo" ? "pause" : func === "playVideo" ? "play" : "setVolume";
+    const method =
+      func === "pauseVideo"
+        ? "pause"
+        : func === "playVideo"
+          ? "play"
+          : func === "seekTo"
+            ? "setCurrentTime"
+            : "setVolume";
     frame.contentWindow.postMessage(
       JSON.stringify({
         method,
-        value: method === "setVolume" ? (func === "mute" ? 0 : func === "unMute" ? 1 : args[0]) : undefined,
+        value:
+          method === "setVolume"
+            ? func === "mute"
+              ? 0
+              : func === "unMute"
+                ? 1
+                : args[0]
+            : method === "setCurrentTime"
+              ? args[0]
+              : undefined,
       }),
       "*"
     );
@@ -1503,6 +1520,50 @@ function postVideoFrame(card, func, args = []) {
   return true;
 }
 
+function formatMediaTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function updateVideoControls(card) {
+  const wrap = cardElement(card.id)?.querySelector(".mn-video");
+  if (!wrap) return;
+  const duration = Number(card.__mediaDuration) || 0;
+  const time = Math.max(0, Math.min(Number(card.__mediaTime) || 0, duration || Infinity));
+  const seek = wrap.querySelector("[data-video-seek]");
+  if (seek && document.activeElement !== seek) {
+    seek.value = String(duration ? Math.round((time / duration) * 1000) : 0);
+    seek.style.setProperty("--video-progress", `${duration ? Math.min(100, (time / duration) * 100) : 0}%`);
+  }
+  const label = wrap.querySelector("[data-video-time]");
+  if (label) label.textContent = `${formatMediaTime(time)} / ${formatMediaTime(duration)}`;
+  wrap.classList.toggle("is-playing", Boolean(card.__mediaPlaying));
+}
+
+function onMediaFrameMessage(event) {
+  if (!state.board) return;
+  for (const card of state.board.cards) {
+    if (card.type !== "video") continue;
+    const frame = cardElement(card.id)?.querySelector("iframe");
+    if (!frame || frame.contentWindow !== event.source) continue;
+    let data = event.data;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        continue;
+      }
+    }
+    if (data?.event !== "infoDelivery" || !data.info) continue;
+    if (Number.isFinite(data.info.currentTime)) card.__mediaTime = data.info.currentTime;
+    if (Number.isFinite(data.info.duration)) card.__mediaDuration = data.info.duration;
+    if (data.info.playerState === 1) card.__mediaPlaying = true;
+    if (data.info.playerState === 2) card.__mediaPlaying = false;
+    updateVideoControls(card);
+  }
+}
+
 function updateVideoUI(wrap, video = null) {
   if (!wrap) return;
   const playing = video ? !video.paused && !video.ended : wrap.classList.contains("is-playing");
@@ -1511,6 +1572,16 @@ function updateVideoUI(wrap, video = null) {
   const volume = wrap.querySelector("[data-video-volume]");
   if (volume && video) {
     volume.value = String(Math.round((video.muted ? 0 : video.volume) * 1000));
+  }
+  if (video) {
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    const seek = wrap.querySelector("[data-video-seek]");
+    if (seek && document.activeElement !== seek) {
+      seek.value = String(duration ? Math.round((video.currentTime / duration) * 1000) : 0);
+      seek.style.setProperty("--video-progress", `${duration ? Math.min(100, (video.currentTime / duration) * 100) : 0}%`);
+    }
+    const label = wrap.querySelector("[data-video-time]");
+    if (label) label.textContent = `${formatMediaTime(video.currentTime)} / ${formatMediaTime(duration)}`;
   }
 }
 
@@ -1578,6 +1649,25 @@ function onInput(event) {
       audio.muted = false;
       updateAudioUI(audio);
     }
+    return;
+  }
+  if (target.matches("[data-video-seek]")) {
+    const wrap = cardElement(card.id)?.querySelector(".mn-video");
+    const video = wrap?.querySelector("video");
+    const duration = video
+      ? Number.isFinite(video.duration) && video.duration > 0
+        ? video.duration
+        : 0
+      : Number(card.__mediaDuration) || 0;
+    const time = (Number(target.value) / 1000) * duration;
+    if (video) {
+      video.currentTime = time;
+      card.__mediaTime = time;
+    } else if (wrap) {
+      card.__mediaTime = time;
+      postVideoFrame(card, "seekTo", [time, true]);
+    }
+    updateVideoControls(card);
     return;
   }
   if (target.matches("[data-video-volume]")) {
@@ -1912,6 +2002,27 @@ function onClick(event) {
       }
       break;
     }
+    case "video-back5":
+    case "video-forward5": {
+      const delta = action === "video-back5" ? -5 : 5;
+      const wrap = cardElement(card.id)?.querySelector(".mn-video");
+      const video = wrap?.querySelector("video");
+      if (video) {
+        const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+        video.currentTime = Math.max(
+          0,
+          Math.min(duration || video.currentTime + delta, video.currentTime + delta)
+        );
+        card.__mediaTime = video.currentTime;
+      } else if (wrap) {
+        const duration = Number(card.__mediaDuration) || 0;
+        const next = Math.max(0, Math.min(duration || Infinity, (Number(card.__mediaTime) || 0) + delta));
+        card.__mediaTime = next;
+        postVideoFrame(card, "seekTo", [next, true]);
+      }
+      updateVideoControls(card);
+      break;
+    }
     case "video-toggle": {
       const wrap = cardElement(card.id)?.querySelector(".mn-video");
       const video = wrap?.querySelector("video");
@@ -1968,6 +2079,12 @@ function onClick(event) {
       const field = card.type === "map" ? "query" : "url";
       if (value) card[field] = value;
       delete card.__editEmbed;
+      if (card.type === "video") {
+        card.h = Math.max(card.h || 0, Math.round(card.w * (9 / 16)));
+      }
+      if (card.type === "map") {
+        card.h = Math.max(card.h || 0, 190);
+      }
       markDirty("board");
       refreshCard(card.id);
       syncAutoHeight(card);

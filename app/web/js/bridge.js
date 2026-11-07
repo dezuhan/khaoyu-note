@@ -199,6 +199,11 @@ export async function backupData() {
   throw new Error("Backups are only available in the desktop app");
 }
 
+export async function exportBackupZip() {
+  if (hasTauri) return invoke("export_backup_zip");
+  throw new Error("ZIP export is only available in the desktop app");
+}
+
 export async function dbIntegrity() {
   if (hasTauri) return invoke("db_integrity");
   throw new Error("Integrity checks are only available in the desktop app");

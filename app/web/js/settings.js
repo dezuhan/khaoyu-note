@@ -61,6 +61,7 @@ const HEADING_FONT_CHOICES = [["Georgia", "Georgia (system serif)"], ...FONT_CHO
 
 const NAV = [
   { id: "account", label: "Account" },
+  { id: "backup", label: "Backup" },
   { divider: true },
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
@@ -311,6 +312,13 @@ function pages() {
       divider: false,
       rows: () => [
         { type: "note", text: "Optional self-hosted service account, passkeys, API tokens and sharing." },
+      ],
+    },
+    {
+      id: "backup",
+      title: "Backup",
+      rows: () => [
+        { type: "note", text: "Back up or export the local database, assets and settings." },
       ],
     },
     { divider: true },
@@ -703,6 +711,8 @@ function renderContent() {
   const page = pages().find((entry) => !entry.divider && entry.id === activePage);
   if (activePage === "account") {
     renderAccountPage(content);
+  } else if (activePage === "backup") {
+    renderBackupPage(content);
   } else if (activePage === "tools") {
     content.append(heading("Tools"));
     renderToolsGrid(content);
@@ -803,15 +813,16 @@ function renderAccountPage(content) {
     window.dispatchEvent(new CustomEvent("mn:open-docs"));
   });
   content.append(docs);
+}
+
+function renderBackupPage(content) {
+  content.append(heading("Backup"));
   renderBackupSection(content);
 }
 
 function renderBackupSection(content) {
   const section = document.createElement("div");
   section.className = "mn-account-backup";
-  const title = document.createElement("div");
-  title.className = "mn-prefs-group-label";
-  title.textContent = "Backup";
   const note = document.createElement("p");
   note.className = "mn-prefs-note";
   note.textContent =
@@ -831,6 +842,10 @@ function renderBackupSection(content) {
   open.className = "mn-btn mn-btn-quiet";
   open.textContent = "Open folder";
   open.disabled = true;
+  const exportZip = document.createElement("button");
+  exportZip.type = "button";
+  exportZip.className = "mn-btn";
+  exportZip.textContent = "Export ZIP";
   backup.addEventListener("click", async () => {
     backup.disabled = true;
     status.textContent = "Creating backup...";
@@ -848,8 +863,22 @@ function renderBackupSection(content) {
   open.addEventListener("click", () => {
     if (lastPath) bridge.openPath(lastPath).catch(() => {});
   });
-  row.append(backup, open);
-  section.append(title, note, status, row);
+  exportZip.addEventListener("click", async () => {
+    exportZip.disabled = true;
+    status.textContent = "Exporting ZIP...";
+    try {
+      lastPath = await bridge.exportBackupZip();
+      status.textContent = `ZIP created: ${lastPath}`;
+      open.disabled = false;
+      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Backup ZIP exported" } }));
+    } catch (error) {
+      status.textContent = error.message || "ZIP export failed";
+    } finally {
+      exportZip.disabled = false;
+    }
+  });
+  row.append(backup, exportZip, open);
+  section.append(note, status, row);
   content.append(section);
 }
 

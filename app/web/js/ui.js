@@ -1492,8 +1492,12 @@ export function openMenu(x, y, items) {
       "mn-menu-item" + (item.danger ? " is-danger" : "") + (item.disabled ? " is-disabled" : "");
     button.disabled = Boolean(item.disabled);
     button.innerHTML = `<span>${item.text}</span>${
-      item.kbd ? `<span class="mn-menu-kbd">${item.kbd}</span>` : ""
-    }`;
+      item.checked !== undefined
+        ? `<span class="mn-menu-check"><input type="checkbox" tabindex="-1" ${
+            item.checked ? "checked" : ""
+          } /></span>`
+        : ""
+    }${item.kbd ? `<span class="mn-menu-kbd">${item.kbd}</span>` : ""}`;
     button.addEventListener("click", () => {
       if (item.disabled) return;
       closeMenu();
@@ -1772,7 +1776,8 @@ window.addEventListener("mn:open-menu", (event) => {
           onClick: () => pauseMedia(card.id),
         });
         items.push({
-          text: `${card.repeat ? "☑" : "☐"} Repeat`,
+          text: "Repeat",
+          checked: Boolean(card.repeat),
           onClick: () => toggleMediaRepeat(card.id),
         });
         items.push({ type: "sep" });
