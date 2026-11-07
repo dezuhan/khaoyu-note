@@ -40,6 +40,14 @@ body.lp {
   color: inherit;
 }
 
+.lp .lp-button {
+  color: var(--ky-bg);
+}
+
+.lp .lp-button-quiet {
+  color: var(--ky-text);
+}
+
 .lp img {
   max-width: 100%;
   display: block;
@@ -100,17 +108,12 @@ body.lp {
 }
 
 .lp-mark {
-  display: grid;
+  display: block;
   flex: none;
-  place-items: center;
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: var(--ky-text);
-  color: var(--ky-bg);
-  font-family: "Space Mono", ui-monospace, monospace;
-  font-size: 13px;
-  font-weight: 700;
+  object-fit: cover;
 }
 
 .lp-links {

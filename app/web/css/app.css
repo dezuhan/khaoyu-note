@@ -80,15 +80,11 @@ body.ky-scope {
 }
 
 .mn-logo-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 18px;
   height: 18px;
   border-radius: 5px;
-  background: var(--ky-accent);
-  color: var(--ky-on-accent);
-  font-size: 10px;
-  font-weight: 700;
+  object-fit: cover;
 }
 
 .mn-board-title {
