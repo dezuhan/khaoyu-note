@@ -2055,9 +2055,9 @@ await page.locator(".mn-prefs-nav-item", { hasText: "Tools" }).click();
 await page.waitForTimeout(350);
 const toolLabels = await page.locator(".mn-tool-card-label").allInnerTexts();
 check(
-  "Tools settings lists every tool including Kanban",
-  toolLabels.includes("Kanban") && toolLabels.length === 19,
-  `${toolLabels.length} labels, kanban=${toolLabels.includes("Kanban")}`
+  "Tools settings lists every tool including Section and Kanban",
+  toolLabels.includes("Section") && toolLabels.includes("Kanban") && toolLabels.length === 20,
+  `${toolLabels.length} labels, section=${toolLabels.includes("Section")}, kanban=${toolLabels.includes("Kanban")}`
 );
 const toolsGridColumns = await page
   .locator(".mn-tools-grid")
@@ -2065,7 +2065,7 @@ const toolsGridColumns = await page
 check("Tools are arranged in a two-column grid", toolsGridColumns === 2, String(toolsGridColumns));
 check(
   "Each tool card shows an icon before its name",
-  (await page.locator(".mn-tool-card-icon svg").count()) === 19
+  (await page.locator(".mn-tool-card-icon svg").count()) === 20
 );
 const disabledToolCards = await page.evaluate(() =>
   [...document.querySelectorAll(".mn-tool-card.is-disabled")].map((card) => ({
