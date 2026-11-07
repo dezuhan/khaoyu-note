@@ -62,13 +62,13 @@ try {
   page.on("pageerror", (error) => console.log("PAGEERROR", error.message));
   await page.goto(`${base}/account`, { waitUntil: "load" });
   const design = await page.evaluate(() => ({
-    css: Boolean(document.querySelector('link[href="/ui.css"]')),
+    css: Boolean(document.querySelector('link[href="/ky.css"]')),
     bg: getComputedStyle(document.body).backgroundColor,
     surface: getComputedStyle(document.querySelector("main")).backgroundColor,
   }));
   check(
     "account page uses the shared design tokens",
-    design.css && design.bg === "rgb(17, 17, 17)" && design.surface === "rgb(27, 27, 27)",
+    design.css && design.bg === "rgb(17, 17, 17)" && design.surface === "rgb(21, 21, 21)",
     `${design.bg} / ${design.surface}`
   );
 
