@@ -120,7 +120,7 @@ remaining work named in the item.
 
 ### Public sharing
 
-- [ ] Public sharing is off by default and requires an explicit warning (partial: off by default and a 409 warning response exist; no UI warning flow yet).
+- [x] Public sharing is off by default and requires an explicit warning.
 - [x] Public links show only the selected scope.
 - [x] Search engines excluded with `noindex` and no sitemap exposure.
 - [ ] Optional watermark and download restrictions for shared assets (partial: download flag enforced and audited; watermarking pending).

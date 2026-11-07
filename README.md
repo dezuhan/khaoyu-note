@@ -232,11 +232,11 @@ sharing endpoints, configuration, backup and upgrade steps are documented in
 [SECURITY.md](<SECURITY.md>).
 
 The service exposes project, item and column share links, passphrase and expiry controls, member
-roles, invitations and ownership transfer. The service account page is at `/account` and passkey
-management is at `/passkeys`. Desktop boards can opt in to server sync from the Sync control in the
-topbar: open it, enter the service URL and a scoped API token, then choose Enable for this board. The
-local board remains authoritative until that action. Verification and reset mail uses SMTP when
-configured and otherwise the outbox. The service tests run with:
+roles, invitations and ownership transfer. The service account page is at `/account`, passkey
+management is at `/passkeys`, and sharing is at `/shares`. Desktop boards can opt in to server sync
+from the Sync control in the topbar: open it, enter the service URL and a scoped API token, then
+choose Enable for this board. The local board remains authoritative until that action. Verification
+and reset mail uses SMTP when configured and otherwise the outbox. The service tests run with:
 
 ```powershell
 node --test service/test/service.test.mjs service/test/auth.test.mjs
@@ -401,8 +401,8 @@ Built artifacts are copied to `dist/`:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.18.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
-| `Khaoyu Note_0.18.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.19.0_x64-setup.exe` | 3.10 MiB | NSIS installer (installs the app and `khaoyu-note-mcp.exe`) |
+| `Khaoyu Note_0.19.0_x64_en-US.msi` | 5.21 MiB | MSI installer (also bundles `khaoyu-note-mcp.exe`) |
 | `KhaoyuNote.exe` | 10.79 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.38 MiB | standalone MCP server for AI agents |
 

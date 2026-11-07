@@ -8,7 +8,6 @@ still be implemented later.
 | Item | Why it remains | Next step |
 | --- | --- | --- |
 | Full account UI | `/account` covers registration, verification, reset, sessions and API tokens, but project/share management pages are missing. | Add project, member and share dialogs with CSRF and CSP tests. |
-| Public sharing warning UI | API warning exists but no share management page. | Build a share dialog with an explicit acknowledgement before enabling links. |
 | Asset watermark | Needs an image pipeline and platform decision. | Add a supported image pipeline and per-share watermark rendering with tests. |
 | Encryption at rest | Depends on the database and volume platform. | Document SQLCipher or encrypted-volume deployments and add a startup check. |
 | Application-level encryption | Needs key management and migration design. | Design envelope encryption for sensitive fields and rotation. |

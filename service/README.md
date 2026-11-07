@@ -94,6 +94,12 @@ a migration is pending.
 Startup fails closed when the secret is missing, shorter than 32 characters, too repetitive or still
 looks like a placeholder.
 
+`/shares` is the browser sharing page: it lists accessible projects, requires an acknowledgement
+before enabling public sharing, creates project/item/column links, shows a new token once and revokes
+links. The public-sharing API enforces the same acknowledgement with
+`{"enabled":true,"acknowledge":true}`; omitting it returns 400 `acknowledgement_required`. Disabling
+public sharing revokes every link for that project.
+
 ## Operator admin
 
 Set `KHAOYU_SERVICE_ADMIN_TOKEN` to enable `/api/v1/admin/*`. These endpoints require
