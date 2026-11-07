@@ -210,12 +210,13 @@ Email verification and password reset tokens are single use, short lived and sto
 development mailer writes messages to the outbox instead of sending SMTP; treat that directory as
 sensitive and add an SMTP adapter before production use.
 
-Desktop sync uses a scoped API token with `projects:read` and `projects:write`. When a synced local
-board has a parent board that is already synced, the new server project is created with
-`parentProjectId`, so nested shares can include it under the policy above. The service allows
-bearer-token CORS preflight only from `KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are
-never allowed from those origins. Add the local web host origin manually if the browser build should
-sync directly.
+Desktop sync uses a scoped API token with `projects:read` and `projects:write`. The same token can
+manage share links for projects the account can edit, so the desktop header Share panel and the
+right-click Share link action do not need a browser session. When a synced local board has a parent
+board that is already synced, the new server project is created with `parentProjectId`, so nested
+shares can include it under the policy above. The service allows bearer-token CORS preflight only from
+`KHAOYU_SERVICE_CORS_ORIGINS`; cookies and credentials are never allowed from those origins. Add the
+local web host origin manually if the browser build should sync directly.
 
 ## Browser account pages
 
