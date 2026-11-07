@@ -1,4 +1,5 @@
 import * as bridge from "./bridge.js";
+import { initAutoBackup } from "./auto-backup.js";
 import { initInteractions } from "./interact.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
@@ -85,6 +86,7 @@ async function boot() {
   refreshSync();
   maybeShowOnboarding();
   initUpdateUI();
+  initAutoBackup();
   document.getElementById("boot")?.remove();
   document.fonts?.ready.then(() => {
     if (state.board) render("geometry");

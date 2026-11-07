@@ -303,6 +303,21 @@ version comes from a separate `app_version` command (the Cargo package version o
 `package.json` version on the web host). The check never downloads an installer: it only opens the
 release page with the existing external-link command.
 
+## Automatic backups
+
+Settings > Backup stores `autoBackupDays` in the `ui_settings` JSON. Off is `0`; the offered intervals
+are 1, 3, 7, 14 and 30 days, where 30 is labelled as one month. `app/web/js/auto-backup.js` keeps the
+last backup timestamp in the `meta` table under `auto_backup_last_at`, so the desktop app and the local
+web host share one schedule even when both are open. It checks shortly after boot and every 15 minutes
+while the app stays open; when the interval has elapsed it calls the existing `backup_data` command (a
+`VACUUM INTO` snapshot plus an assets copy) and records the new time.
+
+A missed interval is caught up on the next launch because the desktop process does not run while the
+window is closed. A manual backup or Export ZIP resets the timestamp so an automatic backup does not
+duplicate it. A failed backup keeps the previous timestamp, so it is retried on the next check. Old
+backup folders are not pruned yet; the Backup pane says so and retention is listed in
+`docs/blockers.md`.
+
 ## Web host
 
 `server.mjs` serves the same `app/web` frontend on `http://127.0.0.1:1430` and opens the same

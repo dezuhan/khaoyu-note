@@ -328,10 +328,16 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
       <ul>
         <li>Back up now writes a consistent SQLite snapshot plus assets to
         <code>Documents/Khaoyu Note Backups</code>.</li>
+        <li>Automatic backup can run every day, every 3, 7 or 14 days, or every month (30 days). The
+        schedule runs while the app is open, and a missed interval is caught up on the next launch.</li>
+        <li>A manual backup or Export ZIP resets the automatic schedule so the backup is not
+        duplicated.</li>
         <li>Export ZIP writes the same folder as one archive next to it.</li>
         <li>Open folder opens the latest backup location.</li>
         <li>The restore command validates a backup and stages it for the next launch. There is no
         Restore control in the pane yet.</li>
+        <li>Old backup folders are not deleted automatically; remove them from the folder when you no
+        longer need them.</li>
         <li>Integrity check runs <code>PRAGMA integrity_check</code> from Settings &gt; About and the
         command palette.</li>
       </ul>

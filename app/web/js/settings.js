@@ -1,6 +1,7 @@
 // Settings dialog in the Photon preferences style, plus persisted app preferences.
 
 import * as bridge from "./bridge.js";
+import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } from "./auto-backup.js";
 import { icon } from "./icons.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS = {
   reduceMotion: false,
   gridSize: 24,
   showGrid: true,
+  autoBackupDays: 0,
   hiddenTools: [],
   toolOrder: [...DEFAULT_TOOL_ORDER],
   headingFont: "Georgia",
@@ -895,6 +897,16 @@ function renderBackupSection(content) {
   const status = document.createElement("p");
   status.className = "mn-account-backup-status";
   status.textContent = "No backup created in this session.";
+  const autoRow = buildRow({
+    type: "select",
+    label: "Automatic backup",
+    value: String(settings.autoBackupDays ?? 0),
+    options: AUTO_BACKUP_OPTIONS.map(([value, label]) => [String(value), label]),
+    onChange: (value) => setValue("autoBackupDays", Number(value)),
+  });
+  const lastLine = document.createElement("p");
+  lastLine.className = "mn-account-backup-status";
+  lastLine.textContent = `Last automatic backup: ${formatLastBackup(lastBackupAt())}`;
   let lastPath = "";
   const row = document.createElement("div");
   row.className = "mn-account-backup-actions";
@@ -916,6 +928,8 @@ function renderBackupSection(content) {
     status.textContent = "Creating backup...";
     try {
       lastPath = await bridge.backupData();
+      await markBackupTaken();
+      lastLine.textContent = `Last automatic backup: ${formatLastBackup(lastBackupAt())}`;
       status.textContent = `Backup created: ${lastPath}`;
       open.disabled = false;
       window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Backup created" } }));
@@ -933,6 +947,8 @@ function renderBackupSection(content) {
     status.textContent = "Exporting ZIP...";
     try {
       lastPath = await bridge.exportBackupZip();
+      await markBackupTaken();
+      lastLine.textContent = `Last automatic backup: ${formatLastBackup(lastBackupAt())}`;
       status.textContent = `ZIP created: ${lastPath}`;
       open.disabled = false;
       window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Backup ZIP exported" } }));
@@ -943,7 +959,11 @@ function renderBackupSection(content) {
     }
   });
   row.append(backup, exportZip, open);
-  section.append(note, status, row);
+  const retention = document.createElement("p");
+  retention.className = "mn-prefs-note";
+  retention.textContent =
+    "Automatic backups run while the app is open, and a missed interval is caught up on the next launch. Old backup folders are kept, so remove them from the folder when you no longer need them.";
+  section.append(note, autoRow, lastLine, status, row, retention);
   content.append(section);
 }
 

@@ -30,6 +30,9 @@ project uses Semantic Versioning.
   and from Help > Check for updates or Settings > About. It compares versions, shows the release notes
   and offers to open the release page. It never downloads or runs an installer. The About pane now
   reports the real app version instead of a hardcoded value.
+- Automatic backups. Settings > Backup offers Off, every day, every 3, 7 or 14 days, and every month
+  (30 days). The app checks the schedule while it runs and catches up on the next launch when an
+  interval was missed. A manual backup or Export ZIP resets the schedule so it is not duplicated.
 - Server sync signs in with the account email and password instead of an API token. The service
   exchanges the credentials for a scoped project token, revokes the previous sync token on each
   sign-in, and the client stores it without showing it. The sync dialog, the first-run screen and the

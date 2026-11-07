@@ -101,7 +101,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Design system states | audited: buttons use hover, focus, active and disabled states; inputs use the Khaoyu focus glow; menubar, header search and palette have complete keyboard states; remaining gaps are documented in docs/design-system-audit.md |
 | Single-file header | implemented: multi-project Home gallery is disabled for now; the app opens one active file, the menu-bar logo and Template button open a template library, and the breadcrumb shows only the current file path |
 | Menu bar and command palette | implemented: the fixed menu bar has three columns (logo and menus, centered Search commands, icon actions), grouped command menus, and the command palette with Recently used, Tools, File, Edit, View and Help groups plus arrow keys, Enter and Escape |
-| Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
+| Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; automatic backups can run daily, every 3, 7 or 14 days, or monthly (30 days) while the app is open, and a missed interval is caught up on the next launch; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color, column and kanban |
 | Settings | implemented: token-based styling with only the essentials (Account, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done |
@@ -388,6 +388,9 @@ node tools/test-mcp.mjs
 
 # update check version comparison, release parsing and error handling
 node tools/test-update.mjs
+
+# automatic backup interval and catch-up rules
+node tools/test-auto-backup.mjs
 
 # self-hosted service and account tests (Node 24, temp databases)
 node --test service/test/service.test.mjs service/test/auth.test.mjs

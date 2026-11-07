@@ -106,6 +106,9 @@ jobs:
       - name: Update check checks
         run: node tools/test-update.mjs
 
+      - name: Auto backup checks
+        run: node tools/test-auto-backup.mjs
+
       - name: Passkey virtual-authenticator suite
         run: node tools/test-passkeys.mjs
 

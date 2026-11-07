@@ -1741,6 +1741,19 @@ check(
     (await page.locator(".mn-account-backup-actions .mn-btn", { hasText: "Back up now" }).count()) === 1 &&
     (await page.locator(".mn-account-backup-actions .mn-btn", { hasText: "Export ZIP" }).count()) === 1
 );
+check(
+  "Backup page offers automatic backup intervals and the last run",
+  (await page.locator(".mn-account-backup .mn-prefs-select").count()) >= 1 &&
+    (await page.locator(".mn-account-backup").innerText()).includes("Automatic backup") &&
+    (await page.locator(".mn-account-backup").innerText()).includes("Last automatic backup")
+);
+await page.locator(".mn-account-backup select").selectOption("7");
+await page.waitForTimeout(300);
+const autoBackupDays = await page.evaluate(
+  () => JSON.parse(localStorage.getItem("mn.settings")).autoBackupDays
+);
+check("Automatic backup interval is saved", autoBackupDays === 7, String(autoBackupDays));
+await page.locator(".mn-account-backup select").selectOption("0");
 await page.locator(".mn-prefs-nav-item", { hasText: "General" }).click();
 await page.waitForTimeout(300);
 check(

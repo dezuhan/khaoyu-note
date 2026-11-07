@@ -60,3 +60,6 @@ gateway, browser isolation, audit and prompt-injection test design before any im
    `desktop-release.yml` only uploads artifacts for 14 days, so a check currently reports "no published
    release". Push the repo, create `v*` releases with notes and installers, then the existing check
    starts reporting versions.
+6. Add retention for backups. Automatic backups are not pruned, and each one copies the assets folder,
+   so a daily interval grows without bound. Keep the newest N automatic backups and leave manual ones
+   alone.
