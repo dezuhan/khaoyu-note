@@ -12,6 +12,18 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.24.0] - 2026-11-07
+
+### Added
+
+- Settings redesign: Account first with a divider, then General, Appearance, Tools, Performance,
+  divider, MCP and About. Language is merged into General and Canvas into Appearance.
+- Tools pane as a two-column icon grid with visibility toggles.
+- Account pane with server status and links to the service account, passkey and sharing pages.
+- Shared service design token stylesheet for `/account`, `/passkeys`, `/shares` and `/s/:token`.
+- Glass blurred backdrops for dialogs, settings, sync, share and onboarding overlays.
+- Design system documentation and a service token regression check.
+
 ## [0.23.2] - 2026-11-07
 
 ### Added
