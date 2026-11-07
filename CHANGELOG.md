@@ -12,6 +12,18 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.28.1] - 2026-11-07
+
+### Fixed
+
+- Service account, passkey, sharing and share viewer pages now load the real framework stylesheet
+  `ky.css` and use `.ky-scope`, `.ky-panel`, `.ky-title`, `.ky-label`, `.ky-input` and `.ky-button`
+  components instead of a hand-written token approximation.
+- Page-specific layout moved to a small `ui.css` layer; service pages now match the app surfaces,
+  typography, control heights and button hierarchy.
+- Dynamic account and sharing row buttons use the framework button classes.
+- Account browser check now asserts the `ky.css` link and framework surface colors.
+
 ## [0.28.0] - 2026-11-07
 
 ### Fixed
