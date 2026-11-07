@@ -79,12 +79,12 @@ try {
   await page.click("#register");
   await page.waitForFunction(() => document.getElementById("status").textContent.includes("Account created"));
   check("registration from the browser", true);
-
-  const verifyToken = latestMail("verify").text.match(/token: (\S+)/)[1];
-  await page.fill("#verify-token", verifyToken);
-  await page.click("#verify");
-  await page.waitForFunction(() => document.getElementById("status").textContent.includes("Email verified"));
-  check("email verification from the browser", true);
+  check(
+    "email verification UI is hidden",
+    (await page.locator("#verify-token").count()) === 0 &&
+      (await page.locator("#verify").count()) === 0 &&
+      !(await page.locator(".ky-auth-panel").innerText()).includes("Verify email")
+  );
 
   await page.fill("#login-email", email);
   await page.fill("#login-password", password);

@@ -147,14 +147,12 @@ async function start() {
       method: "POST",
       body: { email, password, displayName: email.split("@")[0] },
     });
-    assert.equal(result.status, 202, JSON.stringify(result.body));
+    assert.equal(result.status, 201, JSON.stringify(result.body));
   }
 
   async function verify(email) {
-    const message = latestMail("verify", email);
-    const token = message.text.match(/token: (\S+)/)[1];
-    const result = await call("/api/v1/auth/verify-email", { method: "POST", body: { token } });
-    assert.equal(result.status, 204);
+    const account = db.prepare("SELECT email_verified_at FROM accounts WHERE email = ?").get(email);
+    assert.ok(account?.email_verified_at, "registration should mark the account verified");
   }
 
   async function login(email, password = PASSWORD, extra = {}) {
@@ -237,22 +235,24 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     return updated.body.revision;
   }
 
-  await t.test("registration requires email verification before login", async () => {
+  await t.test("registration does not require email verification before login", async () => {
     const email = `verify-${crypto.randomUUID()}@example.com`;
     await api.register(email);
-    const before = await api.login(email);
-    assert.equal(before.status, 403);
-    assert.equal(before.body.error, "Email verification required");
-    await api.verify(email);
-    const after = await api.login(email);
-    assert.equal(after.status, 200);
-    assert.equal(after.body.account.email, email);
-    assert.ok(after.jar.khaoyu_access);
-    assert.ok(after.jar.khaoyu_refresh);
-    assert.ok(after.jar.khaoyu_csrf);
-    const projects = await api.call("/api/v1/projects", { jar: after.jar });
+    const login = await api.login(email);
+    assert.equal(login.status, 200);
+    assert.equal(login.body.account.email, email);
+    assert.ok(login.jar.khaoyu_access);
+    assert.ok(login.jar.khaoyu_refresh);
+    assert.ok(login.jar.khaoyu_csrf);
+    const projects = await api.call("/api/v1/projects", { jar: login.jar });
     assert.equal(projects.status, 200);
     assert.deepEqual(projects.body.projects, []);
+    const disabled = await api.call("/api/v1/auth/verify-email", {
+      method: "POST",
+      body: { token: "unused" },
+    });
+    assert.equal(disabled.status, 410);
+    assert.equal(disabled.body.code, "verification_disabled");
   });
 
   await t.test("trusted-proxy SSO requires a signed email and can auto-create", async () => {

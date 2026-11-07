@@ -61,13 +61,8 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password, displayName: "Shares Test" }),
   });
-  check("account registered", registration.status === 202);
-  const token = latestMail("verify").text.match(/token: (\S+)/)[1];
-  await fetch(`${base}/api/v1/auth/verify-email`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token }),
-  });
+  check("account registered", registration.status === 201);
+  // Registration is auto-verified; no email verification step.
 
   browser = await chromium.launch();
   const page = await browser.newPage();

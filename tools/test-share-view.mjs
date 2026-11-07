@@ -78,8 +78,7 @@ async function api(pathname, { method = "GET", body, jar } = {}) {
 try {
   await waitForReady();
   await api("/api/v1/auth/register", { method: "POST", body: { email, password, displayName: "Share Viewer" } });
-  const verifyToken = latestMail("verify").text.match(/token: (\S+)/)[1];
-  await api("/api/v1/auth/verify-email", { method: "POST", body: { token: verifyToken } });
+  // Registration is auto-verified; no email verification step.
   const jar = {};
   await api("/api/v1/auth/login", { method: "POST", body: { email, password }, jar });
   const project = await api("/api/v1/projects", { method: "POST", body: { title: "Viewer board" }, jar });

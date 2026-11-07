@@ -76,14 +76,7 @@ try {
     method: "POST",
     body: { email, password, displayName: "Passkey Test" },
   });
-  check("account registration accepted", register.status === 202, String(register.status));
-  const mail = fs
-    .readdirSync(path.join(dataDir, "outbox"))
-    .map((file) => JSON.parse(fs.readFileSync(path.join(dataDir, "outbox", file), "utf8")))
-    .find((message) => message.kind === "verify" && message.to === email);
-  const token = mail.text.match(/token: (\S+)/)[1];
-  check("verification token issued", Boolean(token));
-  check("email verified", (await api("/api/v1/auth/verify-email", { method: "POST", body: { token } })).status === 204);
+  check("account registration accepted", register.status === 201, String(register.status));
 
   browser = await chromium.launch();
   const page = await browser.newPage();

@@ -170,22 +170,6 @@ function projectRole(db, projectId, accountId) {
     .get(projectId, accountId)?.role;
 }
 
-async function sendVerification(db, config, mailer, account, token) {
-  await mailer.send({
-    to: account.email,
-    kind: "verify",
-    subject: "Verify your Khaoyu Note email",
-    text: `Verification token: ${token}`,
-  });
-  writeAudit(db, {
-    actorAccountId: account.id,
-    action: "auth.verification_sent",
-    resourceType: "account",
-    resourceId: account.id,
-    secret: config.secret,
-  });
-}
-
 async function sendReset(db, config, mailer, account, token) {
   await mailer.send({
     to: account.email,
@@ -880,46 +864,24 @@ export function createApiRouter({ db, config, logger, mailer }) {
             id: crypto.randomUUID(),
             email,
             display_name: displayName,
-            email_verified_at: null,
+            email_verified_at: now(),
             deletion_requested_at: null,
             deleted_at: null,
           };
           db.prepare(
-            "INSERT INTO accounts (id, email, display_name, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-          ).run(account.id, email, displayName, await hashPassword(password), now(), now());
+            "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+          ).run(account.id, email, displayName, await hashPassword(password), now(), now(), now());
         } catch (error) {
           if (!/UNIQUE/.test(error.message)) throw error;
-          const existing = db.prepare("SELECT * FROM accounts WHERE email = ?").get(email);
-          if (existing && !existing.email_verified_at && !existing.deleted_at) {
-            const token = issueEmailToken(db, config, existing.id, "verify", 24 * 3600_000);
-            await sendVerification(db, config, mailer, existing, token);
-          }
-          sendJson(response, 202, { status: "verification_pending" }, config);
+          sendJson(response, 202, { status: "registered" }, config);
           return true;
         }
-        const token = issueEmailToken(db, config, account.id, "verify", 24 * 3600_000);
-        await sendVerification(db, config, mailer, account, token);
-        sendJson(response, 202, { status: "verification_pending" }, config);
+        sendJson(response, 201, { status: "registered" }, config);
         return true;
       }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/verify-email") {
-        const body = await readJson(request);
-        const resource = consumeEmailToken(db, requireString(body.token, "token", 200), "verify");
-        db.prepare("UPDATE accounts SET email_verified_at = ?, updated_at = ? WHERE id = ?").run(
-          now(),
-          now(),
-          resource.account_id
-        );
-        writeAudit(db, {
-          actorAccountId: resource.account_id,
-          action: "auth.email_verified",
-          resourceType: "account",
-          resourceId: resource.account_id,
-          secret: config.secret,
-        });
-        sendNoContent(response, 204, config);
-        return true;
+        throw new HttpError(410, "Email verification is disabled", "verification_disabled");
       }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/otp/request") {
@@ -987,7 +949,7 @@ export function createApiRouter({ db, config, logger, mailer }) {
           Boolean(otp) &&
           Number(otp.attempts) < 5 &&
           otp.code_hash === otpHash(account.id, code, config.secret);
-        if (!valid || !account.email_verified_at) {
+        if (!valid) {
           if (account) {
             db.prepare("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?").run(
               otp?.id || ""
@@ -1057,10 +1019,6 @@ export function createApiRouter({ db, config, logger, mailer }) {
         if (!valid || account.deleted_at) {
           recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
           sendJson(response, 401, { error: "Invalid email or password" }, config);
-          return true;
-        }
-        if (!account.email_verified_at) {
-          sendJson(response, 403, { error: "Email verification required" }, config);
           return true;
         }
         if (account.totp_enabled_at && !verifyTotp(account.totp_secret, body.totp)) {

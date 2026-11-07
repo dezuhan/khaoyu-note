@@ -50,7 +50,7 @@ async function register() {
         password: $("register-password").value,
       },
     });
-    setStatus("Account created. Verify the email token before signing in.");
+    setStatus("Account created. You can sign in now.");
     showTab("login");
   } catch (error) {
     setStatus(error.message);
@@ -69,18 +69,6 @@ async function login() {
     });
     setStatus("Signed in.");
     await refresh();
-  } catch (error) {
-    setStatus(error.message);
-  }
-}
-
-async function verify() {
-  try {
-    await api("/api/v1/auth/verify-email", {
-      method: "POST",
-      body: { token: $("verify-token").value.trim() },
-    });
-    setStatus("Email verified. You can sign in now.");
   } catch (error) {
     setStatus(error.message);
   }
@@ -221,7 +209,6 @@ $("tab-login").addEventListener("click", () => showTab("login"));
 $("tab-register").addEventListener("click", () => showTab("register"));
 $("login").addEventListener("click", login);
 $("register").addEventListener("click", register);
-$("verify").addEventListener("click", verify);
 $("reset-request").addEventListener("click", requestReset);
 $("reset-confirm").addEventListener("click", confirmReset);
 $("token-create").addEventListener("click", createToken);
