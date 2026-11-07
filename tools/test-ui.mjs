@@ -1906,6 +1906,16 @@ check(
 );
 await page.locator(".mn-sync-panel .mn-modal-close").click();
 check("Sync dialog closes without changing the board", (await page.locator(".mn-sync-overlay").count()) === 0);
+await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
+await page.locator(".mn-menu-item", { hasText: "Documentation" }).click();
+await page.waitForTimeout(250);
+check(
+  "Help > Documentation opens the documentation page",
+  (await page.locator(".mn-modal-title").innerText()) === "Documentation" &&
+    (await page.locator(".mn-docs").innerText()).includes("Server sync")
+);
+await page.locator(".mn-modal-close").click();
+check("Documentation page closes", (await page.locator(".mn-docs").count()) === 0);
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
 const failed = results.filter((entry) => !entry.ok);
