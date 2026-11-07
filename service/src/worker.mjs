@@ -140,14 +140,18 @@ export function runMaintenance(db, config, logger) {
   return { tempRemoved, auditRemoved: Number(audit.changes || 0), backup };
 }
 
-export function startWorker(db, config, logger, intervalMs = 60_000) {
+export function startWorker(db, config, logger, intervalMs = 60_000, mailer = null) {
   let timer = null;
   let running = false;
-  const tick = () => {
+  const tick = async () => {
     if (running) return;
     running = true;
     try {
       runMaintenance(db, config, logger);
+      if (mailer?.flush) {
+        const result = await mailer.flush();
+        if (result?.sent) logger.info("mail.flushed", result);
+      }
     } catch (error) {
       logger.error("worker.failed", { message: error.message });
     } finally {

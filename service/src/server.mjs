@@ -3,7 +3,7 @@ import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
 import { openDatabase } from "./db.mjs";
 import { assertSchemaCurrent, createService, listen } from "./app.mjs";
-import { createMailer } from "./auth/mailer.mjs";
+import { createQueuedMailer } from "./auth/mailer.mjs";
 import { startWorker } from "./worker.mjs";
 
 const logger = createLogger();
@@ -21,10 +21,10 @@ async function main() {
   }
   const db = openDatabase(config.databasePath);
   assertSchemaCurrent(db);
-  const mailer = createMailer(config, logger);
+  const mailer = createQueuedMailer(db, config, logger);
   const server = createService({ config, db, logger, mailer });
   await listen(server, config);
-  const worker = startWorker(db, config, logger);
+  const worker = startWorker(db, config, logger, 60_000, mailer);
   logger.info("service.started", {
     host: config.host,
     port: config.port,

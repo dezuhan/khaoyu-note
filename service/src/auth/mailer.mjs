@@ -56,6 +56,74 @@ export function createMailer(config, logger) {
   return createFileMailer(config, logger);
 }
 
+export function enqueueEmail(db, { to, subject, text, kind }, error) {
+  db.prepare(
+    `INSERT INTO email_jobs (id, to_address, subject, body, kind, attempts, last_error, next_at, created_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)`
+  ).run(
+    crypto.randomUUID(),
+    to,
+    subject,
+    text,
+    kind,
+    error ? String(error.message || error).slice(0, 500) : null,
+    Date.now(),
+    Date.now()
+  );
+}
+
+export async function flushEmailJobs(db, base, logger, limit = 20) {
+  const jobs = db
+    .prepare(
+      "SELECT * FROM email_jobs WHERE sent_at IS NULL AND attempts < 10 AND next_at <= ? ORDER BY next_at LIMIT ?"
+    )
+    .all(Date.now(), limit);
+  let sent = 0;
+  let failed = 0;
+  for (const job of jobs) {
+    try {
+      await base.send({
+        to: job.to_address,
+        subject: job.subject,
+        text: job.body,
+        kind: job.kind,
+      });
+      db.prepare("UPDATE email_jobs SET sent_at = ? WHERE id = ?").run(Date.now(), job.id);
+      sent += 1;
+    } catch (error) {
+      failed += 1;
+      const attempts = Number(job.attempts) + 1;
+      const delay = Math.min(30 * 60_000, 60_000 * 2 ** attempts);
+      db.prepare(
+        "UPDATE email_jobs SET attempts = ?, last_error = ?, next_at = ? WHERE id = ?"
+      ).run(attempts, String(error.message || error).slice(0, 500), Date.now() + delay, job.id);
+      logger?.warn("mail.retry_scheduled", { id: job.id, attempts });
+    }
+  }
+  return { sent, failed, total: jobs.length };
+}
+
+export function createQueuedMailer(db, config, logger, baseMailer = null) {
+  const base = baseMailer || createMailer(config, logger);
+  return {
+    async send(payload) {
+      try {
+        return await base.send(payload);
+      } catch (error) {
+        enqueueEmail(db, payload, error);
+        logger?.warn("mail.queued_for_retry", { kind: payload.kind });
+        return { queued: true, error: error.message };
+      }
+    },
+    async flush(limit = 20) {
+      return flushEmailJobs(db, base, logger, limit);
+    },
+    async close() {
+      await base.close?.();
+    },
+  };
+}
+
 export function readOutbox(config, id) {
   return JSON.parse(fs.readFileSync(path.join(config.outboxDir, `${id}.json`), "utf8"));
 }
