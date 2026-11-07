@@ -12,6 +12,17 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.29.0] - 2026-11-07
+
+### Changed
+
+- Email verification is disabled. Registration creates an immediately usable, already-verified
+  account and login no longer blocks on verification.
+- `POST /api/v1/auth/verify-email` returns 410 `verification_disabled`.
+- The Verify email section and its client code are removed from `/account`; registration copy now
+  says sign-in is immediate.
+- Browser suites register and sign in directly without reading an outbox verification token.
+
 ## [0.28.2] - 2026-11-07
 
 ### Fixed
