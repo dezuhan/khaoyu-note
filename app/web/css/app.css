@@ -787,6 +787,11 @@ body.ky-scope {
   color: var(--ky-text);
   font-size: 9px;
   font-weight: 700;
+  background-position: center;
+  background-size: cover;
+}
+.mn-avatar.has-image {
+  color: transparent;
 }
 
 .mn-msg-body {

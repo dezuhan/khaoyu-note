@@ -1301,10 +1301,17 @@ fn current_local_user(
     Ok(user.filter(|user| user.status == "active"))
 }
 
-fn require_editor(conn: &Connection, auth_state: &AuthState) -> Result<auth::PublicUser, String> {
-    let user = current_local_user(conn, auth_state)?.ok_or("Sign in required")?;
-    if user.role == "member" && (user.member_role == "viewer" || user.member_role == "commenter") {
-        return Err("You do not have permission to edit this board".into());
+fn require_editor(
+    conn: &Connection,
+    auth_state: &AuthState,
+) -> Result<Option<auth::PublicUser>, String> {
+    let user = current_local_user(conn, auth_state)?;
+    if let Some(user) = user.as_ref() {
+        if user.role == "member"
+            && (user.member_role == "viewer" || user.member_role == "commenter")
+        {
+            return Err("You do not have permission to edit this board".into());
+        }
     }
     Ok(user)
 }
@@ -1435,7 +1442,7 @@ fn rename_board(
     .map_err(|e| e.to_string())?;
     auth::log_activity(
         &conn,
-        Some(&user),
+        user.as_ref(),
         "board.renamed",
         Some("board"),
         Some(&id),
@@ -1460,7 +1467,7 @@ fn archive_board(
     .map_err(|e| e.to_string())?;
     auth::log_activity(
         &conn,
-        Some(&user),
+        user.as_ref(),
         if archived {
             "board.archived"
         } else {
@@ -1489,7 +1496,7 @@ fn trash_board(
     .map_err(|e| e.to_string())?;
     auth::log_activity(
         &conn,
-        Some(&user),
+        user.as_ref(),
         if trashed {
             "board.trashed"
         } else {
@@ -1524,9 +1531,9 @@ fn save_board(
         )
         .map_err(|error| error.to_string())?
         != 0;
-    let author_value = auth::author_value(&user);
+    let author_value = user.as_ref().map(auth::author_value);
     let updated_at =
-        write_doc_checked_with_author(&conn, &doc, base_updated_at, Some(&author_value), true)?;
+        write_doc_checked_with_author(&conn, &doc, base_updated_at, author_value.as_ref(), true)?;
     let cards = doc
         .get("cards")
         .and_then(Value::as_array)
@@ -1539,15 +1546,17 @@ fn save_board(
     } else {
         "board.created"
     };
-    auth::log_activity_throttled(
-        &conn,
-        &user,
-        action,
-        "board",
-        &id,
-        metadata,
-        if existed { 5 * 60 * 1000 } else { 0 },
-    )?;
+    if let Some(user) = user.as_ref() {
+        auth::log_activity_throttled(
+            &conn,
+            user,
+            action,
+            "board",
+            &id,
+            metadata,
+            if existed { 5 * 60 * 1000 } else { 0 },
+        )?;
+    }
     Ok(updated_at)
 }
 
@@ -1580,14 +1589,16 @@ fn delete_board(
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let user = require_editor(&conn, &auth_state)?;
     delete_board_tree(&conn, &id)?;
-    auth::log_activity(
-        &conn,
-        Some(&user),
-        "board.deleted",
-        Some("board"),
-        Some(&id),
-        json!({}),
-    )?;
+    if let Some(user) = user.as_ref() {
+        auth::log_activity(
+            &conn,
+            Some(user),
+            "board.deleted",
+            Some("board"),
+            Some(&id),
+            json!({}),
+        )?;
+    }
     Ok(())
 }
 
@@ -2059,8 +2070,8 @@ fn auth_status(db: State<'_, AppDb>, auth_state: State<'_, AuthState>) -> Result
     let user = current_local_user(&conn, &auth_state)?;
     Ok(json!({
         "userCount": auth::count_users(&conn)?,
-        "requireLogin": true,
-        "guestAllowed": false,
+        "requireLogin": false,
+        "guestAllowed": true,
         "user": user,
         "csrfToken": Value::Null,
     }))
@@ -3151,7 +3162,9 @@ mod tests {
         let root = test_root("auth-required");
         let conn = open_db_at(&root).expect("open db");
         let state = AuthState(Mutex::new(None));
-        assert!(require_editor(&conn, &state).is_err());
+        assert!(require_editor(&conn, &state)
+            .expect("guest editor")
+            .is_none());
         let _ = fs::remove_dir_all(root);
     }
 

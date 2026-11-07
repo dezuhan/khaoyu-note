@@ -1047,14 +1047,6 @@ async function invoke(cmd, args = {}, actor = null) {
       return doc ? JSON.stringify(doc) : null;
     }
     case "save_board": {
-      if (!actor) throw new Error("Sign in required");
-      if (
-        actor &&
-        actor.role === "member" &&
-        (actor.memberRole === "viewer" || actor.memberRole === "commenter")
-      ) {
-        throw new Error("You do not have permission to edit this board");
-      }
       const doc = JSON.parse(String(args.data));
       if (doc.id !== args.id) throw new Error("board id mismatch");
       return writeDoc(doc, args.baseUpdatedAt ?? null, actor);
@@ -1327,8 +1319,8 @@ function authStatus(request) {
   const session = currentSession(request);
   return {
     userCount: countUsers(),
-    requireLogin: true,
-    guestAllowed: false,
+    requireLogin: false,
+    guestAllowed: true,
     user: session ? session.user : null,
     csrfToken: session ? readCookies(request)[CSRF_COOKIE] || null : null,
   };
@@ -1587,20 +1579,10 @@ const server = http.createServer(async (request, response) => {
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/asset") {
-      if (!currentSession(request)) {
-        response.writeHead(401, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ error: "Sign in required" }));
-        return;
-      }
       serveAsset(request, response, false);
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/download") {
-      if (!currentSession(request)) {
-        response.writeHead(401, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ error: "Sign in required" }));
-        return;
-      }
       serveAsset(request, response, true);
       return;
     }
@@ -1609,12 +1591,6 @@ const server = http.createServer(async (request, response) => {
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/share-info") {
-      const session = currentSession(request);
-      if (!session) {
-        response.writeHead(401, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ error: "Sign in required" }));
-        return;
-      }
       sendJson(response, 200, {
         urls: SHARE_URLS,
         localUrl: LOCAL_URL,
@@ -1626,15 +1602,9 @@ const server = http.createServer(async (request, response) => {
     }
     if (request.method === "POST" && url.pathname === "/api/invoke") {
       const session = currentSession(request);
-      if (!session) {
-        response.writeHead(401, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ error: "Sign in required" }));
-        return;
-      }
-      requireCsrf(request, session);
       const body = JSON.parse(await readBody(request));
       try {
-        const result = await invoke(String(body.cmd || ""), body.args || {}, session.user);
+        const result = await invoke(String(body.cmd || ""), body.args || {}, session ? session.user : null);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ result }));
       } catch (error) {

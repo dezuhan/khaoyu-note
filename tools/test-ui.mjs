@@ -276,56 +276,10 @@ check(
   (await page.locator("#share-btn").isVisible()) &&
     (await page.locator(".mn-topbar-right #share-btn").count()) === 1
 );
-const accountAfterShare = await page.evaluate(() => {
-  const share = document.getElementById("share-btn");
-  const account = document.getElementById("account-btn");
-  return Boolean(
-    share &&
-      account &&
-      share.parentElement === account.parentElement &&
-      share.nextElementSibling === account
-  );
-});
 check(
-  "Account avatar button follows Share in the header",
-  (await page.locator(".mn-topbar-right #account-btn").isVisible()) && accountAfterShare
+  "Account avatar button is disabled in local-first mode",
+  await page.locator("#account-btn").isHidden()
 );
-const accountAvatar = await page.locator("#account-btn").evaluate((el) => {
-  const style = getComputedStyle(el);
-  const box = el.getBoundingClientRect();
-  return {
-    width: Math.round(box.width),
-    height: Math.round(box.height),
-    radius: style.borderRadius,
-    label: el.getAttribute("aria-label") || "",
-    text: el.textContent.trim(),
-  };
-});
-check(
-  "Account avatar is a 30px round labelled button",
-  accountAvatar.width === 30 &&
-    accountAvatar.height === 30 &&
-    (accountAvatar.radius === "50%" || Number.parseFloat(accountAvatar.radius) >= 15) &&
-    accountAvatar.label.length > 0 &&
-    accountAvatar.text.length > 0,
-  JSON.stringify(accountAvatar)
-);
-await page.click("#account-btn");
-await page.waitForTimeout(300);
-check(
-  "Avatar opens Settings on the Account page",
-  (await page.locator(".mn-prefs-dialog").isVisible()) &&
-    (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Account"
-);
-check(
-  "Account page shows the account tabs and sign-in prompt without an account",
-  (await page.locator(".mn-account-tabs .mn-account-tab").count()) === 3 &&
-    (await page.locator('[data-role="content"]').innerText()).includes("You are not signed in") &&
-    (await page.locator(".mn-account-guest .mn-btn", { hasText: "Sign In" }).count()) === 1
-);
-await page.keyboard.press("Escape");
-await page.waitForTimeout(200);
-check("Settings closes with Escape", (await page.locator(".mn-prefs-overlay").count()) === 0);
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
 check(
   "Application menu bar has File, Edit, Tools, View and Help",
@@ -1811,14 +1765,13 @@ check(
   (await page.locator("#language-btn").isVisible()) && (await page.locator("#language-btn").isDisabled())
 );
 check(
-  "Account is the first settings page",
-  (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Account"
+  "Server is the first settings page",
+  (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Server"
 );
 const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
 check(
-  "Settings navigation follows the requested order",
-  navLabels.join(",") ===
-    "Account,Server,Backup,General,Appearance,Tools,Performance,MCP,About",
+  "Settings navigation follows the local-first order",
+  navLabels.join(",") === "Server,Backup,General,Appearance,Tools,Performance,MCP,About",
   navLabels.join(", ")
 );
 check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
@@ -1826,11 +1779,9 @@ check(
   "Settings overlay uses a blurred glass backdrop",
   (await page.locator(".mn-prefs-overlay").evaluate((el) => getComputedStyle(el).backdropFilter)).includes("blur")
 );
-const accountPageText = await page.locator('[data-role="content"]').innerText();
 check(
-  "Account page shows the local profile or the sign-in prompt",
-  accountPageText.includes("Profile Picture") ||
-  accountPageText.includes("You are not signed in")
+  "Settings no longer exposes an Account page",
+  (await page.locator(".mn-prefs-nav-item", { hasText: "Account" }).count()) === 0
 );
 await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
 await page.waitForTimeout(300);
@@ -1841,7 +1792,7 @@ check(
     (await page.locator(".mn-account-grid").innerText()).includes("Passkeys") &&
     (await page.locator(".mn-account-grid").innerText()).includes("Sharing")
 );
-check("Account no longer contains the backup controls", (await page.locator(".mn-account-backup").count()) === 0);
+check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
 await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();
 await page.waitForTimeout(300);
 check(
@@ -1896,7 +1847,7 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 9, String(await page.locator(".mn-prefs-nav-item").count()));
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 8, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
   "Language and Canvas are merged away",
   !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),

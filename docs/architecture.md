@@ -344,18 +344,16 @@ app data folder only when Stay signed in is ticked. The web host exposes the sam
 authenticated mutations, a 30 day session and login rate limiting. The web host accepts
 `owner@localhost` as an email because the account is local.
 
-`save_board` resolves the signed-in account, rejects viewers and commenters, and writes the author
-snapshots through `write_doc_checked_with_author`. An account is mandatory: board writes and the web
-host command bridge return `Sign in required` without a session. Backups copy
+`save_board` resolves an optional signed-in account, rejects viewers and commenters when a session is
+present, and writes author snapshots through `write_doc_checked_with_author`. This local-first deploy
+does not require an account: guest writes are accepted by the desktop and the web host command bridge,
+and attribution is recorded only for an existing session. Backups copy
 the database and assets but delete `sessions` from the snapshot with `secure_delete` before returning.
 
-The frontend keeps auth state in `auth.js`, shows the first-run setup or login gate in `account-ui.js`,
-and renders the avatar after Share. Clicking it opens Settings > Account, which uses tabs for Admin
-Dashboard (admins only), Account Information, Account Settings, History Activity and Delete Account,
-with Log Out in the footer. Delete Account re-authenticates, clears every local table, uploaded asset
-and saved session, vacuums the database and reloads into first-run setup. The account UI is not a
-separate modal. The gate waits for setup or sign-in before any board or setting is read, and both hosts
-keep the session so a reload does not ask again. `bridge.js` calls Tauri commands on the desktop and the HTTP
+The frontend keeps auth state in `auth.js`, but the first-run setup/login gate is disabled. The avatar
+button and Settings > Account are hidden; board and settings work without an account. The optional
+account code remains for a future milestone, including Delete Account, but is not reachable from the
+current UI. `bridge.js` calls Tauri commands on the desktop and the HTTP
 endpoints on the web host.
 
 ## Web host

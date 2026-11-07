@@ -1,5 +1,9 @@
 # Local account M1 contract
 
+> Local-first deploy note: the shipped build disables login, signup, reset-password, account page and
+> Settings > Account. Boards and settings work without an account; the optional account code remains
+> for a future milestone, and the rest of this document records the inactive M1 contract.
+
 This is the shared contract for milestone M1 (local account foundation). Rust, the web host and the
 frontend must match it exactly so the desktop app and the web host stay compatible.
 
@@ -7,7 +11,8 @@ frontend must match it exactly so the desktop app and the web host stay compatib
 
 - Local accounts in the app SQLite database, schema version 3.
 - First-run admin setup, mandatory login on desktop and web, logout, profile update, password change,
-  logout all, basic account and board activity history.
+  logout all, basic account and board activity history. These flows are disabled in the current
+  local-first deploy.
 - Avatar button and the Settings > Account page in the app chrome.
 - Service accounts, roles enforcement and the Admin Panel are later milestones and are not part of
   this contract.

@@ -225,8 +225,8 @@ try {
     "status reports an empty account table",
     initial.status === 200 &&
       initial.body.userCount === 0 &&
-      initial.body.requireLogin === true &&
-      initial.body.guestAllowed === false &&
+      initial.body.requireLogin === false &&
+      initial.body.guestAllowed === true &&
       initial.body.user === null &&
       initial.body.csrfToken === null,
     JSON.stringify(initial.body)
@@ -244,8 +244,8 @@ try {
   );
   const guestVersion = await invoke(instance, cookieJar(), "app_version", {}, { csrf: false });
   check(
-    "commands require an account before setup",
-    guestVersion.status === 401 && /sign in/i.test(guestVersion.body?.error || ""),
+    "commands work before setup in local-first mode",
+    guestVersion.status === 200 && !guestVersion.body?.error,
     JSON.stringify({ status: guestVersion.status, body: guestVersion.body })
   );
 
@@ -377,8 +377,8 @@ try {
     { csrf: false }
   );
   check(
-    "board saves without CSRF are rejected",
-    blockedSave.status === 403 && /csrf/i.test(blockedSave.body?.error || ""),
+    "board saves work without CSRF in local-first mode",
+    blockedSave.status === 200 && !blockedSave.body?.error,
     JSON.stringify(blockedSave.body)
   );
 
@@ -471,14 +471,14 @@ try {
     { csrf: false }
   );
   check(
-    "a signed-out client cannot save",
-    guestSave.status === 401 && /sign in/i.test(guestSave.body?.error || ""),
+    "a signed-out client can save in local-first mode",
+    guestSave.status === 200 && !guestSave.body?.error,
     JSON.stringify({ status: guestSave.status, body: guestSave.body })
   );
   const guestLoaded = await invoke(instance, cookies, "load_board", { id: boardId }, { csrf: false });
   check(
-    "a signed-out client cannot read a board",
-    guestLoaded.status === 401 && /sign in/i.test(guestLoaded.body?.error || ""),
+    "a signed-out client can read a board in local-first mode",
+    guestLoaded.status === 200 && !guestLoaded.body?.error,
     JSON.stringify({ status: guestLoaded.status, body: guestLoaded.body })
   );
 

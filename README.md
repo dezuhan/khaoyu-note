@@ -2,9 +2,8 @@
 
 A local-first desktop app for visual notes, boards, kanban, tables and freehand drawing. Rust backend
 (Tauri v2) with a vanilla ES-module frontend. Boards live in a local SQLite database and need no
-network. An account is required on first run: the app creates the local database admin, then the
-desktop and browser editions both require sign in so board and account activity can be attributed.
-Sessions persist on the device and in the browser.
+network. This deploy is local-first: no login, signup, reset-password or account page is required.
+Optional account code remains in the database for future work but is disabled in the UI.
 
 ![Light theme](shots/board-light.png)
 
@@ -105,9 +104,9 @@ the app works offline; only optional video and map embeds need the internet.
 | Menu bar and command palette | implemented: the fixed menu bar has three columns (logo and menus, centered Search commands, icon actions), grouped command menus, and the command palette with Recently used, Tools, File, Edit, View and Help groups plus arrow keys, Enter and Escape |
 | Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; automatic backups can run daily, every 3, 7 or 14 days, or monthly (30 days) while the app is open, and a missed interval is caught up on the next launch; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
-| Local accounts (M1) | implemented: first-run setup creates the local admin in the same SQLite database, with PBKDF2-SHA256 password hashes, hashed sessions, and required sign-in on both the desktop and the browser edition. Sessions persist for 30 days on the web host and stay saved on the desktop. The avatar after Share opens Settings > Account, which has tabs for Admin Dashboard, Account Information, Account Settings, History Activity and Delete Account plus Log Out. Delete Account requires the current password and the phrase DELETE ALL, wipes every local table, uploaded asset and saved session, then returns to first-run setup. Boards and cards store their creator and last editor, and History records account and board actions. Role enforcement and the full Admin Panel follow in M2 and M3. |
+| Local accounts (M1) | disabled in this local-first deploy: boards and settings work without an account, the account button and Settings > Account are hidden, and desktop/web writes no longer require sign-in. Existing account data stays in SQLite but is not used by the UI. |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color, column and kanban |
-| Settings | implemented: token-based styling with only the essentials (Account, Server, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done. Account is a profile page with picture, names, email and password; Server holds the runtime details and self-hosted service connection. |
+| Settings | implemented: token-based styling with only the essentials (Server, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done. Account is disabled in this local-first deploy. |
 | Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and their cards are hidden from boards and templates. Hiding a tool in Settings only removes the rail button and leaves the feature available. |
 | Tool drag to canvas | implemented: floating label plus dashed drop preview, card created at the pointer, works reliably in WebView2 because it does not depend on HTML5 drag (board/document/image keep their own flows) |
 | MCP server | implemented: `khaoyu-note-mcp.exe` with 14 board tools over the same SQLite database |

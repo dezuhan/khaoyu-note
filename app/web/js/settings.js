@@ -73,7 +73,6 @@ const FONT_CHOICES = [
 const HEADING_FONT_CHOICES = [["Georgia", "Georgia (system serif)"], ...FONT_CHOICES];
 
 const NAV = [
-  { id: "account", label: "Account" },
   { id: "server", label: "Server" },
   { id: "backup", label: "Backup" },
   { divider: true },
@@ -110,7 +109,7 @@ const TOOL_LABELS = [
 
 let settings = { ...DEFAULT_SETTINGS };
 let overlay = null;
-let activePage = "account";
+let activePage = "server";
 let accountTab = "information";
 let query = "";
 let searchTimer = 0;
@@ -335,17 +334,6 @@ function webviewLabel() {
 
 function pages() {
   return [
-    {
-      id: "account",
-      title: "Account",
-      divider: false,
-      rows: () => [
-        {
-          type: "note",
-          text: "Local account on this computer. Self-hosted service accounts and sharing arrive in M4.",
-        },
-      ],
-    },
     {
       id: "server",
       title: "Server",
@@ -759,9 +747,7 @@ function renderContent() {
   }
 
   const page = pages().find((entry) => !entry.divider && entry.id === activePage);
-  if (activePage === "account") {
-    renderAccountPage(content);
-  } else if (activePage === "server") {
+  if (activePage === "server") {
     renderServerPage(content);
   } else if (activePage === "backup") {
     renderBackupPage(content);

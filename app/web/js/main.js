@@ -1,6 +1,6 @@
 import * as bridge from "./bridge.js";
 import { initAutoBackup } from "./auto-backup.js";
-import { initAccountGate } from "./account-ui.js";
+import { initAuth } from "./auth.js";
 import { initInteractions } from "./interact.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
@@ -77,7 +77,7 @@ function syncBoardUrl() {
 async function boot() {
   initTheme();
   // Accounts are mandatory, so finish the setup or sign-in gate before any board or setting is read.
-  await initAccountGate();
+  await initAuth();
   await initSettings();
   initRender(refs);
   initInteractions(refs);

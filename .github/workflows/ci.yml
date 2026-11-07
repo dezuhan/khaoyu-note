@@ -118,8 +118,8 @@ jobs:
       - name: Passkey virtual-authenticator suite
         run: node tools/test-passkeys.mjs
 
-      - name: Browser account suite
-        run: node tools/test-account-ui.mjs
+      - name: Local-first onboarding suite
+        run: node tools/test-onboarding.mjs http://127.0.0.1:1430/
 
       - name: Browser sharing suite
         run: node tools/test-shares-ui.mjs

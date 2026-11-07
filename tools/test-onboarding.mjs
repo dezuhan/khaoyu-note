@@ -1,4 +1,4 @@
-// First-run account gate check against the local web host.
+// Local-first onboarding check: no account gate should appear.
 // node tools/test-onboarding.mjs http://127.0.0.1:1430/
 import { chromium } from "playwright";
 
@@ -15,20 +15,15 @@ function check(name, ok, detail = "") {
 try {
   await page.goto(url, { waitUntil: "load" });
   await page.waitForTimeout(1600);
-  check("first run requires the local admin account", await page.locator(".mn-onboard-panel").isVisible());
+  check("no account gate is shown", (await page.locator('[data-role="account-gate"]').count()) === 0);
   check(
-    "the gate asks for the account fields",
-    (await page.locator('[data-role="setup-form"] input[name="username"]').count()) === 1 &&
-      (await page.locator('[data-role="setup-form"] input[name="email"]').count()) === 1 &&
-      (await page.locator('[data-role="setup-form"] input[name="password"]').count()) === 1
+    "the board is available without an account",
+    (await page.locator(".mn-viewport").isVisible()) &&
+      (await page.locator("#account-btn").isHidden())
   );
   check(
-    "the gate has no guest escape",
-    (await page.locator('[data-role="continue-local"]').count()) === 0
-  );
-  check(
-    "the create admin action is available",
-    (await page.locator('[data-role="create-admin"]').count()) === 1
+    "Settings remains available without an account",
+    await page.locator("#settings-btn").isVisible()
   );
 } finally {
   await browser.close();
