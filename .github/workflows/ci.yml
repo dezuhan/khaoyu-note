@@ -29,6 +29,9 @@ jobs:
         working-directory: tools
         run: npm ci
 
+      - name: Install service dependencies
+        run: npm ci --prefix service
+
       - name: Install Chromium
         working-directory: tools
         run: npx playwright install --with-deps chromium
@@ -99,6 +102,9 @@ jobs:
 
       - name: Sync engine checks
         run: node tools/test-sync.mjs
+
+      - name: Passkey virtual-authenticator suite
+        run: node tools/test-passkeys.mjs
 
       - name: Show preview server log on failure
         if: failure()
