@@ -2018,6 +2018,83 @@ fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Manual screen color picker. The desktop webview does not expose the browser EyeDropper
+/// capability, so hide the window, wait for a click, and read the pixel under the cursor with GDI.
+#[tauri::command]
+async fn pick_screen_color(app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::Foundation::POINT;
+        use windows_sys::Win32::Graphics::Gdi::{GetDC, GetPixel, ReleaseDC};
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetCursorPos, LoadCursorW, SetCursor, IDC_CROSS,
+        };
+
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| "Main window is not available".to_string())?;
+        window.hide().map_err(|error| error.to_string())?;
+
+        let picked = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+            std::thread::sleep(Duration::from_millis(220));
+            unsafe {
+                let crosshair = LoadCursorW(std::ptr::null_mut(), IDC_CROSS);
+                let started = std::time::Instant::now();
+                while GetAsyncKeyState(VK_LBUTTON as i32) < 0 {
+                    if started.elapsed() > Duration::from_secs(2) {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(15));
+                }
+                loop {
+                    SetCursor(crosshair);
+                    if GetAsyncKeyState(VK_ESCAPE as i32) < 0 {
+                        return Err("Screen color picking was cancelled".to_string());
+                    }
+                    if GetAsyncKeyState(VK_LBUTTON as i32) < 0 {
+                        let mut point = POINT { x: 0, y: 0 };
+                        if GetCursorPos(&mut point) == 0 {
+                            return Err("Could not read the cursor position".to_string());
+                        }
+                        let dc = GetDC(std::ptr::null_mut());
+                        if dc.is_null() {
+                            return Err("Could not access the screen".to_string());
+                        }
+                        let pixel = GetPixel(dc, point.x, point.y);
+                        ReleaseDC(std::ptr::null_mut(), dc);
+                        if pixel == u32::MAX {
+                            return Err("Could not read the screen color".to_string());
+                        }
+                        let red = (pixel & 0xFF) as u8;
+                        let green = ((pixel >> 8) & 0xFF) as u8;
+                        let blue = ((pixel >> 16) & 0xFF) as u8;
+                        return Ok(format!("#{:02X}{:02X}{:02X}", red, green, blue));
+                    }
+                    if started.elapsed() > Duration::from_secs(15) {
+                        return Err("Screen color picking timed out".to_string());
+                    }
+                    std::thread::sleep(Duration::from_millis(15));
+                }
+            }
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+
+        let _ = window.show();
+        let _ = window.set_focus();
+        picked
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        Err("Screen color picking is only available on Windows".to_string())
+    }
+}
+
 /// Check the latest published GitHub release. The request never downloads an installer; the client
 /// only compares versions and shows the release notes.
 #[tauri::command]
@@ -2635,6 +2712,7 @@ pub fn run() {
             app_data_dir,
             mcp_server_path,
             app_version,
+            pick_screen_color,
             check_update,
             auth_status,
             auth_setup_admin,

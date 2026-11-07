@@ -2,6 +2,7 @@
 // vertical hue slider, hex field, eyedropper, OK and Cancel.
 
 import { icon } from "./icons.js";
+import { hasTauri, pickScreenColor } from "./bridge.js";
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -100,7 +101,7 @@ export function openColorPicker({ color, anchor, onChange }) {
   const hueMarker = pop.querySelector('[data-role="hue-marker"]');
   const hexInput = pop.querySelector('[data-role="hex"]');
   const eyedrop = pop.querySelector('[data-role="eyedrop"]');
-  if (!("EyeDropper" in window)) eyedrop.hidden = true;
+  if (!hasTauri && !("EyeDropper" in window)) eyedrop.hidden = true;
 
   function hexValue() {
     return rgbToHex(...Object.values(hsvToRgb(hsv.h, hsv.s, hsv.v)));
@@ -197,10 +198,15 @@ export function openColorPicker({ color, anchor, onChange }) {
     if (!setFromHex(hexInput.value)) hexInput.value = current;
   });
   eyedrop.addEventListener("click", async () => {
-    if (!("EyeDropper" in window)) return;
     try {
-      const result = await new window.EyeDropper().open();
-      if (setFromHex(result?.sRGBHex)) close();
+      let hex = null;
+      if (hasTauri) {
+        hex = await pickScreenColor();
+      } else if ("EyeDropper" in window) {
+        const result = await new window.EyeDropper().open();
+        hex = result?.sRGBHex || null;
+      }
+      if (setFromHex(hex)) close();
     } catch {
       // The picker was cancelled or the platform does not expose the API.
     }

@@ -13,6 +13,11 @@ function invoke(cmd, args) {
   return tauri.core.invoke(cmd, args);
 }
 
+export async function pickScreenColor() {
+  if (!hasTauri) return null;
+  return invoke("pick_screen_color");
+}
+
 export function convertFileSrc(path) {
   if (hasTauri && path) {
     try {
