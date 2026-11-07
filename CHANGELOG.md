@@ -12,6 +12,16 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.29.1] - 2026-11-07
+
+### Fixed
+
+- The crop dialog now fits the whole image inside the dialog using its available width and height,
+  instead of sizing against the whole viewport and clipping the overview.
+- The crop stage no longer shrinks inside the flex body, so the crop frame and image stay aligned.
+- Refits on window resize and removes the resize listener when the dialog closes.
+- Audio edit actions now share the same height, so the clip upload button and Submit align.
+
 ## [0.29.0] - 2026-11-07
 
 ### Changed
