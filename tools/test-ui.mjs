@@ -1092,6 +1092,16 @@ await page.waitForTimeout(300);
 const sectionNoteId = await selectedId();
 const sectionNoteZ = Number(await byId(sectionNoteId).evaluate((el) => el.style.zIndex));
 check("Sections stay below regular cards", sectionZ < sectionNoteZ, `${sectionZ} < ${sectionNoteZ}`);
+await page.evaluate((id) => {
+  const el = document.querySelector(`.mn-card[data-id="${id}"]`);
+  el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
+  el.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0 }));
+}, sectionId);
+await page.waitForTimeout(250);
+check(
+  "Clicking a Section does not raise it above cards",
+  Number(await sectionCard.evaluate((el) => el.style.zIndex)) < sectionNoteZ
+);
 await page.evaluate(async (ids) => {
   const store = await import("/js/store.js");
   const actions = await import("/js/actions.js");

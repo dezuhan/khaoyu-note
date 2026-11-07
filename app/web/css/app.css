@@ -1317,7 +1317,10 @@ body.ky-scope {
 }
 
 .mn-section-title {
-  width: min(70%, 280px);
+  width: auto;
+  min-width: 86px;
+  max-width: calc(100% - 32px);
+  field-sizing: content;
   height: 24px;
   padding: 0 8px;
   border: 0;

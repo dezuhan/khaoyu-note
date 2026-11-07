@@ -343,7 +343,7 @@ function beginDrag(card, event) {
     const el = cardElement(id);
     if (el) el.classList.add("is-dragging");
   }
-  if (!card.parentId) {
+  if (!card.parentId && card.type !== "section") {
     const top = Math.max(...state.board.cards.map((item) => item.z || 1)) + 1;
     card.z = top;
     const el = cardElement(card.id);

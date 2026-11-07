@@ -13,6 +13,7 @@ project uses Semantic Versioning.
   while title and color edits stay available.
 - View > Snap to grid aligns dragged cards and Section resize edges to the board grid.
 - Section height no longer grows after a page reload; it is excluded from automatic content-height measurement.
+- Clicking a Section no longer raises it above regular cards, and its title pill now sizes to the title text.
 - Columns can convert to rows and back. Row mode lays the children out horizontally and shares the
   column width between them; Convert to column restores the vertical stack.
 - Color cards can pick a color directly from the screen with the eyedropper button beside the hex
