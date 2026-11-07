@@ -12,6 +12,16 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.25.0] - 2026-11-07
+
+### Added
+
+- Free-form crop editor for link header images and image cards.
+- Crop rectangle can move and resize on any edge or corner without a fixed ratio.
+- Fit to image resets the crop to the full image ratio.
+- Crops persist on the card and render through a clipped image frame.
+- UI checks for header and image card crop entry, dialog, free resize and reset.
+
 ## [0.24.0] - 2026-11-07
 
 ### Added
