@@ -12,6 +12,18 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.23.0] - 2026-11-07
+
+### Added
+
+- Header-above-menubar chrome with a right-corner Share control for per-board access.
+- Per-board sharing panel: default not shared, view-only access, optional comment/edit, password,
+  expiry, download permission, create/copy/revoke links.
+- Right-click Share link action for a card or column.
+- First-run setup with Continue locally, Create account or Connect server.
+- Sync API tokens can manage share links for editable projects.
+- Updated in-app Documentation for the new board access flow.
+
 ## [0.22.0] - 2026-11-07
 
 ### Added
