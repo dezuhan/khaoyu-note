@@ -159,7 +159,7 @@ jobs:
         run: docker build --tag khaoyu-note-service:ci service
 
       - name: Scan service image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: khaoyu-note-service:ci
           severity: HIGH,CRITICAL
