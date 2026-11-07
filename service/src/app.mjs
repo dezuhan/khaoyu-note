@@ -37,7 +37,13 @@ export function createService({ config, db, logger, mailer }) {
   const api = createApiRouter({ db, config, logger, mailer });
   const server = http.createServer(async (request, response) => {
     const started = Date.now();
-    const url = new URL(request.url || "/", config.publicUrl);
+    let url;
+    try {
+      url = new URL(request.url || "/", config.publicUrl);
+    } catch {
+      sendJson(response, 400, { error: "bad request", code: "bad_request" }, config);
+      return;
+    }
     const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
     const secure = request.socket.encrypted || (config.trustProxy && forwardedProto === "https");
     if (config.requireHttps && !secure) {

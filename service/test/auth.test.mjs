@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
+import net from "node:net";
 import path from "node:path";
 import test from "node:test";
 import { loadConfig } from "../src/config.mjs";
@@ -177,6 +178,7 @@ async function start() {
 
   return {
     base,
+    port,
     config,
     db,
     server,
@@ -198,6 +200,22 @@ async function start() {
 test("account, login, refresh, session, reset and authorization flows", async (t) => {
   const api = await start();
   t.after(() => api.close());
+
+  await t.test("malformed request targets return 400 without crashing", async () => {
+    const response = await new Promise((resolve, reject) => {
+      const socket = net.connect(api.port, "127.0.0.1", () => {
+        socket.write("GET // HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+      });
+      let data = "";
+      socket.on("data", (chunk) => {
+        data += chunk.toString();
+      });
+      socket.on("end", () => resolve(data));
+      socket.on("error", reject);
+    });
+    assert.match(response, /400 Bad Request/);
+    assert.equal((await api.call("/readyz")).status, 200);
+  });
 
   async function createProject(user, title = "Test project") {
     const created = await api.call("/api/v1/projects", {
