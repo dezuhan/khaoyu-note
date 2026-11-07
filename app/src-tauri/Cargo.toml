@@ -1,6 +1,6 @@
 [package]
 name = "khaoyu-note"
-version = "0.23.0"
+version = "0.23.1"
 description = "Local-first visual notes and boards"
 edition = "2021"
 rust-version = "1.77"

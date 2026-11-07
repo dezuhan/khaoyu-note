@@ -12,6 +12,14 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.23.1] - 2026-11-07
+
+### Fixed
+
+- Link header image preview now renders in plain browser preview mode by converting the stored
+  localStorage asset into a data URL instead of an invalid relative path.
+- Added a UI regression check for the visible header image preview.
+
 ## [0.23.0] - 2026-11-07
 
 ### Added
