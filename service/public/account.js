@@ -123,7 +123,7 @@ function renderSessions(sessions) {
     label.textContent = `${session.device || "Unknown device"} · ${session.current ? "current" : new Date(session.createdAt).toLocaleString()}`;
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "secondary";
+    button.className = "ky-button ky-button-quiet";
     button.textContent = "Revoke";
     button.addEventListener("click", async () => {
       try {
@@ -149,7 +149,7 @@ function renderTokens(tokens) {
     label.textContent = `${token.name} · ${token.scopes.join(", ")} · expires ${new Date(token.expiresAt).toLocaleDateString()}`;
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "danger";
+    button.className = "ky-button ky-button-danger";
     button.textContent = "Revoke";
     button.addEventListener("click", async () => {
       try {

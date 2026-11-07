@@ -1,92 +1,68 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-ky-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Khaoyu Note sharing</title>
-    <style>
-      * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; background: #111; color: #eee; font-family: system-ui, sans-serif; padding: 24px; }
-      main { width: min(860px, 100%); margin: 0 auto; background: #1b1b1b; border: 1px solid #333; border-radius: 10px; padding: 24px; }
-      h1 { font-size: 20px; margin: 0 0 4px; }
-      h2 { font-size: 15px; margin: 0 0 10px; }
-      p { color: #aaa; font-size: 13px; line-height: 1.5; }
-      section { border-top: 1px solid #333; margin-top: 18px; padding-top: 16px; }
-      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
-      .row > label { flex: 1 1 160px; }
-      label { display: block; color: #aaa; font-size: 12px; margin: 8px 0 4px; }
-      input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #111; color: #eee; }
-      input[type="checkbox"] { width: auto; }
-      button { padding: 8px 11px; border-radius: 6px; border: 1px solid #555; background: #eee; color: #111; cursor: pointer; font-weight: 600; }
-      button.secondary { background: transparent; color: #eee; }
-      button.danger { background: transparent; color: #f88; border-color: #633; }
-      button:disabled { opacity: 0.45; cursor: default; }
-      [hidden] { display: none !important; }
-      #status { min-height: 18px; font-size: 12px; color: #9ad; margin-top: 10px; }
-      ul { list-style: none; padding: 0; margin: 8px 0 0; }
-      li { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #333; border-radius: 6px; padding: 8px 10px; margin-top: 6px; font-size: 12px; color: #ccc; }
-      code, .token { font-family: ui-monospace, monospace; overflow-wrap: anywhere; color: #dfe; }
-      .warning { border: 1px solid #654; background: #241d18; border-radius: 6px; padding: 10px; font-size: 12px; color: #fc9; margin: 8px 0; }
-      .muted { color: #888; }
-    </style>
+      <link rel="stylesheet" href="/ky.css" />
     <link rel="stylesheet" href="/ui.css" />
   </head>
-  <body>
-    <main>
-      <h1>Khaoyu Note sharing</h1>
+  <body class="ky-scope">
+    <main class="ky-panel ky-auth-panel">
+      <h1 class="ky-title">Khaoyu Note sharing</h1>
       <p>Share a whole project, one card, or a column. Public sharing is off by default and every link is scoped.</p>
 
       <section id="login-section">
         <h2>Sign in</h2>
         <div class="row">
-          <label>Email <input id="login-email" type="email" autocomplete="username" /></label>
-          <label>Password <input id="login-password" type="password" autocomplete="current-password" /></label>
-          <button id="login" type="button">Sign in</button>
+          <label>Email <input class="ky-input" id="login-email" type="email" autocomplete="username" /></label>
+          <label>Password <input class="ky-input" id="login-password" type="password" autocomplete="current-password" /></label>
+          <button class="ky-button ky-button-primary" id="login" type="button">Sign in</button>
         </div>
         <p class="muted">Account and passkeys: <a href="/account">/account</a> · <a href="/passkeys">/passkeys</a></p>
       </section>
 
       <div id="content" hidden>
-        <section>
+        <section class="ky-auth-section">
           <h2>Project</h2>
           <div class="row">
-            <label>Project <select id="project"></select></label>
-            <button id="refresh" type="button" class="secondary">Refresh</button>
+            <label>Project <select class="ky-input" id="project"></select></label>
+            <button id="refresh" type="button" class="ky-button ky-button-quiet">Refresh</button>
           </div>
         </section>
 
-        <section>
+        <section class="ky-auth-section">
           <h2>Public sharing</h2>
           <p id="public-state" class="muted"></p>
           <div id="enable-box">
             <div class="warning">
               Enabling public sharing allows anyone with a link to view the selected scope. Search engines are excluded, but a copied link is a bearer secret. Do not enable this for private material.
             </div>
-            <label><input id="acknowledge" type="checkbox" /> I understand that share links can be forwarded and accessed by anyone who has them.</label>
+            <label><input class="ky-input" id="acknowledge" type="checkbox" /> I understand that share links can be forwarded and accessed by anyone who has them.</label>
             <div class="row">
-              <button id="enable-sharing" type="button">Enable public sharing</button>
+              <button class="ky-button ky-button-primary" id="enable-sharing" type="button">Enable public sharing</button>
             </div>
           </div>
           <div id="disable-box" hidden>
             <div class="row">
-              <button id="disable-sharing" type="button" class="danger">Disable and revoke all links</button>
+              <button id="disable-sharing" type="button" class="ky-button ky-button-danger">Disable and revoke all links</button>
             </div>
           </div>
         </section>
 
-        <section>
+        <section class="ky-auth-section">
           <h2>Create a link</h2>
           <div class="row">
             <label>Scope
-              <select id="scope">
+              <select class="ky-input" id="scope">
                 <option value="project">Whole project</option>
                 <option value="item">One card</option>
                 <option value="column">Column and children</option>
               </select>
             </label>
-            <label id="target-wrap" hidden>Target <select id="target"></select></label>
+            <label class="ky-label" id="target-wrap" hidden>Target <select class="ky-input" id="target"></select></label>
             <label>Permission
-              <select id="permission">
+              <select class="ky-input" id="permission">
                 <option value="view">View</option>
                 <option value="comment">Comment</option>
                 <option value="edit">Edit</option>
@@ -95,15 +71,15 @@
             </label>
           </div>
           <div class="row">
-            <label>Expiry days <input id="expiry" type="number" min="1" max="365" placeholder="Never" /></label>
-            <label>Passphrase <input id="password" type="password" autocomplete="new-password" /></label>
-            <label><input id="download" type="checkbox" /> Allow asset downloads</label>
+            <label>Expiry days <input class="ky-input" id="expiry" type="number" min="1" max="365" placeholder="Never" /></label>
+            <label>Passphrase <input class="ky-input" id="password" type="password" autocomplete="new-password" /></label>
+            <label><input class="ky-input" id="download" type="checkbox" /> Allow asset downloads</label>
           </div>
-          <button id="create" type="button">Create share link</button>
+          <button class="ky-button ky-button-primary" id="create" type="button">Create share link</button>
           <p id="token" class="token"></p>
         </section>
 
-        <section>
+        <section class="ky-auth-section">
           <h2>Existing links</h2>
           <ul id="shares"></ul>
         </section>

@@ -85,7 +85,7 @@ function renderShares(shares) {
     if (!share.revoked) {
       const revoke = document.createElement("button");
       revoke.type = "button";
-      revoke.className = "danger";
+      revoke.className = "ky-button ky-button-danger";
       revoke.textContent = "Revoke";
       revoke.addEventListener("click", async () => {
         try {

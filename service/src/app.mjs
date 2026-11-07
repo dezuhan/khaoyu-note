@@ -15,6 +15,7 @@ const AUTH_PAGES = {
   "/shares.js": ["shares.js", "text/javascript; charset=utf-8"],
   "/share-view.js": ["share-view.js", "text/javascript; charset=utf-8"],
   "/ui.css": ["ui.css", "text/css; charset=utf-8"],
+  "/ky.css": ["ky.css", "text/css; charset=utf-8"],
 };
 
 export function assertSchemaCurrent(db) {

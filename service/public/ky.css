@@ -1,0 +1,959 @@
+/*
+ * Khaoyu Design System — framework stylesheet
+ * version 1.0.0
+ *
+ * A standalone, namespaced (.ky-*) distribution of the Khaoyu plugin design language.
+ *
+ *   <html data-ky-theme="dark">  ← preview / standalone pages (dark, softDark, light, softLight)
+ *   <body class="ky-scope">          ← applies typography + box sizing
+ *   <main class="ky-panel ky-scope"> ← plugin panel shell
+ *
+ * Inside Photon Studio the host injects the real --ph-* theme tokens, so plugins should NOT set
+ * data-ky-theme: the framework tokens follow --ph-* automatically. The bundled theme blocks only
+ * exist so the preview (and standalone docs) render without the host.
+ *
+ * Only --ky-* / --ph-* variables are used for colour. Geometry and type are framework constants.
+ */
+
+/* ============================================================== tokens */
+
+:root {
+  /* Host fallbacks = Photon Studio `dark` skin (Khaoyu design notes §3 "Shared palette — resolved per skin").
+     In Photon the host injects the real tokens; these blocks only power the standalone preview. */
+  --ph-black-0: #000000;
+  --ph-black-1: #050505;
+  --ph-black-2: #090909;
+  --ph-black-3: #0d0d0d;
+  --ph-black-4: #111111;
+  --ph-black-5: #151515;
+  --ph-black-6: #1b1b1b;
+  --ph-black-7: #222222;
+  --ph-black-8: #2b2b2b;
+  --ph-bg: var(--ph-black-0);
+  --ph-chrome: var(--ph-black-4);
+  --ph-window: var(--ph-black-5);
+  --ph-text: #f7f7f7;
+  --ph-muted: #a4a4a4;
+  --ph-soft: #6b6b6b;
+  --ph-accent: #ecebe7;
+  --ph-accent-bright: #ffffff;
+  --ph-on-accent: #0c0c0d;
+  --ph-danger: #f5566f;
+  --ph-control: rgba(255, 255, 255, 0.055);
+  --ph-control-hover: rgba(255, 255, 255, 0.1);
+  --ph-control-active: rgba(255, 255, 255, 0.14);
+  --ph-stroke: rgba(255, 255, 255, 0.07);
+  --ph-stroke-strong: rgba(255, 255, 255, 0.12);
+  --ph-hairline: inset 0 0 0 1px var(--ph-stroke);
+  --ph-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%);
+  --ph-glass: rgba(255, 255, 255, 0.075);
+  --ph-glass-plate-strong: rgba(10, 10, 10, 0.86);
+  --ph-glow-input-focus: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 18px rgba(255, 255, 255, 0.045), 0 0 20px rgba(255, 255, 255, 0.06);
+  --ph-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.75);
+
+  /* framework aliases */
+  --ky-bg: var(--ph-chrome);
+  --ky-surface: var(--ph-window);
+  --ky-text: var(--ph-text);
+  --ky-muted: var(--ph-muted);
+  --ky-soft: var(--ph-soft);
+  --ky-control: var(--ph-control);
+  --ky-control-hover: var(--ph-control-hover);
+  --ky-control-active: var(--ph-control-active);
+  --ky-raise: var(--ph-raise);
+  --ky-hairline: var(--ph-hairline);
+  --ky-stroke: var(--ph-stroke);
+  --ky-line-strong: var(--ph-stroke-strong);
+  --ky-accent: var(--ph-accent);
+  --ky-accent-bright: var(--ph-accent-bright);
+  --ky-on-accent: var(--ph-on-accent);
+  --ky-danger: var(--ph-danger);
+  --ky-popup-bg: var(--ph-glass-plate-strong);
+  --ky-glass: var(--ph-glass);
+  --ky-shadow-popup: var(--ph-depth-raised);
+  --ky-glow-input-focus: var(--ph-glow-input-focus);
+
+  /* geometry */
+  --ky-radius-control: 7px;
+  --ky-radius-card: 12px;
+  --ky-control-height: 24px;
+  --ky-panel-padding: 12px;
+  --ky-gap: 10px;
+
+  /* type */
+  --ky-font: Inter, "SF Pro Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --ky-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ky-text-base: 12px;
+  --ky-label: 10px;
+  --ky-title: 14px;
+  --ky-button: 11px;
+  --ky-leading: 17px;
+  --ky-leading-tight: 15px;
+
+  /* motion */
+  --ky-duration-popover: 0.19s;
+  --ky-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --ky-chevron-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' fill='none' stroke='%23a4a4a4' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------- Photon skins
+ * Four skins: light, softLight, softDark, dark (dark is the fallback above).
+ * Values are resolved from the shared-palette table in Khaoyu design notes §3.
+ */
+
+html[data-ky-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-ky-theme="softDark"] {
+  color-scheme: dark;
+  --ph-black-0: #202022;
+  --ph-black-1: #242426;
+  --ph-black-2: #28282a;
+  --ph-black-3: #2c2c2e;
+  --ph-black-4: #303033;
+  --ph-black-5: #343437;
+  --ph-black-6: #3a3a3d;
+  --ph-black-7: #414144;
+  --ph-black-8: #49494c;
+  --ph-text: #ededee;
+  --ph-muted: #b4b4b9;
+  --ph-soft: #9c9ca3;
+  --ph-accent: #ecebe7;
+  --ph-accent-bright: #ffffff;
+  --ph-on-accent: #0c0c0d;
+  --ph-control: rgba(255, 255, 255, 0.055);
+  --ph-control-hover: rgba(255, 255, 255, 0.1);
+  --ph-control-active: rgba(255, 255, 255, 0.14);
+  --ph-stroke: rgba(255, 255, 255, 0.07);
+  --ph-stroke-strong: rgba(255, 255, 255, 0.12);
+  --ph-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%);
+  --ph-glass: rgba(255, 255, 255, 0.075);
+  --ph-glass-plate-strong: rgba(40, 40, 42, 0.94);
+  --ph-glow-input-focus: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 18px rgba(255, 255, 255, 0.045), 0 0 20px rgba(255, 255, 255, 0.06);
+  --ph-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.75);
+}
+
+html[data-ky-theme="light"],
+html[data-ky-theme="softLight"] {
+  color-scheme: light;
+  --ph-black-0: #eeeeee;
+  --ph-black-1: #e7e7e7;
+  --ph-black-2: #f0f0f0;
+  --ph-black-3: #f3f3f3;
+  --ph-black-4: #f7f7f7;
+  --ph-black-5: #fafafa;
+  --ph-black-6: #fdfdfd;
+  --ph-black-7: #ffffff;
+  --ph-black-8: #ffffff;
+  --ph-text: #17171a;
+  --ph-muted: #4f4f57;
+  --ph-soft: #6f6f78;
+  --ph-accent: #26262b;
+  --ph-accent-bright: #0c0c0d;
+  --ph-on-accent: #ffffff;
+  --ph-danger: #f5566f;
+  --ph-control: rgba(0, 0, 0, 0.055);
+  --ph-control-hover: rgba(0, 0, 0, 0.09);
+  --ph-control-active: rgba(0, 0, 0, 0.13);
+  --ph-stroke: rgba(0, 0, 0, 0.09);
+  --ph-stroke-strong: rgba(0, 0, 0, 0.14);
+  --ph-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%);
+  --ph-glass: rgba(255, 255, 255, 0.5);
+  --ph-glass-plate-strong: rgba(253, 253, 253, 0.88);
+  --ph-glow-input-focus: inset 0 0 0 1px rgba(0, 0, 0, 0.2), 0 0 14px rgba(0, 0, 0, 0.05);
+  --ph-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.2);
+}
+
+html[data-ky-theme="softLight"] {
+  --ph-black-0: #c4c4c8;
+  --ph-black-1: #bdbdc2;
+  --ph-black-2: #cacace;
+  --ph-black-3: #d0d0d4;
+  --ph-black-4: #d6d6da;
+  --ph-black-5: #dfdfe3;
+  --ph-black-6: #e6e6ea;
+  --ph-black-7: #ededf0;
+  --ph-black-8: #f1f1f3;
+  --ph-muted: #484850;
+  --ph-soft: #606069;
+  --ph-glass: rgba(230, 230, 234, 0.5);
+  --ph-glass-plate-strong: rgba(224, 224, 228, 0.94);
+}
+
+/* ============================================================== base scope */
+
+.ky-scope {
+  font-family: var(--ky-font);
+  font-size: var(--ky-text-base);
+  line-height: var(--ky-leading);
+  color: var(--ky-text);
+  background: var(--ky-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.ky-scope,
+.ky-scope *,
+.ky-scope *::before,
+.ky-scope *::after {
+  box-sizing: border-box;
+}
+
+/* Native Photon focus:
+ *   buttons, tabs, links and summaries keep the 2px accent ring;
+ *   text inputs, textareas and select triggers use the host input glow instead of an outline. */
+.ky-scope button:focus-visible,
+.ky-scope a:focus-visible,
+.ky-scope summary:focus-visible,
+.ky-scope [role="tab"]:focus-visible {
+  outline: 2px solid var(--ky-accent);
+  outline-offset: 1px;
+}
+
+.ky-scope [hidden] {
+  display: none !important;
+}
+
+.ky-mono {
+  font-family: var(--ky-mono);
+}
+
+.ky-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================== panel shell */
+
+.ky-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-gap);
+  height: 100%;
+  min-height: 0;
+  padding: var(--ky-panel-padding);
+  overflow-y: auto;
+  background: var(--ky-bg);
+}
+
+.ky-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ky-control-height);
+}
+
+.ky-title {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: var(--ky-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ky-text);
+}
+
+.ky-state,
+.ky-sep {
+  color: var(--ky-muted);
+  font-size: var(--ky-label);
+}
+
+.ky-badge {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+  font-size: var(--ky-label);
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.ky-badge.is-busy {
+  color: var(--ky-muted);
+}
+
+.ky-badge.is-danger {
+  background: color-mix(in srgb, var(--ky-danger) 22%, transparent);
+  color: var(--ky-danger);
+}
+
+.ky-badge.is-ok {
+  color: var(--ky-text);
+}
+
+.ky-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--ky-stroke);
+  color: var(--ky-muted);
+  font-size: var(--ky-label);
+  line-height: 16px;
+}
+
+/* Left: version. Right: Details + Check service (see the Upscale panel). */
+.ky-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ky-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ky-accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ky-link-button:hover {
+  color: var(--ky-text);
+}
+
+/* ============================================================== tabs & views */
+
+.ky-tabs {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+}
+
+.ky-tab {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms var(--ky-ease-standard);
+}
+
+.ky-tab:hover {
+  color: var(--ky-text);
+}
+
+.ky-tab.is-active {
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+}
+
+/* Sliding active plate (ky.js): falls back to the plain is-active background without JS. */
+.ky-tabs.has-thumb .ky-tab {
+  background: transparent;
+}
+
+.ky-tabs.has-thumb .ky-tab.is-active {
+  background: transparent;
+}
+
+.ky-tab-thumb {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  border-radius: 5px;
+  background: var(--ky-control-active);
+  box-shadow: inset 0 0 0 1px var(--ky-line);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ky-tabs.has-thumb.is-ready .ky-tab-thumb {
+  opacity: 1;
+  transition:
+    left 220ms var(--ky-ease-standard),
+    width 220ms var(--ky-ease-standard),
+    opacity 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ky-tab-thumb,
+  .ky-tab {
+    transition: none !important;
+  }
+}
+
+.ky-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-gap);
+  min-height: 0;
+}
+
+/* ============================================================== fields */
+
+.ky-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ky-label {
+  color: var(--ky-muted);
+  font-size: var(--ky-label);
+  font-weight: 600;
+}
+
+.ky-hint {
+  margin: 0;
+  color: var(--ky-soft);
+  font-size: var(--ky-label);
+  line-height: var(--ky-leading-tight);
+}
+
+.ky-input,
+.ky-textarea,
+.ky-template {
+  width: 100%;
+  height: var(--ky-control-height);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-raise), var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: var(--ky-text-base);
+}
+
+.ky-textarea,
+.ky-template {
+  height: auto;
+  min-height: 64px;
+  padding: 7px 8px;
+  line-height: var(--ky-leading);
+  resize: vertical;
+}
+
+.ky-template {
+  min-height: 76px;
+  font-family: var(--ky-mono);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.ky-input::placeholder,
+.ky-textarea::placeholder {
+  color: var(--ky-soft);
+}
+
+.ky-input:focus,
+.ky-input:focus-visible,
+.ky-textarea:focus,
+.ky-textarea:focus-visible,
+.ky-template:focus,
+.ky-template:focus-visible {
+  outline: none;
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+.ky-input:disabled,
+.ky-textarea:disabled {
+  opacity: 0.55;
+}
+
+.ky-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ky-row .ky-input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.ky-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.ky-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 7px;
+}
+
+/* ============================================================== buttons */
+
+.ky-button {
+  height: var(--ky-control-height);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: var(--ky-button);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ky-button:hover:not(:disabled) {
+  background: var(--ky-control-active);
+}
+
+.ky-button:active:not(:disabled) {
+  background: var(--ky-control-hover);
+}
+
+.ky-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ky-button-primary {
+  background: var(--ky-accent);
+  color: var(--ky-on-accent);
+}
+
+.ky-button-primary:hover:not(:disabled) {
+  background: var(--ky-accent-bright);
+}
+
+.ky-button-quiet {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ky-muted);
+}
+
+.ky-button-quiet:hover:not(:disabled) {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.ky-button-tiny {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ky-muted);
+}
+
+.ky-button-danger {
+  color: var(--ky-danger);
+}
+
+.ky-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ky-actions .ky-button {
+  flex: 1 1 0;
+}
+
+/* ============================================================== segmented */
+
+.ky-segmented {
+  display: flex;
+  gap: 3px;
+  height: var(--ky-control-height);
+  padding: 2px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+}
+
+.ky-seg {
+  flex: 1 1 0;
+  height: 100%;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ky-seg:hover {
+  color: var(--ky-text);
+}
+
+.ky-seg.is-active {
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+}
+
+/* ============================================================== checkbox */
+
+.ky-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--ky-text);
+  font-size: var(--ky-text-base);
+  user-select: none;
+}
+
+.ky-check input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  display: grid;
+  place-content: center;
+}
+
+.ky-check input::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ky-accent);
+  transform: scale(0);
+  transition: transform 120ms var(--ky-ease-standard);
+}
+
+.ky-check input:checked::before {
+  transform: scale(1);
+}
+
+.ky-check input:focus-visible {
+  outline: none;
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+/* ============================================================== select */
+
+.ky-select {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.ky-select select {
+  width: 100%;
+  height: var(--ky-control-height);
+  padding: 0 22px 0 8px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-raise), var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-size: var(--ky-text-base);
+  font-weight: 500;
+  line-height: 22px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.ky-select select option {
+  background: var(--ph-black-5, #151515);
+  color: var(--ky-text);
+}
+
+.ky-select-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ky-select-trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--ky-control-height);
+  padding: 0 22px 0 8px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-raise), var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  color: var(--ky-text);
+  font-family: inherit;
+  font-size: var(--ky-text-base);
+  font-weight: 500;
+  line-height: var(--ky-leading);
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.ky-select-trigger:hover:not(:disabled) {
+  background: var(--ky-raise), var(--ky-control-hover);
+  box-shadow: inset 0 0 0 1px var(--ky-line-strong);
+}
+
+.ky-select-trigger:focus-visible,
+.ky-select.is-open .ky-select-trigger {
+  outline: none;
+  background: var(--ky-raise), var(--ky-control-hover);
+  box-shadow: var(--ky-glow-input-focus);
+}
+
+.ky-select select:focus-visible {
+  outline: none;
+}
+
+.ky-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ky-select-popup {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 5px;
+  max-height: 168px;
+  overflow-y: auto;
+  border: 0;
+  border-radius: var(--ky-radius-card);
+  background: linear-gradient(var(--ky-glass), var(--ky-glass)), var(--ky-popup-bg);
+  box-shadow: var(--ky-shadow-popup), var(--ky-hairline);
+  backdrop-filter: blur(30px) saturate(180%);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ky-soft) transparent;
+}
+
+.ky-select-popup[hidden] {
+  display: none;
+}
+
+.ky-select-popup::-webkit-scrollbar {
+  width: 3px;
+}
+
+.ky-select-popup::-webkit-scrollbar-thumb {
+  background: var(--ky-soft);
+  border-radius: 26px;
+}
+
+.ky-select-item {
+  display: flex;
+  align-items: center;
+  flex: none;
+  min-height: var(--ky-control-height);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+  color: var(--ky-muted);
+  font-family: inherit;
+  font-size: var(--ky-text-base);
+  font-weight: 500;
+  line-height: var(--ky-leading);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ky-select-item:hover {
+  background: var(--ky-control-hover);
+  color: var(--ky-text);
+}
+
+.ky-select-item.is-selected {
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-raise), var(--ky-control-active);
+  color: var(--ky-text);
+}
+
+.ky-chevron {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  z-index: 2;
+  background-color: var(--ky-muted);
+  -webkit-mask: var(--ky-chevron-mask) center / 10px 10px no-repeat;
+  mask: var(--ky-chevron-mask) center / 10px 10px no-repeat;
+  pointer-events: none;
+  transition: transform var(--ky-duration-popover) var(--ky-ease-standard);
+}
+
+.ky-select.is-open .ky-chevron {
+  transform: rotate(180deg);
+}
+
+/* ============================================================== chips & tags */
+
+.ky-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-raise), var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  font-size: 11px;
+  color: var(--ky-muted);
+}
+
+.ky-chip-row strong {
+  color: var(--ky-text);
+  font-weight: 600;
+}
+
+.ky-tag {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ky-control-active);
+  color: var(--ky-text);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ============================================================== preview / history / logs */
+
+.ky-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  padding: 6px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+  box-shadow: var(--ky-hairline);
+}
+
+.ky-preview canvas,
+.ky-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 5px;
+}
+
+.ky-preview-empty {
+  font-size: var(--ky-label);
+  color: var(--ky-soft);
+  text-align: center;
+  line-height: var(--ky-leading-tight);
+}
+
+.ky-history {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ky-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-raise), var(--ky-control);
+  box-shadow: var(--ky-hairline);
+  font-size: var(--ky-label);
+  color: var(--ky-muted);
+}
+
+.ky-history-item img {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--ky-surface);
+}
+
+.ky-history-item span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ky-advanced {
+  border-top: 1px solid var(--ky-stroke);
+  padding-top: 8px;
+}
+
+.ky-advanced > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--ky-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ky-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ky-log {
+  max-height: 120px;
+  margin: 5px 0 0;
+  overflow: auto;
+  padding: 6px;
+  border-radius: var(--ky-radius-control);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ky-muted);
+  font-family: var(--ky-mono);
+  font-size: 10px;
+  line-height: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+html[data-ky-theme="light"] .ky-log,
+html[data-ky-theme="softLight"] .ky-log {
+  background: rgba(0, 0, 0, 0.045);
+}
+
+/* ============================================================== motion preference */
+
+@media (prefers-reduced-motion: reduce) {
+  .ky-scope *,
+  .ky-scope *::before,
+  .ky-scope *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
