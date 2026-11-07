@@ -773,7 +773,7 @@ export function refreshColorPreview(card) {
 function measureHeights() {
   const zoom = state.view.zoom || 1;
   for (const card of visibleCards(state.board)) {
-    if (card.type === "column") continue;
+    if (card.type === "column" || card.type === "section") continue;
     if (CARD_ASPECTS[card.type] || card.aspect) {
       card.h = cardHeightFor(card);
       continue;
@@ -939,7 +939,7 @@ async function hydrateBoardCards() {
 
 // Re-measure one card after its content changed (inline text editing) and grow it in place.
 export function syncCardHeight(card) {
-  if (!state.board || !card || card.type === "column") return;
+  if (!state.board || !card || card.type === "column" || card.type === "section") return;
   const el = cardElement(card.id);
   if (!el) return;
   if (CARD_ASPECTS[card.type] || card.aspect) {
