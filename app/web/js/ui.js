@@ -1824,7 +1824,7 @@ window.addEventListener("mn:open-menu", (event) => {
         });
         items.push({ type: "sep" });
       }
-      items.push({ text: "Share link", onClick: () => openSharePanel(card) });
+      items.push({ text: "Share link", onClick: () => openSharePanel(card), disabled: true });
       items.push({ type: "sep" });
       if (isBoard) {
         items.push({ text: "Open board", kbd: "Enter", onClick: () => openBoardCard(card) });

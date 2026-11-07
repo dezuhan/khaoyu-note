@@ -83,33 +83,19 @@ export const DOCUMENTATION_SECTIONS = [
     id: "access",
     label: "Access and sharing",
     html: `
-      <h3>Board access</h3>
-      <p>The menu bar sits above the file header. The Share control in the header opens the per-board
-      access panel. Each board is not shared by default. Enable it after the warning, choose View only
-      (default), Can comment or Can edit, and optionally add a password and an expiry. Revoke links from
-      the same panel.</p>
-      <h3>Board link</h3>
-      <p>The browser edition keeps a full board URL such as
-      <code>http://192.168.1.10:1430/?board=&lt;id&gt;</code>. Share in the header shows that URL and
-      Copy board link. Other devices on the same network can open it while the host stays running; they
-      sign in with an account on this host. The desktop window is local to its computer, so run the
-      browser edition to share by IP.</p>
-      <h3>Share links</h3>
+      <p class="mn-docs-lead">This build is local-first. Share and Sync are disabled; boards stay in
+      the local SQLite database on this computer.</p>
+      <h3>Disabled controls</h3>
       <ul>
-        <li>Share a whole board from the header, or one item or column from the right-click menu.</li>
-        <li>Recipients open the read-only viewer at <code>/s/:token</code>.</li>
-        <li>Public sharing is off by default and needs an explicit acknowledgement per project.</li>
-        <li>Search engines are excluded with noindex, and share tokens are redacted from logs.</li>
-        <li>A link is a bearer secret. Never forward one to someone who should not have access.</li>
+        <li>The Share and Sync buttons are hidden from the header.</li>
+        <li>There are no public links, share tokens, passkeys, invitations or account permissions.</li>
+        <li>No login, signup, password reset or account page is required or available.</li>
+        <li>Right-click Share link is disabled.</li>
       </ul>
-      <h3>Permission ranks</h3>
-      <table>
-        <tr><th>Permission</th><th>Allows</th></tr>
-        <tr><td>View</td><td>Read the shared scope only.</td></tr>
-        <tr><td>Comment</td><td>Add scoped comments on cards inside the share.</td></tr>
-        <tr><td>Edit</td><td>Change allowed fields on cards inside the share.</td></tr>
-        <tr><td>Manage</td><td>Currently the same write surface as Edit.</td></tr>
-      </table>
+      <h3>Local board URLs</h3>
+      <p>The browser edition still keeps a local board URL such as
+      <code>http://127.0.0.1:1430/?board=&lt;id&gt;</code>. It opens the board on the same machine;
+      network sharing and the self-hosted service are not part of this build.</p>
     `,
   },
   {
@@ -117,83 +103,49 @@ export const DOCUMENTATION_SECTIONS = [
     label: "Server sync",
     dividerBefore: true,
     html: `
-      <p class="mn-docs-lead">Sync is optional and opt-in per board. The local board stays
-      authoritative until a connection is confirmed.</p>
-      <h3>Sign in and connect</h3>
-      <ol>
-        <li>Open the Sync control in the topbar.</li>
-        <li>Enter the server URL. A local service needs no domain: <code>127.0.0.1:8080</code>,
-        <code>localhost:8080</code> and <code>http://localhost:8080</code> are all accepted. A remote
-        host defaults to <code>https</code>.</li>
-        <li>Enter the account email and password, then choose Sign in and connect.</li>
-        <li>The app checks that the server and its database answer, signs in, and keeps a scoped token
-        in the background. You never create or paste a token.</li>
-      </ol>
-      <h3>Status</h3>
-      <p>Settings &gt; Account shows Server, Account and Status, and the sync dialog shows the same
-      connection line. The possible states are connected and database ready, server reachable but
-      database not ready, server unreachable, wrong email or password, and missing project access.</p>
-      <h3>Conflicts and offline</h3>
-      <p>When both sides changed, choose Use server or Keep local. The other version stays in server
-      revision history. Unsent changes wait in a local queue and retry when the connection returns.
-      Disabling sync or deleting a local board never deletes server data.</p>
-      <h3>Limits</h3>
-      <p>A project snapshot can contain up to 8 MB of board JSON. Signing in rotates the previous
-      sync token, so an old token stops working. Create an account on the service at
-      <code>/account</code>; the sync dialog links to it.</p>
+      <p class="mn-docs-lead">Sync is disabled in this local-first build. The desktop app, local web
+      host and SQLite database work entirely offline.</p>
+      <h3>What is off</h3>
+      <ul>
+        <li>The Sync button is hidden and the sync dialog is not reachable from the UI.</li>
+        <li>No server URL, account email, password or API token is requested.</li>
+        <li>Settings &gt; Server shows only local runtime details.</li>
+        <li>No background sync queue runs and no data leaves this computer.</li>
+      </ul>
+      <h3>Data</h3>
+      <p>Boards, cards, assets, settings and comments stay in the local database and asset folder.
+      Backups remain available from Settings &gt; Backup.</p>
     `,
   },
   {
     id: "accounts",
     label: "Accounts and passkeys",
     html: `
-      <h3>Local account</h3>
+      <p class="mn-docs-lead">Accounts, passkeys, login, signup and password reset are disabled in
+      this local-first build. No account is needed to use the app.</p>
+      <h3>What is off</h3>
       <ul>
-        <li>An account is required. The first run on an empty database creates the local admin, and
-        later launches ask for sign in. The avatar after Share opens Settings &gt; Account.</li>
-        <li>The Account page has tabs for Admin Dashboard, Account Information, Account Settings,
-        History Activity and Delete Account, with Log Out in the footer. Settings changes your profile
-        and password and signs out every session; History lists account and board activity.</li>
-        <li>Delete Account requires your password and typing DELETE ALL. It removes every local board,
-        card, asset, account, session and setting, then restarts at first-run setup. GitHub and the
-        self-hosted service are not affected.</li>
-        <li>Passwords use PBKDF2-SHA256 and sessions are stored hashed. The desktop keeps you signed
-        in on this device; the browser keeps the session for 30 days. Log out to return to the login
-        gate.</li>
-        <li>Roles enforcement (editor, commenter, viewer) and the Admin Panel arrive in M2 and M3.
-        Service accounts and sharing remain in the self-hosted service section below.</li>
+        <li>No first-run admin setup and no login gate.</li>
+        <li>The topbar account avatar is hidden and Settings has no Account page.</li>
+        <li>There is no account information, password, history or delete-account UI.</li>
+        <li>Comments use the local identity <strong>You</strong> without a profile picture.</li>
+        <li>Passkeys, invitations, member roles, API tokens and the admin panel are not exposed.</li>
       </ul>
-      <h3>Account page</h3>
-      <ul>
-        <li><code>/account</code>: register and sign in immediately, reset the password, manage sessions and API tokens. Email verification is disabled and hidden.</li>
-        <li><code>/passkeys</code>: register or use a WebAuthn passkey on localhost or an HTTPS deployment.</li>
-        <li><code>/shares</code>: enable public sharing after the acknowledgement, create project, card or column links, and choose permission, expiry, passphrase and asset download permission.</li>
-        <li><code>/s/:token</code>: the read-only viewer used by people who receive a share link.</li>
-      </ul>
-      <h3>Members and roles</h3>
-      <table>
-        <tr><th>Role</th><th>Can do</th></tr>
-        <tr><td>Owner</td><td>Everything, including invitations, member roles, public sharing and ownership transfer.</td></tr>
-        <tr><td>Editor</td><td>Push snapshots, manage shares, restore revisions.</td></tr>
-        <tr><td>Commenter</td><td>Read and add scoped comments.</td></tr>
-        <tr><td>Viewer</td><td>Read only.</td></tr>
-      </table>
-      <p>Invitations are email-bound, single use and expiring. The owner cannot be removed directly;
-      transfer ownership instead. Removing a member takes effect on their next request.</p>
-      <h3>API tokens</h3>
-      <p>Tokens use the <code>khn_</code> prefix, are stored hashed, grant
-      <code>projects:read</code> or <code>projects:write</code>, and can expire. They cannot manage
-      sessions, passkeys or account settings. The sync login creates one automatically; scripted
-      clients can still create one at <code>/account</code> or with
-      <code>node tools/create-service-token.mjs</code>.</p>
+      <h3>Existing data</h3>
+      <p>Account tables may still exist in an older local database, but this build does not read them
+      for sign-in or display. Boards and settings continue to work without an account.</p>
+      <h3>Future work</h3>
+      <p>The optional account and service code remains in the repository for a later milestone. It is
+      not part of the current local-first release.</p>
     `,
   },
   {
     id: "service",
     label: "Self-hosted service",
     html: `
-      <p class="mn-docs-lead">The service is optional. It stores accounts, project snapshots, assets,
-      share links and audit records in SQLite under the configured data directory.</p>
+      <p class="mn-docs-lead">The self-hosted service is not part of this local-first build. The
+      desktop app, local web host and local database work without it. The notes below are reference
+      for a future service deployment.</p>
       <h3>Run it locally</h3>
       <pre class="mn-docs-code">cd service
 Copy-Item .env.example .env
@@ -273,8 +225,8 @@ cmd /c "call ""C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\
     id: "api",
     label: "HTTP API",
     html: `
-      <p class="mn-docs-lead">The service exposes one HTTP port. Browser pages use session cookies and
-      CSRF, while the desktop client and scripts use a bearer token.</p>
+      <p class="mn-docs-lead">This HTTP API belongs to the optional self-hosted service, which is not
+      used by the local-first app and is disabled from its UI. It is documented here for future work.</p>
       <h3>Authentication</h3>
       <ul>
         <li><code>Authorization: Bearer khn_...</code> with the <code>projects:read</code> and
@@ -349,23 +301,16 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
     label: "Settings and backup",
     html: `
       <h3>Panes</h3>
-      <p>Settings opens with Account, Server and Backup at the top, then a divider, General,
+      <p>Settings opens with Server and Backup at the top, then a divider, General,
       Appearance, Tools and Performance, then another divider, MCP and About. Language is part of
       General and Canvas is part of Appearance. Tools is a two-column icon grid; Map, Video and Audio
-      show a disabled status.</p>
-      <h3>Account</h3>
-      <ul>
-        <li>The Account pane is a profile page: profile picture, first and last name, email, and a
-        Change Password section, with Save and Cancel.</li>
-        <li>Upload Image accepts PNG, JPEG or GIF up to 10 MB and crops it to 256 px before saving.
-        Remove clears the picture and Save applies the change.</li>
-      </ul>
+      show a disabled status. There is no Account page in this local-first build.</p>
       <h3>Server</h3>
       <ul>
-        <li>Server shows the local runtime (mode, version, database folder) and, on the web host, the
+        <li>Server shows only the local runtime: mode, version, database folder and, on the web host,
         host and port.</li>
-        <li>The same pane holds the self-hosted service connection, health status, account page,
-        passkeys, sharing and the sign-in or change-server action.</li>
+        <li>Account, passkeys, sharing, sign-in and sync actions are removed; Share and Sync are
+        disabled in the topbar.</li>
       </ul>
       <h3>Backup</h3>
       <ul>

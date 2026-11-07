@@ -1539,10 +1539,10 @@ function renderServerPage(content) {
   const intro = document.createElement("p");
   intro.className = "mn-prefs-note";
   intro.textContent =
-    "Local runtime details and the optional self-hosted service connection for passkeys, sharing and sync.";
+    "Local runtime details. Accounts, sync and sharing are disabled in this local-first build.";
   content.append(intro);
   renderServerRuntime(content);
-
+  return;
   const status = document.createElement("div");
   status.className = "mn-account-status";
   const server = document.createElement("div");

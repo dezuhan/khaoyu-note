@@ -272,9 +272,8 @@ check(
     (await page.locator("#command-search-btn").isVisible())
 );
 check(
-  "Board access control is in the header right corner",
-  (await page.locator("#share-btn").isVisible()) &&
-    (await page.locator(".mn-topbar-right #share-btn").count()) === 1
+  "Share and Sync controls are hidden in local-first mode",
+  (await page.locator("#share-btn").isHidden()) && (await page.locator("#sync-state").isHidden())
 );
 check(
   "Account avatar button is disabled in local-first mode",
@@ -1786,11 +1785,10 @@ check(
 await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
 await page.waitForTimeout(300);
 check(
-  "Server page shows runtime details and the service pages",
+  "Server page shows local runtime details only",
   (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
-    (await page.locator('[data-role="content"]').innerText()).includes("Server: not connected") &&
-    (await page.locator(".mn-account-grid").innerText()).includes("Passkeys") &&
-    (await page.locator(".mn-account-grid").innerText()).includes("Sharing")
+    (await page.locator('[data-role="content"]').innerText()).includes("Accounts, sync and sharing are disabled") &&
+    (await page.locator(".mn-account-grid").count()) === 0
 );
 check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
 await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();
@@ -2216,27 +2214,7 @@ const persisted = await page.evaluate(() => {
 });
 check("Board persists card edits", persisted.max >= 15, JSON.stringify(persisted));
 check("Single-file header keeps the template menu visible", await page.locator("#template-btn").isVisible());
-check("Sync state is explicit and off by default", (await page.locator("#sync-state").innerText()).includes("Sync"));
-await page.click("#sync-state");
-await page.waitForTimeout(250);
-check(
-  "Sync dialog exposes server URL, email, password and sign-in action",
-  (await page.locator(".mn-sync-panel").isVisible()) &&
-    (await page.locator(".mn-sync-field").count()) === 3 &&
-    (await page.locator(".mn-sync-foot").innerText()).includes("Sign in and connect")
-);
-await page.locator(".mn-sync-panel .mn-modal-close").click();
-check("Sync dialog closes without changing the board", (await page.locator(".mn-sync-overlay").count()) === 0);
-await page.click("#share-btn");
-await page.waitForTimeout(300);
-check(
-  "Header share control offers a board link and optional service sharing",
-  (await page.locator(".mn-share-panel").isVisible()) &&
-    (await page.locator(".mn-share-panel").innerText()).includes("Board link") &&
-    (await page.locator(".mn-share-panel").innerText()).toLowerCase().includes("self-hosted service")
-);
-await page.locator(".mn-share-panel .mn-modal-close").click();
-check("Share panel closes", (await page.locator(".mn-share-overlay").count()) === 0);
+check("Sync and Share are hidden from the header", (await page.locator("#sync-state").isHidden()) && (await page.locator("#share-btn").isHidden()));
 await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
 await page.locator(".mn-menu-item", { hasText: "Documentation" }).click();
 await page.waitForTimeout(250);
@@ -2255,7 +2233,7 @@ await page.locator('.mn-docs-nav-item[data-doc="sync"]').click();
 await page.waitForTimeout(150);
 check(
   "Documentation switches to the Server sync section",
-  (await page.locator(".mn-docs").innerText()).includes("Sign in and connect")
+  (await page.locator(".mn-docs").innerText()).includes("Sync is disabled")
 );
 await page.locator('.mn-docs-nav-item[data-doc="mcp"]').click();
 await page.waitForTimeout(150);

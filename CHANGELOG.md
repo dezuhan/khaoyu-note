@@ -13,8 +13,9 @@ project uses Semantic Versioning.
 - Local-first deploy mode: login, signup, reset-password, account page and Settings > Account are
   disabled. Boards and settings open without an account, the account avatar and Account settings page
   are hidden, desktop guest writes are accepted, and the web host no longer requires a session for the
-  command bridge, assets or downloads. Comment cards use the local "You" identity with no profile
-  picture while account features are disabled.
+  command bridge, assets or downloads. The Share and Sync controls are hidden, Settings > Server shows
+  local runtime only, and the in-app documentation marks accounts, sharing and sync as disabled. Comment
+  cards use the local "You" identity with no profile picture.
 - Separate service auth pages at `/login`, `/register` and `/reset`, using the reference centred card
   layout with `ky.css` tokens and light/dark mode. Password reset requires the current password and
   never sends an email token. Login lands on `/admin`; `/account` redirects there, and the dashboard

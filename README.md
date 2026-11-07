@@ -123,8 +123,8 @@ the app works offline; only optional video and map embeds need the internet.
 | System file drop | implemented: native drag and drop stores dropped files as assets, images open as image cards, audio and video use their media cards, raw files and all other documents become file cards; a drop overlay appears while dragging |
 | Template library | implemented: Blank board, Welcome board, Project plan, Kanban board, Meeting notes and Moodboard starters replace the active file and can be undone; applying one to a non-empty board asks for overwrite confirmation first |
 | Labels and reactions | out of scope for this local app |
-| Service admin dashboard | implemented at `/admin` on the self-hosted service: left rail with Overview, Accounts, Teams and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, team creation and members, and the full audit feed. The first service account is admin. |
-| Sharing and sync | optional: they need the self-hosted service in `service/` and are off by default |
+| Sharing and sync | disabled in this local-first build: Share and Sync are hidden, Settings > Server shows local runtime only, and no service/account connection is exposed. The `service/` code remains for a future deployment. |
+| Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Teams and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, team creation and members, and the full audit feed. |
 | Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, login and sharing architecture (planning only) |
 
 ### Settings, GPU and comments
