@@ -508,6 +508,23 @@ export function removeLinkHeader(cardId) {
   const card = getCard(state.board, cardId);
   if (!card || card.type !== "link" || card.locked || !card.headerImage) return;
   delete card.headerImage;
+  delete card.headerImageCrop;
+  markDirty("board");
+}
+
+export function applyLinkHeaderCrop(cardId, crop) {
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "link" || !card.headerImage) return;
+  card.headerImageCrop = crop;
+  markDirty("board");
+}
+
+export function applyImageCrop(cardId, crop) {
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "image" || !card.src) return;
+  card.imageCrop = crop;
+  const ratio = (crop.w / crop.h) * (crop.ratio || 1);
+  card.h = Math.max(120, Math.round(card.w / ratio) + 24);
   markDirty("board");
 }
 

@@ -1,6 +1,7 @@
 // Chrome UI: tool rail, top bar, modals, menus, toasts and shortcuts.
 
 import { DOCUMENTATION_HTML } from "./documentation.js";
+import { openImageCrop } from "./image-crop.js";
 import { openSharePanel } from "./share-ui.js";
 import * as bridge from "./bridge.js";
 import { closeDocumentEditor, documentEditorOpen, openDocumentEditor } from "./document-editor.js";
@@ -15,6 +16,8 @@ import {
   attachFile,
   attachLinkHeader,
   removeLinkHeader,
+  applyLinkHeaderCrop,
+  applyImageCrop,
   assetPathForCard,
   bringToFront,
   canWrapInColumn,
@@ -1771,10 +1774,31 @@ window.addEventListener("mn:open-menu", (event) => {
         });
         if (card.headerImage) {
           items.push({
+            text: "Crop header image",
+            onClick: () =>
+              openImageCrop({
+                src: bridge.convertFileSrc(card.headerImage),
+                crop: card.headerImageCrop,
+                onApply: (crop) => applyLinkHeaderCrop(card.id, crop),
+              }),
+          });
+          items.push({
             text: "Remove header image",
             onClick: () => removeLinkHeader(card.id),
           });
         }
+        items.push({ type: "sep" });
+      }
+      if (!card.locked && card.type === "image" && card.src) {
+        items.push({
+          text: "Crop image",
+          onClick: () =>
+            openImageCrop({
+              src: bridge.convertFileSrc(card.src),
+              crop: card.imageCrop,
+              onApply: (crop) => applyImageCrop(card.id, crop),
+            }),
+        });
         items.push({ type: "sep" });
       }
       const assetPath = assetPathForCard(card);

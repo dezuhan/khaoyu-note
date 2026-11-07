@@ -150,10 +150,17 @@ function contentFor(card) {
       const domain = domainOf(card.url);
       const title = (card.title || domain || "").trim();
       const showDomain = domain && title.toLowerCase() !== domain.toLowerCase();
+      const crop = card.headerImageCrop;
       const header = card.headerImage
-        ? `<div class="mn-link-header"><img src="${escapeHtml(
-            bridge.convertFileSrc(card.headerImage)
-          )}" alt="" /></div>`
+        ? `<div class="mn-link-header${crop ? " is-cropped" : ""}"${
+            crop
+              ? ` style="aspect-ratio:${(crop.w / crop.h) * (crop.ratio || 1)}"`
+              : ""
+          }><img src="${escapeHtml(bridge.convertFileSrc(card.headerImage))}" alt=""${
+            crop
+              ? ` style="position:absolute;width:${100 / crop.w}%;height:${100 / crop.h}%;left:${(-crop.x / crop.w) * 100}%;top:${(-crop.y / crop.h) * 100}%;max-width:none;object-fit:fill"`
+              : ""
+          } /></div>`
         : "";
       return `<div class="mn-link${header ? " has-header" : ""}">${header}
         <div class="mn-link-row">
@@ -355,8 +362,18 @@ function contentFor(card) {
           ${icon("image", 22)}<span>Add image</span>
         </div>`;
       }
+      const imageCrop = card.imageCrop;
+      const image = `<img src="${escapeHtml(imgSrc(card.src))}" alt="" draggable="false"${
+        imageCrop
+          ? ` style="position:absolute;width:${100 / imageCrop.w}%;height:${100 / imageCrop.h}%;left:${(-imageCrop.x / imageCrop.w) * 100}%;top:${(-imageCrop.y / imageCrop.h) * 100}%;max-width:none;object-fit:fill"`
+          : ""
+      } />`;
       return `<div class="mn-image">
-        <img src="${escapeHtml(imgSrc(card.src))}" alt="" draggable="false" />
+        ${
+          imageCrop
+            ? `<div class="mn-image-crop is-cropped" style="aspect-ratio:${(imageCrop.w / imageCrop.h) * (imageCrop.ratio || 1)}">${image}</div>`
+            : image
+        }
         <input class="mn-field-input mn-image-caption" data-field="caption" value="${escapeHtml(
           card.caption
         )}" placeholder="Caption" />

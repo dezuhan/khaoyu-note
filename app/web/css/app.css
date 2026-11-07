@@ -5684,3 +5684,91 @@ html[data-performance="true"] .mn-card {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+
+/* Image crop */
+.mn-link-header.is-cropped {
+  position: relative;
+}
+.mn-image-crop {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--ky-control);
+}
+.mn-image-crop.is-cropped {
+  position: relative;
+}
+.mn-image-crop.is-cropped img {
+  max-width: none;
+}
+.mn-crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, #000 52%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.mn-crop-panel {
+  width: min(760px, calc(100vw - 40px));
+}
+.mn-crop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.mn-crop-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  max-height: 62vh;
+  line-height: 0;
+  overflow: hidden;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+}
+.mn-crop-stage img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 80vw;
+  max-height: 62vh;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.mn-crop-box {
+  position: absolute;
+  border: 1px solid var(--ky-accent);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, #000 58%, transparent);
+  cursor: move;
+  touch-action: none;
+}
+.mn-crop-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--ky-bg);
+  border-radius: 2px;
+  background: var(--ky-accent);
+  touch-action: none;
+}
+.mn-crop-handle[data-handle="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
+.mn-crop-handle[data-handle="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
+.mn-crop-handle[data-handle="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.mn-crop-handle[data-handle="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.mn-crop-handle[data-handle="n"] { left: calc(50% - 4px); top: -5px; cursor: ns-resize; }
+.mn-crop-handle[data-handle="s"] { left: calc(50% - 4px); bottom: -5px; cursor: ns-resize; }
+.mn-crop-handle[data-handle="w"] { left: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+.mn-crop-handle[data-handle="e"] { right: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+.mn-crop-size {
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+}
