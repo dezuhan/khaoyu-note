@@ -118,7 +118,7 @@ if (projectId) {
   const enabled = await call(`/api/v1/projects/${projectId}/public-sharing`, {
     method: "POST",
     jar,
-    body: { enabled: true },
+    body: { enabled: true, acknowledge: true },
   });
   check("owner can enable public sharing", enabled.status === 204);
   const share = await call(`/api/v1/projects/${projectId}/shares`, {

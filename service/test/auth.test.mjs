@@ -497,7 +497,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     const revision = await putSnapshot(owner, projectId, {
       id: projectId,
@@ -598,7 +598,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     await putSnapshot(owner, projectId, {
       id: projectId,
@@ -650,7 +650,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${parentId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     const share = await api.call(`/api/v1/projects/${parentId}/shares`, {
       method: "POST",
@@ -695,10 +695,17 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     });
     assert.equal(denied.status, 409);
     assert.equal(denied.body.code, "sharing_disabled");
-    const enabled = await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+    const noAcknowledgement = await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
       body: { enabled: true },
+    });
+    assert.equal(noAcknowledgement.status, 400);
+    assert.equal(noAcknowledgement.body.code, "acknowledgement_required");
+    const enabled = await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true, acknowledge: true },
     });
     assert.equal(enabled.status, 204);
     const created = await api.call(`/api/v1/projects/${projectId}/shares`, {
@@ -733,7 +740,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     const doc = {
       id: projectId,
@@ -802,7 +809,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     await putSnapshot(owner, projectId, {
       id: projectId,
@@ -1010,7 +1017,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     const share = await api.call(`/api/v1/projects/${projectId}/shares`, {
       method: "POST",
@@ -1038,7 +1045,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     const share = await api.call(`/api/v1/projects/${projectId}/shares`, {
       method: "POST",
@@ -1109,7 +1116,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
       method: "POST",
       jar: owner.jar,
-      body: { enabled: true },
+      body: { enabled: true, acknowledge: true },
     });
     const allowed = await api.call(`/api/v1/projects/${projectId}/shares`, {
       method: "POST",
