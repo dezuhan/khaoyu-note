@@ -9,13 +9,15 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
+    "start:background": "node src/background.mjs",
+    "stop": "node src/stop.mjs",
     "migrate": "node src/cli.mjs migrate",
     "rollback": "node src/cli.mjs rollback",
     "status": "node src/cli.mjs status",
     "bootstrap": "node src/cli.mjs bootstrap",
     "backup": "node src/cli.mjs backup",
     "restore": "node src/cli.mjs restore",
-    "test": "node --test test/service.test.mjs test/auth.test.mjs"
+    "test": "node --test test/service.test.mjs test/auth.test.mjs test/admin.test.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.3",

@@ -234,15 +234,19 @@ authenticated upload, member-only download and share download enforcement.
 cd service
 Copy-Item .env.example .env
 # Set KHAOYU_SERVICE_SECRET to: openssl rand -hex 32
-$env:KHAOYU_SERVICE_PUBLIC_URL = "http://127.0.0.1:8080"
 $env:KHAOYU_SERVICE_COOKIE_SECURE = "false"
 $env:KHAOYU_BOOTSTRAP_PASSWORD = "use-a-unique-password-of-12-plus"
 node src/cli.mjs migrate
 node src/cli.mjs bootstrap
 node src/server.mjs
+# or keep it running in the background:
+npm run start:background
 ```
 
-`GET /healthz` returns only `{"status":"ok"}`. Docker Compose, reverse proxy examples, auth endpoints,
+The service prints a random 5-digit frontend URL and a random 5-digit backend URL, writes them to
+`<data>/runtime.json`, and keeps both listeners running. The frontend proxies `/api` to the backend,
+so the browser only needs the frontend URL. `GET /healthz` returns only `{"status":"ok"}`. Docker
+Compose, reverse proxy examples, auth endpoints,
 sharing endpoints, configuration, backup and upgrade steps are documented in
 [service/README.md](<service/README.md>). The current security findings and remaining risks are in
 [docs/security-audit.md](<docs/security-audit.md>), [docs/threat-model.md](<docs/threat-model.md>),
@@ -252,15 +256,15 @@ sharing endpoints, configuration, backup and upgrade steps are documented in
 
 The service exposes project, item and column share links, passphrase and expiry controls, member
 roles, invitations and ownership transfer. The service account page is at `/account`, passkey
-management is at `/passkeys`, sharing is at `/shares`, the admin dashboard is at `/admin`, and a shared
-link opens read-only at `/s/:token`. The first registered account (or the account created by
+management is at `/passkeys`, sharing is at `/shares`, the admin dashboard is at `<frontend URL>/admin`,
+and a shared link opens read-only at `/s/:token`. The first registered account (or the account created by
 `bootstrap`) is the service admin. `/admin` uses the same signed-in session and shows Overview,
 Accounts, Teams and Activity with light and dark themes; admins can create teams, inspect every
 audit row and change another account's role or status. Desktop boards can opt in to server sync from
 the Sync control in the topbar: open it,
-enter the service URL and your account email and password, then choose Sign in and connect. A local
-service needs no domain: `127.0.0.1:8080`, `localhost:8080` and `http://localhost:8080` are all
-accepted, while a remote host defaults to `https`. The dialog calls `/readyz` (service and database),
+enter the service URL and your account email and password, then choose Sign in and connect. Use the
+printed frontend URL, for example `http://127.0.0.1:29194`; a remote host defaults to `https`. The
+dialog calls `/readyz` (service and database),
 signs in, and receives a scoped project token that the client stores without showing it; the Account
 pane repeats Server, Account and Status. A new account is created on the service at `/account`, which
 the dialog links to. The local board
@@ -277,7 +281,7 @@ Create a sync token after the service is running:
 
 ```powershell
 $env:KHAOYU_SERVICE_PASSWORD = "your-account-password"
-node tools/create-service-token.mjs --base http://127.0.0.1:8080 --email you@example.com
+node tools/create-service-token.mjs --base http://127.0.0.1:18080 --email you@example.com
 ```
 
 ## MCP server
@@ -417,8 +421,8 @@ node tools/test-auth-web.mjs
 # self-hosted service and account tests (Node 24, temp databases)
 node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
 
-# live security smoke check against a running service
-node tools/check-service-security.mjs --base http://127.0.0.1:8080 --credentials target/service-dev-credentials.json
+# live security smoke check against a running service (use its frontend port)
+node tools/check-service-security.mjs --base http://127.0.0.1:18080 --credentials target/service-dev-credentials.json
 
 # screenshot of the native window
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/screenshot.ps1

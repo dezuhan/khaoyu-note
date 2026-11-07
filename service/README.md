@@ -18,7 +18,6 @@ cd service
 Copy-Item .env.example .env
 # Edit .env and replace KHAOYU_SERVICE_SECRET with: openssl rand -hex 32
 $env:KHAOYU_SERVICE_SECRET = "paste-the-generated-secret"
-$env:KHAOYU_SERVICE_PUBLIC_URL = "http://127.0.0.1:8080"
 $env:KHAOYU_SERVICE_COOKIE_SECURE = "false"
 $env:KHAOYU_BOOTSTRAP_PASSWORD = "use-a-unique-password-of-12-plus"
 node src/cli.mjs migrate
@@ -26,14 +25,39 @@ node src/cli.mjs bootstrap
 node src/server.mjs
 ```
 
+The server prints a frontend URL and a backend URL, then keeps both listeners running. The admin
+dashboard is at `<frontend URL>/admin`. To keep it running after the terminal closes:
+
+```powershell
+npm run start:background
+npm run stop
+```
+
+`start:background` detaches the process, writes logs under `<data>/logs`, and prints both URLs. The
+same ports are written to `<data>/runtime.json`.
+
 `bootstrap` creates a verified owner account and project. Registration through
 `POST /api/v1/auth/register` creates an immediately usable verified account; email verification is
 disabled and its form is hidden. Password reset messages are written to `<data>/outbox/*.json` with
 mode `0600`; the SMTP adapter is not implemented.
 
+## Ports
+
+The service always opens two listeners on different free ports in the 5-digit range 20000 to 59999:
+
+- **Frontend** serves `/account`, `/passkeys`, `/shares`, `/s/:token`, `/admin` and the static assets.
+- **Backend** serves `/api/v1/*`, `/healthz` and `/readyz`; it refuses page requests.
+
+The browser only uses the frontend origin. The frontend proxies `/api`, `/healthz` and `/readyz` to
+the backend, so cookies, CSRF and the public URL all stay on one origin. Both ports are random unless
+`KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_PORT` are set. The chosen ports are printed
+at startup and written to `<data>/runtime.json`. If no public URL is configured, `config.publicUrl`
+becomes the frontend URL.
+
 ## Admin dashboard
 
-Open `http://127.0.0.1:8080/admin`. The page uses the normal service session and requires an account
+Open `<frontend URL>/admin`, for example `http://127.0.0.1:29194/admin`. The page uses the normal
+service session and requires an account
 with the global `admin` role. The first account created by `bootstrap`, or the first account registered
 on a fresh database, becomes an admin; migration 13 also promotes the oldest existing account.
 
@@ -66,8 +90,9 @@ docker compose run --rm -e KHAOYU_BOOTSTRAP_PASSWORD='use-a-unique-password-of-1
 docker compose up -d
 ```
 
-The published port binds to `127.0.0.1:8080` only. Put Caddy, Nginx or another TLS proxy in front of
-it before exposing it to a network. The container runs as the `node` user, with a read-only root
+The Compose file fixes the frontend at `127.0.0.1:18080` and the backend at `127.0.0.1:18081`,
+both 5-digit ports. Put Caddy, Nginx or another TLS proxy in front of the frontend only before
+exposing it to a network. The container runs as the `node` user, with a read-only root
 filesystem, no Linux capabilities and a writable named volume for `/data`.
 
 Migrations are explicit. The server checks the schema version at startup and refuses to start while
@@ -79,10 +104,11 @@ a migration is pending.
 | --- | --- | --- |
 | `KHAOYU_SERVICE_PROFILE` | `single-user` | `single-user` or `team`. Team membership APIs are still limited. |
 | `KHAOYU_SERVICE_HOST` | `127.0.0.1` | Bind address. Compose sets `0.0.0.0` inside the container. |
-| `KHAOYU_SERVICE_PORT` | `8080` | Single HTTP port. |
-| `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files, outbox and backups. |
+| `KHAOYU_SERVICE_FRONTEND_PORT` | random 5-digit | Frontend listener port (pages and API proxy). |
+| `KHAOYU_SERVICE_BACKEND_PORT` | random 5-digit | Backend listener port (API and health only). |
+| `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files, outbox, backups, logs and `runtime.json`. |
 | `KHAOYU_SERVICE_SECRET` | required | At least 32 characters and not a placeholder. |
-| `KHAOYU_SERVICE_PUBLIC_URL` | `http://host:port` | Public HTTPS origin behind a proxy. |
+| `KHAOYU_SERVICE_PUBLIC_URL` | frontend URL | Public HTTPS origin behind a proxy. |
 | `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |
@@ -433,7 +459,7 @@ reports `x-forwarded-proto: https`; the public URL must be HTTPS at startup. Cad
 
 ```caddyfile
 notes.example.com {
-  reverse_proxy 127.0.0.1:8080
+  reverse_proxy 127.0.0.1:18080
 }
 ```
 
@@ -446,7 +472,7 @@ server {
   client_max_body_size 100m;
 
   location / {
-    proxy_pass http://127.0.0.1:8080;
+    proxy_pass http://127.0.0.1:18080;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
@@ -459,10 +485,10 @@ Set `KHAOYU_SERVICE_PUBLIC_URL` to the public HTTPS origin after the proxy is ac
 ## Tests
 
 ```powershell
-node --test test/service.test.mjs test/auth.test.mjs
+node --test test/service.test.mjs test/auth.test.mjs test/admin.test.mjs
 
-# against a running instance with a verified account
-node ../tools/check-service-security.mjs --base http://127.0.0.1:8080 --credentials ../target/service-dev-credentials.json
+# against a running instance with a verified account; use the frontend port from startup
+node ../tools/check-service-security.mjs --base http://127.0.0.1:18080 --credentials ../target/service-dev-credentials.json
 ```
 
 The service suite covers fail-closed configuration, reversible migrations, opaque object storage

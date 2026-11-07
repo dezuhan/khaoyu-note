@@ -8,6 +8,7 @@ import test from "node:test";
 import { loadConfig } from "../src/config.mjs";
 import { createLogger } from "../src/logger.mjs";
 import { openDatabase, migrate, rollback, migrationStatus, MIGRATIONS_DIR } from "../src/db.mjs";
+import { pickServicePorts } from "../src/ports.mjs";
 import { ObjectStore } from "../src/objects.mjs";
 import { writeAudit } from "../src/audit.mjs";
 import { createBackup, restoreBackup } from "../src/backup.mjs";
@@ -120,6 +121,13 @@ test("migrations are reversible and recreate the schema", () => {
   );
   migrate(db, { directory: MIGRATIONS_DIR });
   db.close();
+});
+
+test("the service picks two distinct 5-digit ports", async () => {
+  const { frontendPort, backendPort } = await pickServicePorts("127.0.0.1");
+  assert.match(String(frontendPort), /^\d{5}$/);
+  assert.match(String(backendPort), /^\d{5}$/);
+  assert.notEqual(frontendPort, backendPort);
 });
 
 test("share tokens are redacted from request logs", () => {

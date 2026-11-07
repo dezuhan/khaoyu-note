@@ -7,6 +7,12 @@ project uses Semantic Versioning.
 
 ### Added
 
+- The self-hosted service now starts two listeners automatically: a frontend port for pages and a
+  backend port for the API. Both use free 5-digit ports in 20000-59999, are guaranteed distinct,
+  can be pinned with `KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_PORT`, and are written
+  to `<data>/runtime.json`. The frontend proxies `/api` to the backend so cookies, CSRF and the public
+  URL stay on one origin. `npm run start:background` detaches the service with logs and `npm run stop`
+  stops it. Docker Compose pins the pair to 18080 and 18081.
 - Self-hosted service admin dashboard at `/admin`: left rail and content pane with Overview,
   Accounts, Teams and Activity, light and dark themes, profile pictures or initials, user role and
   active/disabled status, team creation and members, and the full audit activity feed. The first

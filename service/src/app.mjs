@@ -36,9 +36,9 @@ export function logPath(pathname) {
     .replace(/^\/s\/[^/]+$/, "/s/[redacted]");
 }
 
-export function createService({ config, db, logger, mailer }) {
+export function createServiceHandler({ config, db, logger, mailer }) {
   const api = createApiRouter({ db, config, logger, mailer });
-  const server = http.createServer(async (request, response) => {
+  const handler = async (request, response) => {
     const started = Date.now();
     let url;
     try {
@@ -119,9 +119,57 @@ export function createService({ config, db, logger, mailer }) {
         response.end();
       }
     }
-  });
-  server.closeStreams = () => api.closeAll?.();
+  };
+  handler.closeStreams = () => api.closeAll?.();
+  return handler;
+}
+
+export function createService(options) {
+  const handler = createServiceHandler(options);
+  const server = http.createServer(handler);
+  server.closeStreams = () => handler.closeStreams?.();
   return server;
+}
+
+// The frontend listener serves the browser pages and proxies the API to the backend listener.
+// Browsers therefore keep one origin for cookies and CSRF while the API has its own port.
+export function createFrontendServer({ handler, backendHost, backendPort, logger }) {
+  return http.createServer((request, response) => {
+    let pathname = "/";
+    try {
+      pathname = new URL(request.url || "/", "http://localhost").pathname;
+    } catch {
+      pathname = "/";
+    }
+    const isApi =
+      pathname.startsWith("/api/") || pathname === "/healthz" || pathname === "/readyz";
+    if (!isApi) {
+      void handler(request, response);
+      return;
+    }
+    const headers = { ...request.headers, host: `${backendHost}:${backendPort}` };
+    const proxy = http.request(
+      {
+        host: backendHost,
+        port: backendPort,
+        path: request.url,
+        method: request.method,
+        headers,
+      },
+      (upstream) => {
+        response.writeHead(upstream.statusCode || 502, upstream.headers);
+        upstream.pipe(response);
+      }
+    );
+    proxy.on("error", (error) => {
+      logger?.error?.("http.proxy_failed", { message: error.message });
+      if (!response.headersSent) {
+        response.writeHead(502, { "Content-Type": "application/json" });
+      }
+      response.end(JSON.stringify({ error: "backend unavailable", code: "backend_unavailable" }));
+    });
+    request.pipe(proxy);
+  });
 }
 
 export function listen(server, config) {

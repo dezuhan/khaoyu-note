@@ -398,6 +398,14 @@ carry a global `role` (`admin` or `member`), `status` (`active` or `disabled`), 
 avatar. Migration 13 promotes the oldest account to admin; a fresh database makes the first registered
 account or bootstrap account admin.
 
+The service now starts two listeners instead of one. A frontend listener serves the browser pages and
+proxies `/api`, `/healthz` and `/readyz` to a backend listener; the backend only answers API and health
+requests. Both ports are chosen from the free 5-digit range 20000 to 59999, are guaranteed distinct,
+can be fixed with `KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_PORT`, and are written to
+`<data>/runtime.json`. The frontend proxy keeps cookies, CSRF and the public URL on one browser origin.
+`npm run start:background` launches the pair detached with logs under `<data>/logs`; `npm run stop`
+uses the runtime PID.
+
 The service serves browser pages at `/account`, `/passkeys`, `/shares`, `/s/:token` and `/admin`. The
 admin page uses the normal account session, requires the global admin role and calls
 `/api/v1/admin/dashboard`, `/users`, `/teams` and `/activity`; every mutation goes through the same
@@ -479,8 +487,9 @@ changes produce an explicit conflict with Use server and Keep local choices. Fai
 local queue and retry when online. Deleting or disabling a local board never deletes server data;
 there is no server project delete call in the sync client.
 
-`normalizeServerUrl` accepts a bare host or `host:port`, so a local service can be entered as
-`127.0.0.1:8080` or `localhost:8080`. Loopback and private addresses get an `http` scheme; any other
+`normalizeServerUrl` accepts a bare host or `host:port`, so a local service can be entered with its
+printed frontend port, for example `127.0.0.1:29194` or `localhost:29194`. Loopback and private
+addresses get an `http` scheme; any other
 host defaults to `https`, and credentials in the URL are rejected. `checkServerReachable` calls
 `/readyz` before credentials are sent, then `signIn` exchanges the email and password for the token,
 and `checkConnection` uses an authenticated `GET /api/v1/projects` to prove the account and the

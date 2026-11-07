@@ -10,10 +10,12 @@ services:
       - .env
     environment:
       KHAOYU_SERVICE_HOST: 0.0.0.0
-      KHAOYU_SERVICE_PORT: 8080
+      KHAOYU_SERVICE_FRONTEND_PORT: 18080
+      KHAOYU_SERVICE_BACKEND_PORT: 18081
       KHAOYU_SERVICE_DATA_DIR: /data
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:18080"
+      - "127.0.0.1:18081:18081"
     volumes:
       - khaoyu-service-data:/data
     read_only: true
@@ -29,7 +31,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:18080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
