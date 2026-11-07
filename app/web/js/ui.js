@@ -212,7 +212,9 @@ export function initUI(elements) {
   if (refs.homePage) initHome(refs.homePage);
   if (refs.commentCount) initComments(refs.commentCount);
   if (refs.notificationBtn) initNotifications(refs.notificationBtn);
-  if (refs.accountBtn) initAccountUI(refs);
+  if (refs.accountBtn) {
+    initAccountUI({ ...refs, openModal, closeModal, confirmAction });
+  }
   initContextToolbar();
   initCommandPalette(buildCommands);
   wireMenuBar();
@@ -1687,7 +1689,17 @@ export function openModal({ title, body, footer, width }) {
   modal.querySelector(".mn-modal-close").addEventListener("click", closeModal);
   layer.append(overlay);
   if (window.KySelect) window.KySelect.enhanceAll(modal);
-  modalCloser = () => overlay.remove();
+  const onKeyDown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeModal();
+    }
+  };
+  document.addEventListener("keydown", onKeyDown, true);
+  modalCloser = () => {
+    overlay.remove();
+    document.removeEventListener("keydown", onKeyDown, true);
+  };
   return { bodyEl, footerEl, modal };
 }
 

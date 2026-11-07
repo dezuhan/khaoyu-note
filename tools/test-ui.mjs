@@ -305,14 +305,21 @@ check(
 );
 await page.click("#account-btn");
 await page.waitForTimeout(250);
-check("Account popover opens from the avatar", await page.locator(".mn-account-pop").isVisible());
+check("Account center opens from the avatar", await page.locator(".mn-account-shell").isVisible());
+const accountMenu = await page.locator(".mn-account-nav").innerText();
 check(
-  "Guest account popover offers a sign-in action",
-  (await page.locator(".mn-account-pop").innerText()).toLowerCase().includes("sign in")
+  "Account center menu lists the account sections",
+  ["Account Information", "Account Settings", "History Activity"].every((label) =>
+    accountMenu.includes(label)
+  )
+);
+check(
+  "Guest account information offers a sign-in action",
+  (await page.locator(".mn-account-pane").innerText()).toLowerCase().includes("sign in")
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);
-check("Account popover closes with Escape", (await page.locator(".mn-account-pop").count()) === 0);
+check("Account center closes with Escape", (await page.locator(".mn-account-shell").count()) === 0);
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
 check(
   "Application menu bar has File, Edit, Tools, View and Help",

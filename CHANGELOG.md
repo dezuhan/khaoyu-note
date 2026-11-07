@@ -37,7 +37,8 @@ project uses Semantic Versioning.
   removes the rail button.
 - Local accounts (milestone M1). A fresh database offers to create the local admin, with username,
   email, first and last name and a PBKDF2-SHA256 password. The app keeps a hashed session, the topbar
-  shows an avatar after Share, and the account popover covers Account, Settings, History and Logout.
+  shows an avatar after Share, and the Documentation-style account center covers Admin Dashboard,
+  Account Information, Account Settings, History Activity and Log Out.
   Guest use stays available with Continue locally. Boards and cards now store creator and last editor
   snapshots, and backups leave live sessions out. Role enforcement and the Admin Panel follow in M2
   and M3.

@@ -1,4 +1,4 @@
-// Account UI: topbar avatar, anchored account popover and the first-run sign-in gate.
+// Account UI: topbar avatar, the Documentation-style account center and the first-run sign-in gate.
 
 import * as bridge from "./bridge.js";
 import { icon } from "./icons.js";
@@ -12,16 +12,20 @@ import {
   logoutAll,
   setupAdmin,
   subscribeAuth,
+  updateProfile,
 } from "./auth.js";
 import { openSettingsPage } from "./settings.js";
 
 let avatarButton = null;
-let popover = null;
+let modalApi = null;
+let accountModal = null;
 let gate = null;
 let gateKeyHandler = null;
 
-const HISTORY_LIMIT = 20;
 const GUEST_KEY = "mn.auth.guest";
+const AVATAR_TONES = 6;
+const HISTORY_LIMIT = 50;
+
 const ACTION_LABELS = {
   "auth.setup": "Admin account created",
   "auth.login": "Signed in",
@@ -30,8 +34,6 @@ const ACTION_LABELS = {
   "auth.password_changed": "Password changed",
   "auth.profile_updated": "Profile updated",
 };
-
-const AVATAR_TONES = 6;
 
 // ------------------------------------------------------------------ helpers
 
@@ -83,7 +85,8 @@ function avatarColorStyle(user) {
 function roleLabel(user) {
   if (!user) return "Guest";
   if (user.role === "admin") return "Admin";
-  const memberRole = user.memberRole === "commenter" ? "commenter" : user.memberRole === "viewer" ? "viewer" : "editor";
+  const memberRole =
+    user.memberRole === "commenter" ? "commenter" : user.memberRole === "viewer" ? "viewer" : "editor";
   return `Member (${memberRole})`;
 }
 
@@ -146,18 +149,20 @@ function rememberFieldMarkup() {
 export function initAccountUI(elements = {}) {
   if (avatarButton) return;
   avatarButton = elements.accountBtn || document.getElementById("account-btn");
-  if (!avatarButton) return;
+  modalApi = {
+    openModal: elements.openModal,
+    closeModal: elements.closeModal,
+    confirmAction: elements.confirmAction,
+  };
+  if (!avatarButton || typeof modalApi.openModal !== "function") return;
   avatarButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    toggleAccountPopover();
+    openAccountCenter();
   });
-  window.addEventListener("mn:open-account", () => openAccountPopover());
+  window.addEventListener("mn:open-account", () => openAccountCenter());
   subscribeAuth(() => {
     renderAvatar();
-    if (popover) {
-      renderAccountPopover();
-      void fillHistory();
-    }
+    if (accountModal && accountModal.shell.isConnected) renderAccountShell();
   });
   renderAvatar();
 }
@@ -185,209 +190,227 @@ function renderAvatar() {
   }
 }
 
-// ------------------------------------------------------------------ popover
+// ------------------------------------------------------------------ account center
 
-function toggleAccountPopover() {
-  if (popover) closeAccountPopover();
-  else openAccountPopover();
+export function openAccountCenter(pane = "information") {
+  if (!modalApi?.openModal) return;
+  const shell = document.createElement("div");
+  shell.className = "mn-docs-shell mn-account-shell";
+  accountModal = { shell, active: pane };
+  modalApi.openModal({
+    title: "Account",
+    body: shell,
+    footer: [
+      {
+        label: "Close",
+        onClick: () => closeAccountCenter(),
+      },
+    ],
+    width: "min(960px, calc(100vw - 48px))",
+  });
+  renderAccountShell();
 }
 
-export function openAccountPopover() {
-  if (popover || !avatarButton) return;
-  popover = document.createElement("div");
-  popover.className = "mn-account-pop";
-  popover.setAttribute("role", "dialog");
-  popover.setAttribute("aria-label", "Account menu");
-  document.body.append(popover);
-  renderAccountPopover();
-  positionAccountPopover();
-  document.addEventListener("pointerdown", onOutsidePointer, true);
-  window.addEventListener("keydown", onPopoverKeyDown, true);
-  window.addEventListener("resize", positionAccountPopover);
-  popover.addEventListener("click", onPopoverClick);
-  popover.addEventListener("submit", onPopoverSubmit);
-  void fillHistory();
+function closeAccountCenter() {
+  accountModal = null;
+  modalApi?.closeModal?.();
 }
 
-export function closeAccountPopover() {
-  if (!popover) return;
-  popover.remove();
-  popover = null;
-  document.removeEventListener("pointerdown", onOutsidePointer, true);
-  window.removeEventListener("keydown", onPopoverKeyDown, true);
-  window.removeEventListener("resize", positionAccountPopover);
+function accountNavItems() {
+  const user = authState().user;
+  const items = [];
+  if (user && user.role === "admin") items.push(["admin", "Admin Dashboard"]);
+  items.push(
+    ["information", "Account Information"],
+    ["settings", "Account Settings"],
+    ["history", "History Activity"]
+  );
+  return items;
 }
 
-function positionAccountPopover() {
-  if (!popover || !avatarButton) return;
-  const rect = avatarButton.getBoundingClientRect();
-  const top = rect.width ? Math.round(rect.bottom + 8) : 34;
-  const right = rect.width ? Math.round(window.innerWidth - rect.right) : 8;
-  popover.style.top = `${top}px`;
-  popover.style.right = `${Math.max(8, right)}px`;
+function renderAccountShell() {
+  if (!accountModal || !accountModal.shell.isConnected) return;
+  const user = authState().user;
+  const items = accountNavItems();
+  if (!items.some(([id]) => id === accountModal.active)) accountModal.active = "information";
+  const nav = items
+    .map(
+      ([id, label]) =>
+        `<button type="button" class="mn-docs-nav-item${
+          id === accountModal.active ? " is-active" : ""
+        }" data-account-pane="${id}">${escape(label)}</button>`
+    )
+    .join("");
+  accountModal.shell.innerHTML = `
+    <nav class="mn-docs-nav mn-account-nav" aria-label="Account sections">
+      ${nav}
+      ${
+        user
+          ? `<span class="mn-docs-nav-sep"></span>
+             <button type="button" class="mn-docs-nav-item mn-account-logout" data-account-action="logout">Log Out</button>`
+          : ""
+      }
+    </nav>
+    <div class="mn-docs-pane mn-account-pane" data-role="pane"></div>`;
+  for (const button of accountModal.shell.querySelectorAll("[data-account-pane]")) {
+    button.addEventListener("click", () => {
+      accountModal.active = button.dataset.accountPane;
+      renderAccountShell();
+    });
+  }
+  accountModal.shell
+    .querySelector('[data-account-action="logout"]')
+    ?.addEventListener("click", () => void performLogout());
+  renderAccountPane();
 }
 
-function onOutsidePointer(event) {
-  if (popover && !popover.contains(event.target) && !avatarButton?.contains(event.target)) {
-    closeAccountPopover();
+function renderAccountPane() {
+  const pane = accountModal?.shell.querySelector('[data-role="pane"]');
+  if (!pane) return;
+  const user = authState().user;
+  if (accountModal.active === "settings") {
+    pane.innerHTML = user ? settingsPane(user) : guestPane("Account Settings", "Sign in to change your profile, password and sessions.");
+  } else if (accountModal.active === "history") {
+    pane.innerHTML = user ? historyPane() : guestPane("History Activity", "Sign in to see your account activity.");
+  } else if (accountModal.active === "admin" && user && user.role === "admin") {
+    pane.innerHTML = adminPane(user);
+  } else {
+    pane.innerHTML = informationPane(user);
+  }
+  wirePaneActions(pane);
+  if (accountModal.active === "history" && user) void fillHistoryPane(pane);
+  if (accountModal.active === "admin" && user && user.role === "admin") {
+    void bridge
+      .appVersion()
+      .then((version) => {
+        const target = pane.querySelector('[data-role="admin-version"]');
+        if (target) target.textContent = version || "unknown";
+      })
+      .catch(() => {});
   }
 }
 
-function onPopoverKeyDown(event) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    closeAccountPopover();
-  }
-}
-
-function onPopoverSubmit(event) {
-  if (!event.target.matches('[data-role="password-form"]')) return;
-  event.preventDefault();
-  void submitPasswordChange(event.target);
-}
-
-function onPopoverClick(event) {
-  const button = event.target.closest("[data-account-action]");
-  if (!button) return;
-  const action = button.dataset.accountAction;
-  if (action === "close") {
-    closeAccountPopover();
-  } else if (action === "sign-in") {
-    closeAccountPopover();
-    openLoginOverlay({ dismissible: true });
-  } else if (action === "setup") {
-    closeAccountPopover();
-    openSetupOverlay();
-  } else if (action === "open-settings") {
-    closeAccountPopover();
-    openSettingsPage();
-  } else if (action === "logout") {
-    void doLogout();
-  } else if (action === "logout-all") {
-    void doLogoutAll();
-  }
-}
-
-function renderAccountPopover() {
-  if (!popover) return;
-  const state = authState();
-  const user = state.user;
-  const admin = Boolean(user && user.role === "admin");
-  popover.innerHTML = `
-    ${popoverHead(user)}
-    <div class="mn-account-scroll">
-      ${accountSection(user, state)}
-      ${settingsSection(user)}
-      ${historySection(user)}
-    </div>
-    ${popoverFoot(admin, Boolean(user))}`;
-}
-
-function popoverHead(user) {
-  const tone = toneFor(user);
-  const name = displayNameFor(user);
-  const handle = user ? `@${user.username}` : "Not signed in";
-  const role = roleLabel(user);
+function identityHead(user) {
   return `
-    <header class="mn-account-pop-head">
-      <span class="mn-account-identity">
-        <span class="mn-account-chip" data-tone="${escape(tone)}"${avatarColorStyle(user)}>${escape(initialsFor(user))}</span>
-        <span class="mn-account-names">
-          <span class="mn-account-name">${escape(name)}</span>
-          <span class="mn-account-handle">${escape(handle)} · ${escape(role)}</span>
-        </span>
+    <div class="mn-account-identity-head">
+      <span class="mn-account-chip is-large" data-tone="${escape(toneFor(user))}"${avatarColorStyle(user)}>${escape(initialsFor(user))}</span>
+      <span class="mn-account-identity-copy">
+        <strong>${escape(displayNameFor(user))}</strong>
+        <span>@${escape(user.username)} · ${escape(roleLabel(user))}</span>
       </span>
-      <button type="button" class="mn-icon-btn" data-account-action="close" title="Close" aria-label="Close account menu">${icon(
-        "close",
-        12
-      )}</button>
-    </header>`;
+    </div>`;
 }
 
-function accountSection(user, state) {
-  if (user) {
+function informationPane(user) {
+  if (!user) {
+    const setup =
+      authState().available && authState().userCount === 0
+        ? `<button type="button" class="mn-btn mn-btn-quiet" data-account-action="create-admin">Create admin account</button>`
+        : "";
     return `
-      <section class="mn-account-section">
-        <h3 class="mn-account-section-title">Account</h3>
-        <div class="mn-account-row"><span>Username</span><span class="mn-account-value">@${escape(user.username || "")}</span></div>
-        <div class="mn-account-row"><span>Email</span><span class="mn-account-value">${escape(user.email || "Not set")}</span></div>
-      </section>`;
-  }
-  const setup = state.available && state.userCount === 0
-    ? `<button type="button" class="mn-btn mn-btn-quiet" data-account-action="setup">Create admin account</button>`
-    : "";
-  return `
-    <section class="mn-account-section">
-      <h3 class="mn-account-section-title">Account</h3>
-      <p class="mn-account-note">Local boards work without an account. ${escape(totalCountLabel(state.userCount))} on this computer.</p>
+      <h3 class="mn-account-pane-title">Account Information</h3>
+      <p class="mn-docs-lead">You are using Khaoyu Note as a guest. Local boards stay available without an account.</p>
+      <div class="mn-account-row"><span>Accounts on this computer</span><span class="mn-account-value">${escape(
+        totalCountLabel(authState().userCount)
+      )}</span></div>
       <div class="mn-account-actions">
         ${setup}
         <button type="button" class="mn-btn mn-btn-primary" data-account-action="sign-in">Sign in</button>
+      </div>`;
+  }
+  return `
+    <h3 class="mn-account-pane-title">Account Information</h3>
+    ${identityHead(user)}
+    <div class="mn-account-row"><span>Username</span><span class="mn-account-value">@${escape(user.username)}</span></div>
+    <div class="mn-account-row"><span>Email</span><span class="mn-account-value">${escape(user.email || "Not set")}</span></div>
+    <div class="mn-account-row"><span>Role</span><span class="mn-account-value">${escape(roleLabel(user))}</span></div>
+    <div class="mn-account-row"><span>Status</span><span class="mn-account-value">${escape(statusLabel(user.status))}</span></div>
+    <div class="mn-account-row"><span>Account type</span><span class="mn-account-value">Local account</span></div>
+    <div class="mn-account-row"><span>Member since</span><span class="mn-account-value">${escape(
+      formatStamp(user.createdAt) || "Unknown"
+    )}</span></div>
+    <div class="mn-account-row"><span>Last login</span><span class="mn-account-value">${escape(lastLoginLabel(user))}</span></div>`;
+}
+
+function guestPane(title, message) {
+  return `
+    <h3 class="mn-account-pane-title">${escape(title)}</h3>
+    <p class="mn-docs-lead">${escape(message)}</p>
+    <div class="mn-account-actions">
+      <button type="button" class="mn-btn mn-btn-primary" data-account-action="sign-in">Sign in</button>
+    </div>`;
+}
+
+function settingsPane(user) {
+  const color = /^#[0-9a-f]{6}$/i.test(String(user.avatarColor || "")) ? user.avatarColor : "#B262C0";
+  return `
+    <h3 class="mn-account-pane-title">Account Settings</h3>
+    <form class="mn-account-form" data-role="profile-form">
+      <span class="mn-account-form-title">Profile</span>
+      <div class="mn-account-form-grid">
+        <label>First name<input class="ky-input" name="firstName" autocomplete="given-name" value="${escape(
+          user.firstName
+        )}" /></label>
+        <label>Last name<input class="ky-input" name="lastName" autocomplete="family-name" value="${escape(
+          user.lastName
+        )}" /></label>
+        <label>Email<input class="ky-input" name="email" type="email" autocomplete="email" value="${escape(
+          user.email
+        )}" /></label>
+        <label>Avatar color<input class="ky-input mn-account-color" name="avatarColor" type="color" value="${escape(
+          color
+        )}" /></label>
       </div>
-    </section>`;
+      <p class="mn-account-form-status" data-role="profile-status" role="status"></p>
+      <div class="mn-account-actions">
+        <button type="submit" class="mn-btn mn-btn-primary">Save profile</button>
+        <button type="button" class="mn-btn mn-btn-quiet" data-account-action="reset-avatar">Use automatic color</button>
+      </div>
+    </form>
+    <form class="mn-account-form" data-role="password-form">
+      <span class="mn-account-form-title">Change password</span>
+      <input class="ky-input" name="currentPassword" type="password" autocomplete="current-password" placeholder="Current password" />
+      <input class="ky-input" name="newPassword" type="password" autocomplete="new-password" placeholder="New password (12 or more characters)" />
+      <input class="ky-input" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Confirm new password" />
+      <p class="mn-account-form-status" data-role="password-status" role="status"></p>
+      <div class="mn-account-actions">
+        <button type="submit" class="mn-btn">Change password</button>
+        <button type="button" class="mn-btn mn-btn-quiet" data-account-action="logout-all">Log out everywhere</button>
+      </div>
+    </form>
+    <div class="mn-account-actions">
+      <button type="button" class="mn-btn mn-btn-quiet" data-account-action="open-settings">Open full settings</button>
+    </div>`;
 }
 
-function settingsSection(user) {
-  if (!user) {
-    return `
-      <section class="mn-account-section">
-        <h3 class="mn-account-section-title">Settings</h3>
-        <div class="mn-account-row"><span>Role</span><span class="mn-account-value">Guest</span></div>
-        <div class="mn-account-row"><span>Status</span><span class="mn-account-value">Local only</span></div>
-        <p class="mn-account-note">Sign in to change your password and manage sessions.</p>
-      </section>`;
-  }
+function historyPane() {
   return `
-    <section class="mn-account-section">
-      <h3 class="mn-account-section-title">Settings</h3>
-      <div class="mn-account-row"><span>Role</span><span class="mn-account-value">${escape(roleLabel(user))}</span></div>
-      <div class="mn-account-row"><span>Status</span><span class="mn-account-value">${escape(statusLabel(user.status))}</span></div>
-      <div class="mn-account-row"><span>Last login</span><span class="mn-account-value">${escape(lastLoginLabel(user))}</span></div>
-      <form class="mn-account-form" data-role="password-form">
-        <span class="mn-account-form-title">Change password</span>
-        <input class="ky-input" name="currentPassword" type="password" autocomplete="current-password" placeholder="Current password" />
-        <input class="ky-input" name="newPassword" type="password" autocomplete="new-password" placeholder="New password (12 or more characters)" />
-        <input class="ky-input" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Confirm new password" />
-        <p class="mn-account-form-status" data-role="password-status" role="status"></p>
-        <div class="mn-account-actions">
-          <button type="submit" class="mn-btn">Change password</button>
-          <button type="button" class="mn-btn mn-btn-quiet" data-account-action="logout-all">Log out everywhere</button>
-        </div>
-      </form>
-      <button type="button" class="mn-btn mn-btn-quiet mn-account-wide" data-account-action="open-settings">Open settings</button>
-    </section>`;
+    <h3 class="mn-account-pane-title">History Activity</h3>
+    <p class="mn-account-note">Account actions recorded on this computer.</p>
+    <div class="mn-account-actions">
+      <button type="button" class="mn-btn mn-btn-quiet" data-account-action="history-refresh">Refresh</button>
+    </div>
+    <div class="mn-account-history" data-role="history">Loading history...</div>`;
 }
 
-function historySection(user) {
-  if (!user) {
-    return `
-      <section class="mn-account-section">
-        <h3 class="mn-account-section-title">History</h3>
-        <p class="mn-account-note">Sign in to see account activity.</p>
-      </section>`;
-  }
+function adminPane(user) {
   return `
-    <section class="mn-account-section">
-      <h3 class="mn-account-section-title">History</h3>
-      <div class="mn-account-history" data-role="history">Loading history...</div>
-    </section>`;
-}
-
-function popoverFoot(admin, signedIn) {
-  if (!admin && !signedIn) return "";
-  return `
-    <footer class="mn-account-pop-foot">
-      ${
-        admin
-          ? `<button type="button" class="mn-btn mn-account-admin" disabled>Admin Panel (coming in M3)</button>`
-          : ""
-      }
-      ${
-        signedIn
-          ? `<button type="button" class="mn-btn mn-btn-danger-outline" data-account-action="logout">Log out</button>`
-          : ""
-      }
-    </footer>`;
+    <h3 class="mn-account-pane-title">Admin Dashboard</h3>
+    <p class="mn-docs-lead">Administration for the local database. Only this admin account can open it.</p>
+    <div class="mn-admin-grid">
+      <div class="mn-admin-card"><span>Accounts</span><strong>${escape(
+        totalCountLabel(authState().userCount)
+      )}</strong></div>
+      <div class="mn-admin-card"><span>Your role</span><strong>${escape(roleLabel(user))}</strong></div>
+      <div class="mn-admin-card"><span>App version</span><strong data-role="admin-version">Loading...</strong></div>
+    </div>
+    <div class="mn-account-actions">
+      <button type="button" class="mn-btn" data-account-action="backup">Back up now</button>
+      <button type="button" class="mn-btn" data-account-action="integrity">Check database</button>
+      <button type="button" class="mn-btn mn-btn-quiet" data-account-action="open-settings">Open settings</button>
+    </div>
+    <p class="mn-account-form-status" data-role="admin-status" role="status"></p>
+    <p class="mn-account-note">User management, role changes and the full audit view arrive in M3.</p>`;
 }
 
 function historyLabel(action) {
@@ -396,30 +419,100 @@ function historyLabel(action) {
 
 function historyRow(entry) {
   if (!entry) return "";
-  const action = historyLabel(entry.action);
-  const actor = entry.actorName || entry.actor_name || "";
   const when = formatStamp(entry.createdAt ?? entry.created_at) || "Just now";
   return `
     <div class="mn-account-history-row">
-      <span class="mn-account-history-action">${escape(action)}</span>
-      ${actor ? `<span class="mn-account-history-actor">${escape(actor)}</span>` : ""}
+      <span class="mn-account-history-action">${escape(historyLabel(entry.action))}</span>
       <span class="mn-account-history-time">${escape(when)}</span>
     </div>`;
 }
 
-async function fillHistory() {
-  const box = popover?.querySelector('[data-role="history"]');
+async function fillHistoryPane(pane) {
+  const box = pane.querySelector('[data-role="history"]');
   if (!box) return;
   try {
     const data = await loadHistory(HISTORY_LIMIT, 0);
-    if (!popover) return;
+    if (!box.isConnected) return;
     const entries = Array.isArray(data?.entries) ? data.entries : [];
     box.innerHTML = entries.length
       ? entries.map(historyRow).join("")
       : `<span class="mn-account-note">No account activity yet.</span>`;
   } catch {
-    const current = popover?.querySelector('[data-role="history"]');
-    if (current) current.textContent = "History is unavailable.";
+    if (box.isConnected) box.textContent = "History is unavailable.";
+  }
+}
+
+function wirePaneActions(pane) {
+  pane.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-account-action]");
+    if (!button) return;
+    const action = button.dataset.accountAction;
+    if (action === "sign-in") {
+      closeAccountCenter();
+      openLoginOverlay({ dismissible: true });
+    } else if (action === "create-admin") {
+      closeAccountCenter();
+      openSetupOverlay();
+    } else if (action === "open-settings") {
+      closeAccountCenter();
+      openSettingsPage();
+    } else if (action === "logout-all") {
+      void performLogoutAll();
+    } else if (action === "history-refresh") {
+      void fillHistoryPane(pane);
+    } else if (action === "backup") {
+      void runBackup(pane);
+    } else if (action === "integrity") {
+      void runIntegrity(pane);
+    } else if (action === "reset-avatar") {
+      void resetAvatar();
+    }
+  });
+  pane.querySelector('[data-role="profile-form"]')?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitProfile(event.target);
+  });
+  pane.querySelector('[data-role="password-form"]')?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitPasswordChange(event.target);
+  });
+}
+
+async function submitProfile(form) {
+  const status = form.querySelector('[data-role="profile-status"]');
+  const firstName = String(form.elements.firstName.value || "").trim();
+  const lastName = String(form.elements.lastName.value || "").trim();
+  const email = String(form.elements.email.value || "").trim();
+  const avatarColor = String(form.elements.avatarColor.value || "");
+  if (!firstName) {
+    setFormStatus(status, "Enter your first name.", true);
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
+    setFormStatus(status, "Enter a valid email address.", true);
+    return;
+  }
+  try {
+    await updateProfile({ firstName, lastName, email, avatarColor });
+    notify("Profile updated");
+  } catch (error) {
+    setFormStatus(status, error?.message || "Could not update the profile.", true);
+  }
+}
+
+async function resetAvatar() {
+  const user = authState().user;
+  if (!user) return;
+  try {
+    await updateProfile({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      avatarColor: "",
+    });
+    notify("Avatar color reset");
+  } catch (error) {
+    notify(error?.message || "Could not reset the avatar color");
   }
 }
 
@@ -455,27 +548,50 @@ async function submitPasswordChange(form) {
   }
 }
 
-async function doLogout() {
+async function runBackup(pane) {
+  const status = pane.querySelector('[data-role="admin-status"]');
+  setFormStatus(status, "Creating backup...");
+  try {
+    const path = await bridge.backupData();
+    setFormStatus(status, `Backup created: ${path}`);
+    notify("Backup created");
+  } catch (error) {
+    setFormStatus(status, error?.message || "Backup failed", true);
+  }
+}
+
+async function runIntegrity(pane) {
+  const status = pane.querySelector('[data-role="admin-status"]');
+  setFormStatus(status, "Checking database...");
+  try {
+    const result = await bridge.dbIntegrity();
+    setFormStatus(status, `Integrity: ${result}`);
+  } catch (error) {
+    setFormStatus(status, error?.message || "Integrity check failed", true);
+  }
+}
+
+async function performLogout() {
   try {
     await logout();
   } catch (error) {
     notify(error?.message || "Could not log out");
     return;
   }
-  closeAccountPopover();
+  closeAccountCenter();
   renderAvatar();
   notify("Signed out");
   if (authState().requireLogin) openLoginOverlay({ dismissible: false });
 }
 
-async function doLogoutAll() {
+async function performLogoutAll() {
   try {
     await logoutAll();
   } catch (error) {
     notify(error?.message || "Could not log out everywhere");
     return;
   }
-  closeAccountPopover();
+  closeAccountCenter();
   renderAvatar();
   notify("Signed out everywhere");
   if (authState().requireLogin) openLoginOverlay({ dismissible: false });

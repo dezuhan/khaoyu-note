@@ -349,9 +349,11 @@ while `require_local_login` is off, and writes the author snapshots through
 the database and assets but delete `sessions` from the snapshot with `secure_delete` before returning.
 
 The frontend keeps auth state in `auth.js`, shows the first-run setup or login gate in `account-ui.js`,
-and renders the avatar after Share plus an anchored account popover with Account, Settings, History
-and Logout. Continue locally sets `mn.auth.guest` so the setup prompt does not return on every launch;
-the avatar menu still offers Create admin. `bridge.js` calls Tauri commands on the desktop and the HTTP
+and renders the avatar after Share plus a Documentation-style account center. The center has a left menu
+with Admin Dashboard (admins only), Account Information, Account Settings, History Activity and Log
+Out, and a content pane for the selected item. Continue locally sets `mn.auth.guest` so the setup
+prompt does not return on every launch; the avatar menu still offers Create admin. `bridge.js` calls
+Tauri commands on the desktop and the HTTP
 endpoints on the web host.
 
 ## Web host

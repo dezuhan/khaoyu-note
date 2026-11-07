@@ -66,6 +66,6 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 7. Finish local accounts. M1 ships setup, login, guest mode, profile, password, history and author
    snapshots. M2 adds full activity coverage for board and card actions. M3 adds role enforcement in
    the UI and hosts plus the Admin Panel (users, roles, status, history, database backup).
-8. Wire the hybrid service identity. M4 connects the app account popover to the self-hosted service,
+8. Wire the hybrid service identity. M4 connects the app account center to the self-hosted service,
    creates the first service admin from the app when the service database is empty, and maps project
    roles to the app permission helpers.

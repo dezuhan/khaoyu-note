@@ -143,9 +143,10 @@ export const DOCUMENTATION_SECTIONS = [
       <h3>Local account</h3>
       <ul>
         <li>The first run on an empty database offers to create the local admin, or Continue locally
-        as a guest. The avatar after Share opens the account popover.</li>
-        <li>The popover shows Account, Settings and History. Settings changes the password and signs
-        out every session; History lists account activity.</li>
+        as a guest. The avatar after Share opens the account center.</li>
+        <li>The center has a left menu with Admin Dashboard, Account Information, Account Settings,
+        History Activity and Log Out. Settings changes your profile and password and signs out every
+        session; History lists account activity.</li>
         <li>Passwords use PBKDF2-SHA256 and sessions are stored hashed. A desktop session lasts 30
         days when Stay signed in is ticked; a browser session lasts 12 hours.</li>
         <li>Roles enforcement (editor, commenter, viewer) and the Admin Panel arrive in M2 and M3.
