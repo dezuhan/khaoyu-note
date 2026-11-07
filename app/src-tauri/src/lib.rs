@@ -867,6 +867,9 @@ fn migrate_legacy(conn: &Connection, root: &Path) -> Result<(), String> {
         let Ok(entries) = fs::read_dir(&folder) else {
             continue;
         };
+        // Count failures per folder: one broken file in an older backup folder must not stop the
+        // primary boards folder from being archived.
+        let mut folder_failed = 0usize;
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -876,6 +879,7 @@ fn migrate_legacy(conn: &Connection, root: &Path) -> Result<(), String> {
                 Ok(text) => text,
                 Err(error) => {
                     failed_count += 1;
+                    folder_failed += 1;
                     eprintln!("khaoyu-note: cannot read {}: {error}", path.display());
                     continue;
                 }
@@ -884,6 +888,7 @@ fn migrate_legacy(conn: &Connection, root: &Path) -> Result<(), String> {
                 Ok(doc) => doc,
                 Err(error) => {
                     failed_count += 1;
+                    folder_failed += 1;
                     eprintln!(
                         "khaoyu-note: invalid legacy board {}: {error}",
                         path.display()
@@ -895,11 +900,12 @@ fn migrate_legacy(conn: &Connection, root: &Path) -> Result<(), String> {
                 Ok(()) => imported_count += 1,
                 Err(error) => {
                     failed_count += 1;
+                    folder_failed += 1;
                     eprintln!("khaoyu-note: cannot import {}: {error}", path.display());
                 }
             }
         }
-        if folder == legacy && failed_count == 0 {
+        if folder == legacy && folder_failed == 0 {
             let backup = unique_path(root, &format!("boards-json-backup-{}", now_ms()), None);
             let _ = fs::rename(&legacy, backup);
         }
@@ -1256,7 +1262,6 @@ fn collect_descendants(
     Ok(())
 }
 
-#[tauri::command]
 fn write_asset(app: &tauri::AppHandle, name: &str, bytes: &[u8]) -> Result<String, String> {
     validate_asset_name(name)?;
     if bytes.len() as u64 > MAX_ASSET_BYTES {
@@ -1557,15 +1562,23 @@ fn app_data_dir(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn mcp_server_path() -> Result<String, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let dir = exe.parent().ok_or("cannot resolve the app directory")?;
-    let candidate = dir.join("khaoyu-note-mcp.exe");
-    if candidate.exists() {
-        Ok(candidate.to_string_lossy().to_string())
-    } else {
-        Ok(String::new())
+fn mcp_server_path(app: tauri::AppHandle) -> Result<String, String> {
+    let binary = format!("khaoyu-note-mcp{}", std::env::consts::EXE_SUFFIX);
+    let mut candidates = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join(&binary));
+        }
     }
+    if let Ok(resources) = app.path().resource_dir() {
+        candidates.push(resources.join(&binary));
+    }
+    for candidate in candidates {
+        if candidate.is_file() {
+            return Ok(candidate.to_string_lossy().to_string());
+        }
+    }
+    Ok(String::new())
 }
 
 #[tauri::command]
@@ -2002,6 +2015,48 @@ mod tests {
         assert!(
             !boards.exists(),
             "clean folder should be renamed to a backup"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn newer_schema_versions_are_rejected() {
+        let root = test_root("schema-newer");
+        {
+            let conn = open_db_at(&root).expect("open db");
+            conn.execute(
+                "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
+                params![(CURRENT_SCHEMA_VERSION + 1).to_string()],
+            )
+            .expect("bump schema version");
+        }
+        let error = open_db_at(&root).expect_err("newer schema must be rejected");
+        assert!(
+            error.contains("newer than this app supports"),
+            "unexpected error: {error}"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_broken_older_backup_folder_does_not_block_the_primary_archive() {
+        let root = test_root("legacy-older-backup");
+        let boards = root.join("boards");
+        let older = root.join("boards-json-backup-1");
+        fs::create_dir_all(&boards).expect("primary folder");
+        fs::create_dir_all(&older).expect("older backup folder");
+        fs::write(
+            boards.join("good.json"),
+            serde_json::to_string(&sample_doc("b_primary", "Primary", 1_700_000_000)).expect("json"),
+        )
+        .expect("good file");
+        fs::write(older.join("broken.json"), b"{ not json").expect("broken file");
+
+        let conn = open_db_at(&root).expect("open db");
+        assert!(read_doc(&conn, "b_primary").expect("read").is_some());
+        assert!(
+            !boards.exists(),
+            "the clean primary folder must still be archived"
         );
         let _ = fs::remove_dir_all(root);
     }
