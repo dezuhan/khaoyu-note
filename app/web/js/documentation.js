@@ -7,11 +7,26 @@ export const DOCUMENTATION_HTML = `
 
   <h3>Getting started</h3>
   <ul>
+    <li>On first run choose Continue locally, Create account on your server, or Connect server with an API token.</li>
     <li>Double-click empty canvas to create a note.</li>
     <li>Pick a tool from the left rail, then click the canvas to place a card.</li>
     <li>Drag cards to move them. Shift-click or drag a marquee to select several cards.</li>
     <li>Use the toolbar above a selected card to style text, change color or convert a note to a document.</li>
     <li>Files are saved automatically after five seconds of inactivity.</li>
+  </ul>
+
+  <h3>Board access and sharing</h3>
+  <p>The header sits above the menu bar. The Share control in the header right corner opens the
+  per-board access panel. Each board is not shared by default. Enable it with the warning, choose
+  View only (default), Can comment or Can edit, and optionally add a password and expiry. Revoke links
+  from the same panel. Right-click any card and choose Share link to share that item or column.</p>
+
+  <h3>Board sharing links</h3>
+  <ul>
+    <li>Every board has individual access, default not shared and view only.</li>
+    <li>Share a whole board from the header or one item or column from the context menu.</li>
+    <li>Optional password protection is supported for shared links.</li>
+    <li>Recipients open the read-only viewer at <code>/s/:token</code>.</li>
   </ul>
 
   <h3>Cards and tools</h3>

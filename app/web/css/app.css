@@ -5443,3 +5443,139 @@ html[data-performance="true"] .mn-card {
 .mn-docs th { color: var(--ky-text); font-weight: 600; }
 .mn-docs code { font-family: var(--mn-font-code); font-size: 11px; color: var(--ky-text); background: color-mix(in srgb, var(--ky-text) 7%, transparent); padding: 1px 4px; border-radius: 4px; }
 .mn-docs-foot { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--ky-border); font-size: 11px; }
+
+/* Board access and share panel */
+.mn-access-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.mn-access-btn:hover {
+  background: var(--ky-control-hover);
+}
+.mn-share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 42%, transparent);
+}
+.mn-share-panel {
+  width: min(560px, calc(100vw - 48px));
+}
+.mn-share-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mn-share-target {
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+}
+.mn-share-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.mn-share-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+.mn-share-fields .ky-input {
+  width: 100%;
+}
+.mn-share-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+.mn-share-warning {
+  border: 1px solid color-mix(in srgb, var(--ky-danger) 35%, var(--ky-stroke));
+  background: color-mix(in srgb, var(--ky-danger) 8%, transparent);
+  border-radius: var(--ky-radius-control);
+  padding: 9px;
+  font-size: 11px;
+  color: var(--ky-text);
+}
+.mn-share-token {
+  font-family: var(--mn-font-code);
+  font-size: 10px;
+  color: var(--ky-soft);
+  overflow-wrap: anywhere;
+  min-height: 14px;
+}
+.mn-share-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.mn-share-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  padding: 6px 8px;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+
+/* First-run onboarding */
+.mn-onboard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 340;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 48%, transparent);
+}
+.mn-onboard-panel {
+  width: min(540px, calc(100vw - 48px));
+}
+.mn-onboard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mn-onboard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+.mn-onboard-field .ky-input {
+  width: 100%;
+}
+.mn-onboard-status {
+  min-height: 16px;
+  font-size: 11px;
+  color: var(--ky-soft);
+}
+.mn-onboard-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

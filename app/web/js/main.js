@@ -3,6 +3,8 @@ import { initInteractions } from "./interact.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
+import { initShareUI } from "./share-ui.js";
+import { maybeShowOnboarding } from "./onboarding.js";
 import {
   createBoard,
   firstOpenableBoard,
@@ -32,6 +34,7 @@ const uiRefs = {
   saveState: document.getElementById("save-state"),
   syncButton: document.getElementById("sync-state"),
   syncState: document.getElementById("sync-state"),
+  shareButton: document.getElementById("share-btn"),
   undoBtn: document.getElementById("undo-btn"),
   redoBtn: document.getElementById("redo-btn"),
   commentCount: document.getElementById("comment-count"),
@@ -54,6 +57,7 @@ async function boot() {
   initInteractions(refs);
   initUI(uiRefs);
   initSyncUI(uiRefs);
+  initShareUI(uiRefs);
   initContextMenu();
 
   subscribe((kind) => {
@@ -78,6 +82,7 @@ async function boot() {
   render("board");
   renderView();
   refreshSync();
+  maybeShowOnboarding();
   document.getElementById("boot")?.remove();
   document.fonts?.ready.then(() => {
     if (state.board) render("geometry");

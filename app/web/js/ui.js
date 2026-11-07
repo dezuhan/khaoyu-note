@@ -1,6 +1,7 @@
 // Chrome UI: tool rail, top bar, modals, menus, toasts and shortcuts.
 
 import { DOCUMENTATION_HTML } from "./documentation.js";
+import { openSharePanel } from "./share-ui.js";
 import * as bridge from "./bridge.js";
 import { closeDocumentEditor, documentEditorOpen, openDocumentEditor } from "./document-editor.js";
 import { closeDrawingEditor, drawingEditorOpen, openDrawingEditor } from "./drawing-editor.js";
@@ -872,6 +873,9 @@ function wireTopbar() {
   el.redoBtn.innerHTML = icon("redo", 16);
   el.helpBtn.innerHTML = icon("help", 16);
   el.settingsBtn.innerHTML = icon("settings", 16);
+  if (el.shareBtn) {
+    el.shareBtn.innerHTML = `${icon("share", 14)}<span class="mn-access-label">Share</span>`;
+  }
   el.themeBtn.innerHTML = icon("sun", 16);
   if (el.languageBtn) el.languageBtn.innerHTML = icon("globe", 16);
   el.commentCount.innerHTML = `${icon("comment", 14)}<span>0</span>`;
@@ -1744,6 +1748,8 @@ window.addEventListener("mn:open-menu", (event) => {
       const ids = [...state.selection];
       const isBoard = card.type === "board";
       const items = [{ type: "label", text: TYPE_LABELS[card.type] || card.type }];
+      items.push({ text: "Share link", onClick: () => openSharePanel(card) });
+      items.push({ type: "sep" });
       if (isBoard) {
         items.push({ text: "Open board", kbd: "Enter", onClick: () => openBoardCard(card) });
         items.push({ type: "sep" });
