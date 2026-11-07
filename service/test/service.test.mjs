@@ -17,6 +17,7 @@ import { assertSchemaCurrent } from "../src/app.mjs";
 import { logPath } from "../src/app.mjs";
 import { createSmtpMailer } from "../src/auth/mailer.mjs";
 import { createFileMailer } from "../src/auth/mailer.mjs";
+import { createQueuedMailer } from "../src/auth/mailer.mjs";
 import { scanUpload, validateUpload } from "../src/uploads.mjs";
 import http from "node:http";
 import { sendAlert } from "../src/alerts.mjs";
@@ -83,12 +84,12 @@ test("migrations are reversible and recreate the schema", () => {
   const db = openDatabase(config.databasePath);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [false, false, false, false, false, false, false, false, false, false, false]
+    [false, false, false, false, false, false, false, false, false, false, false, false]
   );
-  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  assert.deepEqual(migrate(db, { directory: MIGRATIONS_DIR }), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.deepEqual(
     migrationStatus(db).map((entry) => entry.applied),
-    [true, true, true, true, true, true, true, true, true, true, true]
+    [true, true, true, true, true, true, true, true, true, true, true, true]
   );
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -108,7 +109,7 @@ test("migrations are reversible and recreate the schema", () => {
   ]) {
     assert.ok(tables.includes(table), `${table} missing`);
   }
-  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 11 }), [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(rollback(db, { directory: MIGRATIONS_DIR, steps: 12 }), [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
   assert.equal(
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get(),
     undefined
@@ -237,6 +238,50 @@ test("backup and restore round-trip the database and objects", () => {
   assert.equal(restored.value, "before");
   const restoredStore = new ObjectStore(db, config.objectsDir);
   assert.deepEqual(restoredStore.get(object.id).body, Buffer.from("asset"));
+  db.close();
+});
+
+test("queued mailer retries failed sends and records backoff", async () => {
+  const dataDir = tempDir();
+  const config = configFor(dataDir);
+  const db = openDatabase(config.databasePath);
+  migrate(db, { directory: MIGRATIONS_DIR });
+  const delivered = [];
+  let failing = true;
+  const base = {
+    async send(payload) {
+      if (failing) throw new Error("SMTP unavailable");
+      delivered.push(payload);
+    },
+  };
+  const mailer = createQueuedMailer(db, config, quietLogger, base);
+  const queued = await mailer.send({
+    to: "user@example.com",
+    subject: "Queued",
+    text: "Retry me",
+    kind: "verify",
+  });
+  assert.equal(queued.queued, true);
+  assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM email_jobs").get().count), 1);
+  failing = false;
+  const flushed = await mailer.flush();
+  assert.equal(flushed.sent, 1);
+  assert.equal(delivered.length, 1);
+  assert.ok(db.prepare("SELECT sent_at FROM email_jobs").get().sent_at);
+  failing = true;
+  await mailer.send({
+    to: "user@example.com",
+    subject: "Still down",
+    text: "Retry later",
+    kind: "verify",
+  });
+  const failed = await mailer.flush();
+  assert.equal(failed.failed, 1);
+  const retry = db
+    .prepare("SELECT attempts, next_at FROM email_jobs WHERE sent_at IS NULL")
+    .get();
+  assert.equal(retry.attempts, 1);
+  assert.ok(retry.next_at > Date.now());
   db.close();
 });
 
