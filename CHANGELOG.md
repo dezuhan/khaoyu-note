@@ -12,6 +12,16 @@ project uses Semantic Versioning.
 - `tools/checksums.mjs` and `npm run dist:checksums`.
 - Explicit remaining-work and external-blocker document.
 
+## [0.20.0] - 2026-11-07
+
+### Added
+
+- Durable `email_jobs` queue for failed SMTP sends, flushed by the worker with exponential backoff,
+  a 10 attempt cap and last-error recording.
+- Queued mailer wrapper keeps verification and invitation requests successful during a short SMTP
+  outage.
+- Queue retry and backoff tests plus migration 012.
+
 ## [0.19.0] - 2026-11-07
 
 ### Added
