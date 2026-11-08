@@ -23,6 +23,7 @@ const docker = fs
   .readFileSync("service/docker-compose.yml", "utf8")
   .match(/image: khaoyu-note-service:([0-9]+\.[0-9]+\.[0-9]+)/)?.[1];
 const readme = fs.readFileSync("README.md", "utf8");
+const landing = fs.readFileSync("index.html", "utf8");
 
 const versions = {
   "package.json": rootPkg,
@@ -43,4 +44,5 @@ for (const [file, version] of Object.entries(versions)) {
 }
 assert.match(readme, new RegExp(`Khaoyu Note_${expected}_x64-setup\\.exe`));
 assert.match(readme, new RegExp(`Khaoyu Note_${expected}_x64_en-US\\.msi`));
+assert.match(landing, new RegExp(`Khaoyu Note ${expected} · local-first`));
 console.log(`PASS  every version field reports ${expected}`);

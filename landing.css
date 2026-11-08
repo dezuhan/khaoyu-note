@@ -417,7 +417,7 @@ html[data-ky-theme="light"] .lp-theme-sun {
 
 .lp-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   width: min(100%, var(--lp-max) + (var(--lp-gutter) * 2));
   margin: 0 auto;
   padding: 30px var(--lp-gutter) 0;
@@ -427,7 +427,7 @@ html[data-ky-theme="light"] .lp-theme-sun {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 0 22px;
+  padding: 0 16px;
   border-left: 1px solid var(--lp-line);
 }
 
@@ -989,7 +989,7 @@ html[data-ky-theme="light"] .lp-theme-sun {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 0;
   }
-  .lp-stats div:nth-child(3) {
+  .lp-stats div:nth-child(odd) {
     border-left: 0;
     padding-left: 0;
   }
