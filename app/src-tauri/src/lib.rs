@@ -22,8 +22,8 @@ pub const DB_FILE: &str = "khaoyu-note.db";
 // Only used to find and migrate data written by releases before the rename. These values must keep
 // matching the identifiers those releases actually wrote, or the migration becomes a no-op and an
 // upgraded install starts on an empty database.
-const LEGACY_APP_IDENTIFIER: &str = "com.dezuhan.milanoteclone";
-const LEGACY_DB_FILE: &str = "milanote.db";
+const LEGACY_APP_IDENTIFIER: &str = "com.dezuhan.khaoyunote";
+const LEGACY_DB_FILE: &str = "khaoyunote.db";
 const BLOCKED_ASSET_EXTENSIONS: &[&str] = &[
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
 ];

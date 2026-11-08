@@ -181,6 +181,29 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 - [x] Revision history for shared projects, with restore limited to editors and above.
 - [x] Comments and notifications respect scope: a column share cannot leak board-wide activity.
 
+### Architecture migration: Redis + PostgreSQL for live collaboration
+
+Migrate the self-hosted collaboration layer to a scalable real-time architecture using PostgreSQL and Redis, while preserving SQLite for single-user, zero-account offline use.
+
+- [ ] **Dual database strategy**:
+  - Keep SQLite as the default, zero-dependency storage engine for the single-user desktop app and no-account mode.
+  - Migrate self-hosted collaborative deployments to PostgreSQL for ACID guarantees, relational integrity, and high-concurrency multi-user transactions.
+  - Unified repository interface in the service layer to isolate SQLite vs PostgreSQL differences.
+  - Reversible schema migration tooling compatible with both SQLite (local) and PostgreSQL (self-hosted).
+- [ ] **Redis for real-time pub/sub and state**:
+  - Redis Pub/Sub backend for broadcasting WebSocket events across server processes and worker nodes.
+  - Ephemeral presence tracking (online users, live cursor positions, and active card selection highlights).
+  - Distributed lock management for board/column operations and real-time conflict avoidance.
+  - Redis-backed rate limiting and session caching for collaborative endpoints.
+- [ ] **Live collaboration protocol**:
+  - Operational sync protocol for low-latency broadcast of card movements, edits, and column reordering.
+  - Heartbeat-driven presence rooms with graceful disconnect handling and state reconciliation.
+  - Offline sync merge: replay offline queue from local SQLite into the PostgreSQL project upon reconnection.
+- [ ] **Deployment and operations**:
+  - Updated Docker Compose stack including khaoyu-note-service, PostgreSQL, and Redis.
+  - Automated backup and restore tooling (pg_dump coordinated with asset storage).
+  - Health checks and readiness probes covering both PostgreSQL and Redis connectivity.
+
 ## Milestone 5: Notifications and activity (server side)
 
 - [x] Server notifications for invitations, role changes, comments on shared scopes and mention events.
@@ -210,6 +233,8 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 ## Decision log
 
 - [ ] Keep local-first as the default and server sync as an option.
+- [ ] Maintain SQLite as the zero-dependency, zero-account default for single-user offline boards.
+- [ ] Migrate self-hosted live collaboration to PostgreSQL and Redis for concurrency and pub/sub.
 - [ ] Prefer self-hosted single-tenant deployments before any hosted offer.
 - [ ] Share by scope (project, item, column) rather than by cloning boards.
 - [ ] Server-side authorisation is the source of truth; UI state is never trusted.
