@@ -52,10 +52,15 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push("console: " + message.text());
+    if (
+      message.type() === "error" &&
+      !message.text().includes("Permissions policy violation: compute-pressure")
+    ) {
+      errors.push("console: " + message.text());
+    }
   });
   await page.goto(url, { waitUntil: "load" });
-  await page.waitForTimeout(1800);
+  await page.waitForSelector('[data-role="account-gate"], .mn-web-badge', { timeout: 15000 });
   // A fresh database requires the local admin account before the app opens.
   if ((await page.locator('[data-role="account-gate"]').count()) > 0) {
     await page.fill('[data-role="setup-form"] input[name="username"]', "owner");
@@ -67,8 +72,9 @@ try {
       "correct horse battery staple"
     );
     await page.click('[data-role="create-admin"]');
-    await page.waitForTimeout(1600);
   }
+  await page.waitForSelector(".mn-web-badge", { timeout: 20000 });
+  await page.waitForTimeout(300);
 
   check("the app boots against the web backend", await page.locator("#app").isVisible());
   check(
@@ -136,7 +142,8 @@ try {
   });
   await page.waitForTimeout(700);
   await page.reload({ waitUntil: "load" });
-  await page.waitForTimeout(1600);
+  await page.waitForSelector("#app", { state: "visible", timeout: 20000 });
+  await page.waitForTimeout(500);
   const after = await page.locator(".mn-card").count();
   check("an edit survives a reload through SQLite", after === before + 1, `${before} -> ${after}`);
 
