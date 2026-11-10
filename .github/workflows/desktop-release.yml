@@ -106,12 +106,15 @@ jobs:
         working-directory: app
         env:
           CI: "true"
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Unsigned macOS builds. A corrupt/missing Apple certificate makes Tauri fail with
+          # SecKeychainItemImport before it can produce the DMG. Restore the signed values only
+          # after the certificate, password and identity have been re-encoded and verified.
+          APPLE_CERTIFICATE: ""
+          APPLE_CERTIFICATE_PASSWORD: ""
+          APPLE_SIGNING_IDENTITY: ""
+          APPLE_ID: ""
+          APPLE_PASSWORD: ""
+          APPLE_TEAM_ID: ""
         run: npx tauri build ${{ matrix.args }}
 
       - name: Upload bundled artifacts
