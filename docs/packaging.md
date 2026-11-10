@@ -9,7 +9,7 @@ uploads unsigned bundles. It is defined but has not been executed in this worksp
 | Target | Artifact | Status |
 | --- | --- | --- |
 | Windows x64 | NSIS setup `.exe`, MSI, portable `KhaoyuNote.exe` | Built and tested locally |
-| Linux x64 | `.deb`, portable `.tar.gz` | Built locally on 2026-11-11; AppImage/Flatpak still blocked |
+| Linux x64 | AppImage, `.deb`, portable `.tar.gz` | Built locally on 2026-11-11; Flatpak still blocked |
 | macOS arm64 | unsigned `.dmg` | Matrix workflow defined, not yet executed |
 | Flatpak | `.flatpak` | Not configured yet, see follow-up below |
 | Android | APK/AAB | Not started, requires mobile port |
@@ -59,8 +59,9 @@ Local 0.35.0 build evidence (Linux x86_64):
 - `Khaoyu-Note_0.35.0_linux-x86_64.tar.gz` contains the desktop and MCP binaries, README, changelog and
   license;
 - checksums are written to `dist/linux/SHA256SUMS.txt`;
-- AppImage bundling failed inside `linuxdeploy` because the workspace sysroot has no GTK module tree;
-  this must be built on the Ubuntu matrix runner;
+- `Khaoyu-Note_0.35.0_amd64.AppImage` was packaged from the linuxdeploy AppDir with
+  `appimagetool` after fixing the AppRun permissions; it starts and initializes the database, though the
+  sandbox reports `GStreamer element appsink not found` (a media-runtime warning, not a startup crash);
 - Flatpak was not built: `flatpak-builder` and a Flatpak manifest are not present.
 
 ## Flatpak
