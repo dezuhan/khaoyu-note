@@ -90,6 +90,18 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Build universal MCP sidecar (macOS)
+        if: runner.os == 'macOS'
+        working-directory: app/src-tauri
+        run: |
+          mkdir -p target/universal-apple-darwin/release
+          cargo build --release --target aarch64-apple-darwin --bin khaoyu-note-mcp
+          cargo build --release --target x86_64-apple-darwin --bin khaoyu-note-mcp
+          lipo -create \
+            target/aarch64-apple-darwin/release/khaoyu-note-mcp \
+            target/x86_64-apple-darwin/release/khaoyu-note-mcp \
+            -output target/universal-apple-darwin/release/khaoyu-note-mcp
+
       - name: Build desktop bundles
         working-directory: app
         env:
