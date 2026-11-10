@@ -9,8 +9,7 @@ import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "khaoyu-passkeys-"));
-const port = 18090;
-const base = `http://localhost:${port}`;
+let base = "";
 const secret = crypto.randomBytes(32).toString("hex");
 const password = "passkey-password-123";
 const email = `passkey-${crypto.randomUUID()}@example.com`;
@@ -18,9 +17,7 @@ const env = {
   ...process.env,
   KHAOYU_SERVICE_SECRET: secret,
   KHAOYU_SERVICE_DATA_DIR: dataDir,
-  KHAOYU_SERVICE_PUBLIC_URL: base,
-  KHAOYU_SERVICE_HOST: "127.0.0.1",
-  KHAOYU_SERVICE_PORT: String(port),
+  KHAOYU_SERVICE_HOST: "localhost",
   KHAOYU_SERVICE_COOKIE_SECURE: "false",
   KHAOYU_SERVICE_PASSKEYS_ENABLED: "true",
   KHAOYU_SERVICE_RP_ID: "localhost",
@@ -30,12 +27,27 @@ spawnSync(process.execPath, ["service/src/cli.mjs", "migrate"], { cwd: root, env
 const server = spawn(process.execPath, ["service/src/server.mjs"], {
   cwd: root,
   env,
-  stdio: "ignore",
+  stdio: ["ignore", "pipe", "pipe"],
 });
+let serverLog = "";
+server.stdout.on("data", (chunk) => (serverLog += chunk.toString()));
+server.stderr.on("data", (chunk) => (serverLog += chunk.toString()));
 let browser;
 function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  ::  " + detail : ""}`);
   if (!ok) process.exitCode = 1;
+}
+
+async function waitForRuntime() {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(dataDir, "runtime.json"), "utf8"));
+    } catch {
+      /* the service writes runtime.json after both listeners are ready */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error("service did not write runtime.json");
 }
 
 async function waitForReady() {
@@ -48,7 +60,7 @@ async function waitForReady() {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("service did not start");
+  throw new Error("service did not start\n" + serverLog);
 }
 
 async function api(pathname, { method = "GET", body, jar = {} } = {}) {
@@ -71,6 +83,7 @@ async function api(pathname, { method = "GET", body, jar = {} } = {}) {
 }
 
 try {
+  base = (await waitForRuntime()).frontendUrl;
   await waitForReady();
   const register = await api("/api/v1/auth/register", {
     method: "POST",
@@ -125,6 +138,7 @@ try {
   check("passkey list requires and uses the new session", session.status === 200 && session.body.passkeys.length === 1);
 } catch (error) {
   console.error("FAIL", error.message);
+  if (serverLog) console.error("service log:\n" + serverLog);
   process.exitCode = 1;
 } finally {
   await browser?.close();

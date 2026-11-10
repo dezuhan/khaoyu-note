@@ -9,8 +9,7 @@ import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "khaoyu-account-"));
-const port = 18091;
-const base = `http://localhost:${port}`;
+let base = "";
 const secret = crypto.randomBytes(32).toString("hex");
 const email = `account-${crypto.randomUUID()}@example.com`;
 const password = "account-password-123";
@@ -19,9 +18,7 @@ const env = {
   ...process.env,
   KHAOYU_SERVICE_SECRET: secret,
   KHAOYU_SERVICE_DATA_DIR: dataDir,
-  KHAOYU_SERVICE_PUBLIC_URL: base,
-  KHAOYU_SERVICE_HOST: "127.0.0.1",
-  KHAOYU_SERVICE_PORT: String(port),
+  KHAOYU_SERVICE_HOST: "localhost",
   KHAOYU_SERVICE_COOKIE_SECURE: "false",
   KHAOYU_SERVICE_RP_ID: "localhost",
 };
@@ -33,6 +30,18 @@ let browser;
 function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  ::  " + detail : ""}`);
   if (!ok) process.exitCode = 1;
+}
+
+async function waitForRuntime() {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(dataDir, "runtime.json"), "utf8"));
+    } catch {
+      /* the service writes runtime.json after both listeners are ready */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error("service did not write runtime.json");
 }
 
 async function waitForReady() {
@@ -56,6 +65,7 @@ function latestMail(kind) {
 }
 
 try {
+  base = (await waitForRuntime()).frontendUrl;
   await waitForReady();
   browser = await chromium.launch();
   const page = await browser.newPage();
