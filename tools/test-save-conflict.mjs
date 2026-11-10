@@ -42,7 +42,12 @@ const modalTitle = await page.locator(".mn-modal-title").innerText();
 check("conflict dialog explains the situation", modalTitle === "Board changed outside this window", modalTitle);
 
 await page.getByRole("button", { name: "Keep my version as a copy" }).click();
-await page.waitForTimeout(900);
+await page.waitForFunction(
+  () => document.getElementById("save-state")?.textContent === "Saved",
+  null,
+  { timeout: 5000 }
+).catch(() => {});
+await page.waitForTimeout(100);
 const afterCopy = await page.evaluate(() => {
   const id = localStorage.getItem("mn.lastBoard");
   return {

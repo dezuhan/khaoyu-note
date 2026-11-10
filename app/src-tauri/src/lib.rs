@@ -2962,11 +2962,7 @@ fn detect_system_gpus() -> Vec<String> {
 
 #[tauri::command]
 fn graphics_info(db: State<'_, AppDb>) -> Value {
-    let gpu_enabled = db
-        .0
-        .lock()
-        .map(|conn| gpu_enabled(&conn))
-        .unwrap_or(true);
+    let gpu_enabled = db.0.lock().map(|conn| gpu_enabled(&conn)).unwrap_or(true);
     json!({
         "platform": std::env::consts::OS,
         "gpuEnabled": gpu_enabled,
@@ -3341,7 +3337,9 @@ mod tests {
         }
         fs::write(legacy.join("assets").join("note.txt"), b"asset").expect("legacy asset");
 
-        let new_root = parent.join("com.dezuhan.khaoyunote");
+        // The legacy directory and the current root must have different names, otherwise the
+        // migration is a deliberate no-op when the identifiers are equal.
+        let new_root = parent.join("com.dezuhan.khaoyunote-current");
         migrate_legacy_data_dir(&new_root).expect("migration");
 
         assert!(new_root.join(DB_FILE).is_file());
