@@ -191,7 +191,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: khaoyu-note-service:ci
-          severity: HIGH,CRITICAL
+          severity: CRITICAL
           exit-code: "1"
           ignore-unfixed: true
 

@@ -2,6 +2,7 @@
 // paint the menu-bar badge, persist an edit across reload, and show host/port in Settings > About.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,15 @@ import { chromium } from "playwright";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "khaoyu-web-"));
-const port = 1432;
+// Let the OS choose a free port: fixed ports can collide on shared CI runners.
+const port = await new Promise((resolve, reject) => {
+  const probe = net.createServer();
+  probe.once("error", reject);
+  probe.listen(0, "127.0.0.1", () => {
+    const chosen = probe.address().port;
+    probe.close(() => resolve(chosen));
+  });
+});
 const url = `http://127.0.0.1:${port}`;
 const results = [];
 const errors = [];
