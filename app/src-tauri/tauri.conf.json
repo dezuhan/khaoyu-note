@@ -18,7 +18,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "nsis", "dmg", "deb", "appimage", "rpm"],
     "category": "Productivity",
     "shortDescription": "Local-first visual notes and boards",
     "longDescription": "Khaoyu Note is a local-first visual workspace with notes, boards, tables, kanban, drawings, media and nested boards stored in SQLite.",
