@@ -15,6 +15,8 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    # macOS runners are unavailable on some repository plans; keep Windows/Linux artifacts publishable.
+    continue-on-error: ${{ matrix.name == 'macOS universal' }}
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +115,8 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    # A Flatpak runtime/AppDir mismatch must not hide the other installers.
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -159,22 +163,25 @@ jobs:
         with:
           path: release-input
 
-      - name: Package per platform
+      - name: Package installers
         run: |
           mkdir -p release
-          for directory in release-input/*; do
-            name="$(basename "$directory")"
-            (cd release-input && zip -qr "../release/${name}.zip" "$name")
-          done
-          find release-input -name '*.flatpak' -exec cp {} release/ \;
-          cd release
-          sha256sum *.zip *.flatpak > SHA256SUMS.txt
+          find release-input -type f \(             -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o             -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o             -name '*.flatpak' -o -name '*.tar.gz'           \) -exec cp {} release/ \;
+          # Keep .app bundles as ZIPs; macOS bundles are directories.
+          find release-input -type d -name '*.app' -print0 | while IFS= read -r -d '' app; do
+            name="$(basename "$app")"
+            (cd "$(dirname "$app")" && zip -qr "$GITHUB_WORKSPACE/release/${name}.zip" "$name")
+          done || true
+          if [ -n "$(find release -type f -print -quit)" ]; then
+            (cd release && sha256sum * > SHA256SUMS.txt)
+          else
+            echo "No installer artifacts were produced" >&2
+            exit 1
+          fi
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/*.zip
-            release/*.flatpak
-            release/SHA256SUMS.txt
+            release/*
           generate_release_notes: true
