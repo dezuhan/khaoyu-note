@@ -47,7 +47,10 @@ async function waitForServer() {
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  throw new Error("web server did not start:\n" + serverLog);
+  const message = "web server did not start:\n" + serverLog;
+  // Surface the child-process log in the GitHub Actions annotation so CI failures are diagnosable.
+  console.log(`::error title=Web mode server::${message.replace(/\n/g, "%0A")}`);
+  throw new Error(message);
 }
 
 let browser;
