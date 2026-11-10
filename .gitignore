@@ -57,3 +57,8 @@ dsh-bundle-note-studio-mcp/
 .desktop-data/
 .xdg*/
 .desktop-data*/
+
+# Flatpak build outputs
+packaging/flatpak/appdir/
+packaging/flatpak/build/
+packaging/flatpak/repo/

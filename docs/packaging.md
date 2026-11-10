@@ -62,7 +62,11 @@ Local 0.35.0 build evidence (Linux x86_64):
 - `Khaoyu-Note_0.35.0_amd64.AppImage` was packaged from the linuxdeploy AppDir with
   `appimagetool` after fixing the AppRun permissions; it starts and initializes the database, though the
   sandbox reports `GStreamer element appsink not found` (a media-runtime warning, not a startup crash);
-- Flatpak was not built: `flatpak-builder` and a Flatpak manifest are not present.
+- Flatpak manifest is in `packaging/flatpak/com.dezuhan.khaoyunote.yml` and is built by the
+  `Linux Flatpak` job in `.github/workflows/desktop-release.yml`; it still needs a CI run to verify
+  the runtime/AppDir combination.
+- `desktop-release.yml` now builds Linux `deb`, `rpm`, `AppImage`, Flatpak, Windows NSIS/MSI and macOS
+  DMG/app artifacts.
 
 ## Flatpak
 

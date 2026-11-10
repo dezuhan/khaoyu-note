@@ -1,0 +1,31 @@
+app-id: com.dezuhan.khaoyunote
+runtime: org.gnome.Platform
+runtime-version: "48"
+sdk: org.gnome.Sdk
+command: khaoyu-note
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.freedesktop.secrets
+
+modules:
+  - name: khaoyu-note
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/bin /app/lib /app/share/applications /app/share/icons /app/share/metainfo
+      - cp -a appdir/usr/bin/. /app/bin/
+      - cp -a appdir/usr/lib/. /app/lib/
+      - install -Dm644 "appdir/usr/share/applications/Khaoyu Note.desktop" /app/share/applications/com.dezuhan.khaoyunote.desktop
+      - cp -a appdir/usr/share/icons/. /app/share/icons/
+      - install -Dm644 com.dezuhan.khaoyunote.metainfo.xml /app/share/metainfo/com.dezuhan.khaoyunote.metainfo.xml
+    sources:
+      - type: dir
+        path: appdir
+      - type: file
+        path: com.dezuhan.khaoyunote.metainfo.xml

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.dezuhan.khaoyunote</id>
+  <name>Khaoyu Note</name>
+  <summary>Local-first visual notes and boards</summary>
+  <description>
+    <p>
+      Khaoyu Note is a local-first visual workspace with notes, boards, tables, kanban,
+      drawings, media and nested boards stored in SQLite.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.dezuhan.khaoyunote.desktop</launchable>
+  <url type="homepage">https://github.com/dezuhan/khaoyu-note</url>
+  <categories>
+    <category>Office</category>
+    <category>ProjectManagement</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+</component>
