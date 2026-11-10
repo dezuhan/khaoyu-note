@@ -16,28 +16,20 @@ function parseTransports(value) {
   }
 }
 
-function storeChallenge(db, { email, accountId, kind, challenge }) {
-  db.prepare("DELETE FROM passkey_challenges WHERE email = ? AND kind = ?").run(email, kind);
-  db.prepare(
-    "INSERT INTO passkey_challenges (id, challenge, email, account_id, kind, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(crypto.randomUUID(), challenge, email, accountId || null, kind, Date.now(), Date.now() + 5 * 60_000);
+async function storeChallenge(db, { email, accountId, kind, challenge }) {
+  (await db.run("DELETE FROM passkey_challenges WHERE email = ? AND kind = ?", [email, kind]));
+  (await db.run("INSERT INTO passkey_challenges (id, challenge, email, account_id, kind, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)", [crypto.randomUUID(), challenge, email, accountId || null, kind, Date.now(), Date.now() + 5 * 60_000]));
 }
 
-function consumeChallenge(db, { email, kind }) {
-  const row = db
-    .prepare(
-      "SELECT * FROM passkey_challenges WHERE email = ? AND kind = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1"
-    )
-    .get(email, kind, Date.now());
+async function consumeChallenge(db, { email, kind }) {
+  const row = (await db.get("SELECT * FROM passkey_challenges WHERE email = ? AND kind = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1", [email, kind, Date.now()]));
   if (!row) return null;
-  db.prepare("DELETE FROM passkey_challenges WHERE id = ?").run(row.id);
+  (await db.run("DELETE FROM passkey_challenges WHERE id = ?", [row.id]));
   return row;
 }
 
 export async function registrationOptions(db, config, account) {
-  const credentials = db
-    .prepare("SELECT id, transports FROM passkey_credentials WHERE account_id = ?")
-    .all(account.id);
+  const credentials = (await db.all("SELECT id, transports FROM passkey_credentials WHERE account_id = ?", [account.id]));
   const options = await generateRegistrationOptions({
     rpName: "Khaoyu Note",
     rpID: config.rpId,
@@ -54,7 +46,7 @@ export async function registrationOptions(db, config, account) {
       userVerification: "preferred",
     },
   });
-  storeChallenge(db, {
+  await storeChallenge(db, {
     email: account.email,
     accountId: account.id,
     kind: "register",
@@ -64,7 +56,7 @@ export async function registrationOptions(db, config, account) {
 }
 
 export async function verifyRegistration(db, config, account, response, name) {
-  const challenge = consumeChallenge(db, { email: account.email, kind: "register" });
+  const challenge = await consumeChallenge(db, { email: account.email, kind: "register" });
   if (!challenge) throw new Error("registration challenge expired");
   const verification = await verifyRegistrationResponse({
     response,
@@ -78,12 +70,9 @@ export async function verifyRegistration(db, config, account, response, name) {
   }
   const info = verification.registrationInfo;
   const credential = info.credential;
-  db.prepare(
-    `INSERT INTO passkey_credentials
+  (await db.run(`INSERT INTO passkey_credentials
      (id, account_id, public_key, counter, transports, device_type, backed_up, name, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    credential.id,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [credential.id,
     account.id,
     isoBase64URL.fromBuffer(credential.publicKey),
     Number(credential.counter) || 0,
@@ -91,19 +80,14 @@ export async function verifyRegistration(db, config, account, response, name) {
     info.credentialDeviceType || "singleDevice",
     info.credentialBackedUp ? 1 : 0,
     String(name || "Passkey").slice(0, 80),
-    Date.now()
-  );
+    Date.now()]));
   return credential.id;
 }
 
 export async function authenticationOptions(db, config, email) {
-  const account = db
-    .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL")
-    .get(email);
+  const account = (await db.get("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL", [email]));
   const credentials = account
-    ? db
-        .prepare("SELECT id, transports FROM passkey_credentials WHERE account_id = ?")
-        .all(account.id)
+    ? (await db.all("SELECT id, transports FROM passkey_credentials WHERE account_id = ?", [account.id]))
     : [];
   const options = await generateAuthenticationOptions({
     rpID: config.rpId,
@@ -113,7 +97,7 @@ export async function authenticationOptions(db, config, email) {
     })),
     userVerification: "preferred",
   });
-  storeChallenge(db, {
+  await storeChallenge(db, {
     email,
     accountId: account?.id || null,
     kind: "login",
@@ -123,15 +107,11 @@ export async function authenticationOptions(db, config, email) {
 }
 
 export async function verifyAuthentication(db, config, email, response) {
-  const account = db
-    .prepare("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL")
-    .get(email);
+  const account = (await db.get("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL", [email]));
   if (!account || typeof response?.id !== "string") throw new Error("passkey authentication failed");
-  const stored = db
-    .prepare("SELECT * FROM passkey_credentials WHERE id = ? AND account_id = ?")
-    .get(response.id, account.id);
+  const stored = (await db.get("SELECT * FROM passkey_credentials WHERE id = ? AND account_id = ?", [response.id, account.id]));
   if (!stored) throw new Error("passkey authentication failed");
-  const challenge = consumeChallenge(db, { email, kind: "login" });
+  const challenge = await consumeChallenge(db, { email, kind: "login" });
   if (!challenge) throw new Error("login challenge expired");
   const verification = await verifyAuthenticationResponse({
     response,
@@ -147,20 +127,14 @@ export async function verifyAuthentication(db, config, email, response) {
     requireUserVerification: false,
   });
   if (!verification.verified) throw new Error("passkey authentication failed");
-  db.prepare("UPDATE passkey_credentials SET counter = ?, last_used_at = ? WHERE id = ?").run(
-    Number(verification.authenticationInfo.newCounter),
+  (await db.run("UPDATE passkey_credentials SET counter = ?, last_used_at = ? WHERE id = ?", [Number(verification.authenticationInfo.newCounter),
     Date.now(),
-    stored.id
-  );
+    stored.id]));
   return account;
 }
 
-export function listPasskeys(db, accountId) {
-  return db
-    .prepare(
-      "SELECT id, name, device_type, backed_up, created_at, last_used_at FROM passkey_credentials WHERE account_id = ? ORDER BY created_at"
-    )
-    .all(accountId)
+export async function listPasskeys(db, accountId) {
+  return (await db.all("SELECT id, name, device_type, backed_up, created_at, last_used_at FROM passkey_credentials WHERE account_id = ? ORDER BY created_at", [accountId]))
     .map((entry) => ({
       id: entry.id,
       name: entry.name,
@@ -171,16 +145,14 @@ export function listPasskeys(db, accountId) {
     }));
 }
 
-export function deletePasskey(db, accountId, id) {
-  const account = db.prepare("SELECT password_hash FROM accounts WHERE id = ?").get(accountId);
+export async function deletePasskey(db, accountId, id) {
+  const account = (await db.get("SELECT password_hash FROM accounts WHERE id = ?", [accountId]));
   const count = Number(
-    db.prepare("SELECT COUNT(*) AS count FROM passkey_credentials WHERE account_id = ?").get(accountId)
+    (await db.get("SELECT COUNT(*) AS count FROM passkey_credentials WHERE account_id = ?", [accountId]))
       .count
   );
   if (count <= 1 && !account?.password_hash) {
     throw new Error("add a password or another passkey before removing the last passkey");
   }
-  return db
-    .prepare("DELETE FROM passkey_credentials WHERE id = ? AND account_id = ?")
-    .run(id, accountId).changes;
+  return (await db.run("DELETE FROM passkey_credentials WHERE id = ? AND account_id = ?", [id, accountId])).changes;
 }

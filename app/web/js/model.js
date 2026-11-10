@@ -24,7 +24,6 @@ export const CARD_SIZES = {
   board: [260, 70],
   column: [280, 220],
   section: [620, 420],
-  kanban: [560, 500],
 };
 
 // Cards that cannot be resized vertically: they grow with their content and never below this height.
@@ -89,7 +88,6 @@ export const MIN_SIZES = {
   board: [180, 90],
   column: [220, 120],
   section: [260, 160],
-  kanban: [320, 500],
   drawing: [160, 100],
 };
 
@@ -164,15 +162,6 @@ export function defaultContent(type) {
       return { title: "Column" };
     case "section":
       return { title: "Section", sectionColor: SECTION_COLORS[0].color };
-    case "kanban":
-      return {
-        title: "Kanban",
-        columns: [
-          { id: uid("k"), title: "Backlog", items: [] },
-          { id: uid("k"), title: "In progress", items: [] },
-          { id: uid("k"), title: "Done", items: [] },
-        ],
-      };
     default:
       return {};
   }
@@ -239,7 +228,10 @@ export function columnSummary(board, column) {
   const children = columnChildren(board, column.id).filter(
     (card) => !isTemporarilyDisabledType(card.type)
   );
-  if (!children.length) return "0 cards";
+  if (!children.length) return column.direction === "row" ? "0 columns" : "0 cards";
+  if (column.direction === "row" && children.every((card) => card.type === "column")) {
+    return `${children.length} column${children.length === 1 ? "" : "s"}`;
+  }
   const docs = children.filter((card) => card.type === "document").length;
   const rest = children.length - docs;
   const cardsWord = `${rest} card${rest === 1 ? "" : "s"}`;
@@ -270,8 +262,12 @@ export function layoutColumn(board, column) {
       child.x = x;
       child.y = column.y + header;
       child.w = childW;
-      const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
-      if (child.h < minimum) child.h = minimum;
+      if (child.type === "column") {
+        layoutColumn(board, child);
+      } else {
+        const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
+        if (child.h < minimum) child.h = minimum;
+      }
       x += childW + gap;
       maxH = Math.max(maxH, child.h);
     }
@@ -283,8 +279,12 @@ export function layoutColumn(board, column) {
     child.x = column.x + padding;
     child.y = y;
     child.w = column.w - padding * 2;
-    const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
-    if (child.h < minimum) child.h = minimum;
+    if (child.type === "column") {
+      layoutColumn(board, child);
+    } else {
+      const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
+      if (child.h < minimum) child.h = minimum;
+    }
     y += child.h + gap;
   }
   column.h = Math.max(column.minHeight || 160, y - column.y - gap + padding);
@@ -293,7 +293,57 @@ export function layoutColumn(board, column) {
 export function layoutColumns(board) {
   if (!board) return;
   const columns = board.cards.filter((card) => card.type === "column");
-  for (const column of columns) layoutColumn(board, column);
+  const ids = new Set(columns.map((column) => column.id));
+  for (const column of columns) {
+    if (!column.parentId || !ids.has(column.parentId)) layoutColumn(board, column);
+  }
+}
+
+// Migrate the removed kanban card type into a row of columns, one column per former lane. Each
+// former item becomes a note card inside that column so no text is lost.
+export function migrateLegacyKanban(board) {
+  if (!board?.cards?.some((card) => card.type === "kanban")) return false;
+  const cards = [];
+  for (const card of board.cards) {
+    if (card.type !== "kanban") {
+      cards.push(card);
+      continue;
+    }
+    const parent = createCard("column", card.x, card.y, {
+      title: card.title || "Kanban",
+      direction: "row",
+      kanban: true,
+    });
+    parent.id = card.id;
+    parent.w = card.w || 760;
+    parent.h = card.h || 360;
+    parent.z = card.z || 1;
+    parent.parentId = card.parentId || null;
+    parent.order = card.order || 0;
+    cards.push(parent);
+    const lanes = Array.isArray(card.columns) ? card.columns : [];
+    lanes.forEach((lane, laneIndex) => {
+      const column = createCard("column", parent.x, parent.y, {
+        title: lane.title || "Column",
+      });
+      column.parentId = parent.id;
+      column.order = laneIndex;
+      column.w = Math.max(180, Math.round((parent.w - 28 - 10 * Math.max(0, lanes.length - 1)) / Math.max(1, lanes.length)));
+      cards.push(column);
+      (lane.items || []).forEach((item, itemIndex) => {
+        const note = createCard("note", column.x, column.y, {
+          text: item.text || "",
+        });
+        note.parentId = column.id;
+        note.order = itemIndex;
+        note.w = Math.max(120, column.w - 24);
+        cards.push(note);
+      });
+    });
+  }
+  board.cards = cards;
+  layoutColumns(board);
+  return true;
 }
 
 export const TYPE_LABELS = {
@@ -314,7 +364,6 @@ export const TYPE_LABELS = {
   board: "Board",
   column: "Column",
   section: "Section",
-  kanban: "Kanban",
   drawing: "Drawing",
 };
 
@@ -401,7 +450,7 @@ export function welcomeBoard() {
   const showcaseNote = add(
     createCard("note", 180, 1040, {
       text:
-        "All the enabled tools from the left rail are represented on this board.\nScroll down and right to try the kanban board and the nested board.",
+        "All the enabled tools from the left rail are represented on this board.\nScroll down and right to try the nested board.",
     })
   );
   showcaseNote.w = 380;
@@ -418,20 +467,6 @@ export function welcomeBoard() {
 
   add(createCard("file", 920, 960, { name: "Brand-assets.zip", path: "" }));
   add(createCard("board", 1260, 960, { title: "Examples board" }));
-
-  add(
-    createCard("kanban", 620, 1260, {
-      title: "Kanban",
-      columns: [
-        { id: uid("k"), title: "Backlog", items: [
-          { id: uid("i"), text: "Collect references" },
-          { id: uid("i"), text: "Write outline" },
-        ] },
-        { id: uid("k"), title: "In progress", items: [{ id: uid("i"), text: "Design cover" }] },
-        { id: uid("k"), title: "Done", items: [{ id: uid("i"), text: "Set up the board" }] },
-      ],
-    })
-  );
 
   const welcomeSketch = add(
     createCard("sketch", 1300, 1260, {

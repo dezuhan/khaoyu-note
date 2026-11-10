@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { createPostgresBackup } from "./storage/backup-postgres.mjs";
 
 const FORMAT = 2;
 const ALGORITHM = "aes-256-gcm";
@@ -71,13 +72,14 @@ function fileEntry(directory, file) {
   };
 }
 
-export function createBackup(db, config) {
+export async function createBackup(db, config) {
+  if (db.dialect === "postgres") return createPostgresBackup(db, config);
   fs.mkdirSync(config.backupsDir, { recursive: true });
   const directory = path.join(config.backupsDir, `${timestamp()}-${crypto.randomUUID().slice(0, 8)}`);
   fs.mkdirSync(directory, { recursive: true });
   const databaseFile = path.join(directory, "database.db");
   const quoted = databaseFile.replace(/'/g, "''");
-  db.exec(`VACUUM INTO '${quoted}'`);
+  await db.exec(`VACUUM INTO '${quoted}'`);
   if (!integrityCheck(databaseFile)) {
     fs.rmSync(directory, { recursive: true, force: true });
     throw new Error("backup database failed the integrity check");

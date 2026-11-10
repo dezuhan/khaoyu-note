@@ -47,3 +47,13 @@ desktop.ini
 
 # Local agent/plugin bundles
 dsh-bundle-note-studio-mcp/
+
+# Local web host data used while running the app from the repository
+.khaoyu-web-data/
+.khaoyu-*-test/
+.build/
+.toolchain/
+.xdg/
+.desktop-data/
+.xdg*/
+.desktop-data*/

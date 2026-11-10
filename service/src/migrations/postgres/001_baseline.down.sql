@@ -1,0 +1,26 @@
+-- Reverse the PostgreSQL baseline. schema_migrations is owned by the migration runner.
+DROP TABLE IF EXISTS email_jobs;
+DROP TABLE IF EXISTS passkey_challenges;
+DROP TABLE IF EXISTS passkey_credentials;
+DROP TABLE IF EXISTS email_preferences;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS project_versions;
+DROP TABLE IF EXISTS project_assets;
+DROP TABLE IF EXISTS abuse_reports;
+DROP TABLE IF EXISTS email_otps;
+DROP TABLE IF EXISTS share_attempts;
+DROP TABLE IF EXISTS share_links;
+DROP TABLE IF EXISTS project_invitations;
+DROP TABLE IF EXISTS service_meta;
+DROP TABLE IF EXISTS objects;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS project_snapshots;
+DROP TABLE IF EXISTS project_members;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS api_tokens;
+DROP TABLE IF EXISTS login_attempts;
+DROP TABLE IF EXISTS email_tokens;
+DROP TABLE IF EXISTS access_tokens;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS accounts;

@@ -9,7 +9,7 @@ export class ObjectStore {
     fs.mkdirSync(this.objectsDir, { recursive: true });
   }
 
-  store(buffer, contentType = "application/octet-stream") {
+  async store(buffer, contentType = "application/octet-stream") {
     if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
       throw new Error("object body is empty");
     }
@@ -17,9 +17,10 @@ export class ObjectStore {
       throw new Error("invalid content type");
     }
     const sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
-    const existing = this.db
-      .prepare("SELECT id, sha256, bytes, content_type, storage_key FROM objects WHERE sha256 = ?")
-      .get(sha256);
+    const existing = await this.db.get(
+      "SELECT id, sha256, bytes, content_type, storage_key FROM objects WHERE sha256 = ?",
+      [sha256]
+    );
     if (existing) return { ...existing, deduplicated: true };
 
     const id = crypto.randomUUID();
@@ -29,18 +30,18 @@ export class ObjectStore {
     const temp = path.join(path.dirname(target), `.tmp-${id}`);
     fs.writeFileSync(temp, buffer, { mode: 0o600 });
     fs.renameSync(temp, target);
-    this.db
-      .prepare(
-        "INSERT INTO objects (id, sha256, bytes, content_type, storage_key, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-      )
-      .run(id, sha256, buffer.length, contentType, storageKey, Date.now());
+    await this.db.run(
+      "INSERT INTO objects (id, sha256, bytes, content_type, storage_key, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [id, sha256, buffer.length, contentType, storageKey, Date.now()]
+    );
     return { id, sha256, bytes: buffer.length, content_type: contentType, storage_key: storageKey, deduplicated: false };
   }
 
-  get(id) {
-    const row = this.db
-      .prepare("SELECT id, sha256, bytes, content_type, storage_key FROM objects WHERE id = ?")
-      .get(id);
+  async get(id) {
+    const row = await this.db.get(
+      "SELECT id, sha256, bytes, content_type, storage_key FROM objects WHERE id = ?",
+      [id]
+    );
     if (!row) return null;
     const body = fs.readFileSync(this.resolveKey(row.storage_key));
     return { ...row, body };
@@ -54,12 +55,10 @@ export class ObjectStore {
     return resolved;
   }
 
-  remove(id) {
-    const row = this.db
-      .prepare("SELECT storage_key FROM objects WHERE id = ?")
-      .get(id);
+  async remove(id) {
+    const row = await this.db.get("SELECT storage_key FROM objects WHERE id = ?", [id]);
     if (!row) return false;
-    this.db.prepare("DELETE FROM objects WHERE id = ?").run(id);
+    await this.db.run("DELETE FROM objects WHERE id = ?", [id]);
     fs.rmSync(this.resolveKey(row.storage_key), { force: true });
     return true;
   }

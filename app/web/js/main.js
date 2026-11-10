@@ -17,6 +17,8 @@ import {
   subscribe,
 } from "./store.js";
 import { initContextMenu, initUI } from "./ui.js";
+import { initSetupGate } from "./setup.js";
+import { initLanguage } from "./i18n.js";
 
 const refs = {
   viewport: document.getElementById("viewport"),
@@ -76,7 +78,9 @@ function syncBoardUrl() {
 
 async function boot() {
   initTheme();
-  // Accounts are mandatory, so finish the setup or sign-in gate before any board or setting is read.
+  initLanguage();
+  // After a reset, choose the storage direction before any board or setting is read.
+  await initSetupGate();
   await initAuth();
   await initSettings();
   initRender(refs);

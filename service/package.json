@@ -1,6 +1,6 @@
 {
   "name": "@khaoyu-note/service",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "private": true,
   "type": "module",
   "description": "Self-hosted service foundation for Khaoyu Note",
@@ -17,11 +17,13 @@
     "bootstrap": "node src/cli.mjs bootstrap",
     "backup": "node src/cli.mjs backup",
     "restore": "node src/cli.mjs restore",
-    "test": "node --test test/service.test.mjs test/auth.test.mjs test/admin.test.mjs"
+    "test": "node --test --test-concurrency=1 test/service.test.mjs test/auth.test.mjs test/admin.test.mjs test/storage.test.mjs test/storage-migrations.test.mjs test/postgres-runtime.test.mjs test/redis-bus.test.mjs test/config.test.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.3",
     "hash-wasm": "4.12.0",
-    "nodemailer": "^7.0.13"
+    "nodemailer": "^10.5.0",
+    "pg": "^8.23.1",
+    "redis": "^5.12.1"
   }
 }

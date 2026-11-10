@@ -21,9 +21,9 @@ use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const CARD_TYPES: [&str; 17] = [
+const CARD_TYPES: [&str; 16] = [
     "note", "heading", "link", "todo", "document", "comment", "table", "color", "sketch", "image",
-    "audio", "video", "map", "file", "board", "column", "kanban",
+    "audio", "video", "map", "file", "board", "column",
 ];
 
 fn main() {
@@ -837,7 +837,6 @@ fn card_size(card_type: &str) -> (f64, f64) {
         "file" => (260.0, 70.0),
         "board" => (260.0, 70.0),
         "column" => (280.0, 220.0),
-        "kanban" => (560.0, 500.0),
         _ => (260.0, 70.0),
     }
 }
@@ -860,14 +859,6 @@ fn card_defaults(card_type: &str) -> Value {
         "file" => json!({ "name": "", "path": "" }),
         "board" => json!({ "boardId": "", "title": "Board" }),
         "column" => json!({ "title": "Column" }),
-        "kanban" => json!({
-            "title": "Kanban",
-            "columns": [
-                { "id": "k_backlog", "title": "Backlog", "items": [] },
-                { "id": "k_progress", "title": "In progress", "items": [] },
-                { "id": "k_done", "title": "Done", "items": [] }
-            ]
-        }),
         _ => json!({}),
     }
 }
@@ -1071,13 +1062,6 @@ fn card_summary(card: &Value) -> String {
             .trim()
             .to_string(),
         "column" => format!("column {}", text_of("title")).trim().to_string(),
-        "kanban" => format!(
-            "{} column(s)",
-            card.get("columns")
-                .and_then(Value::as_array)
-                .map(|columns| columns.len())
-                .unwrap_or(0)
-        ),
         "file" => format!("file {}", text_of("name")).trim().to_string(),
         _ => format!("{} {}", card_type, text_of("title"))
             .trim()

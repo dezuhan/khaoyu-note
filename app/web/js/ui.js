@@ -23,11 +23,16 @@ import {
   assetPathForCard,
   bringToFront,
   canWrapInColumn,
+  canWrapInKanban,
+  canWrapInSection,
+  canReleaseContainer,
+  clearClipboard,
   convertColumnToBoard,
   convertNoteToDocument,
   copySelected,
   createNestedBoardCard,
   cutSelected,
+  hasClipboard,
   deleteSelected,
   deleteTrashEntry,
   downloadCardAsset,
@@ -38,6 +43,7 @@ import {
   pasteCards,
   playMedia,
   restoreTrashEntry,
+  releaseContainer,
   selectAllCards,
   sendToBack,
   setBoardTitle,
@@ -46,14 +52,17 @@ import {
   setSectionPositionLocked,
   toggleMediaRepeat,
   wrapInColumn,
+  wrapInKanban,
+  wrapInSection,
 } from "./actions.js";
 import { closeSettingsPage, getSettings, openSettingsPage, saveToolOrder } from "./settings.js";
+import { LANGUAGES, getLanguage, setLanguage, t, translateActionText } from "./i18n.js";
 import { initComments } from "./comments-panel.js";
 import { initCommandPalette, openCommandPalette } from "./command-palette.js";
 import { initContextToolbar } from "./context-toolbar.js";
 import { initFileDrop } from "./file-drop.js";
 import { initNotifications } from "./notifications.js";
-import { openTemplateLibrary } from "./templates.js";
+import { createTemplateFromSelection, openTemplateLibrary } from "./templates.js";
 import { icon } from "./icons.js";
 import { CARD_ASPECTS, columnChildren, createCard, getCard, layoutColumns, TYPE_LABELS } from "./model.js";
 import { cardElement, renderView } from "./render.js";
@@ -86,7 +95,6 @@ const TOOLS = [
   { key: "board", label: "Board", shortcut: "G" },
   { key: "column", type: "column", label: "Column", shortcut: "C" },
   { key: "section", type: "section", label: "Section", focus: '[data-field="title"]', shortcut: "E" },
-  { key: "kanban", type: "kanban", label: "Kanban", shortcut: "K" },
   { key: "comment", type: "comment", label: "Comment", focus: '[data-field="comment-draft"]', shortcut: "M" },
   { key: "table", type: "table", label: "Table", shortcut: "X" },
   { key: "sketch", type: "sketch", label: "Sketch", shortcut: "S" },
@@ -101,6 +109,10 @@ const TOOLS = [
   { key: "draw", label: "Draw", shortcut: "R" },
 ];
 
+function toolLabel(tool) {
+  return t(`tool.${tool.key}`, tool.label);
+}
+
 let refs = {};
 let toastTimer = 0;
 let tooltipEl = null;
@@ -111,7 +123,7 @@ function showToolTooltip(button, tool) {
     tooltipEl.className = "mn-tool-tip";
     document.body.append(tooltipEl);
   }
-  tooltipEl.innerHTML = `<span>${tool.label}</span>${
+  tooltipEl.innerHTML = `<span>${toolLabel(tool)}</span>${
     tool.shortcut ? `<span class="mn-tool-tip-key">${tool.shortcut}</span>` : ""
   }`;
   const rect = button.getBoundingClientRect();
@@ -219,9 +231,14 @@ export function initUI(elements) {
     initAccountUI({ ...refs, openModal, closeModal, confirmAction });
   }
   initContextToolbar();
-  initCommandPalette(buildCommands);
+  initCommandPalette(() => buildCommands().filter((command) => !command.disabled));
   wireMenuBar();
   applyPerformanceMode(localStorage.getItem("mn.performance") === "1");
+  window.addEventListener("mn:language-changed", () => {
+    buildToolRail();
+    buildMenuBar();
+    refreshTopbarLanguage();
+  });
   subscribe(onStoreEvent);
   updateAll();
 }
@@ -280,6 +297,15 @@ function columnAtPoint(clientX, clientY) {
     x: (clientX - rect.left - state.view.x) / state.view.zoom,
     y: (clientY - rect.top - state.view.y) / state.view.zoom,
   };
+  const depth = (column) => {
+    let value = 0;
+    let parent = column.parentId ? getCard(state.board, column.parentId) : null;
+    while (parent) {
+      value += 1;
+      parent = parent.parentId ? getCard(state.board, parent.parentId) : null;
+    }
+    return value;
+  };
   const columns = state.board.cards
     .filter(
       (card) =>
@@ -289,7 +315,7 @@ function columnAtPoint(clientX, clientY) {
         point.y >= card.y &&
         point.y <= card.y + card.h
     )
-    .sort((a, b) => (b.z || 1) - (a.z || 1));
+    .sort((a, b) => depth(b) - depth(a) || (b.z || 1) - (a.z || 1));
   return columns[0] || null;
 }
 
@@ -327,7 +353,7 @@ function showToolDragPreview(key, event) {
     toolDragGhost.className = "mn-tool-drag-ghost";
     document.body.append(toolDragGhost);
   }
-  toolDragGhost.innerHTML = `${icon(key, 14)}<span>${tool.label}</span>`;
+  toolDragGhost.innerHTML = `${icon(key, 14)}<span>${toolLabel(tool)}</span>`;
   toolDragGhost.style.left = `${event.clientX + 16}px`;
   toolDragGhost.style.top = `${event.clientY + 16}px`;
 
@@ -368,7 +394,37 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
     y: (clientY - rect.top - state.view.y) / state.view.zoom,
   };
   const parent = columnId ? getCard(state.board, columnId) : null;
-  const parentColumn = parent && parent.type === "column" ? parent : null;
+  let parentColumn = parent && parent.type === "column" ? parent : null;
+
+  // A kanban row contains lanes, not cards. If the pointer is over the row padding or header,
+  // place the tool in the nearest lane instead of making the card a direct child of the row.
+  const isKanbanRow = (column) => {
+    if (!column || column.type !== "column" || column.direction !== "row") return false;
+    if (column.kanban) return true;
+    const children = columnChildren(state.board, column.id);
+    return children.length > 0 && children.every((child) => child.type === "column");
+  };
+  if (parentColumn && isKanbanRow(parentColumn)) {
+    const lanes = columnChildren(state.board, parentColumn.id).filter(
+      (child) => child.type === "column"
+    );
+    if (lanes.length) {
+      const distanceTo = (lane) => {
+        const dx =
+          point.x < lane.x ? lane.x - point.x : point.x > lane.x + lane.w ? point.x - (lane.x + lane.w) : 0;
+        const dy =
+          point.y < lane.y ? lane.y - point.y : point.y > lane.y + lane.h ? point.y - (lane.y + lane.h) : 0;
+        return dx * dx + dy * dy;
+      };
+      parentColumn = lanes.reduce(
+        (best, lane) => (distanceTo(lane) < distanceTo(best) ? lane : best),
+        lanes[0]
+      );
+    } else {
+      toast("This kanban has no columns yet. Add a column first, then drop the tool into it.");
+      return;
+    }
+  }
   if (parentColumn) parentColumn.collapsed = false;
   const order = parentColumn ? columnChildren(state.board, parentColumn.id).length : 0;
   const parentFields = parentColumn ? { parentId: parentColumn.id, order } : {};
@@ -409,11 +465,6 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
     return;
   }
   const extra = { ...parentFields };
-  if (type === "kanban" && !parentColumn) {
-    const zoom = state.view.zoom || 1;
-    if (viewport) extra.w = Math.max(560, Math.round(viewport.clientWidth / zoom - 96));
-    extra.fullWidth = true;
-  }
   const probe = createCard(type, 0, 0, extra);
   const card = addCard(
     type,
@@ -447,8 +498,8 @@ function buildToolRail() {
     button.type = "button";
     button.className = "mn-tool";
     button.dataset.tool = tool.key;
-    button.setAttribute("aria-label", tool.label);
-    button.innerHTML = `<span class="mn-tool-icon">${icon(tool.key === "image" ? "image" : tool.key, 19)}</span><span class="mn-tool-label">${tool.label}</span>`;
+    button.setAttribute("aria-label", toolLabel(tool));
+    button.innerHTML = `<span class="mn-tool-icon">${icon(tool.key === "image" ? "image" : tool.key, 19)}</span><span class="mn-tool-label">${toolLabel(tool)}</span>`;
     button.addEventListener("click", (event) => {
       if (Date.now() < suppressToolClickUntil) {
         event.preventDefault();
@@ -546,7 +597,9 @@ function buildToolRail() {
   trash.type = "button";
   trash.className = "mn-tool mn-trash";
   trash.setAttribute("aria-label", "Delete selected");
-  trash.innerHTML = `<span class="mn-tool-icon">${icon("trash", 18)}</span><span class="mn-tool-label">Trash</span>`;
+  trash.innerHTML = `<span class="mn-tool-icon">${icon("trash", 18)}</span><span class="mn-tool-label">${t(
+    "topbar.trash"
+  )}</span>`;
   trash.addEventListener("click", () => {
     hideToolTooltip();
     if (state.selection.size || state.connectionSelection) deleteSelected();
@@ -633,14 +686,7 @@ function runTool(tool) {
     createNestedBoardCard(at).catch((error) => toast("Could not create board: " + error));
     return;
   }
-  let extra;
-  if (tool.type === "kanban") {
-    const viewport = document.getElementById("viewport");
-    const zoom = state.view.zoom || 1;
-    extra = { fullWidth: true };
-    if (viewport) extra.w = Math.max(560, Math.round(viewport.clientWidth / zoom - 96));
-  }
-  const card = addCardAtCenter(tool.type, extra);
+  const card = addCardAtCenter(tool.type);
   if (card && tool.type === "document") {
     setTimeout(() => openDocumentEditor(card.id), 40);
     return;
@@ -661,7 +707,6 @@ const TOOL_ICONS = {
   line: "line",
   board: "board",
   column: "column",
-  kanban: "kanban",
   comment: "comment",
   table: "table",
   sketch: "sketch",
@@ -682,6 +727,10 @@ function applyPerformanceMode(enabled) {
   performanceMode = enabled;
   document.documentElement.dataset.performance = enabled ? "true" : "false";
   localStorage.setItem("mn.performance", enabled ? "1" : "0");
+}
+
+export function setPerformanceMode(enabled) {
+  applyPerformanceMode(Boolean(enabled));
 }
 
 function togglePerformanceMode() {
@@ -806,89 +855,106 @@ function buildCommands() {
         ? "Upload file"
         : tool.key === "draw"
           ? "Draw freehand"
-          : `New ${tool.label.toLowerCase()}`;
+          : `${t("menu.new")} ${toolLabel(tool)}`;
     commands.push({
       id: `tool.${tool.key}`,
       label,
       group: "Tools",
       icon: TOOL_ICONS[tool.key] || "plus",
       shortcut: tool.shortcut,
-      keywords: tool.label,
+      keywords: toolLabel(tool),
       run: () => runTool(tool),
     });
   }
   commands.push(
-    { id: "file.templates", label: "Template library...", group: "File", icon: "grid", run: openTemplateLibrary },
-    { id: "file.export", label: "Export board JSON...", group: "File", icon: "download", run: exportBoardToFile },
-    { id: "file.import", label: "Import board JSON...", group: "File", icon: "upload", run: importBoardFile },
-    { id: "file.backup", label: "Backup data now", group: "File", icon: "database", run: backupNow },
-    { id: "file.integrity", label: "Check database integrity", group: "File", icon: "shield", run: checkDatabaseIntegrity },
-    { id: "file.restore", label: "Restore from backup...", group: "File", icon: "database", run: restoreFromBackup },
+    { id: "file.templates", label: t("menu.templates"), group: "File", icon: "grid", run: openTemplateLibrary },
+    { id: "file.export", label: t("menu.export"), group: "File", icon: "download", run: exportBoardToFile },
+    { id: "file.import", label: t("menu.import"), group: "File", icon: "upload", run: importBoardFile },
+    { id: "file.backup", label: t("menu.backup"), group: "File", icon: "database", run: backupNow },
+    { id: "file.integrity", label: t("menu.integrity"), group: "File", icon: "shield", run: checkDatabaseIntegrity },
+    { id: "file.restore", label: t("menu.restore"), group: "File", icon: "database", run: restoreFromBackup },
     ...state.boards
       .filter((board) => board.id !== state.board?.id)
       .slice(0, 5)
       .map((board) => ({
         id: `file.recent.${board.id}`,
-        label: `Open recent: ${board.title}`,
+        label: `${t("menu.openRecent")}: ${board.title}`,
         group: "File",
         icon: "board",
         run: () => openBoard(board.id),
       })),
-    { id: "file.settings", label: "Settings...", group: "File", icon: "settings", run: () => openSettingsPage() },
-    { id: "edit.undo", label: "Undo", group: "Edit", icon: "undo", shortcut: "Ctrl+Z", run: undo },
-    { id: "edit.redo", label: "Redo", group: "Edit", icon: "redo", shortcut: "Ctrl+Shift+Z", run: redo },
-    { id: "edit.select-all", label: "Select all", group: "Edit", icon: "check", shortcut: "Ctrl+A", run: () => selectAllCards() },
-    { id: "edit.duplicate", label: "Duplicate selection", group: "Edit", icon: "copy", shortcut: "Ctrl+D", run: () => duplicateSelected() },
-    { id: "edit.delete", label: "Delete selection", group: "Edit", icon: "trash", shortcut: "Del", run: () => deleteSelected() },
-    { id: "view.zoom-in", label: "Zoom in", group: "View", icon: "zoom", shortcut: "Ctrl+=", run: () => zoomBy(1.2) },
-    { id: "view.zoom-out", label: "Zoom out", group: "View", icon: "zoom", shortcut: "Ctrl+-", run: () => zoomBy(1 / 1.2) },
-    { id: "view.zoom-reset", label: "Reset zoom", group: "View", icon: "zoom", shortcut: "Ctrl+0", run: () => zoomBy(1 / state.view.zoom) },
-    { id: "view.theme", label: "Toggle theme", group: "View", icon: "sun", run: () => setTheme(state.theme === "light" || state.theme === "softLight" ? "dark" : "light") },
+    { id: "file.settings", label: t("menu.settings"), group: "File", icon: "settings", run: () => openSettingsPage() },
+    { id: "edit.undo", label: t("menu.undo"), group: "Edit", icon: "undo", shortcut: "Ctrl+Z", run: undo },
+    { id: "edit.redo", label: t("menu.redo"), group: "Edit", icon: "redo", shortcut: "Ctrl+Shift+Z", run: redo },
+    { id: "edit.select-all", label: t("menu.selectAll"), group: "Edit", icon: "check", shortcut: "Ctrl+A", run: () => selectAllCards() },
+    { id: "edit.duplicate", label: t("menu.duplicate"), group: "Edit", icon: "copy", shortcut: "Ctrl+D", run: () => duplicateSelected() },
+    {
+      id: "edit.clear-clipboard",
+      label: t("menu.clearClipboard"),
+      group: "Edit",
+      icon: "trash",
+      shortcut: "",
+      run: () => {
+        if (clearClipboard()) toast("Clipboard cleared");
+      },
+    },
+    { id: "edit.delete", label: t("menu.delete"), group: "Edit", icon: "trash", shortcut: "Del", run: () => deleteSelected() },
+    { id: "view.zoom-in", label: t("menu.zoomIn"), group: "View", icon: "zoom", shortcut: "Ctrl+=", run: () => zoomBy(1.2) },
+    { id: "view.zoom-out", label: t("menu.zoomOut"), group: "View", icon: "zoom", shortcut: "Ctrl+-", run: () => zoomBy(1 / 1.2) },
+    { id: "view.zoom-reset", label: t("menu.resetZoom"), group: "View", icon: "zoom", shortcut: "Ctrl+0", run: () => zoomBy(1 / state.view.zoom) },
+    { id: "view.theme", label: t("menu.toggleTheme"), group: "View", icon: "sun", run: () => setTheme(state.theme === "light" || state.theme === "softLight" ? "dark" : "light") },
     {
       id: "view.performance",
-      label: `Performance mode: ${performanceMode ? "on" : "off"}`,
+      label: `${t("menu.performance")}: ${performanceMode ? t("menu.on") : t("menu.off")}`,
       group: "View",
       icon: "settings",
       run: togglePerformanceMode,
     },
     {
       id: "view.snap",
-      label: `Snap to grid: ${state.board?.snapToGrid ? "on" : "off"}`,
+      label: `${t("menu.snap")}: ${state.board?.snapToGrid ? t("menu.on") : t("menu.off")}`,
       group: "View",
       icon: "grid",
       run: toggleSnapToGrid,
     },
-    { id: "view.bg.default", label: "Board background: Default", group: "View", icon: "sun", run: () => setBoardBackground("") },
-    { id: "view.bg.paper", label: "Board background: Paper", group: "View", icon: "sun", run: () => setBoardBackground("#f6f1e8") },
-    { id: "view.bg.mist", label: "Board background: Mist", group: "View", icon: "sun", run: () => setBoardBackground("#eaf0f3") },
-    { id: "view.bg.sage", label: "Board background: Sage", group: "View", icon: "sun", run: () => setBoardBackground("#e9efe5") },
-    { id: "help.palette", label: "Command palette", group: "Help", icon: "search", shortcut: "Ctrl+K", run: () => openCommandPalette() },
-    { id: "help.shortcuts", label: "Keyboard shortcuts", group: "Help", icon: "help", shortcut: "?", run: () => openHelpModal() },
-    { id: "help.updates", label: "Check for updates", group: "Help", icon: "download", run: () => window.dispatchEvent(new CustomEvent("mn:check-updates")) },
-    { id: "help.documentation", label: "Documentation", group: "Help", icon: "help", shortcut: "", run: () => openDocumentation() },
+    { id: "view.bg.default", label: `${t("menu.bgDefault")}`, group: "View", icon: "sun", run: () => setBoardBackground("") },
+    { id: "view.bg.paper", label: `${t("menu.bgPaper")}`, group: "View", icon: "sun", run: () => setBoardBackground("#f6f1e8") },
+    { id: "view.bg.mist", label: `${t("menu.bgMist")}`, group: "View", icon: "sun", run: () => setBoardBackground("#eaf0f3") },
+    { id: "view.bg.sage", label: `${t("menu.bgSage")}`, group: "View", icon: "sun", run: () => setBoardBackground("#e9efe5") },
+    { id: "help.palette", label: t("menu.palette"), group: "Help", icon: "search", shortcut: "Ctrl+K", run: () => openCommandPalette() },
+    { id: "help.shortcuts", label: t("menu.shortcuts"), group: "Help", icon: "help", shortcut: "?", run: () => openHelpModal() },
+    { id: "help.updates", label: t("menu.updates"), group: "Help", icon: "download", run: () => window.dispatchEvent(new CustomEvent("mn:check-updates")) },
+    { id: "help.documentation", label: t("menu.documentation"), group: "Help", icon: "help", shortcut: "", disabled: true, run: () => openDocumentation() },
   );
   return commands;
 }
 
-function wireMenuBar() {
+function buildMenuBar() {
   const bar = refs.menubar;
   if (!bar) return;
   const left = bar.querySelector(".mn-menubar-left") || bar;
   const logo = left.querySelector(".mn-logo");
   left.innerHTML = "";
   if (logo) left.append(logo);
-  for (const group of ["File", "Edit", "Tools", "View", "Help"]) {
+  for (const [groupKey, labelKey] of [
+    ["File", "menu.file"],
+    ["Edit", "menu.edit"],
+    ["Tools", "menu.tools"],
+    ["View", "menu.view"],
+    ["Help", "menu.help"],
+  ]) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "mn-menubar-btn";
-    button.textContent = group;
+    button.textContent = t(labelKey);
     button.addEventListener("click", () => {
       const rect = button.getBoundingClientRect();
       const items = buildCommands()
-        .filter((command) => command.group === group)
+        .filter((command) => command.group === groupKey)
         .map((command) => ({
           text: command.label,
           kbd: command.shortcut,
+          disabled: command.disabled,
           onClick: command.run,
         }));
       openMenu(rect.left, rect.bottom + 4, items);
@@ -905,9 +971,15 @@ function wireMenuBar() {
     badge.title = `Web mode: ${bridge.webInfo.url}`;
     left.append(badge);
   }
+}
+
+function wireMenuBar() {
+  buildMenuBar();
   const search = refs.commandSearchBtn;
   if (search) {
-    search.innerHTML = `${icon("search", 13)}<span>Search commands</span><kbd>Ctrl K</kbd>`;
+    search.innerHTML = `${icon("search", 13)}<span>${t(
+      "topbar.search"
+    )}</span><kbd>Ctrl K</kbd>`;
     search.addEventListener("click", () => openCommandPalette());
   }
 }
@@ -923,20 +995,107 @@ function viewportCenterCheck() {
 
 // ------------------------------------------------------------------ topbar
 
+let languagePopover = null;
+
+function closeLanguagePopover() {
+  if (!languagePopover) return;
+  languagePopover.remove();
+  languagePopover = null;
+  document.removeEventListener("pointerdown", onLanguageOutside, true);
+  document.removeEventListener("keydown", onLanguageKey, true);
+  window.removeEventListener("resize", closeLanguagePopover);
+  window.removeEventListener("scroll", onLanguageScroll, true);
+}
+
+const onLanguageOutside = (event) => {
+  if (languagePopover && !languagePopover.contains(event.target) && event.target !== refs.languageBtn) {
+    closeLanguagePopover();
+  }
+};
+
+const onLanguageKey = (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeLanguagePopover();
+  }
+};
+
+const onLanguageScroll = (event) => {
+  // Scrolling the language list itself must not dismiss the picker. Only a canvas/page scroll
+  // should close an anchored popover.
+  if (languagePopover && event.target instanceof Node && languagePopover.contains(event.target)) {
+    return;
+  }
+  closeLanguagePopover();
+};
+
+function openLanguagePopover(button) {
+  closeLanguagePopover();
+  const popover = document.createElement("div");
+  popover.className = "ky-select-popup mn-language-popover";
+  const rect = button.getBoundingClientRect();
+  popover.style.top = `${Math.round(rect.bottom + 6)}px`;
+  popover.style.right = `${Math.max(8, Math.round(window.innerWidth - rect.right))}px`;
+  popover.style.left = "auto";
+  for (const language of LANGUAGES) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className =
+      "ky-select-item" + (getLanguage() === language.id ? " is-selected" : "");
+    option.setAttribute("role", "menuitemradio");
+    option.setAttribute("aria-checked", String(getLanguage() === language.id));
+    option.textContent = language.native;
+    option.addEventListener("click", () => {
+      setLanguage(language.id);
+      closeLanguagePopover();
+    });
+    popover.append(option);
+  }
+  document.body.append(popover);
+  languagePopover = popover;
+  document.addEventListener("pointerdown", onLanguageOutside, true);
+  document.addEventListener("keydown", onLanguageKey, true);
+  window.addEventListener("resize", closeLanguagePopover);
+  window.addEventListener("scroll", onLanguageScroll, true);
+}
+
+function refreshTopbarLanguage() {
+  if (refs.shareButton) {
+    const label = refs.shareButton.querySelector(".mn-access-label");
+    if (label) label.textContent = t("topbar.share");
+  }
+  if (refs.templateBtn) {
+    const label = refs.templateBtn.querySelector("span:not(.mn-tool-icon)");
+    if (label) label.textContent = t("topbar.template");
+  }
+  if (refs.commandSearchBtn) {
+    const label = refs.commandSearchBtn.querySelector("span");
+    if (label) label.textContent = t("topbar.search");
+  }
+  const trashLabel = refs.toolrail?.querySelector(".mn-trash .mn-tool-label");
+  if (trashLabel) trashLabel.textContent = t("topbar.trash");
+  if (refs.languageBtn) {
+    refs.languageBtn.title = t("general.language");
+    refs.languageBtn.setAttribute("aria-label", t("general.language"));
+  }
+}
+
 function wireTopbar() {
   const el = refs;
   el.undoBtn.innerHTML = icon("undo", 16);
   el.redoBtn.innerHTML = icon("redo", 16);
   el.helpBtn.innerHTML = icon("help", 16);
   el.settingsBtn.innerHTML = icon("settings", 16);
-  if (el.shareBtn) {
-    el.shareBtn.innerHTML = `${icon("share", 14)}<span class="mn-access-label">Share</span>`;
+  if (el.shareButton) {
+    el.shareButton.innerHTML = `${icon("share", 14)}<span class="mn-access-label">${t(
+      "topbar.share"
+    )}</span>`;
   }
   el.themeBtn.innerHTML = icon("sun", 16);
   if (el.languageBtn) el.languageBtn.innerHTML = icon("globe", 16);
   el.commentCount.innerHTML = `${icon("comment", 14)}<span>0</span>`;
   if (el.templateBtn) {
-    el.templateBtn.innerHTML = `${icon("grid", 14)}<span>Template</span>`;
+    el.templateBtn.innerHTML = `${icon("grid", 14)}<span>${t("topbar.template")}</span>`;
     el.templateBtn.addEventListener("click", () => openTemplateLibrary());
   }
   el.homeBtn.addEventListener("click", () => openTemplateLibrary());
@@ -948,6 +1107,23 @@ function wireTopbar() {
     const next = state.theme === "light" || state.theme === "softLight" ? "dark" : "light";
     setTheme(next);
   });
+  if (el.languageBtn) {
+    const refreshLanguageButton = () => {
+      el.languageBtn.disabled = false;
+      el.languageBtn.removeAttribute("aria-disabled");
+      el.languageBtn.title = t("general.language");
+      el.languageBtn.setAttribute("aria-label", t("general.language"));
+    };
+    refreshLanguageButton();
+    el.languageBtn.addEventListener("click", () => {
+      if (languagePopover) {
+        closeLanguagePopover();
+        return;
+      }
+      openLanguagePopover(el.languageBtn);
+    });
+  }
+  refreshTopbarLanguage();
 }
 
 function wireZoom() {
@@ -1324,17 +1500,26 @@ function onShortcut(event) {
   }
   if (mod && !event.altKey && event.key.toLowerCase() === "c") {
     const count = copySelected();
-    if (count) toast(`${count} card${count === 1 ? "" : "s"} copied`);
+    if (count) {
+      event.preventDefault();
+      toast(`${count} card${count === 1 ? "" : "s"} copied`);
+    }
     return;
   }
   if (mod && !event.altKey && event.key.toLowerCase() === "x") {
     const count = cutSelected();
-    if (count) toast(`${count} card${count === 1 ? "" : "s"} cut`);
+    if (count) {
+      event.preventDefault();
+      toast(`${count} card${count === 1 ? "" : "s"} cut`);
+    }
     return;
   }
   if (mod && !event.altKey && event.key.toLowerCase() === "v") {
     const count = pasteCards();
-    if (count) toast(`${count} card${count === 1 ? "" : "s"} pasted`);
+    if (count) {
+      event.preventDefault();
+      toast(`${count} card${count === 1 ? "" : "s"} pasted`);
+    }
     return;
   }
   if (mod && event.altKey) {
@@ -1430,6 +1615,12 @@ async function onPaste(event) {
   if (!state.board) return;
   const target = event.target;
   if (target && (target.isContentEditable || target.tagName === "INPUT")) return;
+  if (hasClipboard()) {
+    event.preventDefault();
+    const count = pasteCards();
+    if (count) toast(`${count} card${count === 1 ? "" : "s"} pasted`);
+    return;
+  }
   const items = event.clipboardData?.items || [];
   for (const item of items) {
     if (item.type.startsWith("image/")) {
@@ -1536,7 +1727,7 @@ export function openMenu(x, y, items) {
     if (item.type === "label") {
       const label = document.createElement("div");
       label.className = "mn-menu-label";
-      label.textContent = item.text;
+      label.textContent = translateActionText(item.text);
       menu.append(label);
       continue;
     }
@@ -1545,7 +1736,7 @@ export function openMenu(x, y, items) {
     button.className =
       "mn-menu-item" + (item.danger ? " is-danger" : "") + (item.disabled ? " is-disabled" : "");
     button.disabled = Boolean(item.disabled);
-    button.innerHTML = `<span>${item.text}</span>${
+    button.innerHTML = `<span>${translateActionText(item.text)}</span>${
       item.checked !== undefined
         ? `<span class="mn-menu-check"><input type="checkbox" tabindex="-1" ${
             item.checked ? "checked" : ""
@@ -1863,6 +2054,16 @@ window.addEventListener("mn:open-menu", (event) => {
           text: card.direction === "row" ? "Convert to column" : "Convert to row",
           onClick: () => setColumnDirection(card.id, card.direction === "row" ? "column" : "row"),
         });
+        if (canReleaseContainer(card.id)) {
+          items.push({
+            text: card.kanban
+              ? "Release kanban"
+              : card.direction === "row"
+                ? "Release row"
+                : "Release column",
+            onClick: () => releaseContainer(card.id),
+          });
+        }
         items.push({ type: "sep" });
       }
       if (!card.locked && card.type === "link") {
@@ -1919,6 +2120,17 @@ window.addEventListener("mn:open-menu", (event) => {
         { text: "Copy", kbd: "Ctrl+C", onClick: () => copySelected() },
         { text: "Paste", kbd: "Ctrl+V", onClick: () => pasteCards() },
         { text: "Duplicate", kbd: "Ctrl+D", onClick: () => duplicateSelected() },
+        {
+          text: "Create template from selection",
+          onClick: () => createTemplateFromSelection(ids),
+        },
+        {
+          text: "Clear clipboard",
+          disabled: !hasClipboard(),
+          onClick: () => {
+            if (clearClipboard()) toast("Clipboard cleared");
+          },
+        },
         { type: "sep" }
       );
       if (!isSection) {
@@ -1941,6 +2153,25 @@ window.addEventListener("mn:open-menu", (event) => {
       );
       if (canWrapInColumn(ids)) {
         items.push({ text: "Wrap in column", kbd: "Ctrl+G", onClick: () => wrapInColumn(ids) });
+        items.push({ type: "sep" });
+      }
+      if (canWrapInSection(ids)) {
+        items.push({ text: "Wrap into section", onClick: () => wrapInSection(ids) });
+      }
+      const selectedColumnCards = ids
+        .map((id) => getCard(state.board, id))
+        .filter((selected) => selected?.type === "column");
+      if (selectedColumnCards.length) {
+        items.push({
+          text: "Wrap into kanban",
+          disabled: !canWrapInKanban(ids),
+          onClick: () => wrapInKanban(ids),
+        });
+      }
+      if (
+        canWrapInSection(ids) ||
+        ids.some((id) => getCard(state.board, id)?.type === "column")
+      ) {
         items.push({ type: "sep" });
       }
       items.push(

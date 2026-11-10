@@ -42,6 +42,9 @@ jobs:
       - name: Version consistency check
         run: node tools/test-version.mjs
 
+      - name: Translation coverage
+        run: node tools/i18n-audit.mjs
+
       - name: Start preview server
         run: |
           node tools/serve.mjs 1430 > /tmp/khaoyu-serve.log 2>&1 &
@@ -78,9 +81,6 @@ jobs:
 
       - name: Column title suite
         run: node tools/test-column-title.mjs http://127.0.0.1:1430/
-
-      - name: Kanban scroll suite
-        run: node tools/test-kanban-scroll.mjs http://127.0.0.1:1430/
 
       - name: Tool drop suite
         run: node tools/test-tool-drop-column.mjs http://127.0.0.1:1430/
@@ -138,6 +138,32 @@ jobs:
     name: Self-hosted service foundation
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: khaoyu
+          POSTGRES_PASSWORD: khaoyu
+          POSTGRES_DB: khaoyu_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U khaoyu -d khaoyu_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://khaoyu:khaoyu@127.0.0.1:5432/khaoyu_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -156,7 +182,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Service tests
-        run: node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
+        run: npm run test:service
 
       - name: Build service image
         run: docker build --tag khaoyu-note-service:ci service

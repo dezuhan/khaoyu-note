@@ -155,40 +155,40 @@ test("share tokens are redacted from request logs", () => {
   assert.equal(logPath("/api/v1/projects"), "/api/v1/projects");
 });
 
-test("the server refuses to start while a migration is pending", () => {
+test("the server refuses to start while a migration is pending", async () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
   const db = openDatabase(config.databasePath);
-  assert.throws(() => assertSchemaCurrent(db), /pending migration/);
+  await assert.rejects(assertSchemaCurrent(db), /pending migration/);
   migrate(db, { directory: MIGRATIONS_DIR });
-  assert.doesNotThrow(() => assertSchemaCurrent(db));
+  await assert.doesNotReject(assertSchemaCurrent(db));
   db.close();
 });
 
-test("object storage uses opaque content-addressed keys and deduplicates", () => {
+test("object storage uses opaque content-addressed keys and deduplicates", async () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
   const db = openDatabase(config.databasePath);
   migrate(db, { directory: MIGRATIONS_DIR });
   const store = new ObjectStore(db, config.objectsDir);
   const body = Buffer.from("hello service");
-  const first = store.store(body, "text/plain");
-  const second = store.store(body, "text/plain");
+  const first = await store.store(body, "text/plain");
+  const second = await store.store(body, "text/plain");
   assert.equal(first.id, second.id);
   assert.equal(second.deduplicated, true);
   assert.match(first.storage_key, /^[0-9a-f]{2}\/[0-9a-f]{2}\/[0-9a-f]{64}$/);
   assert.ok(fs.existsSync(path.join(config.objectsDir, first.storage_key)));
-  assert.deepEqual(store.get(first.id).body, body);
-  assert.equal(store.get("missing"), null);
+  assert.deepEqual((await store.get(first.id)).body, body);
+  assert.equal(await store.get("missing"), null);
   db.close();
 });
 
-test("audit entries hash IP addresses and keep JSON metadata", () => {
+test("audit entries hash IP addresses and keep JSON metadata", async () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
   const db = openDatabase(config.databasePath);
   migrate(db, { directory: MIGRATIONS_DIR });
-  writeAudit(db, {
+  await writeAudit(db, {
     action: "project.test",
     resourceType: "project",
     resourceId: "p1",
@@ -244,15 +244,15 @@ test("alert webhook posts structured security events", async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("backup and restore round-trip the database and objects", () => {
+test("backup and restore round-trip the database and objects", async () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
   let db = openDatabase(config.databasePath);
   migrate(db, { directory: MIGRATIONS_DIR });
   db.prepare("INSERT INTO service_meta (key, value) VALUES ('check', 'before')").run();
   const store = new ObjectStore(db, config.objectsDir);
-  const object = store.store(Buffer.from("asset"), "text/plain");
-  const backup = createBackup(db, config);
+  const object = await store.store(Buffer.from("asset"), "text/plain");
+  const backup = await createBackup(db, config);
   db.prepare("UPDATE service_meta SET value = 'after' WHERE key = 'check'").run();
   db.close();
 
@@ -266,7 +266,7 @@ test("backup and restore round-trip the database and objects", () => {
   const restored = db.prepare("SELECT value FROM service_meta WHERE key = 'check'").get();
   assert.equal(restored.value, "before");
   const restoredStore = new ObjectStore(db, config.objectsDir);
-  assert.deepEqual(restoredStore.get(object.id).body, Buffer.from("asset"));
+  assert.deepEqual((await restoredStore.get(object.id)).body, Buffer.from("asset"));
   db.close();
 });
 
@@ -314,7 +314,7 @@ test("queued mailer retries failed sends and records backoff", async () => {
   db.close();
 });
 
-test("encrypted backups require the passphrase and restore object bytes", () => {
+test("encrypted backups require the passphrase and restore object bytes", async () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
   config.backupPassphrase = "backup-passphrase-123";
@@ -322,8 +322,8 @@ test("encrypted backups require the passphrase and restore object bytes", () => 
   migrate(db, { directory: MIGRATIONS_DIR });
   db.prepare("INSERT INTO service_meta (key, value) VALUES ('secret-check', 'encrypted')").run();
   const store = new ObjectStore(db, config.objectsDir);
-  const object = store.store(Buffer.from("encrypted asset"), "text/plain");
-  const backup = createBackup(db, config);
+  const object = await store.store(Buffer.from("encrypted asset"), "text/plain");
+  const backup = await createBackup(db, config);
   assert.equal(backup.manifest.encryption.algorithm, "aes-256-gcm");
   const encryptedDatabase = fs.readFileSync(path.join(backup.directory, "database.db"));
   assert.notEqual(encryptedDatabase.subarray(0, 16).toString(), "SQLite format 3\u0000");
@@ -352,11 +352,11 @@ test("encrypted backups require the passphrase and restore object bytes", () => 
   assert.ok(result.manifest.encryption);
   db = openDatabase(config.databasePath);
   assert.equal(db.prepare("SELECT value FROM service_meta WHERE key = 'secret-check'").get().value, "encrypted");
-  assert.deepEqual(new ObjectStore(db, config.objectsDir).get(object.id).body, Buffer.from("encrypted asset"));
+  assert.deepEqual((await new ObjectStore(db, config.objectsDir).get(object.id)).body, Buffer.from("encrypted asset"));
   db.close();
 });
 
-test("worker cleans old temp files and creates a due backup", () => {
+test("worker cleans old temp files and creates a due backup", async () => {
   const dataDir = tempDir();
   const config = configFor(dataDir);
   config.backupIntervalHours = 1;
@@ -367,7 +367,7 @@ test("worker cleans old temp files and creates a due backup", () => {
   fs.writeFileSync(old, "old");
   const oldTime = new Date(Date.now() - 3 * 3600_000);
   fs.utimesSync(old, oldTime, oldTime);
-  const result = runMaintenance(db, config, quietLogger);
+  const result = await runMaintenance(db, config, quietLogger);
   assert.equal(result.tempRemoved, 1);
   assert.ok(result.backup);
   assert.ok(fs.existsSync(path.join(result.backup.directory, "manifest.json")));

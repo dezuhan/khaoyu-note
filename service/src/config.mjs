@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 const PROFILES = new Set(["single-user", "team"]);
@@ -65,8 +66,28 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     throw new Error("KHAOYU_SERVICE_ALERT_WEBHOOK must be an http or https URL");
   }
 
+  const databaseUrl = env.KHAOYU_SERVICE_DATABASE_URL || "";
+  if (databaseUrl && !/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+    throw new Error("KHAOYU_SERVICE_DATABASE_URL must start with postgres:// or postgresql://");
+  }
+  const redisUrl = env.KHAOYU_SERVICE_REDIS_URL || "";
+  if (redisUrl && !/^rediss?:\/\//i.test(redisUrl)) {
+    throw new Error("KHAOYU_SERVICE_REDIS_URL must start with redis:// or rediss://");
+  }
+  const redisPrefix = String(env.KHAOYU_SERVICE_REDIS_PREFIX || "khaoyu").trim();
+  if (!/^[a-z0-9:_-]{1,32}$/i.test(redisPrefix)) {
+    throw new Error("KHAOYU_SERVICE_REDIS_PREFIX must be 1 to 32 letters, digits, colons, dashes or underscores");
+  }
+  const instanceId = String(
+    env.KHAOYU_SERVICE_INSTANCE_ID || `${os.hostname()}:${process.pid}`
+  )
+    .trim()
+    .slice(0, 120);
+  if (!instanceId) throw new Error("KHAOYU_SERVICE_INSTANCE_ID must not be empty");
+
   const trustProxy = boolean(env.KHAOYU_SERVICE_TRUST_PROXY, false);
-  const ssoEnabled = boolean(env.KHAOYU_SERVICE_SSO_ENABLED, false);  const ssoSecret = env.KHAOYU_SERVICE_SSO_SECRET || "";
+  const ssoEnabled = boolean(env.KHAOYU_SERVICE_SSO_ENABLED, false);
+  const ssoSecret = env.KHAOYU_SERVICE_SSO_SECRET || "";
   const ssoHeader = (env.KHAOYU_SERVICE_SSO_HEADER || "x-auth-request-email").toLowerCase();
   const ssoNameHeader = (env.KHAOYU_SERVICE_SSO_NAME_HEADER || "x-auth-request-name").toLowerCase();
   if (!/^x-[a-z0-9-]+$/.test(ssoHeader) || !/^x-[a-z0-9-]+$/.test(ssoNameHeader)) {
@@ -85,7 +106,8 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     throw new Error("KHAOYU_SERVICE_RP_ID must be a hostname");
   }
 
-  const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
+  const smtpHost = env.KHAOYU_SERVICE_SMTP_HOST || "";
+  const smtpUser = env.KHAOYU_SERVICE_SMTP_USER || "";
   const smtpPass = env.KHAOYU_SERVICE_SMTP_PASSWORD || "";
   const smtpFrom = env.KHAOYU_SERVICE_SMTP_FROM || "";
   if (smtpHost && !smtpFrom) {
@@ -120,6 +142,12 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     passkeysEnabled,
     rpId,
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),
+    databaseUrl,
+    databaseSsl: boolean(env.KHAOYU_SERVICE_DATABASE_SSL, false),
+    databasePoolMax: integer(env.KHAOYU_SERVICE_DATABASE_POOL_MAX, 10, 1, 100, "KHAOYU_SERVICE_DATABASE_POOL_MAX"),
+    redisUrl,
+    redisPrefix,
+    instanceId,
     adminToken,
     backupPassphrase,
     requireHttps,
@@ -173,5 +201,28 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
       24 * 30,
       "KHAOYU_SERVICE_TEMP_MAX_AGE_HOURS"
     ),
+    realtimeTicketTtlMs: integer(
+      env.KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS,
+      60_000,
+      1_000,
+      300_000,
+      "KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS"
+    ),
+    editLockTtlMs: integer(
+      env.KHAOYU_SERVICE_EDIT_LOCK_TTL_MS,
+      15_000,
+      1_000,
+      300_000,
+      "KHAOYU_SERVICE_EDIT_LOCK_TTL_MS"
+    ),
+    opRetentionDays: integer(
+      env.KHAOYU_SERVICE_OP_RETENTION_DAYS,
+      7,
+      1,
+      90,
+      "KHAOYU_SERVICE_OP_RETENTION_DAYS"
+    ),
+    compactOps: integer(env.KHAOYU_SERVICE_COMPACT_OPS, 100, 1, 10_000, "KHAOYU_SERVICE_COMPACT_OPS"),
+    compactMs: integer(env.KHAOYU_SERVICE_COMPACT_MS, 30_000, 1_000, 600_000, "KHAOYU_SERVICE_COMPACT_MS"),
   });
 }

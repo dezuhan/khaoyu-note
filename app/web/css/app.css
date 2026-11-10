@@ -350,6 +350,45 @@ body.ky-scope {
   height: 0;
 }
 
+/* Board chrome must never start a native text selection when a drag begins on a card edge,
+   border or resize handle. Editable content and inputs opt back into text selection below. */
+.mn-viewport,
+.mn-card,
+.mn-card * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mn-viewport :is(input, textarea, select) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Later card typography rules opt text classes into selection; keep them overriding those rules
+   while the card is not in edit mode. */
+.mn-viewport .mn-card :is(
+  [contenteditable="true"],
+  .mn-field-input,
+  .mn-note-text,
+  .mn-heading-text,
+  .mn-doc-text,
+  .mn-rich,
+  .mn-link-title,
+  .mn-link-url,
+  .mn-comment-input,
+  .mn-doc-preview
+) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* setEditable() marks the active field with .is-editing; only then is text selectable. */
+.mn-viewport .mn-card .is-editing,
+.mn-viewport .mn-card .is-editing * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* ------------------------------------------------------------------ cards */
 
 .mn-card {
@@ -1206,10 +1245,51 @@ body.ky-scope {
 }
 
 .mn-card-section {
+  --section-ink: #1b1b1b;
+  --section-chip: color-mix(in srgb, #ffffff 52%, transparent);
+  --section-chip-strong: color-mix(in srgb, #ffffff 78%, transparent);
+  --section-border: color-mix(in srgb, #1b1b1b 9%, transparent);
   background: var(--section-color, #f8d7da);
   box-shadow: var(--ky-hairline), 0 1px 2px var(--ph-stroke);
-  border: 1px solid color-mix(in srgb, #1b1b1b 9%, transparent);
+  border: 1px solid var(--section-border);
   overflow: visible;
+}
+
+/* Section swatches are pastel by design; mix each one into the active theme's surface so the
+   same stored color stays identifiable without glowing in the two dark skins. */
+html[data-ky-theme="softLight"] .mn-card-section {
+  background: color-mix(in srgb, var(--section-color, #f8d7da) 78%, var(--ph-black-6));
+}
+
+html[data-ky-theme="softDark"] .mn-card-section {
+  --section-ink: #f0eff2;
+  --section-chip: rgba(255, 255, 255, 0.1);
+  --section-chip-strong: rgba(255, 255, 255, 0.16);
+  --section-border: color-mix(in srgb, var(--section-color, #f8d7da) 30%, rgba(255, 255, 255, 0.14));
+  background: color-mix(
+    in srgb,
+    var(--section-color, #f8d7da) var(--section-strength-soft, 58%),
+    var(--ph-black-3)
+  );
+}
+
+html[data-ky-theme="dark"] .mn-card-section {
+  --section-ink: #f0eff2;
+  --section-chip: rgba(255, 255, 255, 0.09);
+  --section-chip-strong: rgba(255, 255, 255, 0.15);
+  --section-border: color-mix(in srgb, var(--section-color, #f8d7da) 28%, rgba(255, 255, 255, 0.12));
+  background: color-mix(
+    in srgb,
+    var(--section-color, #f8d7da) var(--section-strength-dark, 48%),
+    var(--ph-black-3)
+  );
+}
+
+html[data-ky-theme="softDark"] .mn-card-section.is-neutral-section,
+html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
+  --section-ink: #1b1b1b;
+  --section-chip: rgba(27, 27, 27, 0.08);
+  --section-chip-strong: rgba(27, 27, 27, 0.14);
 }
 
 .mn-card-section .mn-resize {
@@ -1290,7 +1370,7 @@ body.ky-scope {
   width: 100%;
   height: 100%;
   padding: 10px 11px;
-  color: #1b1b1b;
+  color: var(--section-ink, #1b1b1b);
 }
 
 .mn-section-head {
@@ -1307,8 +1387,8 @@ body.ky-scope {
   width: 20px;
   height: 20px;
   border-radius: 5px;
-  background: color-mix(in srgb, #ffffff 45%, transparent);
-  color: #1b1b1b;
+  background: var(--section-chip, color-mix(in srgb, #ffffff 45%, transparent));
+  color: var(--section-ink, #1b1b1b);
 }
 
 .mn-section-mark svg {
@@ -1325,8 +1405,8 @@ body.ky-scope {
   padding: 0 8px;
   border: 0;
   border-radius: 5px;
-  background: color-mix(in srgb, #ffffff 52%, transparent);
-  color: #1b1b1b;
+  background: var(--section-chip, color-mix(in srgb, #ffffff 52%, transparent));
+  color: var(--section-ink, #1b1b1b);
   font-family: inherit;
   font-size: 11px;
   font-weight: 700;
@@ -1336,14 +1416,14 @@ body.ky-scope {
 }
 
 .mn-section-title::placeholder {
-  color: color-mix(in srgb, #1b1b1b 48%, transparent);
+  color: color-mix(in srgb, var(--section-ink, #1b1b1b) 48%, transparent);
   text-transform: none;
   letter-spacing: 0;
 }
 
 .mn-section-title:focus {
-  background: color-mix(in srgb, #ffffff 78%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, #1b1b1b 22%, transparent);
+  background: var(--section-chip-strong, color-mix(in srgb, #ffffff 78%, transparent));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--section-ink, #1b1b1b) 22%, transparent);
 }
 
 .mn-column-head {
@@ -1518,7 +1598,7 @@ body.ky-scope {
 .mn-overlay {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 600;
   display: grid;
   place-items: center;
   background: var(--ph-black-0, rgba(0, 0, 0, 0.4));
@@ -2031,7 +2111,8 @@ body.ky-scope {
   top: 0;
   width: 0;
   height: 0;
-  z-index: 90000;
+  /* Above the dragged card (1.9e9) so the insertion ghost and line are never hidden. */
+  z-index: 2000000000;
   pointer-events: none;
 }
 
@@ -2044,7 +2125,12 @@ body.ky-scope {
   transition:
     top 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
     left 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    width 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    width 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mn-drop-line.is-vertical {
+  border-radius: 2px;
 }
 
 .mn-drop-ghost {
@@ -2055,6 +2141,7 @@ body.ky-scope {
   transition:
     top 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
     left 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 140ms cubic-bezier(0.2, 0.8, 0.2, 1),
     height 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -5074,6 +5161,20 @@ html[data-reduce-motion="true"] .mn-cards * {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #1b1b1b 14%, transparent);
 }
 
+html[data-ky-theme="softLight"] .mn-section-swatch span {
+  background: color-mix(in srgb, var(--section-swatch) 78%, var(--ph-black-6));
+}
+
+html[data-ky-theme="softDark"] .mn-section-swatch span {
+  background: color-mix(in srgb, var(--section-swatch) 52%, var(--ph-black-3));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+html[data-ky-theme="dark"] .mn-section-swatch span {
+  background: color-mix(in srgb, var(--section-swatch) 44%, var(--ph-black-3));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
 .mn-section-swatch.is-active {
   background: var(--ky-control-active);
   box-shadow: inset 0 0 0 1px var(--ky-accent);
@@ -5181,8 +5282,48 @@ html[data-reduce-motion="true"] .mn-cards * {
   font-size: 11px;
 }
 
-.mn-template-close {
+.mn-template-actions {
+  display: flex;
+  gap: 4px;
   margin-left: auto;
+}
+
+.mn-template-close {
+  margin-left: 0;
+}
+
+.mn-template-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--ky-control-active);
+  color: var(--ky-soft);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.mn-template-empty {
+  grid-column: 1 / -1;
+  margin: 12px 4px 20px;
+  color: var(--ky-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mn-template-name-label {
+  display: block;
+  margin: 14px 0 6px;
+  color: var(--ky-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mn-template-name-modal .mn-field-input {
+  width: 100%;
 }
 
 .mn-template-grid {
@@ -5588,6 +5729,14 @@ html[data-performance="true"] .mn-viewport {
 
 html[data-performance="true"] .mn-card {
   box-shadow: var(--ky-hairline);
+}
+
+/* Backdrop blur is one of the most expensive effects on a software-rendered WebKitGTK. */
+html[data-performance="true"] *,
+html[data-performance="true"] *::before,
+html[data-performance="true"] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* Pressed feedback for compact controls that do not define their own active state. */
@@ -6094,8 +6243,102 @@ html[data-performance="true"] .mn-card {
   white-space: nowrap;
   font-size: 9px;
 }
+.mn-template-settings-actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.mn-template-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mn-template-settings-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon copy kind"
+    "icon copy delete";
+  gap: 4px 9px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+}
+
+.mn-template-settings-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  color: var(--ky-soft);
+}
+
+.mn-template-settings-copy {
+  grid-area: copy;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mn-template-settings-copy strong {
+  overflow: hidden;
+  color: var(--ky-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mn-template-settings-copy span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ky-soft);
+  font-size: 10px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mn-template-settings-kind {
+  grid-area: kind;
+  color: var(--ky-soft);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mn-template-settings-delete {
+  grid-area: delete;
+  justify-self: end;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.mn-template-settings-empty {
+  grid-column: 1 / -1;
+  margin: 8px 2px 18px;
+  color: var(--ky-soft);
+  font-size: 12px;
+}
+
 @media (max-width: 720px) {
-  .mn-account-grid { grid-template-columns: 1fr; }
+  .mn-account-grid,
+  .mn-template-settings-grid { grid-template-columns: 1fr; }
+}
+
+/* Language picker uses the design-system select popup styling. */
+.mn-language-popover {
+  position: fixed;
+  z-index: 650;
+  width: 220px;
+  max-height: 240px;
 }
 
 /* Glass overlays */
@@ -7084,4 +7327,145 @@ html[data-performance="true"] .mn-card {
   .mn-auth-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Reset onboarding: choose a storage direction before a fresh board is created. */
+.mn-setup-overlay {
+  z-index: 700;
+}
+
+.mn-setup-modal {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.mn-setup-lead {
+  margin: 0 0 16px;
+  color: var(--ky-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.mn-setup-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mn-setup-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  color: var(--ky-text);
+  background: var(--ky-surface);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-card);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.mn-setup-option:hover,
+.mn-setup-option:focus-visible {
+  background: var(--ky-control-hover);
+  border-color: var(--ky-line-strong);
+  outline: none;
+}
+
+.mn-setup-option.is-selected {
+  background: color-mix(in srgb, var(--ky-accent) 7%, var(--ky-surface));
+  border-color: var(--ky-accent);
+}
+
+.mn-setup-radio {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  border: 1.5px solid var(--ky-line-strong);
+  border-radius: 50%;
+  background: var(--ky-surface);
+}
+
+.mn-setup-option.is-selected .mn-setup-radio {
+  border-color: var(--ky-accent);
+}
+
+.mn-setup-option.is-selected .mn-setup-radio::after {
+  content: "";
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background: var(--ky-accent);
+}
+
+.mn-setup-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mn-setup-option strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mn-setup-option span span {
+  color: var(--ky-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mn-setup-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mn-setup-nav .mn-btn {
+  min-width: 88px;
+}
+
+@media (max-width: 520px) {
+  .mn-setup-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+.mn-setup-option:disabled,
+.mn-setup-option.is-disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.mn-setup-option:disabled:hover {
+  background: var(--ky-surface);
+  border-color: var(--ky-stroke);
+}
+
+.mn-setup-soon {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--ky-control-active);
+  color: var(--ky-soft);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+
+.mn-color-hint {
+  margin: 7px 2px 0;
+  color: var(--ky-soft);
+  font-size: 10px;
+  line-height: 1.35;
 }

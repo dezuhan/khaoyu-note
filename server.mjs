@@ -634,6 +634,32 @@ function wipeDatabase() {
   }
 }
 
+function pathSize(target) {
+  try {
+    const stat = fs.statSync(target);
+    if (!stat.isDirectory()) return stat.size;
+    let total = 0;
+    for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+      total += pathSize(path.join(target, entry.name));
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+function storageStats() {
+  const databaseBytes = pathSize(DB_PATH);
+  const walBytes = pathSize(`${DB_PATH}-wal`) + pathSize(`${DB_PATH}-shm`);
+  const assetsBytes = pathSize(ASSETS_DIR);
+  return {
+    databaseBytes,
+    walBytes,
+    assetsBytes,
+    totalBytes: databaseBytes + walBytes + assetsBytes,
+  };
+}
+
 function clearAssetsDirectory() {
   if (!fs.existsSync(ASSETS_DIR)) return;
   for (const entry of fs.readdirSync(ASSETS_DIR)) {
@@ -1576,6 +1602,38 @@ const server = http.createServer(async (request, response) => {
           2
         )
       );
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/database/export") {
+      const archive = exportBackupZip();
+      const stat = fs.statSync(archive);
+      response.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Length": stat.size,
+        "Content-Disposition": `attachment; filename="khaoyu-note-${Date.now()}.zip"`,
+        "Cache-Control": "no-store",
+      });
+      const stream = fs.createReadStream(archive);
+      stream.pipe(response);
+      stream.on("close", () => {
+        try { fs.rmSync(archive, { force: true }); } catch { /* keep the backup if removal fails */ }
+      });
+      return;
+    }
+    if (request.method === "POST" && url.pathname === "/api/reset") {
+      const body = JSON.parse(await readBody(request));
+      if (String(body.confirmation || "").trim() !== "RESET ALL") {
+        sendJson(response, 400, { error: "Type RESET ALL to confirm" });
+        return;
+      }
+      wipeDatabase();
+      clearAssetsDirectory();
+      clearSessionCookies(request, response);
+      sendJson(response, 200, { reset: true });
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/storage/stats") {
+      sendJson(response, 200, storageStats());
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/asset") {

@@ -16,6 +16,8 @@ export const AUTO_BACKUP_OPTIONS = [
   [30, "Every month"],
 ];
 
+import { getLanguage, t } from "./i18n.js";
+
 let lastAt = 0;
 let loaded = false;
 let running = false;
@@ -81,10 +83,10 @@ export function lastBackupAt() {
 
 export function formatLastBackup(value, locale) {
   const stamp = Number(value) || 0;
-  if (!stamp) return "No automatic backup yet";
+  if (!stamp) return t("backup.noneYet");
   const date = new Date(stamp);
-  if (Number.isNaN(date.getTime())) return "No automatic backup yet";
-  return date.toLocaleString(locale);
+  if (Number.isNaN(date.getTime())) return t("backup.noneYet");
+  return date.toLocaleString(locale || getLanguage());
 }
 
 // A manual backup also resets the schedule so automatic backups do not duplicate it.

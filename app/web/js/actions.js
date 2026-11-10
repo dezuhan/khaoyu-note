@@ -139,6 +139,118 @@ export function wrapInColumn(ids) {
   return column;
 }
 
+// Wrap the current selection in a Section sized to its bounding box. A Section is a visual wrapper,
+// not a parent: the selected cards keep their coordinates and stay above it.
+// Remove a column/row/kanban container while keeping its direct children on the board. The
+// children keep their current coordinates, size and own contents; only the wrapper disappears.
+export function canReleaseContainer(cardId) {
+  const card = state.board ? getCard(state.board, cardId) : null;
+  return Boolean(card && card.type === "column" && !card.locked);
+}
+
+export function releaseContainer(cardId) {
+  if (!canReleaseContainer(cardId)) return 0;
+  const container = getCard(state.board, cardId);
+  const children = columnChildren(state.board, container.id).filter(
+    (card) => !isTemporarilyDisabledType(card.type)
+  );
+  checkpoint();
+  let z = maxZ(state.board);
+  for (const child of children) {
+    child.parentId = null;
+    child.order = 0;
+    child.z = ++z;
+  }
+  state.board.cards = state.board.cards.filter((card) => card.id !== container.id);
+  state.board.connections = (state.board.connections || []).filter(
+    (connection) => connection.from !== container.id && connection.to !== container.id
+  );
+  setSelection(children.map((child) => child.id));
+  markDirty("board");
+  return children.length;
+}
+
+export function canWrapInSection(ids = []) {
+  if (!state.board || !Array.isArray(ids) || !ids.length) return false;
+  return ids.every((id) => {
+    const card = getCard(state.board, id);
+    return card && card.type !== "section";
+  });
+}
+
+export function wrapInSection(ids) {
+  if (!canWrapInSection(ids)) return null;
+  checkpoint();
+  const cards = ids.map((id) => getCard(state.board, id)).filter(Boolean);
+  const minX = Math.min(...cards.map((card) => card.x));
+  const minY = Math.min(...cards.map((card) => card.y));
+  const maxX = Math.max(...cards.map((card) => card.x + card.w));
+  const maxY = Math.max(...cards.map((card) => card.y + card.h));
+  const padding = 20;
+  const header = 44;
+  const section = createCard("section", minX - padding, minY - header, {
+    title: "Section",
+  });
+  section.w = Math.max(220, Math.round(maxX - minX) + padding * 2);
+  section.h = Math.max(120, Math.round(maxY - minY) + header + padding);
+  section.z = Math.max(1, Math.min(...cards.map((card) => card.z || 1)) - 1);
+  state.board.cards.push(section);
+  setSelection([section.id]);
+  markDirty("board");
+  return section;
+}
+
+// A kanban is a row of columns. The former kanban card type is gone; the user selects at least
+// two top-level columns and wraps them into a row container.
+function selectedColumns(ids = []) {
+  return ids
+    .map((id) => getCard(state.board, id))
+    .filter((card) => card && card.type === "column");
+}
+
+export function canWrapInKanban(ids = []) {
+  if (!state.board || !Array.isArray(ids) || ids.length < 2) return false;
+  return ids.every((id) => {
+    const card = getCard(state.board, id);
+    return (
+      card &&
+      card.type === "column" &&
+      !card.locked &&
+      card.direction !== "row"
+    );
+  });
+}
+
+export function wrapInKanban(ids) {
+  if (!canWrapInKanban(ids)) return null;
+  checkpoint();
+  const columns = ids
+    .map((id) => getCard(state.board, id))
+    .filter(Boolean)
+    .sort((a, b) => a.x - b.x || a.y - b.y);
+  const minX = Math.min(...columns.map((column) => column.x));
+  const minY = Math.min(...columns.map((column) => column.y));
+  const maxX = Math.max(...columns.map((column) => column.x + column.w));
+  const maxY = Math.max(...columns.map((column) => column.y + column.h));
+  const kanban = createCard("column", minX, minY, {
+    title: "Kanban",
+    direction: "row",
+    kanban: true,
+  });
+  kanban.w = Math.max(360, Math.round(maxX - minX) + 28);
+  kanban.h = Math.max(220, Math.round(maxY - minY) + 28);
+  kanban.z = maxZ(state.board) + 1;
+  state.board.cards.push(kanban);
+  columns.forEach((column, index) => {
+    column.parentId = kanban.id;
+    column.order = index;
+  });
+  layoutColumns(state.board);
+  setSelection([kanban.id]);
+  markDirty("board");
+  return kanban;
+}
+
 function boardTrash() {
   if (!state.board) return [];
   if (!Array.isArray(state.board.trash)) state.board.trash = [];
@@ -306,6 +418,44 @@ function selectionGraph(ids) {
   };
 }
 
+// Capture the current selection as a reusable template payload. The graph keeps column
+// descendants and connections whose two endpoints are both selected.
+export function captureSelectionForTemplate(ids = []) {
+  if (!state.board || !ids.length) return null;
+  const graph = selectionGraph(ids);
+  if (!graph.cards.length) return null;
+  const roots = new Set(graph.roots);
+  for (const card of graph.cards) {
+    if (roots.has(card.id)) card.parentId = null;
+  }
+  const included = new Set(graph.cards.map((card) => card.id));
+  const connections = (state.board.connections || [])
+    .filter((connection) => included.has(connection.from) && included.has(connection.to))
+    .map((connection) => JSON.parse(JSON.stringify(connection)));
+  return { cards: graph.cards, connections };
+}
+
+function graphBounds(graph) {
+  const roots = graph.roots
+    .map((id) => graph.cards.find((card) => card.id === id))
+    .filter(Boolean);
+  if (!roots.length) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return {
+    minX: Math.min(...roots.map((card) => card.x)),
+    minY: Math.min(...roots.map((card) => card.y)),
+    maxX: Math.max(...roots.map((card) => card.x + card.w)),
+    maxY: Math.max(...roots.map((card) => card.y + card.h)),
+  };
+}
+
+function besideOffset(graph, gap = 32) {
+  const bounds = graphBounds(graph);
+  return {
+    x: Math.max(gap, Math.round(bounds.maxX - bounds.minX) + gap),
+    y: 0,
+  };
+}
+
 function cloneGraph(graph, offset) {
   const idMap = new Map();
   const copies = graph.cards.map((card) => {
@@ -320,19 +470,21 @@ function cloneGraph(graph, offset) {
     const isRoot = roots.has(copy.id);
     copy.parentId = isRoot ? null : idMap.get(copy.parentId) || null;
     if (isRoot) {
-      copy.x += offset;
-      copy.y += offset;
+      copy.x += offset.x;
+      copy.y += offset.y;
     }
     copy.z = ++z;
     state.board.cards.push(copy);
   }
+  layoutColumns(state.board);
   return [...roots];
 }
 
 export function duplicateCards(ids) {
   if (!state.board || !ids.length) return 0;
   checkpoint();
-  const copies = cloneGraph(selectionGraph(ids), 24);
+  const graph = selectionGraph(ids);
+  const copies = cloneGraph(graph, besideOffset(graph));
   if (copies.length) setSelection(copies);
   markDirty("board");
   return copies.length;
@@ -474,6 +626,8 @@ export function setColumnDirection(cardId, direction) {
   if (card.direction === "row") {
     const count = columnChildren(state.board, card.id).length;
     card.w = Math.max(card.w, 28 + count * 220 + Math.max(0, count - 1) * 10);
+  } else {
+    delete card.kanban;
   }
   layoutColumns(state.board);
   markDirty("board");
@@ -771,12 +925,20 @@ export function editCard(cardId) {
 // ------------------------------------------------------------------ clipboard
 
 let cardClipboard = null;
-let pasteOffset = 0;
+
+export function hasClipboard() {
+  return Boolean(cardClipboard?.cards.length);
+}
+
+export function clearClipboard() {
+  const had = hasClipboard();
+  cardClipboard = null;
+  return had;
+}
 
 export function copySelected() {
-  if (!state.board) return 0;
+  if (!state.board || !state.selection.size) return 0;
   cardClipboard = selectionGraph([...state.selection]);
-  pasteOffset = 0;
   return cardClipboard.cards.length;
 }
 
@@ -787,10 +949,11 @@ export function cutSelected() {
 }
 
 export function pasteCards() {
-  if (!state.board || !cardClipboard?.cards.length) return 0;
+  if (!state.board || !hasClipboard()) return 0;
   checkpoint();
-  pasteOffset += 1;
-  const ids = cloneGraph(cardClipboard, 28 * pasteOffset);
+  const graph = cardClipboard;
+  const ids = cloneGraph(graph, besideOffset(graph));
+  cardClipboard = null;
   setSelection(ids);
   markDirty("board");
   return ids.length;

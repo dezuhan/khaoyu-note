@@ -41,7 +41,7 @@ export const DOCUMENTATION_SECTIONS = [
         <tr><td>Column</td><td>Groups cards; drag cards in and out, collapse and expand. Convert to row lays the children out horizontally; Convert to column restores the stack.</td></tr>
         <tr><td>Section</td><td>Pastel background surface with a small title. Always below cards, not a column, resizable from every edge and corner, with a bottom swatch and position-lock toolbar.</td></tr>
         <tr><td>Board</td><td>Nested board card with a mini preview, opened in place.</td></tr>
-        <tr><td>Kanban</td><td>Columns and cards with pointer drag between columns.</td></tr>
+        <tr><td>Kanban</td><td>Select two or more columns, then right-click Wrap into kanban. The kanban is a row container of columns; there is no separate kanban card or tool.</td></tr>
         <tr><td>Color</td><td>HSV picker with HEX, RGB, CMYK and an automatic color name.</td></tr>
         <tr><td>Sketch / Draw</td><td>Canvas sketch card, plus a full page drawing editor.</td></tr>
         <tr><td>Image / Upload</td><td>Local image or file asset. Upload also accepts local audio and video files.</td></tr>
@@ -292,7 +292,7 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
         <tr><td>Delete</td><td>Delete or Backspace</td></tr>
         <tr><td>Command palette</td><td>Ctrl + K</td></tr>
         <tr><td>Shortcuts list</td><td>?</td></tr>
-        <tr><td>New note / link / to-do / heading / board / column / kanban / comment / table / sketch / color / document</td><td>N, L, T, H, G, C, K, M, X, S, O, D</td></tr>
+        <tr><td>New note / link / to-do / heading / board / column / comment / table / sketch / color / document</td><td>N, L, T, H, G, C, M, X, S, O, D</td></tr>
         <tr><td>Line / Draw tool</td><td>A / R</td></tr>
         <tr><td>Image / Upload</td><td>I / W</td></tr>
       </table>

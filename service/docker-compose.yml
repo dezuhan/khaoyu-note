@@ -3,7 +3,7 @@ name: khaoyu-note-service
 services:
   khaoyu-note-service:
     build: .
-    image: khaoyu-note-service:0.34.0
+    image: khaoyu-note-service:0.35.0
     restart: unless-stopped
     init: true
     env_file:
@@ -39,5 +39,50 @@ services:
       start_period: 10s
     stop_grace_period: 20s
 
+  # Team-profile backend. These services are opt-in until the storage adapter is wired into the
+  # service process: docker compose --profile team up -d
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["team"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${KHAOYU_SERVICE_POSTGRES_DB:-khaoyu}
+      POSTGRES_USER: ${KHAOYU_SERVICE_POSTGRES_USER:-khaoyu}
+      POSTGRES_PASSWORD: ${KHAOYU_SERVICE_POSTGRES_PASSWORD:?set KHAOYU_SERVICE_POSTGRES_PASSWORD}
+    volumes:
+      - khaoyu-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["team"]
+    restart: unless-stopped
+    environment:
+      KHAOYU_SERVICE_REDIS_PASSWORD: ${KHAOYU_SERVICE_REDIS_PASSWORD:?set KHAOYU_SERVICE_REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --requirepass
+      - ${KHAOYU_SERVICE_REDIS_PASSWORD:?set KHAOYU_SERVICE_REDIS_PASSWORD}
+      - --appendonly
+      - "no"
+      - --maxmemory-policy
+      - noeviction
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$KHAOYU_SERVICE_REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   khaoyu-service-data:
+  khaoyu-postgres-data:

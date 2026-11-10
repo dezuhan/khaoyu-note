@@ -1,10 +1,112 @@
 // Template library: replace the single current board with a starter layout.
 
+import { captureSelectionForTemplate } from "./actions.js";
 import { icon } from "./icons.js";
-import { createCard, newBoardDoc, uid, visibleCards, welcomeBoard } from "./model.js";
+import { t } from "./i18n.js";
+import { createCard, layoutColumns, newBoardDoc, uid, visibleCards, welcomeBoard } from "./model.js";
 import { checkpoint, markDirty, notify, state } from "./store.js";
 
+const PROTECTED_TEMPLATE_IDS = new Set(["blank"]);
+const CUSTOM_TEMPLATES_KEY = "mn.templates.custom";
+const DELETED_TEMPLATES_KEY = "mn.templates.deleted";
+
 let overlay = null;
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function readStoredArray(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function readCustomTemplates() {
+  return readStoredArray(CUSTOM_TEMPLATES_KEY).filter(
+    (template) => template && template.id && Array.isArray(template.cards)
+  );
+}
+
+function readDeletedTemplates() {
+  return readStoredArray(DELETED_TEMPLATES_KEY).filter((id) => typeof id === "string");
+}
+
+function writeCustomTemplates(templates) {
+  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+}
+
+function writeDeletedTemplates(ids) {
+  localStorage.setItem(DELETED_TEMPLATES_KEY, JSON.stringify([...new Set(ids)]));
+}
+
+export function isBuiltInTemplate(id) {
+  return TEMPLATES.some((template) => template.id === id);
+}
+
+function instantiateTemplate(template) {
+  const idMap = new Map();
+  const cards = (template.cards || []).map((card) => {
+    const clone = JSON.parse(JSON.stringify(card));
+    const oldId = clone.id;
+    clone.id = uid(clone.type || "card");
+    idMap.set(oldId, clone.id);
+    return clone;
+  });
+  for (const card of cards) {
+    card.parentId = card.parentId ? idMap.get(card.parentId) || null : null;
+  }
+  const connections = (template.connections || [])
+    .map((connection) => ({
+      ...JSON.parse(JSON.stringify(connection)),
+      id: uid("conn"),
+      from: idMap.get(connection.from) || null,
+      to: idMap.get(connection.to) || null,
+    }))
+    .filter((connection) => connection.from && connection.to);
+  return { title: template.name, cards, connections };
+}
+
+export function listTemplates() {
+  const deleted = new Set(readDeletedTemplates());
+  const builtIns = TEMPLATES.filter((template) => !deleted.has(template.id));
+  const custom = readCustomTemplates().map((template) => ({
+    ...template,
+    custom: true,
+    icon: template.icon || "note",
+    build: () => instantiateTemplate(template),
+  }));
+  return [...builtIns, ...custom];
+}
+
+export function canDeleteTemplate(id) {
+  return !PROTECTED_TEMPLATE_IDS.has(id);
+}
+
+export function deleteTemplate(id) {
+  if (!id || !canDeleteTemplate(id)) return false;
+  if (isBuiltInTemplate(id)) {
+    const deleted = readDeletedTemplates();
+    if (!deleted.includes(id)) writeDeletedTemplates([...deleted, id]);
+    return true;
+  }
+  const custom = readCustomTemplates();
+  const next = custom.filter((template) => template.id !== id);
+  if (next.length === custom.length) return false;
+  writeCustomTemplates(next);
+  return true;
+}
+
+export function restoreBuiltInTemplates() {
+  writeDeletedTemplates([]);
+}
 
 function todoItems(items) {
   return items.map((text, index) => ({
@@ -76,18 +178,19 @@ export const TEMPLATES = [
   {
     id: "kanban",
     name: "Kanban board",
-    description: "A full-width Backlog, In progress and Done flow.",
-    icon: "kanban",
+    description: "A row of Backlog, In progress and Done columns.",
+    icon: "column",
     build: starter("Kanban board", (add) => {
       add("heading", 120, 80, { text: "Kanban board" });
-      const kanban = add("kanban", 120, 200);
+      const kanban = add("column", 120, 200, { title: "Kanban", direction: "row", kanban: true });
       kanban.w = 980;
       kanban.h = 520;
-      kanban.columns = [
-        { id: uid("col"), title: "Backlog", items: [] },
-        { id: uid("col"), title: "In progress", items: [] },
-        { id: uid("col"), title: "Done", items: [] },
-      ];
+      ["Backlog", "In progress", "Done"].forEach((title, index) => {
+        const column = add("column", 134, 264, { title });
+        column.parentId = kanban.id;
+        column.order = index;
+        column.w = 300;
+      });
     }),
   },
   {
@@ -122,6 +225,96 @@ export const TEMPLATES = [
   },
 ];
 
+function promptTemplateName(defaultValue) {
+  return new Promise((resolve) => {
+    const layer = document.createElement("div");
+    layer.className = "mn-overlay";
+    layer.innerHTML = `<div class="mn-modal mn-template-name-modal">
+        <header class="mn-modal-head">
+          <h2 class="mn-modal-title">${t("templates.createTitle")}</h2>
+        </header>
+        <div class="mn-modal-body">
+          <p class="mn-confirm-text">Save the current selection as a reusable board template.</p>
+          <label class="mn-template-name-label" for="mn-template-name">${t("templates.name")}</label>
+          <input id="mn-template-name" class="mn-field-input" maxlength="80" value="${escapeHtml(
+            defaultValue
+          )}" />
+        </div>
+        <footer class="mn-modal-foot">
+          <button type="button" class="mn-btn" data-template-cancel>${t("templates.cancel")}</button>
+          <button type="button" class="mn-btn mn-btn-primary" data-template-save>${t("templates.save")}</button>
+        </footer>
+      </div>`;
+    document.body.append(layer);
+    const input = layer.querySelector("#mn-template-name");
+    const save = layer.querySelector("[data-template-save]");
+    const finish = (value) => {
+      layer.remove();
+      document.removeEventListener("keydown", onKey, true);
+      resolve(value);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        finish(null);
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        const name = input.value.trim();
+        if (name) finish(name);
+      }
+    };
+    layer.querySelector("[data-template-cancel]").addEventListener("click", () => finish(null));
+    save.addEventListener("click", () => {
+      const name = input.value.trim();
+      if (name) finish(name);
+    });
+    layer.addEventListener("pointerdown", (event) => {
+      if (event.target === layer) finish(null);
+    });
+    document.addEventListener("keydown", onKey, true);
+    input.focus();
+    input.select();
+  });
+}
+
+export async function createTemplateFromSelection(ids = [...state.selection]) {
+  if (!state.board || !ids.length) {
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", { detail: { message: "Select one or more cards first." } })
+    );
+    return null;
+  }
+  const snapshot = captureSelectionForTemplate(ids);
+  if (!snapshot?.cards.length) return null;
+  const name = await promptTemplateName("My template");
+  if (!name) return null;
+  const template = {
+    id: uid("tpl"),
+    name,
+    description: `${snapshot.cards.length} card${snapshot.cards.length === 1 ? "" : "s"} from ${
+      state.board.title || "this board"
+    }`,
+    icon: "note",
+    custom: true,
+    cards: snapshot.cards,
+    connections: snapshot.connections,
+    createdAt: Date.now(),
+  };
+  try {
+    const custom = readCustomTemplates();
+    writeCustomTemplates([template, ...custom]);
+  } catch {
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", { detail: { message: "Could not save the template." } })
+    );
+    return null;
+  }
+  window.dispatchEvent(
+    new CustomEvent("mn:toast", { detail: { message: `Template "${name}" saved.` } })
+  );
+  return template;
+}
+
 export function openTemplateLibrary() {
   if (overlay) return;
   overlay = document.createElement("div");
@@ -129,26 +322,46 @@ export function openTemplateLibrary() {
   overlay.innerHTML = `<div class="mn-template-modal">
       <header class="mn-template-head">
         <div>
-          <h2>Template library</h2>
-          <p>Apply a starter layout to this file. Undo restores the previous board.</p>
+          <h2>${t("templates.library")}</h2>
+          <p>${t("templates.libraryDesc")}</p>
         </div>
-        <button type="button" class="mn-icon-btn mn-template-close" title="Close">${icon("close", 14)}</button>
+        <div class="mn-template-actions">
+          <button type="button" class="mn-icon-btn mn-template-edit" title="Manage templates">${icon(
+            "settings",
+            14
+          )}</button>
+          <button type="button" class="mn-icon-btn mn-template-close" title="Close">${icon(
+            "close",
+            14
+          )}</button>
+        </div>
       </header>
       <div class="mn-template-grid"></div>
     </div>`;
   document.body.append(overlay);
   const grid = overlay.querySelector(".mn-template-grid");
-  for (const template of TEMPLATES) {
+  const templates = listTemplates();
+  if (!templates.length) {
+    grid.innerHTML = `<p class="mn-template-empty">${t("templates.empty")}</p>`;
+  }
+  for (const template of templates) {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "mn-template-card";
-    card.innerHTML = `<span class="mn-template-preview">${icon(template.icon, 24)}</span>
-      <span class="mn-template-copy"><span class="mn-template-name">${template.name}</span>
-      <span class="mn-template-desc">${template.description}</span></span>`;
+    card.innerHTML = `<span class="mn-template-preview">${icon(template.icon || "note", 24)}</span>
+      <span class="mn-template-copy"><span class="mn-template-name">${escapeHtml(
+        template.name
+      )}${template.custom ? `<span class="mn-template-badge">${t("templates.custom")}</span>` : ""}</span>
+      <span class="mn-template-desc">${escapeHtml(template.description || "")}</span></span>`;
     card.addEventListener("click", () => applyTemplate(template));
     grid.append(card);
   }
   overlay.querySelector(".mn-template-close").addEventListener("click", closeTemplates);
+  overlay.querySelector(".mn-template-edit").addEventListener("click", async () => {
+    closeTemplates();
+    const { openSettingsPage } = await import("./settings.js");
+    openSettingsPage("templates");
+  });
   overlay.addEventListener("pointerdown", (event) => {
     if (event.target === overlay) closeTemplates();
   });
@@ -224,6 +437,7 @@ async function applyTemplate(template) {
       (!connection.to || templateCardIds.has(connection.to))
   );
   state.board.cards = built.cards;
+  layoutColumns(state.board);
   state.board.connections = built.connections || [];
   state.board.trash = [];
   state.board.title = built.title || template.name;

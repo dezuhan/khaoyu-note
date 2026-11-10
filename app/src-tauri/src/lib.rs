@@ -1686,15 +1686,61 @@ fn store_asset_from_path(app: tauri::AppHandle, path: String) -> Result<String, 
     write_asset(&app, &name, &bytes)
 }
 
+fn backup_base_dir(app: &tauri::AppHandle, data_root: &Path) -> Result<PathBuf, String> {
+    if let Ok(configured) = std::env::var("KHAOYU_NOTE_BACKUP_DIR") {
+        let configured = configured.trim();
+        if !configured.is_empty() {
+            let path = PathBuf::from(configured);
+            fs::create_dir_all(&path).map_err(|error| error.to_string())?;
+            return Ok(path);
+        }
+    }
+    if let Ok(documents) = app.path().document_dir() {
+        let preferred = documents.join("Khaoyu Note Backups");
+        if fs::create_dir_all(&preferred).is_ok() {
+            return Ok(preferred);
+        }
+    }
+    let fallback = data_root.join("backups");
+    fs::create_dir_all(&fallback).map_err(|error| error.to_string())?;
+    Ok(fallback)
+}
+
+#[tauri::command]
+async fn pick_backup_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = app
+        .dialog()
+        .file()
+        .set_title("Choose Khaoyu Note backup folder")
+        .blocking_pick_folder();
+    match folder {
+        None => Ok(None),
+        Some(path) => path
+            .into_path()
+            .map(|path| Some(path.to_string_lossy().to_string()))
+            .map_err(|error| error.to_string()),
+    }
+}
+
+#[tauri::command]
+fn open_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let target = fs::canonicalize(&path).map_err(|_| "Folder not found".to_string())?;
+    if !target.is_dir() {
+        return Err("Folder not found".into());
+    }
+    let root = fs::canonicalize(root_dir(&app)?).map_err(|e| e.to_string())?;
+    let backups = fs::canonicalize(backup_base_dir(&app, &root)?).unwrap_or_else(|_| root.clone());
+    if !target.starts_with(&root) && !target.starts_with(&backups) {
+        return Err("Folder is outside the app data location".into());
+    }
+    shell_open(&target.to_string_lossy())
+}
+
 #[tauri::command]
 fn backup_data(app: tauri::AppHandle) -> Result<String, String> {
     let root = root_dir(&app)?;
-    let base = app
-        .path()
-        .document_dir()
-        .map_err(|e| e.to_string())?
-        .join("Khaoyu Note Backups");
-    fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let base = backup_base_dir(&app, &root)?;
     let target = unique_path(&base, &format!("khaoyu-note-{}", now_ms()), None);
     fs::create_dir_all(&target).map_err(|e| e.to_string())?;
     let db_target = target.join(DB_FILE);
@@ -2568,6 +2614,77 @@ fn auth_reset_database(
 }
 
 #[tauri::command]
+fn reset_app(
+    app: tauri::AppHandle,
+    db: State<'_, AppDb>,
+    auth_state: State<'_, AuthState>,
+    confirmation: String,
+) -> Result<Value, String> {
+    if confirmation.trim() != "RESET ALL" {
+        return Err("Type RESET ALL to confirm".into());
+    }
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let tables: Vec<String> = {
+        let mut statement = conn
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            )
+            .map_err(|error| error.to_string())?;
+        let names = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| error.to_string())?;
+        names
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|error| error.to_string())?
+    };
+
+    conn.execute_batch("PRAGMA foreign_keys = OFF; BEGIN IMMEDIATE;")
+        .map_err(|error| error.to_string())?;
+    let cleared = (|| -> Result<(), String> {
+        for table in &tables {
+            let quoted = table.replace('"', "\"\"");
+            conn.execute(&format!("DELETE FROM \"{quoted}\""), [])
+                .map_err(|error| error.to_string())?;
+        }
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
+            params![CURRENT_SCHEMA_VERSION.to_string()],
+        )
+        .map_err(|error| error.to_string())?;
+        conn.execute_batch("COMMIT;")
+            .map_err(|error| error.to_string())?;
+        Ok(())
+    })();
+
+    if let Err(error) = cleared {
+        let _ = conn.execute_batch("ROLLBACK; PRAGMA foreign_keys = ON;");
+        return Err(error);
+    }
+    let _ = conn.execute_batch("VACUUM;");
+    let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
+
+    if let Ok(directory) = assets_dir(&app) {
+        if let Ok(entries) = fs::read_dir(&directory) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let _ = fs::remove_dir_all(path);
+                } else {
+                    let _ = fs::remove_file(path);
+                }
+            }
+        }
+    }
+    if let Ok(path) = session_file_path(&app) {
+        let _ = fs::remove_file(path);
+    }
+    if let Ok(mut guard) = auth_state.0.lock() {
+        *guard = None;
+    }
+    Ok(json!({ "reset": true }))
+}
+
+#[tauri::command]
 fn auth_history(
     db: State<'_, AppDb>,
     auth_state: State<'_, AuthState>,
@@ -2695,9 +2812,171 @@ fn gpu_enabled(conn: &Connection) -> bool {
     .unwrap_or(true)
 }
 
+fn path_size(target: &Path) -> u64 {
+    let Ok(metadata) = fs::metadata(target) else {
+        return 0;
+    };
+    if metadata.is_file() {
+        return metadata.len();
+    }
+    let Ok(entries) = fs::read_dir(target) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .map(|entry| path_size(&entry.path()))
+        .sum()
+}
+
+#[tauri::command]
+fn storage_stats(app: tauri::AppHandle) -> Result<Value, String> {
+    let root = root_dir(&app)?;
+    let database = root.join(DB_FILE);
+    let database_bytes = path_size(&database);
+    let wal_bytes = path_size(&root.join(format!("{DB_FILE}-wal")))
+        + path_size(&root.join(format!("{DB_FILE}-shm")));
+    let assets_bytes = path_size(&root.join("assets"));
+    Ok(json!({
+        "databaseBytes": database_bytes,
+        "walBytes": wal_bytes,
+        "assetsBytes": assets_bytes,
+        "totalBytes": database_bytes + wal_bytes + assets_bytes,
+    }))
+}
+
+#[cfg(target_os = "linux")]
+fn apply_linux_graphics_environment() {
+    // Only opt-in overrides here. Disabling DMABUF/compositing globally would benchmark every
+    // Linux user on the software path, including machines where WebKitGTK is fully accelerated.
+    let forced = std::env::var("KHAOYU_FORCE_GPU").ok().as_deref() == Some("1");
+    let dbmabuf_off = std::env::var("KHAOYU_WEBKIT_DMABUF").ok().as_deref() == Some("0");
+    let compositing_off = std::env::var("KHAOYU_WEBKIT_COMPOSITING").ok().as_deref() == Some("0");
+    if forced {
+        std::env::remove_var("WEBKIT_DISABLE_DMABUF_RENDERER");
+        std::env::remove_var("WEBKIT_DISABLE_COMPOSITING_MODE");
+        std::env::remove_var("LIBGL_ALWAYS_SOFTWARE");
+    }
+    if dbmabuf_off {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+    if compositing_off {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    }
+    // Recommended for NVIDIA + Wayland; it has no rendering-performance cost and avoids the
+    // WebKitGTK explicit-sync protocol failure. Users can still override it themselves.
+    let nvidia = Path::new("/proc/driver/nvidia/version").exists();
+    if nvidia
+        && std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && std::env::var_os("__NV_DISABLE_EXPLICIT_SYNC").is_none()
+    {
+        std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+    }
+    if std::env::var("KHAOYU_DEBUG_GRAPHICS").ok().as_deref() == Some("1") {
+        eprintln!(
+            "khaoyu-note: linux graphics forced_gpu={forced} dmabuf_off={dbmabuf_off}              compositing_off={compositing_off} nvidia={nvidia} wayland={}",
+            std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "no".into())
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+fn push_gpu_name(gpus: &mut Vec<String>, name: &str) {
+    let name = name.trim();
+    if !name.is_empty() && !gpus.iter().any(|entry| entry == name) {
+        gpus.push(name.to_string());
+    }
+}
+
+/// Ask the OS for the physical GPU names. WebGL renderer strings are deliberately sanitized by
+/// WebKitGTK/Chromium, so they cannot identify the hardware on their own.
+fn detect_system_gpus() -> Vec<String> {
+    let mut gpus = Vec::new();
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(output) = std::process::Command::new("lspci").output() {
+            if output.status.success() {
+                let text = String::from_utf8_lossy(&output.stdout);
+                for line in text.lines() {
+                    if line.contains("VGA compatible controller")
+                        || line.contains("3D controller")
+                        || line.contains("Display controller")
+                    {
+                        if let Some((_, name)) = line.split_once(": ") {
+                            push_gpu_name(&mut gpus, name);
+                        }
+                    }
+                }
+            }
+        }
+        if gpus.is_empty() {
+            if let Ok(entries) = fs::read_dir("/proc/driver/nvidia/gpus") {
+                for entry in entries.flatten() {
+                    let info = entry.path().join("information");
+                    if let Ok(text) = fs::read_to_string(info) {
+                        for line in text.lines() {
+                            if let Some(name) = line.strip_prefix("Model:") {
+                                push_gpu_name(&mut gpus, name);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
+            ])
+            .output()
+        {
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                push_gpu_name(&mut gpus, line);
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = std::process::Command::new("system_profiler")
+            .args(["SPDisplaysDataType"])
+            .output()
+        {
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                if let Some(name) = line.split_once("Chipset Model:") {
+                    push_gpu_name(&mut gpus, name.1);
+                }
+            }
+        }
+    }
+
+    gpus
+}
+
+#[tauri::command]
+fn graphics_info(db: State<'_, AppDb>) -> Value {
+    let gpu_enabled = db
+        .0
+        .lock()
+        .map(|conn| gpu_enabled(&conn))
+        .unwrap_or(true);
+    json!({
+        "platform": std::env::consts::OS,
+        "gpuEnabled": gpu_enabled,
+        "gpus": detect_system_gpus(),
+    })
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let new_root = app
                 .path()
@@ -2710,6 +2989,8 @@ pub fn run() {
             }
             let conn = open_db(app.handle()).expect("failed to open the local SQLite database");
             let gpu = gpu_enabled(&conn);
+            #[cfg(target_os = "linux")]
+            apply_linux_graphics_environment();
             app.manage(AppDb(Mutex::new(conn)));
             app.manage(AuthState(Mutex::new(None)));
 
@@ -2721,14 +3002,39 @@ pub fn run() {
             .title("Khaoyu Note")
             .inner_size(1440.0, 900.0)
             .min_inner_size(900.0, 600.0)
-            // Native file drops are forwarded to the web layer; internal card drags use pointer events.
-            .drag_and_drop(true)
+            // Keep board zoom in the web layer. Tauri's Linux page-zoom polyfill otherwise scales
+            // the whole WebView with Ctrl +/- or the wheel, which clips the menu bar and makes the
+            // same board look different from Windows.
+            .zoom_hotkeys_enabled(false)
             .center();
+            // Tauri only exposes this builder switch on Windows; Linux/WebKitGTK uses its default
+            // drag handling. Internal card drags use pointer events on every platform.
+            #[cfg(target_os = "windows")]
+            {
+                builder = builder.drag_and_drop(true);
+            }
             if !gpu {
                 builder =
                     builder.additional_browser_args("--disable-gpu --disable-gpu-compositing");
             }
-            builder.build()?;
+            let window = builder.build()?;
+            // A previously remembered page zoom should not survive a launch; board zoom is stored
+            // separately in the board document.
+            let _ = window.set_zoom(1.0);
+            #[cfg(target_os = "linux")]
+            {
+                use webkit2gtk::{HardwareAccelerationPolicy, SettingsExt as _, WebViewExt as _};
+                let policy = if gpu {
+                    HardwareAccelerationPolicy::Always
+                } else {
+                    HardwareAccelerationPolicy::Never
+                };
+                let _ = window.with_webview(move |webview| {
+                    if let Some(settings) = webview.inner().settings() {
+                        settings.set_hardware_acceleration_policy(policy);
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -2742,6 +3048,8 @@ pub fn run() {
             store_asset,
             store_asset_from_path,
             backup_data,
+            pick_backup_folder,
+            open_folder,
             export_backup_zip,
             db_integrity,
             stage_restore,
@@ -2749,6 +3057,8 @@ pub fn run() {
             app_data_dir,
             mcp_server_path,
             app_version,
+            graphics_info,
+            storage_stats,
             capture_window,
             check_update,
             auth_status,
@@ -2760,6 +3070,7 @@ pub fn run() {
             auth_update_profile,
             auth_change_password,
             auth_reset_database,
+            reset_app,
             auth_history,
             auth_restore_session,
             auth_log_activity,

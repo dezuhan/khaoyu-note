@@ -5,6 +5,149 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-10
+
+### Added
+
+- First-run setup now disables **Collaboration** and **Connect to Turso** with Coming soon badges.
+  Only Local SQLite/offline can be selected until the admin dashboard (Roadmap Milestone 10) and the
+  libSQL adapter/migration flow (Milestone 9) are implemented.
+- Display languages: English, Português (Brasil), Bahasa Indonesia, Español, Français, Deutsch,
+  日本語, 한국어, 简体中文 and Русский. The language is persisted in `mn.language`, applied to the
+  document, and the Settings navigation, General, Appearance, Board templates and Performance
+  labels update immediately. The topbar language globe opens a select-style popover with all ten
+  languages using the design-system `ky-select-popup`/`ky-select-item` styling (glass surface,
+  rounded card, popup shadow and selected-row tint). Scrolling the language list no longer dismisses
+  the picker, so all ten languages are reachable with the wheel. The toolbar tool names, topbar
+  Template/Share/Search/Trash labels, Settings > Tools cards and the whole Settings > Backup page
+  (including automatic-backup options and last-backup dates) follow the selected language. Board
+  content is never translated. The menu bar (File/Edit/Tools/View/Help), every command in those
+  menus, the command palette, and card context-menu actions are translated too. A source-level
+  translation audit (`npm run i18n:audit`, also in CI) verifies all 190 wired keys in all ten
+  languages; missing keys fail the check. Changing language now rebuilds the menu bar immediately,
+  and Help > Documentation is disabled temporarily while the documentation localization pass runs.
+- Settings > About has a **Reset app data** action. After confirmation it wipes every board, card,
+  connection, uploaded file, account, setting and activity row, clears the remembered session and
+  reloads into the first-run storage setup screen (single user or collaboration). The web host
+  exposes it through `POST /api/reset`; the desktop app uses the `reset_app` command.
+- The first-run storage screen after a reset offers Single user -> Local SQLite or Connect to Turso,
+  and a Collaboration explanation. The choices are side-by-side radio cards; select one, then use
+  Back/Next to continue. Turso and collaboration are marked as not available in this local build
+  yet; Local SQLite continues into a fresh welcome board.
+- Two or more selected cards can be wrapped in a Section sized to the selection bounds. Sections stay
+  below the selected cards and are not parents.
+- Deleting a board template now asks for confirmation, names the template, and warns that the action
+  cannot be undone.
+- Blank board is a protected built-in template: its Delete button is disabled and `deleteTemplate("blank")`
+  is rejected even when called directly, so the template library always has a safe empty fallback.
+- The column context menu has **Release kanban**, **Release row** and **Release column**. Releasing
+  removes only the wrapper and leaves its direct children on the board at their current position,
+  size and contents.
+- **Wrap into kanban** now accepts columns that currently live inside another row/kanban and lifts
+  them into the new container, so duplicated lanes from a template can be regrouped.
+- Right-clicking two or more selected columns now offers **Wrap into kanban**. The result is a row
+  column whose children are the selected columns, so one container model covers columns, rows and
+  kanban-like boards. A Kanban starter template builds the same structure.
+- The Edit menu, card context menu and command palette can clear the internal card clipboard.
+- Board templates can be created from any selection with **Create template from selection**. Custom
+  templates are stored separately from the board and appear in the template library with a Custom
+  badge.
+- The Color card now uses one manual HSV picker on web and desktop. The square, hue bar and HEX
+  field are always available; the screen-eyedropper button only appears when the browser exposes
+  EyeDropper (or desktop capture is supported), with a visible hint otherwise. The inconsistent
+  zenity/kdialog fallback was removed.
+- Desktop **Import database** now opens the native folder picker via `tauri-plugin-dialog`
+  (Windows Explorer, macOS Finder, Linux portal/GTK/KDE file chooser), instead of a text prompt.
+- **Open folder** now calls a dedicated `open_folder` command that validates the backup path and uses
+  the OS file manager: Explorer, Finder or `xdg-open` (Nautilus/Dolphin/other default).
+- Desktop backups now fall back to `<app data>/backups` when `Documents/Khaoyu Note Backups` is not
+  writable, and honor `KHAOYU_NOTE_BACKUP_DIR`. This fixes Backup now / Export ZIP / Export database
+  failures in sandboxed or read-only Documents directories.
+- Settings > Backup has a **Database and migration** section: **Export database** streams a ZIP
+  snapshot on the web host and writes one in the desktop app; desktop **Import database** restores a
+  folder-shaped backup and restarts. The **Migrate to Turso** action is visibly gated because the
+  libSQL adapter, token storage and asset migration are not implemented.
+- `docs/production-readiness.md` audits collaboration (PostgreSQL + Redis) and Turso readiness and
+  records the release gates. Turso is explicitly **not ready** for a production migration.
+- Settings > About reports **Database size**, **Assets size** and **Total project size**. The web
+  host reads them from `GET /api/storage/stats`; the desktop app uses a Tauri `storage_stats`
+  command. Database size includes the WAL/SHM files, and total size includes assets.
+- Settings > About has a translated **Feedback / Report Bug** action that opens
+  `https://github.com/dezuhan/khaoyu-note/issues/new` in the browser/desktop shell.
+- Settings has a **Board templates** page rendered as a two-column card grid with icons, names,
+  descriptions, Custom/Built-in labels and Delete buttons, plus Create from selection and Restore
+  built-in actions. The template library has an edit action next to Close that opens this page.
+
+### Changed
+
+- Settings > Performance reads physical GPU names from the operating system (Linux `lspci`,
+  Windows `Win32_VideoController`, macOS `system_profiler`) instead of trusting the sanitized WebGL
+  renderer string. The WebGL row is labelled separately as a hint.
+- Linux desktop builds now apply WebKitGTK's hardware-acceleration policy from the GPU setting
+  (`Always` / `Never`) instead of relying on Chromium-only browser arguments. NVIDIA + Wayland
+  automatically gets `__NV_DISABLE_EXPLICIT_SYNC=1`; opt-in overrides (`KHAOYU_FORCE_GPU`,
+  `KHAOYU_WEBKIT_DMABUF`, `KHAOYU_WEBKIT_COMPOSITING`, `KHAOYU_DEBUG_GRAPHICS`) cover driver
+  workarounds without forcing every Linux user onto software rendering.
+- Settings > Performance has a **Reduced effects** toggle, and performance mode now disables
+  backdrop blur in addition to shadows, the grid and animations.
+- Section pastel colors now resolve against all four themes: light stays pastel, soft light is
+  softened toward its surface, and soft dark/dark keep a visible hue while staying dark (48% section
+  color in dark, 58% in soft dark). Neutral colors such as Mist use a stronger tint (72% dark,
+  78% soft dark) and switch to dark ink so they still read as mist instead of blending into the
+  dark surface. Section ink, title chips, borders and the color-picker swatches follow the theme.
+- Copy and cut are one-shot: the next paste consumes the internal clipboard and clears it. A browser
+  paste of an image or URL is handled only when the internal clipboard is empty, so a screenshot no
+  longer competes with a copied card. Shortcut copy/cut/paste no longer also trigger the browser's
+  native paste handler.
+- Duplicate and paste place the copy to the right of the source group instead of on top of it.
+- Row columns preview drag-and-drop horizontally with a vertical insertion line and a slot ghost;
+  normal cards drop into row children and columns drop into kanban rows.
+- Legacy `kanban` cards are migrated on open into a row column with one child column per former lane
+  and one note per former item.
+
+### Removed
+
+- The Kanban toolbar tool, card type, renderer, gesture handling, template card and MCP
+  `create_card` type are removed.
+
+### Fixed
+
+- Linux WebKitGTK now zooms the board with a transform so card boxes and text scale together at
+  low zoom levels; Chromium/Windows keeps CSS zoom for sharp text reflow.
+- Board/card text is no longer selectable in normal mode, preventing WebKitGTK from selecting every
+  card while dragging near a border. A `selectionchange` guard clears any stray board selection;
+  the active `.is-editing` field opts back into native text selection, and inputs/textarea remain
+  selectable.
+- Linux desktop page scaling no longer diverges from Windows. Tauri's Linux page-zoom hotkey
+  polyfill is disabled and the WebView zoom is reset to 100% at launch, leaving board zoom in the
+  app layer.
+- Row drop feedback no longer uses the vertical-stack line and offset ghost.
+- Cloned columns re-layout their children after duplicate or paste.
+- The reset confirmation modal now sits above the Settings dialog instead of behind it.
+- The column context menu shows **Wrap into kanban** with a disabled state unless exactly two or
+  more plain top-level columns are selected. Rows, nested columns and selections containing any
+  non-column keep the action disabled.
+- Cards inside a column now stay inside that column's 1000-wide z band. A child stays above its own
+  column but can no longer cover a sibling column with a higher z, and nested kanban items remain
+  visible above their child columns.
+- Dropping a card inside a kanban now targets the deepest child column under the pointer instead of
+  its parent row, so the drop preview and insertion work in every lane.
+- A dragged card, including a card dragged out of a column, now sits above every board card and
+  kanban lane for the whole gesture instead of disappearing behind the kanban.
+- The drop insertion line and ghost sit above the dragged card, so the preview is visible even over
+  a kanban or a large column.
+- Dragging a column inside a kanban now targets the row container, so the vertical insertion line
+  and lane ghost appear and the column can be reordered between lanes.
+- Dropping a card tool onto a kanban targets the nearest lane instead of adding the card as a direct
+  child of the row. A row can therefore never become a fake column from a toolbar drop.
+- Clicking a Section no longer leaves it raised above the board. Sections keep their background
+  z-index on click, selection and drag.
+- Clicking a kanban or a row now also refreshes the z-index of every descendant column/card, so the
+  lane contents stay visible immediately instead of waiting for a pointer move to repaint them.
+- Wrap into kanban checks only the current column state: a column that was a row or kanban in the
+  past is eligible again after it is converted back to a normal column; only a current row is
+  rejected.
+
 ## [0.34.0] - 2026-11-08
 
 ### Added

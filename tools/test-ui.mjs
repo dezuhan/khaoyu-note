@@ -54,14 +54,6 @@ const emptyPoint = async (dx = 0, dy = 0) => {
   const viewport = await page.locator("#viewport").boundingBox();
   return { x: viewport.x + viewport.width - 130 + dx, y: viewport.y + viewport.height - 140 + dy };
 };
-async function dragKanbanGrip(fromLocator, x, y) {
-  const grip = await fromLocator.locator(".mn-kanban-grip").first().boundingBox();
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(x, y, { steps: 12 });
-  await page.mouse.up();
-  await page.waitForTimeout(500);
-}
 
 // ---------------------------------------------------------------- boot
 check("app shell visible", await page.locator("#app").isVisible());
@@ -75,7 +67,7 @@ const railToolKeys = await page
   .evaluateAll((els) => els.map((el) => el.dataset.tool));
 check(
   "tool rail hides the temporarily disabled tools",
-  railToolKeys.length === 17,
+  railToolKeys.length === 16,
   String(railToolKeys.length)
 );
 check(
@@ -101,7 +93,6 @@ const expectedWelcomeTypes = [
   "image",
   "file",
   "board",
-  "kanban",
 ];
 check(
   "Welcome template shows every enabled card type",
@@ -355,7 +346,7 @@ await page.fill(".mn-palette-input", "new note");
 await page.waitForTimeout(250);
 check(
   "Command palette filters tools and commands",
-  (await page.locator(".mn-palette-item").allInnerTexts()).some((label) => label.includes("New note"))
+  (await page.locator(".mn-palette-item").allInnerTexts()).some((label) => label.toLowerCase().includes("new note"))
 );
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);
@@ -1145,82 +1136,6 @@ await page.waitForTimeout(200);
 await page.locator(".mn-menu-item", { hasText: "Snap to grid: on" }).click();
 await page.waitForTimeout(200);
 
-// ---------------------------------------------------------------- kanban
-await page.click('.mn-tool[data-tool="kanban"]');
-await page.waitForTimeout(400);
-const kanbanId = await selectedId();
-const kanban = byId(kanbanId);
-check("Kanban tool creates three columns", (await kanban.locator(".mn-kanban-col").count()) === 3);
-const kanbanInitialWidth = await kanban.evaluate((el) => parseFloat(el.style.width) || 0);
-check("Kanban starts at the full board content width", kanbanInitialWidth > 900, `${kanbanInitialWidth}px`);
-const kanbanColumnWidths = await kanban
-  .locator(".mn-kanban-col")
-  .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
-check(
-  "Kanban columns stretch across the card",
-  kanbanColumnWidths.every((width) => width > 200),
-  kanbanColumnWidths.map((width) => Math.round(width)).join(",")
-);
-const kanbanMinHeight = await kanban.evaluate((el) => getComputedStyle(el).minHeight);
-check("Kanban keeps a 500px minimum height", parseFloat(kanbanMinHeight) >= 500, kanbanMinHeight);
-await kanban.locator('[data-action="kanban-add-column"]').click();
-await page.waitForTimeout(450);
-check("Kanban can add a column", (await kanban.locator(".mn-kanban-col").count()) === 4);
-const kanbanWidthAfterAdd = await kanban.evaluate((el) => parseInt(el.style.width, 10) || 0);
-check("Kanban auto-widens when a column is added", kanbanWidthAfterAdd >= 700, `${kanbanWidthAfterAdd}px`);
-const firstKanbanColumn = kanban.locator(".mn-kanban-col").first();
-await firstKanbanColumn.hover();
-await firstKanbanColumn.locator('[data-action="kanban-add-item"]').click();
-await page.waitForTimeout(450);
-check("Kanban can add a card", (await firstKanbanColumn.locator(".mn-kanban-item").count()) === 1);
-const kanbanItemInput = firstKanbanColumn.locator(".mn-kanban-item-input").first();
-await kanbanItemInput.fill("Task A");
-await kanbanItemInput.blur();
-await page.waitForTimeout(250);
-check("Kanban card text saved", (await kanbanItemInput.inputValue()) === "Task A");
-await firstKanbanColumn.hover();
-await firstKanbanColumn.locator('[data-action="kanban-add-item"]').click();
-await page.waitForTimeout(400);
-const secondKanbanInput = firstKanbanColumn.locator(".mn-kanban-item-input").nth(1);
-await secondKanbanInput.fill("Task B");
-await secondKanbanInput.blur();
-await page.waitForTimeout(300);
-const rowsBeforeReorder = firstKanbanColumn.locator(".mn-kanban-item");
-const firstRowBox = await rowsBeforeReorder.first().boundingBox();
-await dragKanbanGrip(rowsBeforeReorder.nth(1), firstRowBox.x + 40, firstRowBox.y + 2);
-const reordered = await firstKanbanColumn
-  .locator(".mn-kanban-item-input")
-  .evaluateAll((els) => els.map((el) => el.value));
-check(
-  "Kanban card can be reordered inside its column",
-  reordered.join("|") === "Task B|Task A",
-  reordered.join("|")
-);
-const secondKanbanColumn = kanban.locator(".mn-kanban-col").nth(1);
-const secondColumnBox = await secondKanbanColumn.boundingBox();
-await dragKanbanGrip(
-  firstKanbanColumn.locator(".mn-kanban-item").first(),
-  secondColumnBox.x + secondColumnBox.width / 2,
-  secondColumnBox.y + 50
-);
-check(
-  "Kanban card drags to another column",
-  (await secondKanbanColumn.locator(".mn-kanban-item").count()) === 1 &&
-    (await firstKanbanColumn.locator(".mn-kanban-item").count()) === 1 &&
-    (await secondKanbanColumn.locator(".mn-kanban-item-input").first().inputValue()) === "Task B"
-);
-await secondKanbanColumn.hover();
-await secondKanbanColumn.locator('[data-action="kanban-remove-item"]').first().click();
-await page.waitForTimeout(450);
-check("Kanban can remove a card", (await secondKanbanColumn.locator(".mn-kanban-item").count()) === 0);
-await firstKanbanColumn.hover();
-await firstKanbanColumn.locator('[data-action="kanban-remove-column"]').click();
-await page.waitForTimeout(450);
-check("Kanban can remove a column", (await kanban.locator(".mn-kanban-col").count()) === 3);
-await page.keyboard.press("Delete");
-await page.waitForTimeout(450);
-check("Kanban board can be deleted", (await byId(kanbanId).count()) === 0);
-
 // Temporarily re-enable the disabled card types so the existing-card behaviour stays covered.
 await page.evaluate(async () => {
   const limits = await import("/js/limits.js");
@@ -1851,7 +1766,7 @@ await page.locator('.mn-template-confirm [data-confirm="apply"]').click();
 await page.waitForTimeout(700);
 check(
   "Template library applies a starter board",
-  (await page.locator(".mn-card-kanban").count()) === 1 &&
+  (await page.locator(".mn-card-column").count()) >= 4 &&
     (await page.locator(".mn-crumb.is-current").innerText()).includes("Kanban board")
 );
 await page.click("#template-btn");
@@ -1956,8 +1871,8 @@ await page.click("#settings-btn");
 await page.waitForTimeout(400);
 check("Settings dialog opens", await page.locator(".mn-prefs-dialog").isVisible());
 check(
-  "Topbar language button is present but disabled",
-  (await page.locator("#language-btn").isVisible()) && (await page.locator("#language-btn").isDisabled())
+  "Topbar language button is enabled",
+  (await page.locator("#language-btn").isVisible()) && !(await page.locator("#language-btn").isDisabled())
 );
 check(
   "Server is the first settings page",
@@ -1966,7 +1881,7 @@ check(
 const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
 check(
   "Settings navigation follows the local-first order",
-  navLabels.join(",") === "Server,Backup,General,Appearance,Tools,Performance,MCP,About",
+  navLabels.join(",") === "Server,Backup,General,Appearance,Tools,Board templates,Performance,MCP,About",
   navLabels.join(", ")
 );
 check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
@@ -2010,11 +1925,32 @@ check("Automatic backup interval is saved", autoBackupDays === 7, String(autoBac
 await page.locator(".mn-account-backup select").selectOption("0");
 await page.locator(".mn-prefs-nav-item", { hasText: "General" }).click();
 await page.waitForTimeout(300);
+const languageSelect = page.locator(".mn-prefs-select select").first();
 check(
-  "Language is merged into General as coming soon",
-  (await page.locator(".mn-prefs-content").innerText()).includes("English only") &&
-    (await page.locator(".mn-prefs-select select").first().isDisabled())
+  "Language selector offers ten languages",
+  (await languageSelect.locator("option").count()) === 10 && !(await languageSelect.isDisabled()),
+  String(await languageSelect.locator("option").count())
 );
+await languageSelect.selectOption("id");
+await page.waitForTimeout(350);
+check(
+  "Toolbar labels follow the selected language",
+  (await page.locator('.mn-tool[data-tool="note"] .mn-tool-label').innerText()) === "Catatan",
+  await page.locator('.mn-tool[data-tool="note"] .mn-tool-label').innerText()
+);
+check(
+  "Menu bar follows the selected language without reload",
+  (await page.locator(".mn-menubar-btn").first().innerText()) === "Berkas",
+  (await page.locator(".mn-menubar-btn").allInnerTexts()).join(",")
+);
+check(
+  "Language switch updates settings labels",
+  (await page.locator(".mn-prefs-nav-item").first().innerText()).includes("Server") &&
+    (await page.locator(".mn-prefs-nav-item").nth(2).innerText()).includes("Umum"),
+  (await page.locator(".mn-prefs-nav").innerText()).replace(/\n/g, ",")
+);
+await page.locator(".mn-prefs-select select").first().selectOption("en");
+await page.waitForTimeout(350);
 const prefsHead = await page.locator(".mn-prefs-head").evaluate((el) => {
   const style = getComputedStyle(el);
   return { background: style.backgroundColor, color: style.color };
@@ -2041,7 +1977,7 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 8, String(await page.locator(".mn-prefs-nav-item").count()));
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 9, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
   "Language and Canvas are merged away",
   !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),
@@ -2055,8 +1991,8 @@ await page.locator(".mn-prefs-nav-item", { hasText: "Tools" }).click();
 await page.waitForTimeout(350);
 const toolLabels = await page.locator(".mn-tool-card-label").allInnerTexts();
 check(
-  "Tools settings lists every tool including Section and Kanban",
-  toolLabels.includes("Section") && toolLabels.includes("Kanban") && toolLabels.length === 20,
+  "Tools settings lists every tool including Section",
+  toolLabels.includes("Section") && !toolLabels.includes("Kanban") && toolLabels.length === 19,
   `${toolLabels.length} labels, section=${toolLabels.includes("Section")}, kanban=${toolLabels.includes("Kanban")}`
 );
 const settingsToolKeys = await page
@@ -2073,7 +2009,7 @@ const toolsGridColumns = await page
 check("Tools are arranged in a two-column grid", toolsGridColumns === 2, String(toolsGridColumns));
 check(
   "Each tool card shows an icon before its name",
-  (await page.locator(".mn-tool-card-icon svg").count()) === 20
+  (await page.locator(".mn-tool-card-icon svg").count()) === 19
 );
 const disabledToolCards = await page.evaluate(() =>
   [...document.querySelectorAll(".mn-tool-card.is-disabled")].map((card) => ({
@@ -2124,7 +2060,7 @@ check("GPU acceleration defaults to on", await gpuToggle.locator("input").isChec
 const perfLabels = await page.locator(".mn-prefs-label").allInnerTexts();
 check(
   "Performance lists GPU and CPU details",
-  ["GPU", "GPU vendor", "Graphics API", "CPU", "Memory", "Platform", "WebView"].every((label) => perfLabels.includes(label)),
+  ["GPU (WebGL)", "GPU vendor (WebGL)", "Graphics API", "CPU", "Memory", "Platform", "WebView"].every((label) => perfLabels.includes(label)),
   perfLabels.join(", ")
 );
 check(
@@ -2421,34 +2357,16 @@ check("Board persists card edits", persisted.max >= 15, JSON.stringify(persisted
 check("Single-file header keeps the template menu visible", await page.locator("#template-btn").isVisible());
 check("Sync and Share are hidden from the header", (await page.locator("#sync-state").isHidden()) && (await page.locator("#share-btn").isHidden()));
 await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
-await page.locator(".mn-menu-item", { hasText: "Documentation" }).click();
-await page.waitForTimeout(250);
+await page.waitForTimeout(200);
+const documentationItem = page.locator(".mn-menu-item", { hasText: "Documentation" });
 check(
-  "Help > Documentation opens the tabbed documentation page",
-  (await page.locator(".mn-modal-title").innerText()) === "Documentation" &&
-    (await page.locator(".mn-docs-nav-item").count()) >= 12 &&
-    (await page.locator(".mn-docs").innerText()).includes("local-first")
+  "Help > Documentation is temporarily disabled",
+  (await documentationItem.count()) === 1 &&
+    (await documentationItem.first().evaluate((el) => el.classList.contains("is-disabled"))),
+  (await documentationItem.first().innerText().catch(() => "")) || "missing"
 );
-check(
-  "Documentation navigation includes MCP and API sections",
-  (await page.locator('.mn-docs-nav-item[data-doc="mcp"]').count()) === 1 &&
-    (await page.locator('.mn-docs-nav-item[data-doc="api"]').count()) === 1
-);
-await page.locator('.mn-docs-nav-item[data-doc="sync"]').click();
+await page.keyboard.press("Escape");
 await page.waitForTimeout(150);
-check(
-  "Documentation switches to the Server sync section",
-  (await page.locator(".mn-docs").innerText()).includes("Sync is disabled")
-);
-await page.locator('.mn-docs-nav-item[data-doc="mcp"]').click();
-await page.waitForTimeout(150);
-check(
-  "Documentation MCP section lists the board tools",
-  (await page.locator(".mn-docs").innerText()).includes("khaoyu-note-mcp") &&
-    (await page.locator(".mn-docs").innerText()).includes("create_card")
-);
-await page.locator(".mn-modal-close").click();
-check("Documentation page closes", (await page.locator(".mn-docs").count()) === 0);
 
 const linkCard = page.locator('.mn-card[data-type="link"]').first();
 if (await linkCard.count()) {

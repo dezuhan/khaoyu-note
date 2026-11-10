@@ -8,20 +8,14 @@ export function hasRole(role, minimum) {
   return Boolean(role) && ROLE_RANK[role] >= ROLE_RANK[minimum];
 }
 
-export function projectRole(db, projectId, accountId) {
-  return db
-    .prepare("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?")
-    .get(projectId, accountId)?.role;
+export async function projectRole(db, projectId, accountId) {
+  return (await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, accountId]))?.role;
 }
 
-export function projectSnapshot(db, projectId) {
-  const project = db
-    .prepare("SELECT id, name, revision, public_sharing_enabled, owner_account_id FROM projects WHERE id = ? AND deleted_at IS NULL")
-    .get(projectId);
+export async function projectSnapshot(db, projectId) {
+  const project = (await db.get("SELECT id, name, revision, public_sharing_enabled, owner_account_id FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
   if (!project) return null;
-  const snapshot = db
-    .prepare("SELECT revision, doc FROM project_snapshots WHERE project_id = ?")
-    .get(projectId);
+  const snapshot = (await db.get("SELECT revision, doc FROM project_snapshots WHERE project_id = ?", [projectId]));
   let doc = { cards: [], connections: [], trash: [] };
   if (snapshot?.doc) {
     try {
@@ -72,21 +66,15 @@ function sanitizedDoc(doc) {
   };
 }
 
-function nestedProjectDocs(db, project, depth = 0, seen = new Set()) {
+async function nestedProjectDocs(db, project, depth = 0, seen = new Set()) {
   if (depth >= 5) return { nested: [], excluded: 0 };
-  const children = db
-    .prepare(
-      "SELECT id, name, revision, owner_account_id FROM projects WHERE parent_project_id = ? AND deleted_at IS NULL ORDER BY created_at"
-    )
-    .all(project.id);
+  const children = (await db.all("SELECT id, name, revision, owner_account_id FROM projects WHERE parent_project_id = ? AND deleted_at IS NULL ORDER BY created_at", [project.id]));
   const nested = [];
   let excluded = 0;
   for (const child of children) {
     if (seen.has(child.id)) continue;
     seen.add(child.id);
-    const members = db
-      .prepare("SELECT COUNT(*) AS count, SUM(CASE WHEN account_id != ? THEN 1 ELSE 0 END) AS others FROM project_members WHERE project_id = ?")
-      .get(project.owner_account_id, child.id);
+    const members = (await db.get("SELECT COUNT(*) AS count, SUM(CASE WHEN account_id != ? THEN 1 ELSE 0 END) AS others FROM project_members WHERE project_id = ?", [project.owner_account_id, child.id]));
     const eligible =
       child.owner_account_id === project.owner_account_id &&
       Number(members.count) === 1 &&
@@ -95,16 +83,14 @@ function nestedProjectDocs(db, project, depth = 0, seen = new Set()) {
       excluded += 1;
       continue;
     }
-    const snapshot = db
-      .prepare("SELECT doc FROM project_snapshots WHERE project_id = ?")
-      .get(child.id);
+    const snapshot = (await db.get("SELECT doc FROM project_snapshots WHERE project_id = ?", [child.id]));
     let doc;
     try {
       doc = JSON.parse(snapshot?.doc || "{}");
     } catch {
       continue;
     }
-    const deeper = nestedProjectDocs(db, child, depth + 1, seen);
+    const deeper = await nestedProjectDocs(db, child, depth + 1, seen);
     nested.push({
       id: child.id,
       name: child.name,
@@ -118,12 +104,12 @@ function nestedProjectDocs(db, project, depth = 0, seen = new Set()) {
   return { nested, excluded };
 }
 
-export function sharedPayload(db, share) {
-  const snapshot = projectSnapshot(db, share.project_id);
+export async function sharedPayload(db, share) {
+  const snapshot = await projectSnapshot(db, share.project_id);
   if (!snapshot) return null;
   const { project, doc } = snapshot;
   if (share.scope === "project") {
-    const nested = nestedProjectDocs(db, project);
+    const nested = await nestedProjectDocs(db, project);
     return {
       scope: "project",
       permission: share.permission,
@@ -157,32 +143,22 @@ export function sharedPayload(db, share) {
   };
 }
 
-export function createInvitation(db, { projectId, email, role, invitedBy, expiresAt }) {
+export async function createInvitation(db, { projectId, email, role, invitedBy, expiresAt }) {
   const token = randomToken(32);
   const id = crypto.randomUUID();
-  db.prepare(
-    "INSERT INTO project_invitations (id, project_id, email, role, token_hash, invited_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(id, projectId, email.toLowerCase(), role, hashToken(token), invitedBy, Date.now(), expiresAt);
+  (await db.run("INSERT INTO project_invitations (id, project_id, email, role, token_hash, invited_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [id, projectId, email.toLowerCase(), role, hashToken(token), invitedBy, Date.now(), expiresAt]));
   return { id, token };
 }
 
-export function acceptInvitation(db, { token, account }) {
-  const row = db
-    .prepare(
-      `SELECT * FROM project_invitations
-       WHERE token_hash = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?`
-    )
-    .get(hashToken(token), Date.now());
+export async function acceptInvitation(db, { token, account }) {
+  const row = (await db.get(`SELECT * FROM project_invitations
+       WHERE token_hash = ? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > ?`, [hashToken(token), Date.now()]));
   if (!row) return null;
   if (String(row.email).toLowerCase() !== String(account.email).toLowerCase()) return null;
-  const existing = db
-    .prepare("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?")
-    .get(row.project_id, account.id);
+  const existing = (await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [row.project_id, account.id]));
   if (existing) return { alreadyMember: true, projectId: row.project_id, role: existing.role };
-  db.prepare(
-    "INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, ?, ?)"
-  ).run(row.project_id, account.id, row.role, Date.now());
-  db.prepare("UPDATE project_invitations SET accepted_at = ? WHERE id = ?").run(Date.now(), row.id);
+  (await db.run("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, ?, ?)", [row.project_id, account.id, row.role, Date.now()]));
+  (await db.run("UPDATE project_invitations SET accepted_at = ? WHERE id = ?", [Date.now(), row.id]));
   return { projectId: row.project_id, role: row.role, invitationId: row.id };
 }
 
@@ -204,15 +180,12 @@ export function cardInShareScope(doc, share, cardId) {
   return false;
 }
 
-export function createShareLink(db, { projectId, scope, targetId, permission, passwordHash, expiresAt, downloadAllowed, createdBy }) {
+export async function createShareLink(db, { projectId, scope, targetId, permission, passwordHash, expiresAt, downloadAllowed, createdBy }) {
   const token = `khn_share_${randomToken(32)}`;
   const id = crypto.randomUUID();
-  db.prepare(
-    `INSERT INTO share_links
+  (await db.run(`INSERT INTO share_links
      (id, project_id, scope, target_id, permission, token_hash, password_hash, download_allowed, created_by, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id,
     projectId,
     scope,
     targetId,
@@ -222,40 +195,29 @@ export function createShareLink(db, { projectId, scope, targetId, permission, pa
     downloadAllowed ? 1 : 0,
     createdBy,
     Date.now(),
-    expiresAt || null
-  );
+    expiresAt || null]));
   return { id, token };
 }
 
-export function findShare(db, token) {
-  return db
-    .prepare("SELECT * FROM share_links WHERE token_hash = ?")
-    .get(hashToken(token));
+export async function findShare(db, token) {
+  return (await db.get("SELECT * FROM share_links WHERE token_hash = ?", [hashToken(token)]));
 }
 
-export function shareBlocked(db, { shareId, ip, config }) {
+export async function shareBlocked(db, { shareId, ip, config }) {
   const since = Date.now() - config.loginWindowMinutes * 60_000;
-  const row = db
-    .prepare(
-      "SELECT COUNT(*) AS count FROM share_attempts WHERE share_id = ? AND ip_hash = ? AND success = 0 AND created_at >= ?"
-    )
-    .get(shareId, hashIp(ip, config.secret) || "unknown", since);
+  const row = (await db.get("SELECT COUNT(*) AS count FROM share_attempts WHERE share_id = ? AND ip_hash = ? AND success = 0 AND created_at >= ?", [shareId, hashIp(ip, config.secret) || "unknown", since]));
   const count = Number(row.count);
   return count >= config.loginMaxAttempts;
 }
 
-export function recordShareAttempt(db, { shareId, ip, success, config }) {
-  db.prepare(
-    "INSERT INTO share_attempts (share_id, ip_hash, success, created_at) VALUES (?, ?, ?, ?)"
-  ).run(shareId, hashIp(ip, config.secret) || "unknown", success ? 1 : 0, Date.now());
+export async function recordShareAttempt(db, { shareId, ip, success, config }) {
+  (await db.run("INSERT INTO share_attempts (share_id, ip_hash, success, created_at) VALUES (?, ?, ?, ?)", [shareId, hashIp(ip, config.secret) || "unknown", success ? 1 : 0, Date.now()]));
 }
 
-export function revokeShare(db, projectId, shareId, actorId, config) {
-  const result = db
-    .prepare("UPDATE share_links SET revoked_at = ? WHERE id = ? AND project_id = ? AND revoked_at IS NULL")
-    .run(Date.now(), shareId, projectId);
+export async function revokeShare(db, projectId, shareId, actorId, config) {
+  const result = (await db.run("UPDATE share_links SET revoked_at = ? WHERE id = ? AND project_id = ? AND revoked_at IS NULL", [Date.now(), shareId, projectId]));
   if (!result.changes) return false;
-  writeAudit(db, {
+  await writeAudit(db, {
     actorAccountId: actorId,
     action: "share.revoked",
     resourceType: "share_link",
@@ -265,11 +227,9 @@ export function revokeShare(db, projectId, shareId, actorId, config) {
   return true;
 }
 
-export function rotateShare(db, projectId, shareId, actorId) {
+export async function rotateShare(db, projectId, shareId, actorId) {
   const token = `khn_share_${randomToken(32)}`;
-  const result = db
-    .prepare("UPDATE share_links SET token_hash = ? WHERE id = ? AND project_id = ? AND revoked_at IS NULL")
-    .run(hashToken(token), shareId, projectId);
+  const result = (await db.run("UPDATE share_links SET token_hash = ? WHERE id = ? AND project_id = ? AND revoked_at IS NULL", [hashToken(token), shareId, projectId]));
   if (!result.changes) return null;
   void actorId;
   return token;

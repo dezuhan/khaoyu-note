@@ -10,7 +10,7 @@ landing page is available at [`index.html`](index.html).
 
 ![Dark theme](shots/board-dark.png)
 
-Creating the welcome board seeds one example of every enabled card type, two connection arrows, a kanban with sample cards, a sketch with sample strokes and a nested board card:
+Creating the welcome board seeds one example of every enabled card type, two connection arrows, a sketch with sample strokes and a nested board card:
 
 ![Welcome template with every enabled tool](shots/welcome-all-tools.png)
 
@@ -26,8 +26,8 @@ Document page editor and drawing page editor:
 
 ![Drawing editor](shots/drawing-editor.png)
 
-Status: working MVP. Every behavior below is covered by an automated Playwright suite (263 checks
-defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (17 checks). Both run in
+Status: working MVP. Every behavior below is covered by an automated Playwright suite (268 checks
+defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (16 checks). Both run in
 CI. The menu bar sits above the file header, its Share control manages per-board access, right-clicking
 a card offers Share link, and **Help > Documentation** opens the offline guide.
 
@@ -97,17 +97,17 @@ the app works offline; only optional video and map embeds need the internet.
 | Section surface | implemented: a pastel background surface with a small editable title. It always sits below every regular card, cannot be brought to the front or placed in a column, and resizes freely from all four edges and four corners. Selecting it opens a bottom toolbar with eight pastel swatches and a position-only lock; the lock still allows title and color edits. |
 | Lock position | implemented: right-click Lock position keeps a card selectable and unlockable while blocking drag, resize, inline editing, column and sheet handles; the card shows a lock badge |
 | Card conversions | implemented: right-click a note to Convert to document with its text preserved, or a column to Convert to board with its items moved into the new board |
-| Kanban board | implemented: auto width from the column count, 500 px minimum height (also inside a column), add/remove columns and cards, inline titles, pointer-drag cards to reorder inside a column or move between columns and other kanban boards |
+| Kanban layout | implemented: select two or more columns, then right-click **Wrap into kanban**. The kanban is a row container of columns with inline titles and pointer-drag between columns; there is no separate kanban tool or card type |
 | Connections / lines | implemented: drag a line between cards, columns, boards or canvas points; endpoints snap to items, are draggable to reattach, and the midpoint can be dragged to curve the line; endpoint and midpoint handles appear only after the line is clicked, straight by default, purely a visual annotation that never groups or moves cards |
 | Board nesting | implemented, nested boards with breadcrumb navigation and a mini board thumbnail on the card |
-| Language | a disabled globe button in the top bar and a Display language row in Settings > General that lists planned languages and a disabled Coming soon action; all UI copy is English |
+| Language | Settings > General offers 10 display languages: English, Português (Brasil), Bahasa Indonesia, Español, Français, Deutsch, 日本語, 한국어, 简体中文 and Русский. The language is stored locally, can be changed from Settings > General or the topbar globe, and updates the settings surface, toolbar names, menu bar, command palette, context-menu actions and Backup page immediately; board content is never translated. `npm run i18n:audit` checks all 190 wired keys in all ten languages |
 | Design system states | audited: buttons use hover, focus, active and disabled states; inputs use the Khaoyu focus glow; menubar, header search and palette have complete keyboard states; remaining gaps are documented in docs/design-system-audit.md |
 | Single-file header | implemented: multi-project Home gallery is disabled for now; the app opens one active file, the menu-bar logo and Template button open a template library, and the breadcrumb shows only the current file path |
 | Menu bar and command palette | implemented: the fixed menu bar has three columns (logo and menus, centered Search commands, icon actions), grouped command menus, and the command palette with Recently used, Tools, File, Edit, View and Help groups plus arrow keys, Enter and Escape |
 | Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; automatic backups can run daily, every 3, 7 or 14 days, or monthly (30 days) while the app is open, and a missed interval is caught up on the next launch; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
 | Local accounts (M1) | disabled in this local-first deploy: boards and settings work without an account, the account button and Settings > Account are hidden, and desktop/web writes no longer require sign-in. Existing account data stays in SQLite but is not used by the UI. |
-| Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color, column and kanban |
+| Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color and column |
 | Settings | implemented: token-based styling with only the essentials (Server, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done. Account is disabled in this local-first deploy. |
 | Tool rail | implemented: order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and their cards are hidden from boards and templates. Hiding a tool in Settings only removes the rail button and leaves the feature available. |
 | Tool drag to canvas | implemented: floating label plus dashed drop preview, card created at the pointer, works reliably in WebView2 because it does not depend on HTML5 drag (board/document/image keep their own flows) |
@@ -123,7 +123,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Export | partial: JSON board file, plus HTML and Markdown from the document editor |
 | Search | command palette searches commands; searching card content is available through the MCP server only |
 | System file drop | implemented: native drag and drop stores dropped files as assets, images open as image cards, audio and video use their media cards, raw files and all other documents become file cards; a drop overlay appears while dragging |
-| Template library | implemented: Blank board, Welcome board, Project plan, Kanban board, Meeting notes and Moodboard starters replace the active file and can be undone; applying one to a non-empty board asks for overwrite confirmation first |
+| Template library | implemented: built-in starters plus custom templates created from any board selection; applying one replaces the active file and can be undone, while a non-empty board asks for overwrite confirmation. Settings > Board templates manages both kinds and can restore deleted built-ins |
 | Labels and reactions | out of scope for this local app |
 | Sharing and sync | disabled in this local-first build: Share and Sync are hidden, Settings > Server shows local runtime only, and no service/account connection is exposed. The `service/` code remains for a future deployment. |
 | Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Teams and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, team creation and members, and the full audit feed. |
@@ -221,6 +221,31 @@ Browser limitations: dropping a local file path from the OS is not available (up
 picker instead), and folder restore plus the stdio MCP server remain desktop-only. Windows may ask to
 allow Node through the firewall the first time another device connects.
 
+## GPU acceleration and Linux graphics
+
+The desktop host owns the GPU policy, not the web UI:
+
+- Windows uses WebView2; the GPU toggle switches `--disable-gpu` and `--disable-gpu-compositing`.
+- macOS uses the system WebKit GPU path.
+- Linux uses WebKitGTK. Settings > Performance now applies WebKit's
+  `hardware-acceleration-policy` (`Always` when GPU acceleration is on, `Never` when off) and shows
+  a Linux-specific note. Restart after changing it.
+
+Useful Linux environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `KHAOYU_DEBUG_GRAPHICS=1` | logs the chosen policy and graphics environment at startup |
+| `KHAOYU_FORCE_GPU=1` | clears inherited `WEBKIT_DISABLE_*` / `LIBGL_ALWAYS_SOFTWARE` variables before WebKit starts |
+| `KHAOYU_WEBKIT_DMABUF=0` | sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`; use when the window flickers on NVIDIA |
+| `KHAOYU_WEBKIT_COMPOSITING=0` | sets `WEBKIT_DISABLE_COMPOSITING_MODE=1`; last resort, software compositing |
+
+On NVIDIA + Wayland the host sets `__NV_DISABLE_EXPLICIT_SYNC=1` automatically because it avoids a
+WebKitGTK protocol failure without a rendering-performance cost. Do not set
+`WEBKIT_DISABLE_DMABUF_RENDERER` or `WEBKIT_DISABLE_COMPOSITING_MODE` unconditionally: both move
+working machines to the slower path. Settings > Performance also has a **Reduced effects** toggle
+that disables backdrop blur, shadows, the dot grid and transitions.
+
 ## Self-hosted service foundation and accounts (Milestones 1 and 2)
 
 The `service/` directory contains the self-hosted service: one Node 24 HTTP process, a relational
@@ -277,7 +302,7 @@ immediately, and the verify UI is hidden. Reset mail uses SMTP when configured a
 otherwise the outbox. The service tests run with:
 
 ```powershell
-node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
+node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs service/test/storage.test.mjs service/test/storage-migrations.test.mjs service/test/postgres-runtime.test.mjs service/test/redis-bus.test.mjs service/test/config.test.mjs
 node tools/test-sync.mjs
 ```
 
@@ -386,8 +411,6 @@ node tools/test-column-layout.mjs
 # column title is editable in place
 node tools/test-column-title.mjs
 
-# kanban scrollbar inside a column is draggable
-node tools/test-kanban-scroll.mjs
 
 # a tool dropped on a column becomes its child
 node tools/test-tool-drop-column.mjs
@@ -423,7 +446,7 @@ node tools/test-disabled-cards.mjs
 node tools/test-auth-web.mjs
 
 # self-hosted service and account tests (Node 24, temp databases)
-node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs
+node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs service/test/storage.test.mjs service/test/storage-migrations.test.mjs service/test/postgres-runtime.test.mjs service/test/redis-bus.test.mjs service/test/config.test.mjs
 
 # live security smoke check against a running service (use its frontend port)
 node tools/check-service-security.mjs --base http://127.0.0.1:18080 --credentials target/service-dev-credentials.json
@@ -443,16 +466,16 @@ dispatch. The separate `desktop-release.yml` stays tag-only.
 The UI suite exercises: boot, tool rail, card creation, text editing, drag, resize, undo/redo,
 to-do items, comments, table cells, column drop, zoom, settings modal and custom select, theme
 switching, the disabled Home state, nested board breadcrumbs, document editor, drawing editor, context
-menu, and persistence (263 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
+menu, and persistence (268 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
 checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
-boards, connections and tree deletion (17 checks).
+boards, connections and tree deletion (16 checks).
 
-Built artifacts are copied to `dist/`. The files below are the last built release (0.34.0):
+Built artifacts are copied to `dist/`. The files below are the last built release (0.35.0):
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.34.0_x64-setup.exe` | 4.17 MiB | NSIS installer (app and MCP binary) |
-| `Khaoyu Note_0.34.0_x64_en-US.msi` | 6.78 MiB | MSI installer (app and MCP binary) |
+| `Khaoyu Note_0.35.0_x64-setup.exe` | 4.17 MiB | NSIS installer (app and MCP binary) |
+| `Khaoyu Note_0.35.0_x64_en-US.msi` | 6.78 MiB | MSI installer (app and MCP binary) |
 | `KhaoyuNote.exe` | 13.87 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.71 MiB | standalone MCP server for AI agents |
 
@@ -491,6 +514,10 @@ self-hosted service, accounts, sharing and the planned AI assistant.
 5. Image variants: thumbnails for large uploads, crop/background modes.
 6. Optional sync layer for importing or mirroring boards from other tools.
 7. Optional WebGPU/WebGL rendering path if boards grow past DOM performance limits.
+
+## Production readiness
+
+See `docs/production-readiness.md` for the collaboration, Turso and single-user release audit.
 
 ## Legal note
 

@@ -1,7 +1,7 @@
 {
   "name": "khaoyu-note-web",
   "private": true,
-  "version": "0.34.0",
+  "version": "0.35.0",
   "type": "module",
   "description": "Local web host for Khaoyu Note, backed by the same SQLite database as the desktop app",
   "license": "AGPL-3.0-only",
@@ -26,7 +26,7 @@
     "service:bootstrap": "node service/src/cli.mjs bootstrap",
     "service:backup": "node service/src/cli.mjs backup",
     "service:restore": "node service/src/cli.mjs restore",
-    "test:service": "node --test service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs",
+    "test:service": "node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs service/test/storage.test.mjs service/test/storage-migrations.test.mjs service/test/postgres-runtime.test.mjs service/test/redis-bus.test.mjs service/test/config.test.mjs",
     "test:sync": "node --no-warnings tools/test-sync.mjs",
     "test:update": "node --no-warnings tools/test-update.mjs",
     "test:auto-backup": "node --no-warnings tools/test-auto-backup.mjs",
@@ -37,7 +37,8 @@
     "test:shares-ui": "node tools/test-shares-ui.mjs",
     "test:share-view": "node tools/test-share-view.mjs",
     "test:onboarding": "node tools/test-onboarding.mjs",
-    "dist:checksums": "node tools/checksums.mjs --dir dist"
+    "dist:checksums": "node tools/checksums.mjs --dir dist",
+    "i18n:audit": "node tools/i18n-audit.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3"

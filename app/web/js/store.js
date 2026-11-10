@@ -1,7 +1,7 @@
 // Application state, undo history and persistence scheduling.
 
 import * as bridge from "./bridge.js";
-import { createCard, layoutColumns, newBoardDoc, uid, welcomeBoard } from "./model.js";
+import { createCard, layoutColumns, migrateLegacyKanban, newBoardDoc, uid, welcomeBoard } from "./model.js";
 
 export const state = {
   board: null,
@@ -359,6 +359,9 @@ export async function openBoard(id, { flush = true } = {}) {
     doc.id = id;
   }
   if (!Array.isArray(doc.trash)) doc.trash = [];
+  if (migrateLegacyKanban(doc)) {
+    doc.updatedAt = Date.now();
+  }
   state.board = doc;
   if (doc.theme) applyTheme(doc.theme);
   layoutColumns(doc);

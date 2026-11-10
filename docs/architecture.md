@@ -36,7 +36,8 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `comments-panel.js` | top bar comments popup: collects threads across the board tree, navigates to cards |
 | `notifications.js` | top bar notification center: ingests comment activity, unread badge, read/unread/remove/delete-all actions, persists through app settings |
 | `context-toolbar.js` | floating bottom toolbar: markdown formatting for note/heading text, Move/Pen/Eraser for drawing |
-| `settings.js` | preferences dialog: General, Appearance, Tools, Performance, Backup and the Account, MCP and About pages |
+| `settings.js` | preferences dialog: General, Appearance, Tools, Board templates, Performance, Backup and the Account, MCP and About pages |
+| `i18n.js` | ten-language settings localization, persisted in `mn.language`; board content is never translated |
 | `sync.js` / `sync-ui.js` | opt-in per-board sync client, plus its dialog and status pill |
 | `share.js` / `share-ui.js` | service sharing API client and the board or card share panel |
 | `command-palette.js` | Ctrl+K command palette with recently used commands |
@@ -44,7 +45,7 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `image-crop.js` | crop overlay for image cards and link header images |
 | `preview.js` | mini board painter used by home cards and board cards |
 | `limits.js` | upload size cap, blocked-extension policy, and the temporarily disabled tool list |
-| `onboarding.js` | first-run service or account prompt |
+| `setup.js` | first-run storage setup after reset: single user, local SQLite, Turso and collaboration choices |
 | `documentation.js` | offline Help > Documentation content |
 | `time.js` | absolute comment timestamps |
 | `icons.js` | inline SVG icon set |
@@ -97,12 +98,18 @@ stray wheel event cannot silently scroll the canvas origin away from `view.pan`.
 ```
 
 Types: `note`, `heading`, `link`, `todo`, `document`, `comment`, `table`, `color`, `sketch`,
-`drawing`, `image`, `audio`, `video`, `map`, `file`, `board`, `column`, `kanban`. A column is a
+`drawing`, `image`, `audio`, `video`, `map`, `file`, `board`, `column`. A column is a
 container whose children point at it through `parentId`; that link is cleared when a card is dragged
 out of a column. Link cards open through the Rust `open_external` command, which validates http(s)
 and launches the system default browser instead of a WebView2 child window.
 
-New Kanban cards are created with `fullWidth: true` and a width of the visible canvas minus 96 px, and their columns use `flex: 1 1 168px` so they spread across the full card instead of leaving an empty strip. Adding a column only grows the card when the content minimum exceeds its current width. Kanban cards keep a `columns` array, each with an `id`, a `title` and an `items` array of `{id, text}`. The card has no fixed aspect: its width is recomputed on every add/remove column (`20 + n * 168 + gaps`) and its minimum height is 500 px, also when the card is a child of a column (the column then grows around it). Every mutation (add/remove column, add/remove card, edit title) runs through `checkpoint()`/`markDirty("save")`. Kanban items use a pointer drag (not HTML5 drag): grabbing the grip creates a floating ghost, `elementFromPoint` resolves the target column, the vertical midpoint of the remaining rows computes the insertion index, and a drop line previews the position. Dropping reorders inside the same column, moves between columns, or moves to a column of another kanban card; the mutation checkpoints and re-renders. The MCP `create_card` tool accepts `type: "kanban"` and seeds Backlog/In progress/Done columns.
+Kanban is no longer a card type or a tool. Select at least two top-level columns and use the
+right-click action **Wrap into kanban**; the selected columns become children of a column with
+`direction: "row"` and `kanban: true`. The row container lays its column children horizontally and
+each child lays its own cards vertically. This keeps one container model for columns, rows and
+kanban-like layouts. Legacy `kanban` cards are migrated on open into a row column with one child
+column per former lane and one note per former item. The MCP `create_card` tool no longer accepts
+`type: "kanban"`.
 
 Freehand drawing is a normal card type (`drawing`) whose data is a normalized array of points and a fixed 3 px stroke width, rendered as an SVG path. The Draw tool captures pointer points into a preview SVG, then creates the card with a bounding box and `aspect` so it can be selected, moved and deleted like any other card, but never reshaped; Eraser hit-tests drawing cards and sends them to the board Trash. A fixed bottom `context-toolbar.js` shows Markdown-style commands (bold, italic, underline, strike, code block, bullet and numbered lists) while a note or heading is selected or edited, and switches to Move/Pen/Eraser while the Draw tool or a drawing card is active.
 
@@ -110,7 +117,7 @@ To-do items carry a burger handle beside the remove button; pointer drag reorder
 
 Card deletion keeps a per-board `trash` array. `moveCardsToTrash` groups a column with its children, stores deep copies of those cards and any connections touching them, removes the cards/connections from the live board, and checkpoints; `restoreTrashEntry` re-adds the group (detaching a child only if its column was permanently removed) and `emptyTrashEntries` clears the list. The Trash tool deletes the current selection when there is one, otherwise it opens a modal listing every deleted group with Restore and Delete plus an Empty trash confirmation. The array is stored in a `trash` TEXT column on `boards`; `write_doc` preserves it when a stale document omits the field.
 
-Auto height: `measureHeights` re-measures every card whose height is content driven (note, heading, link, todo, document, comment, table, board, audio, file) and `applyGeometry` leaves their CSS height unset so the DOM content decides it. Fixed-height types (image, video, sketch, map, color, column, kanban) use `CARD_ASPECTS` or their stored height instead. Mutations that change content without a full board re-render (adding or removing a todo item, sending a comment, editing a field) call `syncCardHeight`/`syncAutoHeight`, which also re-lays out a containing column so a growing child never overlaps the next card.
+Auto height: `measureHeights` re-measures every card whose height is content driven (note, heading, link, todo, document, comment, table, board, audio, file) and `applyGeometry` leaves their CSS height unset so the DOM content decides it. Fixed-height types (image, video, sketch, map, color, column) use `CARD_ASPECTS` or their stored height instead. Mutations that change content without a full board re-render (adding or removing a todo item, sending a comment, editing a field) call `syncCardHeight`/`syncAutoHeight`, which also re-lays out a containing column so a growing child never overlaps the next card.
 
 While a table card is selected or focused, `render.js` overlays a spreadsheet header: a grid of A/B/C column letters above the grid (with AA, AB, ... after Z) and one number per row on the left, both generated from the current row and column counts and rebuilt on every add-row/add-column render. The labels are non-interactive and sit outside the card, so they never change the table layout. A right-edge handle (`data-sheet-add-column`) adds one empty column for every 80 px dragged to the right and removes columns when dragged left, while a bottom handle (`data-sheet-add-row`) adds one empty row for every 28 px dragged down and removes rows when dragged up. Removal checks the affected cells, and when any contain text `confirmAction` opens a modal before the mutation; all paths use `checkpoint()`/`markDirty("board")`. The corner resize grip resizes the sheet width and scales existing column widths proportionally. The divider between each pair of header labels is itself the drag target (`data-col-resize`), centred on the header border with a transparent 9 px hit area and an accent line on hover (its pointer events are enabled only while the sheet is selected or focused): dragging it updates one entry in `card.colWidths`, keeps the other columns at their stored pixel widths, and grows or shrinks `card.w` to the new sum. The `<colgroup>` and the header grid use the same pixel widths, so columns stay aligned.
 
@@ -263,7 +270,7 @@ writes both the JSON preference and the dedicated key, then offers "Restart app"
 contains both flags while the toggle is off.
 
 The window is built with `drag_and_drop(true)`, so files dragged from Explorer become OS drops handled
-by `file-drop.js`. Internal drags (tool rail, kanban cards and board cards) use pointer events instead
+by `file-drop.js`. Internal drags (tool rail and board cards) use pointer events instead
 of HTML5 drag: a `pointerdown` arms the drag, movement past a threshold creates a floating ghost and
 drop preview, `elementFromPoint` resolves the target, and `pointerup` creates the card or reorders the
 tools. Internal drags therefore never depend on HTML5 `dragstart` firing from a button.
@@ -389,6 +396,12 @@ desktop-only; the browser uses the file picker for uploads.
 `service/` is a standalone Node 24 process for the Milestone 1 self-hosted foundation. It loads
 configuration from `KHAOYU_SERVICE_*` environment variables, refuses to start when the secret is
 missing, short, repetitive or a placeholder, and fails when a migration is pending.
+
+The service is moving to a team backend with PostgreSQL as the system of record and Redis for
+cross-instance realtime coordination. The storage adapter, configuration and Compose services are in
+progress; the decision record and rollout phases are in
+[backend-postgres-redis.md](backend-postgres-redis.md). The desktop app and local web host stay on
+SQLite.
 
 The SQLite schema covers accounts, sessions, projects, project memberships, project snapshots, audit
 rows and content-addressed objects. Migrations live in `service/src/migrations` as paired up and down
@@ -624,12 +637,11 @@ step. This is simpler than a transaction-id scheme and is accurate for a single-
   Home state, zoom, settings with the custom select, theme switching, context menu and persistence.
 - `tools/test-save-conflict.mjs`, `tools/test-save-retry.mjs`, `tools/test-board-selection.mjs`,
   `tools/test-rename.mjs`, `tools/test-board-card-title.mjs`, `tools/test-column-layout.mjs`,
-  `tools/test-column-title.mjs`, `tools/test-kanban-scroll.mjs`, `tools/test-tool-drop-column.mjs`,
+  `tools/test-column-title.mjs`, `tools/test-tool-drop-column.mjs`,
   `tools/test-wrap-selection.mjs`, `tools/test-tooltips.mjs`, `tools/test-line-area.mjs`,
   `tools/test-card-features.mjs`, `tools/test-web-mode.mjs` and `tools/test-fonts.mjs` cover
   conflict resolution, failed-save retry, the boot board choice, the breadcrumb rename editor, the
-  parent board card title, column layout after a nested board, the inline column title, kanban
-  scrolling inside a column, dropping a tool straight into a column, the wrap-in-column guard, the
+  parent board card title, column layout after a nested board, the inline column title, dropping a tool straight into a column, the wrap-in-column guard, the
   code-block icon and design-system tooltips, the line snap distance and hit area, lock position,
   card conversions and sheet scrolling in a column, the localhost SQLite host and the variable-font
   weight ranges.

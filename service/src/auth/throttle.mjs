@@ -5,30 +5,24 @@ function emailHash(email) {
   return sha256(String(email || "").trim().toLowerCase());
 }
 
-export function recordLoginAttempt(db, { email, ip, success, secret }) {
-  db.prepare(
-    "INSERT INTO login_attempts (email_hash, ip_hash, success, created_at) VALUES (?, ?, ?, ?)"
-  ).run(
-    emailHash(email),
-    hashIp(ip, secret) || "unknown",
-    success ? 1 : 0,
-    Date.now()
+export async function recordLoginAttempt(db, { email, ip, success, secret }) {
+  await db.run(
+    "INSERT INTO login_attempts (email_hash, ip_hash, success, created_at) VALUES (?, ?, ?, ?)",
+    [emailHash(email), hashIp(ip, secret) || "unknown", success ? 1 : 0, Date.now()]
   );
 }
 
-export function loginBlocked(db, { email, ip, config }) {
+export async function loginBlocked(db, { email, ip, config }) {
   const since = Date.now() - config.loginWindowMinutes * 60_000;
-  const emailCount = db
-    .prepare(
-      "SELECT COUNT(*) AS count FROM login_attempts WHERE email_hash = ? AND success = 0 AND created_at >= ?"
-    )
-    .get(emailHash(email), since);
+  const emailCount = await db.get(
+    "SELECT COUNT(*) AS count FROM login_attempts WHERE email_hash = ? AND success = 0 AND created_at >= ?",
+    [emailHash(email), since]
+  );
   const ipHash = hashIp(ip, config.secret) || "unknown";
-  const ipCount = db
-    .prepare(
-      "SELECT COUNT(*) AS count FROM login_attempts WHERE ip_hash = ? AND success = 0 AND created_at >= ?"
-    )
-    .get(ipHash, since);
+  const ipCount = await db.get(
+    "SELECT COUNT(*) AS count FROM login_attempts WHERE ip_hash = ? AND success = 0 AND created_at >= ?",
+    [ipHash, since]
+  );
   const count = Math.max(Number(emailCount.count), Number(ipCount.count));
   if (count < config.loginMaxAttempts) return { blocked: false };
   const extra = Math.max(0, count - config.loginMaxAttempts);
@@ -40,11 +34,11 @@ export function loginBlocked(db, { email, ip, config }) {
   };
 }
 
-export function clearLoginFailures(db, { email }) {
+export async function clearLoginFailures(db, { email }) {
   // A successful login only clears the per-email counter. The per-IP counter is kept so
   // an attacker with one valid account cannot reset the shared IP-wide throttle. Failed
   // attempts for this email are removed from both counters because the row is shared.
-  db.prepare("DELETE FROM login_attempts WHERE email_hash = ? AND success = 0").run(emailHash(email));
+  await db.run("DELETE FROM login_attempts WHERE email_hash = ? AND success = 0", [emailHash(email)]);
 }
 
 // Bounded per-process limiter for endpoints that do not need durable attempt rows.
@@ -84,8 +78,10 @@ export function createRateLimiter({ windowMs, max, maxEntries = 10_000 }) {
   };
 }
 
-export function pruneLoginAttempts(db, days = 30) {
-  return db
-    .prepare("DELETE FROM login_attempts WHERE created_at < ?")
-    .run(Date.now() - days * 86_400_000).changes;
+export async function pruneLoginAttempts(db, days = 30) {
+  return (
+    await db.run("DELETE FROM login_attempts WHERE created_at < ?", [
+      Date.now() - days * 86_400_000,
+    ])
+  ).changes;
 }

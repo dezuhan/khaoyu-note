@@ -2,7 +2,7 @@
 // vertical hue slider, hex field, eyedropper, OK and Cancel.
 
 import { icon } from "./icons.js";
-import { captureWindow, hasTauri } from "./bridge.js";
+import { captureWindow, hasTauri, hasWeb } from "./bridge.js";
 import { openAppScreenPicker } from "./screen-color-picker.js";
 
 function clamp(value, min, max) {
@@ -93,7 +93,8 @@ export function openColorPicker({ color, anchor, onChange }) {
     <div class="mn-color-bottom">
       <input class="mn-color-hex" data-role="hex" maxlength="7" spellcheck="false" />
       <button type="button" class="mn-color-eyedrop" data-role="eyedrop" title="Pick a color from the screen" aria-label="Pick a color from the screen">${icon("eyedropper", 15)}</button>
-    </div>`;
+    </div>
+    <p class="mn-color-hint" data-role="hint" hidden>Drag the square or the hue bar, or type a HEX value.</p>`;
   document.body.append(backdrop, pop);
 
   const sv = pop.querySelector('[data-role="sv"]');
@@ -102,7 +103,13 @@ export function openColorPicker({ color, anchor, onChange }) {
   const hueMarker = pop.querySelector('[data-role="hue-marker"]');
   const hexInput = pop.querySelector('[data-role="hex"]');
   const eyedrop = pop.querySelector('[data-role="eyedrop"]');
-  if (!hasTauri && !("EyeDropper" in window)) eyedrop.hidden = true;
+  const hint = pop.querySelector('[data-role="hint"]');
+  const isLinuxDesktop = hasTauri && !hasWeb && /Linux/i.test(navigator.userAgent);
+  const screenPickingUnavailable = !("EyeDropper" in window) && (isLinuxDesktop || !hasTauri);
+  if (screenPickingUnavailable) {
+    eyedrop.hidden = true;
+    hint.hidden = false;
+  }
 
   function hexValue() {
     return rgbToHex(...Object.values(hsvToRgb(hsv.h, hsv.s, hsv.v)));
@@ -120,7 +127,11 @@ export function openColorPicker({ color, anchor, onChange }) {
   }
 
   function setFromHex(value) {
-    const normalized = normalizeHex(value);
+    const text = String(value || "").trim();
+    const rgb = text.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    const normalized = rgb
+      ? rgbToHex(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]))
+      : normalizeHex(text);
     if (!normalized) return false;
     Object.assign(hsv, rgbToHsv(hexToRgb(normalized)));
     paint();

@@ -12,11 +12,19 @@ import {
 } from "./auth.js";
 import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } from "./auto-backup.js";
 import { icon } from "./icons.js";
+import { LANGUAGES, getLanguage, setLanguage, t } from "./i18n.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
 import { checkConnection, describeConnection, loadSyncConfig, signOut } from "./sync.js";
 import { currentVersion, initCurrentVersion, releaseSummary } from "./update.js";
 import { openSyncDialog } from "./sync-ui.js";
+import {
+  canDeleteTemplate,
+  createTemplateFromSelection,
+  deleteTemplate,
+  listTemplates,
+  restoreBuiltInTemplates,
+} from "./templates.js";
 
 export const DEFAULT_TOOL_ORDER = [
   "note",
@@ -80,6 +88,7 @@ const NAV = [
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
   { id: "tools", label: "Tools" },
+  { id: "templates", label: "Board templates" },
   { id: "performance", label: "Performance" },
   { divider: true },
   { id: "mcp", label: "MCP" },
@@ -94,7 +103,6 @@ const TOOL_LABELS = [
   ["board", "Board"],
   ["column", "Column"],
   ["section", "Section"],
-  ["kanban", "Kanban"],
   ["comment", "Comment"],
   ["table", "Table"],
   ["sketch", "Sketch"],
@@ -110,6 +118,8 @@ const TOOL_LABELS = [
 ];
 
 let settings = { ...DEFAULT_SETTINGS };
+let systemGraphics = null;
+let storageStats = null;
 let overlay = null;
 let activePage = "server";
 let accountTab = "information";
@@ -117,6 +127,42 @@ let query = "";
 let searchTimer = 0;
 let saveTimer = 0;
 let statusText = "";
+
+function errorText(error, fallback) {
+  return error?.message || (typeof error === "string" ? error : "") || fallback;
+}
+
+function formatBytes(value) {
+  if (!Number.isFinite(Number(value))) return "Calculating...";
+  const bytes = Math.max(0, Number(value));
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+async function loadStorageStats() {
+  try {
+    storageStats = await bridge.storageStats();
+    if (overlay && (activePage === "about" || activePage === "server")) renderContent();
+  } catch {
+    storageStats = null;
+  }
+}
+
+async function loadSystemGraphics() {
+  if (!bridge.hasTauri) return;
+  try {
+    systemGraphics = await bridge.graphicsInfo();
+    if (overlay && activePage === "performance") renderContent();
+  } catch {
+    systemGraphics = null;
+  }
+}
 
 export async function initSettings() {
   try {
@@ -129,6 +175,8 @@ export async function initSettings() {
     settings = { ...DEFAULT_SETTINGS };
   }
   applyGlobalSettings();
+  void loadSystemGraphics();
+  void loadStorageStats();
   subscribeAuth(() => {
     if (overlay && activePage === "account" && !query) renderContent();
   });
@@ -331,6 +379,9 @@ function webviewLabel() {
   if (edge) return `WebView2 (Chromium ${edge[1]})`;
   const chrome = ua.match(/Chrome\/([\d.]+)/);
   if (chrome) return `Chromium ${chrome[1]} (browser preview)`;
+  if (/Linux/.test(ua)) return "WebKitGTK 4.1 (Linux)";
+  if (/Mac OS X/.test(ua)) return "WKWebView (macOS)";
+  if (/Windows/.test(ua)) return "WebView2 (Windows)";
   return "Unknown webview";
 }
 
@@ -338,7 +389,7 @@ function pages() {
   return [
     {
       id: "server",
-      title: "Server",
+      title: t("nav.server"),
       divider: false,
       rows: () => [
         {
@@ -349,7 +400,7 @@ function pages() {
     },
     {
       id: "backup",
-      title: "Backup",
+      title: t("nav.backup"),
       rows: () => [
         { type: "note", text: "Back up or export the local database, assets and settings." },
       ],
@@ -357,33 +408,31 @@ function pages() {
     { divider: true },
     {
       id: "general",
-      title: "General",
+      title: t("nav.general"),
       rows: () => [
         {
           type: "select",
-          label: "Display language",
-          value: "en",
-          options: [
-            ["en", "English"],
-            ["id", "Indonesian"],
-            ["es", "Spanish"],
-            ["ja", "Japanese"],
-            ["zh", "Chinese (Simplified)"],
-          ],
-          disabled: true,
-          disabledReason: "More languages are coming soon",
-          onChange: () => {},
+          label: t("general.language"),
+          value: getLanguage(),
+          options: LANGUAGES.map((language) => [language.id, language.native]),
+          onChange: (value) => {
+            setLanguage(value);
+            if (overlay) {
+              renderNav();
+              renderContent();
+            }
+          },
         },
-        note("Khaoyu Note is English only for now. More languages are coming soon."),
-        toggle("Auto-Update Open Documents", "autoUpdateOpenDocuments"),
-        toggle("Export Clipboard", "exportClipboard"),
+        note(t("general.languageNote")),
+        toggle(t("general.autoUpdate"), "autoUpdateOpenDocuments"),
+        toggle(t("general.exportClipboard"), "exportClipboard"),
         {
           type: "select",
-          label: "Image Interpolation",
+          label: t("general.imageInterpolation"),
           value: settings.imageInterpolation,
           options: [
-            ["bicubic", "Bicubic Automatic"],
-            ["nearest", "Nearest Neighbour"],
+            ["bicubic", t("general.bicubic")],
+            ["nearest", t("general.nearest")],
           ],
           onChange: (value) => {
             setValue("imageInterpolation", value);
@@ -392,31 +441,31 @@ function pages() {
         },
         {
           type: "action",
-          label: "Board as JSON",
-          buttonLabel: "Export",
+          label: t("general.boardJson"),
+          buttonLabel: t("general.export"),
           run: () => exportBoard(),
         },
       ],
     },
     {
       id: "appearance",
-      title: "Appearance",
+      title: t("nav.appearance"),
       rows: () => [
         {
           type: "select",
-          label: "Theme",
+          label: t("appearance.theme"),
           value: state.theme,
           options: [
-            ["light", "Light"],
-            ["softLight", "Soft light"],
-            ["softDark", "Soft dark"],
-            ["dark", "Dark"],
+            ["light", t("appearance.light")],
+            ["softLight", t("appearance.softLight")],
+            ["softDark", t("appearance.softDark")],
+            ["dark", t("appearance.dark")],
           ],
           onChange: (value) => setTheme(value),
         },
         {
           type: "select",
-          label: "Heading font",
+          label: t("appearance.headingFont"),
           key: "headingFont",
           value: settings.headingFont || DEFAULT_SETTINGS.headingFont,
           options: HEADING_FONT_CHOICES,
@@ -427,7 +476,7 @@ function pages() {
         },
         {
           type: "select",
-          label: "Body font",
+          label: t("appearance.bodyFont"),
           key: "bodyFont",
           value: settings.bodyFont || DEFAULT_SETTINGS.bodyFont,
           options: FONT_CHOICES,
@@ -438,7 +487,7 @@ function pages() {
         },
         {
           type: "select",
-          label: "Code font",
+          label: t("appearance.codeFont"),
           key: "codeFont",
           value: settings.codeFont || DEFAULT_SETTINGS.codeFont,
           options: FONT_CHOICES,
@@ -447,11 +496,11 @@ function pages() {
             applyGlobalSettings();
           },
         },
-        toggle("Reduce motion", "reduceMotion", () => applyGlobalSettings()),
-        note("Canvas"),
+        toggle(t("appearance.reduceMotion"), "reduceMotion", () => applyGlobalSettings()),
+        note(t("appearance.canvas")),
         {
           type: "select",
-          label: "Grid size",
+          label: t("appearance.gridSize"),
           value: String(state.board?.grid || settings.gridSize || 24),
           options: [
             ["16", "16 px"],
@@ -470,7 +519,7 @@ function pages() {
         },
         {
           type: "toggle",
-          label: "Show grid",
+          label: t("appearance.showGrid"),
           checked: state.board ? state.board.showGrid !== false : true,
           onChange: (checked) => {
             if (state.board) {
@@ -482,8 +531,8 @@ function pages() {
         },
         {
           type: "action",
-          label: "Zoom",
-          buttonLabel: "Reset to 100%",
+          label: t("appearance.zoom"),
+          buttonLabel: t("appearance.resetZoom"),
           run: () => {
             state.view.zoom = 1;
             notify("view");
@@ -493,26 +542,34 @@ function pages() {
     },
     {
       id: "tools",
-      title: "Tools",
+      title: t("nav.tools"),
       rows: () =>
         TOOL_LABELS.map(([key, label]) => ({
           type: "toggle",
-          label,
+          label: t(`tool.${key}`, label),
           checked: !settings.hiddenTools.includes(key),
           onChange: () => {},
         })),
     },
     {
+      id: "templates",
+      title: t("nav.templates"),
+      rows: () => [
+        note("Create templates from a board selection, then manage the library here."),
+      ],
+    },
+    {
       id: "performance",
-      title: "Performance",
+      title: t("nav.performance"),
       rows: () => {
         const gpu = probeGpu();
         const cpu = probeCpu();
         const gpuOn = settings.gpuAcceleration !== false;
+        const isLinux = /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
         return [
           {
             type: "toggle",
-            label: "GPU acceleration",
+            label: t("performance.gpu"),
             checked: gpuOn,
             onChange: (checked) => {
               settings.gpuAcceleration = checked;
@@ -521,9 +578,33 @@ function pages() {
               renderContent();
             },
           },
-          info("Current mode", gpuOn ? "GPU (hardware accelerated)" : "CPU (software rendering)"),
-          info("GPU", gpu.renderer),
-          info("GPU vendor", gpu.vendor),
+          info(
+            t("performance.currentMode"),
+            gpuOn
+              ? isLinux && !gpu.available
+                ? "GPU requested via WebKitGTK"
+                : "GPU (hardware accelerated)"
+              : "CPU (software rendering)"
+          ),
+          {
+            type: "toggle",
+            label: t("performance.reducedEffects"),
+            checked: document.documentElement.dataset.performance === "true",
+            onChange: async (checked) => {
+              const ui = await import("./ui.js");
+              ui.setPerformanceMode(checked);
+            },
+          },
+          ...(systemGraphics?.gpus?.length
+            ? systemGraphics.gpus.map((name, index) =>
+                info(index ? `GPU ${index + 1}` : "System GPU", name)
+              )
+            : []),
+          info(
+            "GPU (WebGL)",
+            isLinux && !gpu.available ? "Hidden by WebKitGTK" : gpu.renderer
+          ),
+          info("GPU vendor (WebGL)", gpu.vendor),
           info("Graphics API", gpu.version),
           info("CPU", cpu.cores),
           info("Memory", cpu.memory),
@@ -532,10 +613,24 @@ function pages() {
           note(
             "GPU acceleration is applied by the Rust host when the window is created; the CPU fallback uses Chromium software rendering. Restart the app after changing it."
           ),
+          ...(systemGraphics?.gpus?.length
+            ? [
+                note(
+                  "System GPU names are read from the operating system. The WebGL renderer string is sanitized by the webview and is only a hint, which is why it can show a generic or older model."
+                ),
+              ]
+            : []),
+          ...(isLinux
+            ? [
+                note(
+                  "Linux runs through WebKitGTK. This build now applies WebKit's hardware-acceleration policy from this toggle. WebGL renderer strings are masked, so the probe is only a hint. If it still feels slow, launch with KHAOYU_DEBUG_GRAPHICS=1 to log the policy and environment, or KHAOYU_FORCE_GPU=1 to clear inherited software-rendering variables. For NVIDIA + Wayland, __NV_DISABLE_EXPLICIT_SYNC=1 is applied automatically; WEBKIT_DISABLE_DMABUF_RENDERER=1 is the fallback when the window flickers."
+                ),
+              ]
+            : []),
           {
             type: "action",
-            label: "Apply GPU change",
-            buttonLabel: "Restart app",
+            label: t("performance.apply"),
+            buttonLabel: t("performance.restart"),
             run: () => bridge.restartApp(),
           },
         ];
@@ -544,7 +639,7 @@ function pages() {
     { divider: true },
     {
       id: "mcp",
-      title: "MCP",
+      title: t("nav.mcp"),
       rows: () => [
         info(
           "Server binary",
@@ -573,7 +668,7 @@ function pages() {
     },
     {
       id: "about",
-      title: "About",
+      title: t("nav.about"),
       rows: () => [
         info("Version", currentVersion() || bridge.webInfo?.version || "unknown"),
         info("Update status", releaseSummary()),
@@ -600,9 +695,54 @@ function pages() {
             ]
           : []),
         info("Data folder", awaitPath()),
+        info(
+          t("stats.database"),
+          formatBytes(
+            storageStats
+              ? Number(storageStats.databaseBytes || 0) + Number(storageStats.walBytes || 0)
+              : null
+          )
+        ),
+        info(t("stats.assets"), formatBytes(storageStats?.assetsBytes)),
+        info(t("stats.total"), formatBytes(storageStats?.totalBytes)),
         info("Projects", String(state.boards.filter((board) => !board.parentId).length)),
         info("Nested boards", String(state.boards.filter((board) => board.parentId).length)),
         note("Local-first visual boards. Accounts and server sync are optional."),
+        {
+          type: "action",
+          label: t("about.feedback"),
+          buttonLabel: t("about.open"),
+          run: () => bridge.openExternal("https://github.com/dezuhan/khaoyu-note/issues/new"),
+        },
+        {
+          type: "action",
+          label: "Reset everything",
+          buttonLabel: "Reset app data",
+          run: async () => {
+            const { confirmAction } = await import("./ui.js");
+            const confirmed = await confirmAction({
+              title: "Reset Khaoyu Note?",
+              message:
+                "This permanently deletes every board, card, connection, uploaded file, account, setting and activity entry in this database. The app will start again like a fresh installation. This cannot be undone.",
+              confirmLabel: "Reset everything",
+            });
+            if (!confirmed) return;
+            try {
+              await bridge.resetAllData();
+              for (const key of Object.keys(localStorage)) {
+                if (key.startsWith("mn.")) localStorage.removeItem(key);
+              }
+              sessionStorage.clear();
+              localStorage.setItem("mn.setupRequired", "1");
+              window.location.reload();
+            } catch (error) {
+              setStatus(error?.message || "Could not reset the app data.");
+            }
+          },
+        },
+        note(
+          "Reset everything wipes the local database and preferences. GitHub releases and the separate self-hosted service are not affected."
+        ),
       ],
     },
   ];
@@ -724,6 +864,14 @@ function renderContent() {
   const content = overlay.querySelector('[data-role="content"]');
   if (!content) return;
   content.innerHTML = "";
+  const titleEl = overlay.querySelector(".mn-prefs-title");
+  if (titleEl) titleEl.textContent = t("common.settings");
+  const searchEl = overlay.querySelector('[data-role="search"]');
+  if (searchEl) searchEl.placeholder = t("common.search");
+  const resetEl = overlay.querySelector('[data-role="reset"]');
+  if (resetEl) resetEl.textContent = t("common.reset");
+  const doneEl = overlay.querySelector('[data-role="done"]');
+  if (doneEl) doneEl.textContent = t("common.done");
 
   if (query) {
     const matches = [];
@@ -761,6 +909,9 @@ function renderContent() {
       "Map, Video and Audio are temporarily disabled. Upload local images, audio, video and other files with the Upload tool. Link cards fetch a hero image, and YouTube links use their thumbnail directly.";
     content.append(note);
     renderToolsGrid(content);
+  } else if (activePage === "templates") {
+    content.append(heading("Board templates"));
+    renderTemplatesPage(content);
   } else if (page) {
     content.append(heading(page.title));
     for (const row of page.rows()) content.append(buildRow(row));
@@ -1032,7 +1183,7 @@ function accountAdminTab(pane) {
   const backup = document.createElement("button");
   backup.type = "button";
   backup.className = "mn-btn";
-  backup.textContent = "Back up now";
+  backup.textContent = t("backup.now");
   const integrity = document.createElement("button");
   integrity.type = "button";
   integrity.className = "mn-btn";
@@ -1041,7 +1192,7 @@ function accountAdminTab(pane) {
   status.className = "mn-profile-status";
   status.setAttribute("role", "status");
   backup.addEventListener("click", async () => {
-    status.textContent = "Creating backup...";
+    status.textContent = t("backup.creating");
     try {
       const path = await bridge.backupData();
       status.textContent = `Backup created: ${path}`;
@@ -1636,6 +1787,85 @@ function renderServerPage(content) {
   content.append(docs);
 }
 
+function renderTemplatesPage(content) {
+  const intro = document.createElement("p");
+  intro.className = "mn-prefs-note";
+  intro.textContent = t("templates.intro");
+  content.append(intro);
+
+  const actions = document.createElement("div");
+  actions.className = "mn-template-settings-actions";
+  const create = document.createElement("button");
+  create.type = "button";
+  create.className = "mn-btn mn-btn-primary";
+  create.textContent = t("templates.create");
+  create.addEventListener("click", async () => {
+    const created = await createTemplateFromSelection([...state.selection]);
+    if (created) {
+      setStatus(`Template "${created.name}" saved.`);
+      renderContent();
+    }
+  });
+  const restore = document.createElement("button");
+  restore.type = "button";
+  restore.className = "mn-btn";
+  restore.textContent = t("templates.restore");
+  restore.addEventListener("click", () => {
+    restoreBuiltInTemplates();
+    setStatus("Built-in templates restored.");
+    renderContent();
+  });
+  actions.append(create, restore);
+  content.append(actions);
+
+  const grid = document.createElement("div");
+  grid.className = "mn-template-settings-grid";
+  const templates = listTemplates();
+  if (!templates.length) {
+    const empty = document.createElement("p");
+    empty.className = "mn-template-settings-empty";
+    empty.textContent = t("templates.empty");
+    grid.append(empty);
+  }
+  for (const template of templates) {
+    const card = document.createElement("article");
+    card.className = "mn-template-settings-card";
+    card.innerHTML = `<span class="mn-template-settings-icon">${icon(
+      template.icon || "note",
+      20
+    )}</span>
+      <span class="mn-template-settings-copy">
+        <strong>${escape(template.name)}</strong>
+        <span>${escape(template.description || "")}</span>
+      </span>
+      <span class="mn-template-settings-kind">${template.custom ? t("templates.custom") : t("templates.builtin")}</span>
+      <button type="button" class="mn-btn mn-btn-quiet mn-template-settings-delete">${t("templates.delete")}</button>`;
+    const deleteButton = card.querySelector(".mn-template-settings-delete");
+    if (!canDeleteTemplate(template.id)) {
+      deleteButton.disabled = true;
+      deleteButton.title = "Blank board is the required fallback template and cannot be deleted";
+    }
+    deleteButton.addEventListener("click", async () => {
+      if (!canDeleteTemplate(template.id)) return;
+      const { confirmAction } = await import("./ui.js");
+      const confirmed = await confirmAction({
+        title: t("templateDelete.title", "Delete template?"),
+        message: t(
+          "templateDelete.message",
+          'Delete "{name}"? This cannot be undone.'
+        ).replace("{name}", escape(template.name)),
+        confirmLabel: t("templates.delete", "Delete"),
+      });
+      if (!confirmed) return;
+      deleteTemplate(template.id);
+      setStatus(`Template "${template.name}" deleted.`);
+      renderContent();
+    });
+    grid.append(card);
+  }
+  content.append(grid);
+}
+
 async function refreshAccountConnection(element) {
   const config = loadSyncConfig();
   if (!config.url || !config.token) {
@@ -1653,7 +1883,7 @@ async function refreshAccountConnection(element) {
 }
 
 function renderBackupPage(content) {
-  content.append(heading("Backup"));
+  content.append(heading(t("nav.backup")));
   renderBackupSection(content);
 }
 
@@ -1662,68 +1892,73 @@ function renderBackupSection(content) {
   section.className = "mn-account-backup";
   const note = document.createElement("p");
   note.className = "mn-prefs-note";
-  note.textContent =
-    "Back up the local SQLite database, assets and settings. Backups are written to Documents/Khaoyu Note Backups in the desktop and web host.";
+  note.textContent = t("backup.intro");
   const status = document.createElement("p");
   status.className = "mn-account-backup-status";
-  status.textContent = "No backup created in this session.";
+  status.textContent = t("backup.none");
   const autoRow = buildRow({
     type: "select",
-    label: "Automatic backup",
+    label: t("backup.auto"),
     value: String(settings.autoBackupDays ?? 0),
-    options: AUTO_BACKUP_OPTIONS.map(([value, label]) => [String(value), label]),
+    options: AUTO_BACKUP_OPTIONS.map(([value, label]) => [
+      String(value),
+      t(`backup.${({ 0: "off", 1: "everyDay", 3: "every3", 7: "every7", 14: "every14", 30: "monthly" })[value] || "off"}`, label),
+    ]),
     onChange: (value) => setValue("autoBackupDays", Number(value)),
   });
   const lastLine = document.createElement("p");
   lastLine.className = "mn-account-backup-status";
-  lastLine.textContent = `Last automatic backup: ${formatLastBackup(lastBackupAt())}`;
+  lastLine.textContent = `${t("backup.last")}: ${formatLastBackup(lastBackupAt())}`;
   let lastPath = "";
   const row = document.createElement("div");
   row.className = "mn-account-backup-actions";
   const backup = document.createElement("button");
   backup.type = "button";
   backup.className = "mn-btn mn-btn-primary";
-  backup.textContent = "Back up now";
+  backup.textContent = t("backup.now");
   const open = document.createElement("button");
   open.type = "button";
   open.className = "mn-btn mn-btn-quiet";
-  open.textContent = "Open folder";
+  open.textContent = t("backup.openFolder");
   open.disabled = true;
   const exportZip = document.createElement("button");
   exportZip.type = "button";
   exportZip.className = "mn-btn";
-  exportZip.textContent = "Export ZIP";
+  exportZip.textContent = t("backup.exportZip");
   backup.addEventListener("click", async () => {
     backup.disabled = true;
-    status.textContent = "Creating backup...";
+    status.textContent = t("backup.creating");
     try {
       lastPath = await bridge.backupData();
       await markBackupTaken();
-      lastLine.textContent = `Last automatic backup: ${formatLastBackup(lastBackupAt())}`;
-      status.textContent = `Backup created: ${lastPath}`;
-      open.disabled = false;
-      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Backup created" } }));
+      lastLine.textContent = `${t("backup.last")}: ${formatLastBackup(lastBackupAt())}`;
+      status.textContent = `${t("backup.created")}: ${lastPath}`;
+      open.disabled = bridge.hasWeb;
+      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: t("backup.created") } }));
     } catch (error) {
-      status.textContent = error.message || "Backup failed";
+      status.textContent = errorText(error, t("backup.failed"));
     } finally {
       backup.disabled = false;
     }
   });
   open.addEventListener("click", () => {
-    if (lastPath) bridge.openPath(lastPath).catch(() => {});
+    if (!lastPath || bridge.hasWeb) return;
+    bridge.openFolder(lastPath).catch((error) => {
+      status.textContent = errorText(error, "Could not open the backup folder");
+    });
   });
   exportZip.addEventListener("click", async () => {
     exportZip.disabled = true;
-    status.textContent = "Exporting ZIP...";
+    status.textContent = t("backup.exporting");
     try {
       lastPath = await bridge.exportBackupZip();
       await markBackupTaken();
-      lastLine.textContent = `Last automatic backup: ${formatLastBackup(lastBackupAt())}`;
-      status.textContent = `ZIP created: ${lastPath}`;
-      open.disabled = false;
-      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Backup ZIP exported" } }));
+      lastLine.textContent = `${t("backup.last")}: ${formatLastBackup(lastBackupAt())}`;
+      status.textContent = `${t("backup.zipCreated")}: ${lastPath}`;
+      open.disabled = bridge.hasWeb;
+      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: t("backup.exported") } }));
     } catch (error) {
-      status.textContent = error.message || "ZIP export failed";
+      status.textContent = errorText(error, t("backup.zipFailed"));
     } finally {
       exportZip.disabled = false;
     }
@@ -1731,9 +1966,79 @@ function renderBackupSection(content) {
   row.append(backup, exportZip, open);
   const retention = document.createElement("p");
   retention.className = "mn-prefs-note";
-  retention.textContent =
-    "Automatic backups run while the app is open, and a missed interval is caught up on the next launch. Old backup folders are kept, so remove them from the folder when you no longer need them.";
+  retention.textContent = t("backup.retention");
   section.append(note, autoRow, lastLine, status, row, retention);
+
+  const databaseTitle = document.createElement("p");
+  databaseTitle.className = "mn-prefs-group-label";
+  databaseTitle.textContent = t("backup.database", "Database and migration");
+  const databaseRow = document.createElement("div");
+  databaseRow.className = "mn-account-backup-actions";
+  const exportDatabaseButton = document.createElement("button");
+  exportDatabaseButton.type = "button";
+  exportDatabaseButton.className = "mn-btn";
+  exportDatabaseButton.textContent = t("backup.exportDatabase", "Export database");
+  exportDatabaseButton.addEventListener("click", async () => {
+    exportDatabaseButton.disabled = true;
+    try {
+      const result = await bridge.exportDatabase();
+      status.textContent =
+        result === "download"
+          ? t("backup.exportStarted", "Database export started.")
+          : `${t("backup.exportPath", "Database exported to")}: ${result}`;
+    } catch (error) {
+      status.textContent = errorText(error, t("backup.failed"));
+    } finally {
+      exportDatabaseButton.disabled = false;
+    }
+  });
+
+  const importDatabaseButton = document.createElement("button");
+  importDatabaseButton.type = "button";
+  importDatabaseButton.className = "mn-btn";
+  importDatabaseButton.textContent = t("backup.importDatabase", "Import database");
+  if (bridge.hasWeb || !bridge.hasTauri) {
+    importDatabaseButton.disabled = true;
+    importDatabaseButton.title = t("backup.importDesktop", "Import is available in the desktop app");
+  } else {
+    importDatabaseButton.addEventListener("click", async () => {
+      let backupPath = null;
+      try {
+        backupPath = await bridge.pickBackupFolder();
+      } catch (error) {
+        status.textContent = errorText(error, "Could not open the folder picker");
+        return;
+      }
+      if (!backupPath) return;
+      const { confirmAction } = await import("./ui.js");
+      const confirmed = await confirmAction({
+        title: "Import database?",
+        message:
+          "The current database and assets will be replaced by this backup, then the app restarts.",
+        confirmLabel: "Import",
+      });
+      if (!confirmed) return;
+      try {
+        await bridge.importDatabase(backupPath.trim());
+        status.textContent = "Import queued. The app will restart.";
+        window.setTimeout(() => bridge.restartApp(), 500);
+      } catch (error) {
+        status.textContent = error.message || "Database import failed";
+      }
+    });
+  }
+
+  const tursoButton = document.createElement("button");
+  tursoButton.type = "button";
+  tursoButton.className = "mn-btn mn-btn-quiet";
+  tursoButton.textContent = t("backup.migrateTurso", "Migrate to Turso");
+  tursoButton.disabled = true;
+  tursoButton.title = t("backup.tursoNotReady", "Turso migration is not ready");
+  databaseRow.append(exportDatabaseButton, importDatabaseButton, tursoButton);
+  const databaseNote = document.createElement("p");
+  databaseNote.className = "mn-prefs-note";
+  databaseNote.textContent = t("backup.tursoNotReady", "Turso migration is not ready");
+  section.append(databaseTitle, databaseRow, databaseNote);
   content.append(section);
 }
 
@@ -1742,6 +2047,7 @@ function renderToolsGrid(content) {
   const grid = document.createElement("div");
   grid.className = "mn-tools-grid";
   for (const [key, label] of TOOL_LABELS) {
+    const translatedLabel = t(`tool.${key}`, label);
     const disabledReason = toolDisabledReason(key);
     const visible = !settings.hiddenTools.includes(key);
     const card = document.createElement("button");
@@ -1760,7 +2066,7 @@ function renderToolsGrid(content) {
     iconEl.innerHTML = icon(key, 18);
     const labelEl = document.createElement("span");
     labelEl.className = "mn-tool-card-label";
-    labelEl.textContent = label;
+    labelEl.textContent = translatedLabel;
     const stateEl = document.createElement("span");
     stateEl.className = "mn-tool-card-state";
     stateEl.textContent = disabledReason
@@ -1776,7 +2082,7 @@ function renderToolsGrid(content) {
         : settings.hiddenTools.filter((entry) => entry !== key);
       persist();
       renderToolsGrid(content);
-      setStatus(`${label} ${visible ? "hidden" : "shown"}`);
+      setStatus(`${translatedLabel} ${visible ? "hidden" : "shown"}`);
     });
     grid.append(card);
   }

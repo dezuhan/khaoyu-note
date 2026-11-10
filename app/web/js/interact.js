@@ -52,6 +52,8 @@ import {
 const COLUMN_HEADER = 64;
 const COLUMN_PADDING = 14;
 const COLUMN_GAP = 10;
+// While a card is moving it must sit above every column, including nested kanban lanes.
+const DRAG_Z_INDEX = 1_900_000_000;
 const KANBAN_COL_WIDTH = 168;
 const KANBAN_GAP = 8;
 
@@ -83,6 +85,7 @@ export function initInteractions(refs) {
   cardsEl = refs.cards;
 
   viewportEl.addEventListener("pointerdown", onPointerDown);
+  viewportEl.addEventListener("mousedown", onViewportMouseDown);
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
   viewportEl.addEventListener("wheel", onWheel, { passive: false });
@@ -99,6 +102,7 @@ export function initInteractions(refs) {
   }
   window.addEventListener("message", onMediaFrameMessage);
 
+  document.addEventListener("selectionchange", onBoardSelectionChange);
   window.addEventListener("keydown", onWindowKeyDown);
   window.addEventListener("keyup", onWindowKeyUp);
   window.addEventListener("blur", () => {
@@ -174,6 +178,42 @@ function cardOfTarget(target) {
 }
 
 // ------------------------------------------------------------------ pointer
+
+function onBoardSelectionChange() {
+  const selection = window.getSelection?.();
+  if (!selection || selection.isCollapsed) return;
+  const anchor = selection.anchorNode;
+  const element = anchor?.nodeType === 1 ? anchor : anchor?.parentElement;
+  if (!element?.closest?.(".mn-viewport")) return;
+  if (element.closest("input, textarea, select, .is-editing")) return;
+  selection.removeAllRanges();
+}
+
+function onViewportMouseDown(event) {
+  if (event.button !== 0) return;
+  const target = event.target;
+  if (!target?.closest) return;
+  if (target.closest("input, textarea, select, button, a, [role='button']")) return;
+  // While a note/document is actively being edited, native text selection must keep working.
+  const editable = target.closest('[contenteditable="true"]');
+  if (editable && state.editing?.el === editable) return;
+  const card = target.closest(".mn-card");
+  if (!card && target !== viewportEl) return;
+  // Do not preventDefault here: card drags also start from these elements. The CSS rule above
+  // keeps the text unselectable until the card enters editing mode; this only clears stale ranges.
+  const selection = window.getSelection?.();
+  if (selection && !selection.isCollapsed) selection.removeAllRanges();
+  // WebKitGTK can keep a text selection inside an unfocused input after a board drag. Collapse
+  // those ranges as well while the field is not being edited.
+  for (const field of viewportEl.querySelectorAll("input, textarea")) {
+    if (field === state.editing?.el) continue;
+    try {
+      field.setSelectionRange(field.value.length, field.value.length);
+    } catch {
+      /* input type without selection support */
+    }
+  }
+}
 
 function onPointerDown(event) {
   if (!state.board) return;
@@ -341,7 +381,13 @@ function beginDrag(card, event) {
   };
   for (const id of ids) {
     const el = cardElement(id);
-    if (el) el.classList.add("is-dragging");
+    if (!el) continue;
+    const target = getCard(state.board, id);
+    el.classList.add("is-dragging");
+    // A Section is a background wrapper even while selected or moved.
+    el.style.zIndex = String(
+      target?.type === "section" ? zIndexFor(target) : DRAG_Z_INDEX
+    );
   }
   if (!card.parentId && card.type !== "section") {
     const top = Math.max(...state.board.cards.map((item) => item.z || 1)) + 1;
@@ -349,12 +395,7 @@ function beginDrag(card, event) {
     const el = cardElement(card.id);
     if (el) el.style.zIndex = String(top * 1000);
     // Raising a column must also raise its children, otherwise the column background covers them.
-    if (card.type === "column") {
-      for (const child of columnChildren(state.board, card.id)) {
-        const childEl = cardElement(child.id);
-        if (childEl) childEl.style.zIndex = String(zIndexFor(child));
-      }
-    }
+    if (card.type === "column") syncColumnStack(card);
   }
 }
 
@@ -691,6 +732,15 @@ function applyCardGeometry(card) {
   el.style.zIndex = String(zIndexFor(card));
 }
 
+function syncColumnStack(column) {
+  if (!column || column.type !== "column") return;
+  for (const child of columnChildren(state.board, column.id)) {
+    const el = cardElement(child.id);
+    if (el) el.style.zIndex = String(zIndexFor(child));
+    if (child.type === "column") syncColumnStack(child);
+  }
+}
+
 function syncColumnChildren() {
   if (!state.board) return;
   layoutColumns(state.board);
@@ -715,7 +765,7 @@ function syncColumnChildren() {
       if (!card || !card.parentId) continue;
       const column = getCard(state.board, card.parentId);
       const el = cardElement(id);
-      if (column && el) el.style.zIndex = String((column.z || 1) * 1000 + 900);
+      if (column && el) el.style.zIndex = String(DRAG_Z_INDEX);
     }
   }
 }
@@ -754,7 +804,19 @@ function onPointerUp(event) {
       const el = cardElement(id);
       if (el) el.classList.remove("is-dragging");
     }
-    if (!current.moved) return;
+    if (!current.moved) {
+      // A click selects without moving. Restore the computed stacking so a Section cannot stay
+      // above the board after being clicked.
+      for (const id of current.ids) {
+        const card = getCard(state.board, id);
+        const el = cardElement(id);
+        if (card && el) {
+          el.style.zIndex = String(zIndexFor(card));
+          syncColumnStack(card);
+        }
+      }
+      return;
+    }
     dragEndedAt = Date.now();
     finishDrag(current);
     return;
@@ -822,8 +884,21 @@ function finishDrag(current) {
   if (target && target.columnId) {
     const column = getCard(state.board, target.columnId);
     if (column) {
+      const children = columnChildren(state.board, column.id).filter(
+        (card) => !dragged.has(card.id)
+      );
+      const rowOfColumns =
+        column.direction === "row" &&
+        (Boolean(column.kanban) || (children.length > 0 && children.every((card) => card.type === "column")));
       const moving = state.board.cards.filter(
-        (card) => dragged.has(card.id) && card.type !== "column" && card.type !== "section"
+        (card) =>
+          dragged.has(card.id) &&
+          card.type !== "section" &&
+          (column.direction === "row"
+            ? rowOfColumns
+              ? card.type === "column"
+              : card.type !== "column"
+            : card.type !== "column")
       );
       if (moving.length) {
         const rest = columnChildren(state.board, column.id).filter(
@@ -943,7 +1018,7 @@ function updateDragIndicators(point) {
   if (!state.board) return;
   const dragged = new Set(gesture.ids);
   const cards = state.board.cards.filter((card) => dragged.has(card.id));
-  if (!cards.length || cards.every((card) => card.type === "column")) {
+  if (!cards.length) {
     if (dragUI) {
       dragUI.line.hidden = true;
       dragUI.ghost.hidden = true;
@@ -952,7 +1027,11 @@ function updateDragIndicators(point) {
     return;
   }
   const ui = ensureDragUI();
-  const column = findColumnAt(point, dragged);
+  const column = findColumnAt(
+    point,
+    dragged,
+    cards.some((card) => card.type === "column")
+  );
   if (!column) {
     ui.line.hidden = true;
     ui.ghost.hidden = true;
@@ -969,6 +1048,68 @@ function updateDragIndicators(point) {
   });
   const columnEl = cardElement(column.id);
   if (columnEl) columnEl.classList.add("is-drop-target");
+
+  if (column.direction === "row") {
+    const children = columnChildren(state.board, column.id).filter(
+      (card) => !dragged.has(card.id)
+    );
+    const rowOfColumns =
+      Boolean(column.kanban) || (children.length > 0 && children.every((card) => card.type === "column"));
+    const moving = cards.filter((card) =>
+      rowOfColumns ? card.type === "column" : card.type !== "column"
+    );
+    if (!moving.length) {
+      ui.line.hidden = true;
+      ui.ghost.hidden = true;
+      gesture.dropTarget = null;
+      return;
+    }
+    const innerX = column.x + COLUMN_PADDING;
+    const innerY = column.y + COLUMN_HEADER;
+    const innerW = column.w - COLUMN_PADDING * 2;
+    const innerH = Math.max(80, column.h - COLUMN_HEADER - COLUMN_PADDING);
+    let slotX = innerX;
+    let index = 0;
+    for (const child of children) {
+      if (point.x > child.x + child.w / 2) {
+        slotX += child.w + COLUMN_GAP;
+        index += 1;
+      } else {
+        break;
+      }
+    }
+    const total = children.length + moving.length;
+    const childW = Math.max(
+      120,
+      Math.floor((innerW - COLUMN_GAP * Math.max(0, total - 1)) / Math.max(1, total))
+    );
+    ui.line.classList.add("is-vertical");
+    ui.line.hidden = false;
+    ui.ghost.hidden = false;
+    ui.origin.hidden = !gesture.wasChild;
+    if (gesture.wasChild) paintOriginGhost(ui, moving[0]);
+    Object.assign(ui.line.style, {
+      left: `${slotX - 1}px`,
+      top: `${innerY}px`,
+      width: "3px",
+      height: `${innerH}px`,
+    });
+    Object.assign(ui.ghost.style, {
+      left: `${slotX}px`,
+      top: `${innerY}px`,
+      width: `${childW}px`,
+      height: `${innerH}px`,
+    });
+    gesture.dropTarget = { columnId: column.id, index };
+    return;
+  }
+  if (cards.every((card) => card.type === "column")) {
+    ui.line.hidden = true;
+    ui.ghost.hidden = true;
+    gesture.dropTarget = null;
+    return;
+  }
+  ui.line.classList.remove("is-vertical");
 
   const children = columnChildren(state.board, column.id).filter(
     (card) => !dragged.has(card.id)
@@ -996,6 +1137,7 @@ function updateDragIndicators(point) {
     left: `${innerX}px`,
     top: `${slotY - 6}px`,
     width: `${innerW}px`,
+    height: "3px",
   });
   Object.assign(ui.ghost.style, {
     left: `${innerX}px`,
@@ -1027,7 +1169,24 @@ function paintOriginGhost(ui, card) {
   ui.origin.hidden = false;
 }
 
-function findColumnAt(point, excludeIds = new Set()) {
+function columnDepth(column) {
+  let depth = 0;
+  let parent = column.parentId ? getCard(state.board, column.parentId) : null;
+  while (parent) {
+    depth += 1;
+    parent = parent.parentId ? getCard(state.board, parent.parentId) : null;
+  }
+  return depth;
+}
+
+function rowOfColumns(column) {
+  if (!column || column.type !== "column" || column.direction !== "row") return false;
+  if (column.kanban) return true;
+  const children = columnChildren(state.board, column.id);
+  return children.length > 0 && children.every((card) => card.type === "column");
+}
+
+function findColumnAt(point, excludeIds = new Set(), preferRowForColumnDrag = false) {
   const columns = state.board.cards
     .filter(
       (card) =>
@@ -1038,8 +1197,19 @@ function findColumnAt(point, excludeIds = new Set()) {
         point.y >= card.y &&
         point.y <= card.y + card.h
     )
-    .sort((a, b) => (b.z || 1) - (a.z || 1));
-  return columns[0] || null;
+    // A child column inside a kanban sits on top of its row parent. Prefer the deepest matching
+    // column so a card can be dropped into the lane, not rejected by the parent row.
+    .sort((a, b) => columnDepth(b) - columnDepth(a) || (b.z || 1) - (a.z || 1));
+  const deepest = columns[0] || null;
+  if (!preferRowForColumnDrag || !deepest) return deepest;
+  // A dragged column belongs to the row, not to a sibling lane. Walk up to the kanban row so the
+  // horizontal insertion preview can show its new lane position.
+  let candidate = deepest;
+  while (candidate) {
+    if (rowOfColumns(candidate)) return candidate;
+    candidate = candidate.parentId ? getCard(state.board, candidate.parentId) : null;
+  }
+  return deepest;
 }
 
 function nearestCardSnap(world) {

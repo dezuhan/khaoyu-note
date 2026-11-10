@@ -104,8 +104,19 @@ a migration is pending.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `KHAOYU_SERVICE_PROFILE` | `single-user` | `single-user` or `team`. Team membership APIs are still limited. |
+| `KHAOYU_SERVICE_PROFILE` | `single-user` | `single-user` or `team`. Team mode requires PostgreSQL and Redis. |
 | `KHAOYU_SERVICE_HOST` | `127.0.0.1` | Bind address. Compose sets `0.0.0.0` inside the container. |
+| `KHAOYU_SERVICE_DATABASE_URL` | empty | PostgreSQL connection string for team mode. |
+| `KHAOYU_SERVICE_DATABASE_SSL` | `false` | Require TLS for the PostgreSQL connection. |
+| `KHAOYU_SERVICE_DATABASE_POOL_MAX` | `10` | PostgreSQL connection pool size. |
+| `KHAOYU_SERVICE_REDIS_URL` | empty | Redis connection string for team mode. |
+| `KHAOYU_SERVICE_REDIS_PREFIX` | `khaoyu` | Namespace for Redis keys. |
+| `KHAOYU_SERVICE_INSTANCE_ID` | hostname plus PID | Instance identity used by the worker leader lock. |
+| `KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS` | `60000` | Lifetime of a single-use SSE ticket. |
+| `KHAOYU_SERVICE_EDIT_LOCK_TTL_MS` | `15000` | Advisory edit lock lifetime. |
+| `KHAOYU_SERVICE_OP_RETENTION_DAYS` | `7` | Operation log retention before clients must resync. |
+| `KHAOYU_SERVICE_COMPACT_OPS` | `100` | Operations between snapshot compactions. |
+| `KHAOYU_SERVICE_COMPACT_MS` | `30000` | Maximum interval between snapshot compactions. |
 | `KHAOYU_SERVICE_FRONTEND_PORT` | random 5-digit | Frontend listener port (pages and API proxy). |
 | `KHAOYU_SERVICE_BACKEND_PORT` | random 5-digit | Backend listener port (API and health only). |
 | `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files, outbox, backups, logs and `runtime.json`. |
@@ -145,6 +156,43 @@ a migration is pending.
 
 Startup fails closed when the secret is missing, shorter than 32 characters, too repetitive or still
 looks like a placeholder.
+
+## Team backend
+
+The multi-user team profile uses PostgreSQL as the system of record and Redis for cross-instance SSE
+fanout. PostgreSQL storage, backup/restore, CLI commands and the Redis bus are in place. Presence is
+currently per-instance; global presence, SSE tickets, edit locks and the operation log are still
+being implemented. The remaining phases are recorded in
+[docs/backend-postgres-redis.md](../docs/backend-postgres-redis.md).
+
+- `single-user` keeps SQLite and needs no PostgreSQL or Redis.
+- `team` requires `KHAOYU_SERVICE_DATABASE_URL` and `KHAOYU_SERVICE_REDIS_URL`; `openStorage` fails
+  closed if either is missing.
+- Docker Compose exposes opt-in `postgres` and `redis` services:
+  `docker compose --profile team up -d postgres redis`.
+- PostgreSQL baseline and data migration commands:
+
+```powershell
+node src/cli.mjs migrate-postgres --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+node src/cli.mjs status-postgres --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+node src/cli.mjs rollback-postgres --steps 1 --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+node src/cli.mjs migrate-to-postgres --sqlite /data/khaoyu-service.db --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu --dry-run
+node src/cli.mjs bootstrap-postgres --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+node src/cli.mjs backup-postgres --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+node src/cli.mjs restore-postgres <backup-directory> --force --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+node src/cli.mjs invalidate-sessions-postgres --database-url postgres://khaoyu:password@127.0.0.1:5432/khaoyu
+```
+
+- `migrate-to-postgres` copies durable rows only; sessions and short-lived tokens are skipped so the
+  cutover forces a fresh sign-in. The target must be a fresh migrated database, and the object store
+  directory is copied separately.
+- `backup-postgres` writes a logical JSON snapshot plus the object files; `restore-postgres` fills a
+  migrated empty database and restores the object files. Passwords and backup encryption are handled
+  the same way as the SQLite backup. `restore-postgres` requires `--force` when the target already has
+  rows.
+- The default CLI commands follow `KHAOYU_SERVICE_DATABASE_URL`: `migrate`, `status`, `rollback`,
+  `backup`, `restore`, `bootstrap` and `invalidate-sessions` work for both dialects. The
+  `*-postgres` variants accept an explicit `--database-url` without changing the environment.
 
 `/shares` is the browser sharing page: it lists accessible projects, requires an acknowledgement
 before enabling public sharing, creates project/item/column links, shows a new token once and revokes
@@ -491,7 +539,7 @@ Set `KHAOYU_SERVICE_PUBLIC_URL` to the public HTTPS origin after the proxy is ac
 ## Tests
 
 ```powershell
-node --test test/service.test.mjs test/auth.test.mjs test/admin.test.mjs
+node --test --test-concurrency=1 test/service.test.mjs test/auth.test.mjs test/admin.test.mjs test/storage.test.mjs test/storage-migrations.test.mjs test/postgres-runtime.test.mjs test/redis-bus.test.mjs test/config.test.mjs
 
 # against a running instance with a verified account; use the frontend port from startup
 node ../tools/check-service-security.mjs --base http://127.0.0.1:18080 --credentials ../target/service-dev-credentials.json

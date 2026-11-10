@@ -5,7 +5,8 @@ accounts, sharing and collaboration, plus an optional AI assistant that can orga
 research with explicit permissions.
 
 Status: `[x]` means done and verified in this repository. `[ ]` means planned, or partial with the
-remaining work named in the item.
+remaining work named in the item. See `docs/production-readiness.md` for the current collaboration and
+Turso release verdict.
 
 Where the plan stands: Milestones 1 to 5 are implemented in `service/` and the desktop sync client
 and are recorded in `CHANGELOG.md` from 0.2.0 onward. Milestone 6 is mostly done, with the external
@@ -20,6 +21,9 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 - [x] No account, no cloud, no outbound sync.
 - [x] The MCP server runs locally over stdio and shares the same database.
 - [x] Boards, cards and columns are scoped to one local database.
+- [~] First-run database setup shell: single-user Local SQLite works; Turso and collaboration are
+  **not production ready**. Collaboration is disabled in the wizard until the admin dashboard and
+  role model in Milestone 10 land. See `docs/production-readiness.md`.
 
 ## Product goals
 
@@ -29,6 +33,8 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 - [ ] 4. Share a whole project, a single card, or a column without exposing the rest of the board.
 - [ ] 5. Treat security, privacy and data ownership as first-class requirements.
 - [ ] 6. Add an optional AI assistant that can organise, research, browse and edit only with explicit user consent.
+- [ ] 7. Offer a first-run storage choice: local SQLite or Turso for single-user, PostgreSQL + Redis
+  for collaboration.
 
 ## Milestone 1: Self-hosted service foundation
 
@@ -233,6 +239,8 @@ Migrate the self-hosted collaboration layer to a scalable real-time architecture
 ## Decision log
 
 - [ ] Keep local-first as the default and server sync as an option.
+- [ ] Keep local SQLite as the default single-user store; Turso is opt-in and never required.
+- [ ] Keep collaboration on PostgreSQL + Redis; do not offer Turso in collaboration mode.
 - [ ] Maintain SQLite as the zero-dependency, zero-account default for single-user offline boards.
 - [ ] Migrate self-hosted live collaboration to PostgreSQL and Redis for concurrency and pub/sub.
 - [ ] Prefer self-hosted single-tenant deployments before any hosted offer.
@@ -430,3 +438,104 @@ with visible user consent. The chatbot never gets silent write access to the dat
 - [ ] Scraping paywalled, private or logged-in content.
 - [ ] Sending the entire project database to a remote provider by default.
 - [ ] Storing provider keys in cards, board JSON, logs or crash reports.
+
+
+## Milestone 9: First-run database setup and Turso
+
+Goal: the first time the service or web host starts, the user chooses the storage model before any
+board or setting is read. Single-user mode offers a second choice between a local SQLite file and a
+Turso (libSQL) database. Collaboration keeps PostgreSQL + Redis.
+
+### Setup flow
+
+- [~] Step 1 UI exists; the Collaboration option does not connect to the service yet.
+  - Single user: one database, no Redis and no account required.
+  - Collaboration: PostgreSQL + Redis, accounts and sharing; this is the existing team profile.
+- [~] Step 2 UI exists; Local SQLite is the only selectable option. Connect to Turso is disabled
+  with a Coming soon badge pending Milestone 9 implementation.
+  - Local SQLite: the current filesystem database under the app data folder.
+  - Turso: libSQL URL (`libsql://...`), auth token, optional embedded replica path, Test connection
+    and Continue.
+- [x] Back/Next between steps; Local SQLite persists the choice. Turso connection/schema checks are
+  not implemented.
+- [ ] First-run setup is idempotent and never silently replaces an existing database.
+- [~] Settings > Backup exposes database export; desktop import uses the backup restore path. Web
+  import and storage-mode change are not implemented.
+
+### Storage and migration
+
+- [ ] Add a `libsql` adapter beside the SQLite and PostgreSQL adapters with the same
+  `get`/`all`/`run`/`exec`/`transaction` contract and the same schema migrations.
+- [ ] Use `@libsql/client` in the Node web host/service. The desktop app needs the libSQL Rust crate
+  or a documented bridge; routes and repositories must not depend on raw SQLite behaviour.
+- [ ] Keep local SQLite as the default. Turso is opt-in and single-user only in this milestone.
+- [ ] Provide explicit migration/export between local SQLite and Turso with a backup, row-count and
+  snapshot-hash verification, and no automatic cutover.
+- [ ] Run migrations explicitly and refuse startup while migrations are pending.
+- [ ] Optional embedded replica and sync interval; document offline reads/writes, latency and
+  conflict behaviour.
+- [ ] Backup and restore cover Turso: export to a local encrypted file, verify checksums, restore into
+  a fresh database.
+- [ ] Changing storage mode requires an explicit migration or a new empty database; it never edits the
+  old database in place.
+
+### Security and operations
+
+- [ ] Store the Turso token in the OS keychain on desktop and in encrypted server configuration on the
+  web host; never in URLs, logs, board JSON or crash reports.
+- [ ] Require TLS, validate the database URL, reject credentials in the URL and redact tokens in logs.
+- [ ] Show a data-residency and network notice before connecting; no Turso request without explicit
+  consent.
+- [ ] Connection failures are neutral and never fall back to a different database silently.
+- [ ] Timeout and rate-limit connection tests; no retry storm.
+- [ ] Document backup location, retention and deletion for Turso data.
+
+### Tests and acceptance
+
+- [ ] Wizard tests: mode choice, back/forward, validation, failed connection, retry and existing
+  database guard.
+- [ ] libSQL adapter parity: CRUD, transactions, unique errors, migrations and rollback.
+- [ ] Migration test: local SQLite -> Turso -> local with row counts and snapshot hashes.
+- [ ] Security tests: token absent from logs and URLs, TLS required, neutral errors.
+- [ ] CI uses a disposable libSQL/Turso-compatible target or a fake adapter; no real cloud token in
+  CI.
+- [ ] `npm run test:service` stays green on SQLite; PostgreSQL and libSQL tests remain CI-gated.
+
+### Out of scope
+
+- Turso for collaboration mode; team mode stays PostgreSQL + Redis.
+- Automatic migration of an existing database without explicit confirmation.
+- Multi-tenant database-per-team provisioning.
+
+## Milestone 10: Admin dashboard and roles
+
+Status: **roadmap only**. Collaboration is disabled in the first-run wizard until this milestone is
+implemented. This is deliberately not a runtime feature yet.
+
+Goal: the first user created in a database is the mandatory administrator and the only role with full
+access. The admin surface lives inside Settings rather than as a separate application.
+
+- [ ] First registered user is created as the only `admin`; the role cannot be chosen during setup and
+  cannot be removed from the last remaining admin.
+- [ ] Roles: `admin` (full access), `editor`, `commenter`, `viewer`. Only `admin` can access user
+  management, storage settings and destructive database actions.
+- [ ] Settings > Administration page, visible only to an admin:
+  - user list with display name, email, role, status and last activity;
+  - create/invite, disable, re-enable and delete users;
+  - role changes with an explicit confirmation and audit entry;
+  - active session list and "revoke all sessions" per user;
+  - guard against deleting, disabling or demoting the last admin.
+- [ ] Every admin action is written to the audit log with actor, target, before/after role and timestamp.
+- [ ] Admin dashboard uses the same authentication, CSRF and session rules as the rest of the service;
+  no admin token in the frontend bundle.
+- [ ] Single-user local/offline mode has no user-management UI; it remains account-free.
+- [ ] Tests: first-user admin invariant, last-admin guard, forbidden role escalation, session revocation,
+  audit coverage and disabled collaboration setup.
+- [ ] Documentation: operator bootstrap, recovery when the only admin is unavailable, and data export
+  before deleting a user.
+
+### Out of scope for this milestone
+
+- SSO/OIDC group-to-role mapping.
+- Multi-tenant billing.
+- Per-project custom roles.

@@ -27,6 +27,16 @@ let svgNs = "http://www.w3.org/2000/svg";
 let sketchRepaintTimer = 0;
 let lastPaintZoom = 1;
 const boardPreviewCache = new Map();
+// WebKitGTK's CSS zoom scales boxes but leaves text at its original size. Chromium reflows text
+// correctly, so only the Linux/WebKit path falls back to a composited transform.
+const webkitTransformZoom = (() => {
+  const ua = navigator.userAgent;
+  return /AppleWebKit/.test(ua) && /Linux/.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
+})();
+
+function usesTransformZoom() {
+  return webkitTransformZoom;
+}
 
 export function initRender(refs) {
   viewportEl = refs.viewport;
@@ -550,57 +560,6 @@ function contentFor(card) {
       </div>`;
     }
 
-    case "kanban": {
-      const columns = (card.columns || [])
-        .map(
-          (column) => `<div class="mn-kanban-col" data-kanban-column="${column.id}">
-            <div class="mn-kanban-col-head">
-              <input class="mn-kanban-col-title" data-kanban-col-title="${column.id}" value="${escapeHtml(
-            column.title || ""
-          )}" spellcheck="false" />
-              <button class="mn-kanban-col-remove" type="button" data-action="kanban-remove-column" data-kanban-col="${
-                column.id
-              }" title="Delete column">${icon("close", 10)}</button>
-            </div>
-            <div class="mn-kanban-items">
-              ${(column.items || [])
-                .map(
-                  (item) => `<div class="mn-kanban-item" data-kanban-item-row="${item.id}" data-kanban-col-id="${
-                    column.id
-                  }">
-                    <span class="mn-kanban-grip" data-kanban-grip="${item.id}" data-kanban-item-row="${
-                    item.id
-                  }" data-kanban-col-id="${column.id}" title="Drag card">${icon("grip", 11)}</span>
-                    <input class="mn-kanban-item-input" draggable="false" data-kanban-item="${item.id}" data-kanban-col-id="${
-                    column.id
-                  }" value="${escapeHtml(item.text || "")}" placeholder="Card" spellcheck="false" />
-                    <button class="mn-kanban-item-remove" type="button" data-action="kanban-remove-item" data-kanban-col="${
-                      column.id
-                    }" data-kanban-item="${item.id}" title="Delete card">${icon("close", 10)}</button>
-                  </div>`
-                )
-                .join("")}
-              <button class="mn-kanban-add-item" type="button" data-action="kanban-add-item" data-kanban-col="${
-                column.id
-              }">${icon("plus", 11)} Add card</button>
-            </div>
-          </div>`
-        )
-        .join("");
-      return `<div class="mn-kanban">
-        <div class="mn-kanban-head">
-          <input class="mn-kanban-title" data-field="title" value="${escapeHtml(card.title || "Kanban")}" spellcheck="false" />
-          <button class="mn-kanban-add-col" type="button" data-action="kanban-add-column">${icon(
-            "plus",
-            12
-          )} Add column</button>
-        </div>
-        <div class="mn-kanban-cols">${
-          columns || `<div class="mn-kanban-empty">No columns yet.</div>`
-        }</div>
-      </div>`;
-    }
-
     default:
       return `<div class="mn-placeholder">${escapeHtml(card.type)}</div>`;
   }
@@ -688,8 +647,19 @@ export function zIndexFor(card) {
   if (card.type === "section") return 1 + Math.min(998, card.z || 1);
   // Integer z-index only: CSS ignores fractional values, which used to hide column children.
   if (card.parentId) {
-    const column = getCard(state.board, card.parentId);
-    if (column) return (column.z || 1) * 1000 + 1 + Math.min(999, card.order || 0);
+    const chain = [];
+    let parent = getCard(state.board, card.parentId);
+    while (parent) {
+      chain.push(parent);
+      parent = parent.parentId ? getCard(state.board, parent.parentId) : null;
+    }
+    if (!chain.length) return (card.z || 1) * 1000;
+    const root = chain[chain.length - 1];
+    // Keep every descendant inside the root column's 1000-wide z band. The next top-level card
+    // starts at (root.z + 1) * 1000, so a child card can never cover a sibling column.
+    const base = (root.z || 1) * 1000;
+    if (chain.length === 1) return base + 1 + Math.min(499, card.order || 0);
+    return base + 500 + Math.min(499, card.order || 0);
   }
   return (card.z || 1) * 1000;
 }
@@ -806,7 +776,27 @@ export function buildCard(card) {
   el.dataset.id = card.id;
   el.dataset.type = card.type;
   if (card.type === "section") {
-    el.style.setProperty("--section-color", card.sectionColor || "#F8D7DA");
+    const sectionColor = card.sectionColor || "#F8D7DA";
+    el.style.setProperty("--section-color", sectionColor);
+    // Neutral colors such as Mist need more of the original color to stay identifiable in dark
+    // themes; saturated pastels need less so the section does not become a bright panel.
+    const hex = String(sectionColor).replace("#", "");
+    const neutral =
+      /^[0-9a-f]{6}$/i.test(hex) &&
+      Math.max(
+        parseInt(hex.slice(0, 2), 16),
+        parseInt(hex.slice(2, 4), 16),
+        parseInt(hex.slice(4, 6), 16)
+      ) -
+        Math.min(
+          parseInt(hex.slice(0, 2), 16),
+          parseInt(hex.slice(2, 4), 16),
+          parseInt(hex.slice(4, 6), 16)
+        ) <=
+        8;
+    el.style.setProperty("--section-strength-dark", neutral ? "72%" : "48%");
+    el.style.setProperty("--section-strength-soft", neutral ? "78%" : "58%");
+    el.classList.toggle("is-neutral-section", neutral);
   }
   applyGeometry(el, card);
   el.innerHTML =
@@ -1004,7 +994,9 @@ function rebuildCards() {
     if (card.type === "link" && !card.headerImage) {
       const el = cardElement(card.id);
       if (!el) continue;
-      const height = Math.round(el.scrollHeight / (state.view.zoom || 1));
+      const height = Math.round(
+        el.scrollHeight / (usesTransformZoom() ? 1 : state.view.zoom || 1)
+      );
       if (height > 0 && Math.abs((card.h || 0) - height) > 2) {
         card.h = Math.max(MIN_CARD_H, height);
         applyGeometry(el, card);
@@ -1026,13 +1018,19 @@ function rebuildCards() {
 
 export function renderView() {
   if (!worldEl) return;
-  // Scale with the CSS `zoom` property instead of a transform: Chromium re-lays out text at the
-  // zoomed size, so cards and text stay sharp at high zoom instead of being raster-scaled.
+  // Chromium re-lays out text with CSS zoom, so cards stay sharp. WebKitGTK only scales the
+  // element boxes, which leaves text at 100% and makes a 15% board look broken; use a transform
+  // there so boxes and text scale together.
   const zoom = state.view.zoom;
-  const panX = state.view.x / zoom;
-  const panY = state.view.y / zoom;
-  worldEl.style.zoom = String(zoom);
-  worldEl.style.transform = `translate(${panX}px, ${panY}px)`;
+  if (usesTransformZoom()) {
+    worldEl.style.zoom = "1";
+    worldEl.style.transform = `translate(${state.view.x}px, ${state.view.y}px) scale(${zoom})`;
+  } else {
+    const panX = state.view.x / zoom;
+    const panY = state.view.y / zoom;
+    worldEl.style.zoom = String(zoom);
+    worldEl.style.transform = `translate(${panX}px, ${panY}px)`;
+  }
   if (Math.abs(zoom - lastPaintZoom) > 0.001) {
     lastPaintZoom = zoom;
     clearTimeout(sketchRepaintTimer);

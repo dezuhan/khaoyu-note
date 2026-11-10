@@ -2,7 +2,8 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { createApiRouter } from "./auth/routes.mjs";
-import { migrationStatus } from "./db.mjs";
+import { MIGRATIONS_DIR, POSTGRES_MIGRATIONS_DIR } from "./db.mjs";
+import { migrationStatus } from "./storage/migrations.mjs";
 import { applySecurityHeaders, sendJson } from "./http.mjs";
 
 const PUBLIC_DIR = path.join(import.meta.dirname, "..", "public");
@@ -30,8 +31,9 @@ const AUTH_PAGES = {
   "/ky.css": ["ky.css", "text/css; charset=utf-8"],
 };
 
-export function assertSchemaCurrent(db) {
-  const pending = migrationStatus(db).filter((migration) => !migration.applied);
+export async function assertSchemaCurrent(db, { dialect = db.dialect } = {}) {
+  const directory = dialect === "postgres" ? POSTGRES_MIGRATIONS_DIR : MIGRATIONS_DIR;
+  const pending = (await migrationStatus(db, directory)).filter((migration) => !migration.applied);
   if (pending.length) {
     throw new Error(
       `database has ${pending.length} pending migration(s); run the migrate command first`
@@ -45,8 +47,8 @@ export function logPath(pathname) {
     .replace(/^\/s\/[^/]+$/, "/s/[redacted]");
 }
 
-export function createServiceHandler({ config, db, logger, mailer }) {
-  const api = createApiRouter({ db, config, logger, mailer });
+export function createServiceHandler({ config, db, logger, mailer, events }) {
+  const api = createApiRouter({ db, config, logger, mailer, events });
   const handler = async (request, response) => {
     const started = Date.now();
     let url;
@@ -117,7 +119,7 @@ export function createServiceHandler({ config, db, logger, mailer }) {
       }
       if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/readyz") {
         try {
-          db.prepare("SELECT 1").get();
+          await db.get("SELECT 1");
           sendJson(response, 200, { status: "ready" }, config);
         } catch {
           sendJson(response, 503, { status: "not_ready" }, config);

@@ -13,7 +13,6 @@
     "test:board-card-title": "node test-board-card-title.mjs",
     "test:columns": "node test-column-layout.mjs",
     "test:column-title": "node test-column-title.mjs",
-    "test:kanban-scroll": "node test-kanban-scroll.mjs",
     "test:tool-drop": "node test-tool-drop-column.mjs",
     "test:wrap": "node test-wrap-selection.mjs",
     "test:tooltips": "node test-tooltips.mjs",

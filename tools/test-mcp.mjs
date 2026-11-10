@@ -169,15 +169,6 @@ try {
   });
   check("create_card maps todo items", todo.card?.items?.length === 2 && todo.card.items[0].text === "One");
 
-  const kanban = await tool("create_card", {
-    board_id: board.board_id,
-    type: "kanban",
-  });
-  check(
-    "create_card supports kanban columns",
-    kanban.card?.columns?.length === 3 && kanban.card.columns[0].title === "Backlog"
-  );
-
   const connected = await tool("connect_cards", {
     board_id: board.board_id,
     from_card_id: note.card.id,

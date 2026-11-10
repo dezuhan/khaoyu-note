@@ -3,13 +3,15 @@ import http from "node:http";
 import path from "node:path";
 import { loadConfig } from "./config.mjs";
 import { createLogger } from "./logger.mjs";
-import { openDatabase } from "./db.mjs";
+import { openStorage } from "./storage/index.mjs";
 import {
   assertSchemaCurrent,
   createFrontendServer,
   createServiceHandler,
 } from "./app.mjs";
 import { createQueuedMailer } from "./auth/mailer.mjs";
+import { createEventHub } from "./events.mjs";
+import { createRedisBus } from "./realtime/redis-bus.mjs";
 import { pickServicePorts, displayHost } from "./ports.mjs";
 import { startWorker } from "./worker.mjs";
 
@@ -36,9 +38,16 @@ async function main() {
   ]) {
     fs.mkdirSync(directory, { recursive: true });
   }
-  const db = openDatabase(config.databasePath);
-  assertSchemaCurrent(db);
+  const db = await openStorage(config);
+  await assertSchemaCurrent(db);
   const mailer = createQueuedMailer(db, config, logger);
+  const events = config.redisUrl
+    ? await createRedisBus({
+        url: config.redisUrl,
+        prefix: config.redisPrefix,
+        logger,
+      })
+    : createEventHub();
 
   const { frontendPort, backendPort } = await pickServicePorts(config.host);
   const host = displayHost(config.host);
@@ -49,7 +58,7 @@ async function main() {
   }
   config.port = backendPort;
 
-  const handler = createServiceHandler({ config, db, logger, mailer });
+  const handler = createServiceHandler({ config, db, logger, mailer, events });
   const backend = http.createServer((request, response) => {
     let pathname = "/";
     try {
@@ -104,19 +113,21 @@ async function main() {
     closing = true;
     logger.info("service.stopping", { signal });
     worker.stop();
-    handler.closeStreams?.();
+    const streamsClosed = Promise.resolve(handler.closeStreams?.()).catch(() => {});
     let pending = 2;
-    const done = () => {
+    const done = async () => {
       pending -= 1;
       if (pending > 0) return;
-      db.close();
-      mailer.close?.();
+      await db.close();
+      await mailer.close?.();
       fs.rmSync(path.join(config.dataDir, "runtime.json"), { force: true });
       logger.info("service.stopped");
       process.exit(0);
     };
-    backend.close(done);
-    frontend.close(done);
+    streamsClosed.finally(() => {
+      backend.close(done);
+      frontend.close(done);
+    });
     setTimeout(() => process.exit(1), 15_000).unref();
   };
   process.on("SIGINT", () => shutdown("SIGINT"));

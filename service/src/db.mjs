@@ -1,15 +1,83 @@
 import fs from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
 export const MIGRATIONS_DIR = fileURLToPath(new URL("./migrations", import.meta.url));
+export const POSTGRES_MIGRATIONS_DIR = fileURLToPath(
+  new URL("./migrations/postgres", import.meta.url)
+);
+
+function runtimeDatabase(raw) {
+  const txContext = new AsyncLocalStorage();
+  let tail = Promise.resolve();
+  const withLock = (work) => {
+    const result = tail.then(work, work);
+    tail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  };
+  const plain = (row) => (row ? { ...row } : undefined);
+  const asyncApi = {
+    dialect: "sqlite",
+    async get(sql, params = []) {
+      const work = () => plain(raw.prepare(sql).get(...params));
+      return txContext.getStore() ? work() : withLock(work);
+    },
+    async all(sql, params = []) {
+      const work = () => raw.prepare(sql).all(...params).map(plain);
+      return txContext.getStore() ? work() : withLock(work);
+    },
+    async run(sql, params = []) {
+      const work = () => {
+        const result = raw.prepare(sql).run(...params);
+        return {
+          changes: Number(result.changes || 0),
+          lastInsertRowid:
+            typeof result.lastInsertRowid === "bigint"
+              ? Number(result.lastInsertRowid)
+              : result.lastInsertRowid,
+        };
+      };
+      return txContext.getStore() ? work() : withLock(work);
+    },
+    async transaction(fn) {
+      if (txContext.getStore()) return fn(api);
+      return withLock(async () => {
+        raw.exec("BEGIN IMMEDIATE");
+        try {
+          const result = await txContext.run(api, () => fn(api));
+          raw.exec("COMMIT");
+          return result;
+        } catch (error) {
+          try {
+            raw.exec("ROLLBACK");
+          } catch {
+            /* already rolled back */
+          }
+          throw error;
+        }
+      });
+    },
+  };
+  const api = new Proxy(raw, {
+    get(target, property) {
+      if (property in asyncApi) return asyncApi[property];
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return api;
+}
 
 export function openDatabase(databasePath) {
   fs.mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = new DatabaseSync(databasePath);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
-  return db;
+  return runtimeDatabase(db);
 }
 
 export function ensureMigrationTable(db) {

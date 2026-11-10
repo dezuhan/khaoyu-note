@@ -1548,7 +1548,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     api.db
       .prepare("UPDATE accounts SET deletion_due_at = ? WHERE id = ?")
       .run(Date.now() - 1000, user.account.id);
-    runMaintenance(api.db, api.config, createLogger({ write() {} }));
+    await runMaintenance(api.db, api.config, createLogger({ write() {} }));
     assert.equal(api.db.prepare("SELECT * FROM accounts WHERE id = ?").get(user.account.id), undefined);
     assert.equal(
       api.db.prepare("SELECT * FROM objects WHERE id = ?").get(orphanObject.object_id),

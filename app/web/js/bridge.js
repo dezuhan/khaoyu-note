@@ -192,6 +192,12 @@ export async function downloadAsset(path) {
   throw new Error("Downloads are only available in the desktop app");
 }
 
+// Physical GPU names come from the OS, not the sanitized WebGL renderer string.
+export async function graphicsInfo() {
+  if (hasTauri) return invoke("graphics_info");
+  return null;
+}
+
 export async function getSetting(key) {
   if (hasTauri) return invoke("get_setting", { key });
   return localStorage.getItem("mn.setting." + key);
@@ -217,6 +223,49 @@ export async function backupData() {
 export async function exportBackupZip() {
   if (hasTauri) return invoke("export_backup_zip");
   throw new Error("ZIP export is only available in the desktop app");
+}
+
+// Portable database snapshot. The web host streams a ZIP of the SQLite database and assets; the
+// desktop app writes the same ZIP through the Rust backup exporter.
+export async function exportDatabase() {
+  if (hasWeb) {
+    const link = document.createElement("a");
+    link.href = "/api/database/export";
+    link.download = "";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    return "download";
+  }
+  if (hasTauri) return invoke("export_backup_zip");
+  throw new Error("Database export needs the desktop app or the local web host");
+}
+
+// Restore accepts the same folder-shaped backup that desktop backups produce. Web import stays
+// explicit for now because replacing the live host database needs a maintenance/restart path.
+export async function importDatabase(backupPath) {
+  if (hasTauri && !hasWeb) return invoke("stage_restore", { backupPath });
+  throw new Error("Database import is currently available in the desktop app");
+}
+
+export async function pickBackupFolder() {
+  if (hasTauri && !hasWeb) return invoke("pick_backup_folder");
+  throw new Error("Choosing a backup folder is available in the desktop app");
+}
+
+export async function openFolder(path) {
+  if (hasTauri && !hasWeb) return invoke("open_folder", { path });
+  throw new Error("Opening a folder is available in the desktop app");
+}
+
+export async function storageStats() {
+  if (hasWeb) {
+    const response = await fetch("/api/storage/stats", { credentials: "include" });
+    if (!response.ok) throw new Error(`Storage stats failed (${response.status})`);
+    return response.json();
+  }
+  if (hasTauri) return invoke("storage_stats");
+  return null;
 }
 
 export async function dbIntegrity() {
@@ -401,6 +450,26 @@ export async function authResetDatabase(input) {
   if (hasWeb) return fetchAuth("/api/auth/reset", { method: "POST", body: input });
   if (hasTauri) return invoke("auth_reset_database", input);
   return accountsUnavailable();
+}
+
+// Full local reset: boards, assets, accounts, settings and activity. Used by Settings > About.
+export async function resetAllData() {
+  if (hasWeb) {
+    const response = await fetch("/api/reset", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ confirmation: "RESET ALL" }),
+    });
+    const body = await response.json().catch(() => null);
+    if (response.status === 405) {
+      throw new Error("The web host is running an older build. Restart the web server, then try again.");
+    }
+    if (!response.ok) throw new Error(body?.error || `Reset failed (${response.status})`);
+    return body;
+  }
+  if (hasTauri) return invoke("reset_app", { confirmation: "RESET ALL" });
+  throw new Error("Reset is available in the desktop app or the local web host");
 }
 
 // Full URLs this host can be reached on. Only the browser edition has share URLs.
