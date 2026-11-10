@@ -12,6 +12,7 @@ import {
 import { openSqliteStorage } from "../src/storage/sqlite.mjs";
 import { openPostgresStorage } from "../src/storage/postgres.mjs";
 import {
+  ensureMigrationTable,
   migrate as migrateStorage,
   migrationStatus,
   rollback as rollbackStorage,
@@ -42,6 +43,16 @@ test("async migration runner applies and rolls back the SQLite schema", async ()
   } finally {
     await db.close();
   }
+});
+
+test("migration metadata uses BIGINT for applied_at", async () => {
+  let sql = "";
+  await ensureMigrationTable({
+    async exec(statement) {
+      sql = statement;
+    },
+  });
+  assert.match(sql, /applied_at BIGINT NOT NULL/i);
 });
 
 test(
