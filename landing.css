@@ -862,6 +862,11 @@ html[data-ky-theme="light"] .lp-theme-sun {
   box-shadow: 0 0 0 3px color-mix(in srgb, #3b82f6 22%, transparent);
 }
 
+.lp-roadmap-status-done .lp-roadmap-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #10b981 22%, transparent);
+}
+
 .lp-roadmap-status-planned .lp-roadmap-dot {
   background: var(--ky-soft);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ky-text) 10%, transparent);
