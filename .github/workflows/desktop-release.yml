@@ -42,7 +42,7 @@ jobs:
               app/src-tauri/target/release/khaoyu-note
               app/src-tauri/target/release/khaoyu-note-mcp
           - name: macOS universal
-            runner: macos-14
+            runner: macos-latest
             artifact: khaoyu-note-macos-universal
             args: "--target universal-apple-darwin"
             paths: |
