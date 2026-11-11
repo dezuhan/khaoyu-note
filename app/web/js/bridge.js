@@ -220,6 +220,13 @@ export async function backupData() {
   throw new Error("Backups are only available in the desktop app");
 }
 
+// Automatic backups use the retention-aware desktop command; the seven-copy cap applies there.
+// Other hosts keep the previous fallback, which means automatic backups stay desktop-only.
+export async function autoBackupData() {
+  if (hasTauri && !hasWeb) return invoke("auto_backup_data");
+  return backupData();
+}
+
 export async function exportBackupZip() {
   if (hasTauri) return invoke("export_backup_zip");
   throw new Error("ZIP export is only available in the desktop app");

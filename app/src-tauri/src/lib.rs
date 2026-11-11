@@ -19,6 +19,8 @@ struct AuthState(Mutex<Option<auth::SessionUser>>);
 const MAX_ASSET_BYTES: u64 = 100 * 1024 * 1024;
 const CURRENT_SCHEMA_VERSION: i64 = 3;
 pub const DB_FILE: &str = "khaoyu-note.db";
+const AUTO_BACKUP_PREFIX: &str = "auto-khaoyu-note-";
+const AUTO_BACKUP_KEEP: usize = 7;
 // Only used to find and migrate data written by releases before the rename. These values must keep
 // matching the identifiers those releases actually wrote, or the migration becomes a no-op and an
 // upgraded install starts on an empty database.
@@ -1737,11 +1739,10 @@ fn open_folder(app: tauri::AppHandle, path: String) -> Result<(), String> {
     shell_open(&target.to_string_lossy())
 }
 
-#[tauri::command]
-fn backup_data(app: tauri::AppHandle) -> Result<String, String> {
-    let root = root_dir(&app)?;
-    let base = backup_base_dir(&app, &root)?;
-    let target = unique_path(&base, &format!("khaoyu-note-{}", now_ms()), None);
+fn backup_into(app: &tauri::AppHandle, prefix: &str) -> Result<String, String> {
+    let root = root_dir(app)?;
+    let base = backup_base_dir(app, &root)?;
+    let target = unique_path(&base, &format!("{prefix}{}", now_ms()), None);
     fs::create_dir_all(&target).map_err(|e| e.to_string())?;
     let db_target = target.join(DB_FILE);
     {
@@ -1766,6 +1767,46 @@ fn backup_data(app: tauri::AppHandle) -> Result<String, String> {
         copy_dir_recursive(&assets, &target.join("assets"))?;
     }
     Ok(target.to_string_lossy().to_string())
+}
+
+/// Keep only the newest `keep` automatic backup folders. Manual backups use a different prefix and
+/// are never touched.
+fn prune_auto_backups(base: &Path, keep: usize) -> Result<usize, String> {
+    let mut automatic: Vec<PathBuf> = fs::read_dir(base)
+        .map_err(|e| e.to_string())?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(AUTO_BACKUP_PREFIX))
+        })
+        .collect();
+    automatic.sort();
+    let remove_count = automatic.len().saturating_sub(keep);
+    for path in automatic.into_iter().take(remove_count) {
+        fs::remove_dir_all(&path)
+            .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
+    }
+    Ok(remove_count)
+}
+
+#[tauri::command]
+fn backup_data(app: tauri::AppHandle) -> Result<String, String> {
+    backup_into(&app, "khaoyu-note-")
+}
+
+#[tauri::command]
+fn auto_backup_data(app: tauri::AppHandle) -> Result<String, String> {
+    let path = backup_into(&app, AUTO_BACKUP_PREFIX)?;
+    let root = root_dir(&app)?;
+    let base = backup_base_dir(&app, &root)?;
+    if let Err(error) = prune_auto_backups(&base, AUTO_BACKUP_KEEP) {
+        // The backup itself succeeded; pruning is best effort and must not turn it into a failure.
+        eprintln!("khaoyu-note: could not prune automatic backups: {error}");
+    }
+    Ok(path)
 }
 
 #[tauri::command]
@@ -3044,6 +3085,7 @@ pub fn run() {
             store_asset,
             store_asset_from_path,
             backup_data,
+            auto_backup_data,
             pick_backup_folder,
             open_folder,
             export_backup_zip,
@@ -3135,6 +3177,37 @@ mod tests {
                 CURRENT_SCHEMA_VERSION
             );
         }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn automatic_backup_retention_keeps_the_newest_and_manual_backups() {
+        let root = test_root("auto-backup-retention");
+        fs::create_dir_all(root.join("khaoyu-note-1700000000001")).expect("manual backup");
+        for index in 0..10u128 {
+            fs::create_dir_all(root.join(format!(
+                "{AUTO_BACKUP_PREFIX}{}",
+                1_700_000_000_000u128 + index
+            )))
+            .expect("automatic backup");
+        }
+
+        let removed = prune_auto_backups(&root, 7).expect("prune");
+
+        assert_eq!(removed, 3);
+        assert!(!root
+            .join(format!("{AUTO_BACKUP_PREFIX}1700000000000"))
+            .exists());
+        assert!(!root
+            .join(format!("{AUTO_BACKUP_PREFIX}1700000000002"))
+            .exists());
+        assert!(root
+            .join(format!("{AUTO_BACKUP_PREFIX}1700000000003"))
+            .is_dir());
+        assert!(root
+            .join(format!("{AUTO_BACKUP_PREFIX}1700000000009"))
+            .is_dir());
+        assert!(root.join("khaoyu-note-1700000000001").is_dir());
         let _ = fs::remove_dir_all(root);
     }
 

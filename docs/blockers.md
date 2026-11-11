@@ -65,9 +65,9 @@ gateway, browser isolation, audit and prompt-injection test design before any im
    Settings status in one place.
 5. Publish GitHub Releases for the update check. The repository has a remote and `v0.35.0` tag, and
    `desktop-release.yml` publishes on `v*` tags; the release must still be created and verified.
-6. Add retention for backups. Automatic backups are not pruned, and each one copies the assets folder,
-   so a daily interval grows without bound. Keep the newest N automatic backups and leave manual ones
-   alone.
+6. ~~Add retention for backups.~~ Done on 2026-11-11: automatic backups use a distinct folder prefix
+   and the desktop keeps the newest seven, pruning older automatic copies after a successful backup.
+   Manual backups are never removed automatically.
 7. Finish local accounts. The local-first build intentionally disables login and Settings > Account;
    the account, activity and role code exists for a future deploy. The remaining desktop work is the
    Settings > Administration page (users, roles, status, history, database backup) and mapping project

@@ -37,7 +37,7 @@ globalThis.window = {
           settings.set(args.key, args.value);
           return null;
         }
-        if (command === "backup_data") {
+        if (command === "backup_data" || command === "auto_backup_data") {
           if (backupFails) throw new Error("disk is full");
           backups += 1;
           return "C:/backup-" + backups;
@@ -71,6 +71,7 @@ localStorage.setItem("mn.settings", JSON.stringify({ autoBackupDays: 1 }));
 result = await auto.maybeAutoBackup({ now: 1000 });
 assert.equal(result.status, "created");
 assert.equal(backups, 1);
+assert.ok(calls.some((call) => call.command === "auto_backup_data"), "automatic backups use the retention-aware command");
 assert.equal(auto.lastBackupAt(), 1000);
 
 // Not due again before the interval elapses.

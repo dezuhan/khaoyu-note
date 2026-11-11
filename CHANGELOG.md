@@ -5,6 +5,12 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Automatic backups now use a distinct folder prefix and keep only the newest seven copies;
+  older automatic folders are pruned after a successful backup. Manual backups and the folders
+  imported through the Backup pane are never removed automatically.
+
 ## [0.35.0] - 2026-11-10
 
 ### Added

@@ -6,7 +6,8 @@
   enables server sync for a board. `KHAOYU_NOTE_DB_DIR` overrides that folder for portable or
   isolated runs.
 - Local backups are written next to the app data or to the operator-selected path;
-  `KHAOYU_NOTE_BACKUP_DIR` overrides the backup folder.
+  `KHAOYU_NOTE_BACKUP_DIR` overrides the backup folder. The desktop keeps the newest seven automatic
+  backups and prunes older automatic copies; manual backups remain until the user removes them.
 
 ## Self-hosted service
 

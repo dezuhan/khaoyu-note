@@ -104,7 +104,7 @@ export async function maybeAutoBackup({ force = false, now = Date.now() } = {}) 
   if (!force && !isBackupDue(days, lastAt, now)) return { status: "not-due" };
   running = true;
   try {
-    const path = await bridge.backupData();
+    const path = await bridge.autoBackupData();
     await saveLastAt(now);
     toast("Automatic backup created");
     return { status: "created", path };
