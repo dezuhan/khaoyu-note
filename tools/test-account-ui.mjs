@@ -1,4 +1,6 @@
-// End-to-end account UI check.
+// End-to-end account UI check against the current service pages:
+// /account redirects to /admin; registration lives on /register, sign-in on /login, and the
+// account section (sessions, API tokens, password, sign-out) is a page inside the admin dashboard.
 // node tools/test-account-ui.mjs
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
@@ -56,87 +58,92 @@ async function waitForReady() {
   throw new Error("service did not start");
 }
 
-function latestMail(kind) {
-  return fs
-    .readdirSync(path.join(dataDir, "outbox"))
-    .map((file) => JSON.parse(fs.readFileSync(path.join(dataDir, "outbox", file), "utf8")))
-    .filter((message) => message.kind === kind)
-    .sort((a, b) => b.queuedAt.localeCompare(a.queuedAt))[0];
-}
-
 try {
   base = (await waitForRuntime()).frontendUrl;
   await waitForReady();
   browser = await chromium.launch();
   const page = await browser.newPage();
-  page.on("pageerror", (error) => console.log("PAGEERROR", error.message));
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  // /account is now a redirect to the admin dashboard.
   await page.goto(`${base}/account`, { waitUntil: "load" });
+  check("account URL redirects to the admin dashboard", page.url().endsWith("/admin"), page.url());
+
+  // Registration creates an immediately usable verified account and sends the user to /login.
+  await page.goto(`${base}/register`, { waitUntil: "load" });
   const design = await page.evaluate(() => ({
     css: Boolean(document.querySelector('link[href="/ky.css"]')),
-    bg: getComputedStyle(document.body).backgroundColor,
-    surface: getComputedStyle(document.querySelector("main")).backgroundColor,
+    token: getComputedStyle(document.body).getPropertyValue("--ky-bg").trim(),
   }));
-  check(
-    "account page uses the shared design tokens",
-    design.css && design.bg === "rgb(17, 17, 17)" && design.surface === "rgb(21, 21, 21)",
-    `${design.bg} / ${design.surface}`
-  );
-
-  await page.click("#tab-register");
-  await page.fill("#register-email", email);
-  await page.fill("#register-name", "Account Test");
-  await page.fill("#register-password", password);
-  await page.click("#register");
-  await page.waitForFunction(() => document.getElementById("status").textContent.includes("Account created"));
-  check("registration from the browser", true);
+  check("auth pages use the shared design tokens", design.css && design.token.length > 0, JSON.stringify(design));
   check(
     "email verification UI is hidden",
     (await page.locator("#verify-token").count()) === 0 &&
-      (await page.locator("#verify").count()) === 0 &&
-      !(await page.locator(".ky-auth-panel").innerText()).includes("Verify email")
+      !(await page.locator("body").innerText()).includes("Verify email")
+  );
+  await page.fill("#name", "Account Test");
+  await page.fill("#email", email);
+  await page.fill("#password", password);
+  await page.fill("#confirm", password);
+  await page.click("#register-submit");
+  await page.waitForURL(/\/login\?registered=1/, { timeout: 15000 });
+  check("registration from the browser", true);
+
+  // Sign-in redirects to /admin and the first account is the admin identity.
+  await page.fill("#email", email);
+  await page.fill("#password", password);
+  await page.click("#login-submit");
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
+  await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
+  check("password login shows the signed-in account", (await page.locator("#admin-email").innerText()).includes(email));
+
+  // The account page inside the dashboard owns sessions, tokens and password changes.
+  await page.click('.admin-nav-item[data-page="account"]');
+  await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("Sessions"));
+  check("account page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
+  check(
+    "account page uses the shared design tokens",
+    (await page.locator('link[href="/ky.css"]').count()) === 1 &&
+      (await page.locator(".ky-button").count()) >= 1
   );
 
-  await page.fill("#login-email", email);
-  await page.fill("#login-password", password);
-  await page.click("#login");
-  await page.waitForFunction(() => !document.getElementById("account-section").hidden);
-  check("password login shows the signed-in account", (await page.locator("#account-email").innerText()).includes(email));
-  check("session list contains the current session", (await page.locator("#sessions li").count()) === 1);
+  await page.fill('[data-role="token-form"] input[name="name"]', "Desktop sync");
+  await page.click('[data-role="token-form"] button[type="submit"]');
+  await page.waitForFunction(
+    () => document.querySelector('[data-role="token-result"]').textContent.includes("khn_"),
+    { timeout: 15000 }
+  );
+  check("API token can be created from the browser", true);
+  check("API token appears in the list", (await page.locator('[data-role="revoke-token"]').count()) === 1);
 
-  await page.fill("#token-name", "Desktop sync");
-  await page.click("#token-create");
-  await page.waitForFunction(() => document.getElementById("token-result").textContent.includes("khn_"));
-  check("API token can be created from the browser", (await page.locator("#token-result").innerText()).includes("khn_"));
-  check("API token appears in the list", (await page.locator("#tokens li").count()) === 1);
-  await page.locator("#tokens li button").click();
-  await page.waitForFunction(() => document.getElementById("status").textContent.includes("revoked"));
-  await page.waitForFunction(() => document.querySelectorAll("#tokens li").length === 0);
-  check("API token can be revoked", (await page.locator("#tokens li").count()) === 0);
+  await page.click('[data-role="revoke-token"]');
+  await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("No API tokens"), {
+    timeout: 15000,
+  });
+  check("API token can be revoked", (await page.locator('[data-role="revoke-token"]').count()) === 0);
 
-  await page.click("#logout-all");
-  await page.waitForFunction(() => document.getElementById("status").textContent.includes("every device"));
-  check("logout everywhere clears the account view", await page.locator("#account-section").isHidden());
+  await page.fill('[data-role="password-form"] input[name="currentPassword"]', password);
+  await page.fill('[data-role="password-form"] input[name="newPassword"]', newPassword);
+  await page.fill('[data-role="password-form"] input[name="confirmPassword"]', newPassword);
+  await page.click('[data-role="password-form"] button[type="submit"]');
+  await page.waitForFunction(
+    () => document.querySelector('[data-role="password-status"]').textContent.includes("Password updated"),
+    { timeout: 15000 }
+  );
+  check("password change from the browser", true);
 
-  await page.fill("#login-email", email);
-  await page.fill("#login-password", password);
-  await page.click("#login");
-  await page.waitForFunction(() => !document.getElementById("account-section").hidden);
+  await page.click('[data-role="logout-all"]');
+  await page.waitForURL(/\/login\?signedout=1/, { timeout: 15000 });
+  check("sign out everywhere returns to the login page", true);
 
-  await page.fill("#reset-email", email);
-  await page.click("#reset-request");
-  await page.waitForFunction(() => document.getElementById("status").textContent.includes("reset token"));
-  const resetToken = latestMail("reset").text.match(/token: (\S+)/)[1];
-  await page.fill("#reset-token", resetToken);
-  await page.fill("#reset-password", newPassword);
-  await page.click("#reset-confirm");
-  await page.waitForFunction(() => document.getElementById("status").textContent.includes("Password changed"));
-  check("password reset from the browser", true);
+  await page.fill("#email", email);
+  await page.fill("#password", newPassword);
+  await page.click("#login-submit");
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
+  check("login with the new password", (await page.locator("#admin-email").innerText()).includes(email));
 
-  await page.fill("#login-email", email);
-  await page.fill("#login-password", newPassword);
-  await page.click("#login");
-  await page.waitForFunction(() => !document.getElementById("account-section").hidden);
-  check("login with the reset password", (await page.locator("#account-email").innerText()).includes(email));
+  check("no unexpected page errors", pageErrors.length === 0, pageErrors.join(" | "));
 } catch (error) {
   console.error("FAIL", error.message);
   process.exitCode = 1;

@@ -451,6 +451,7 @@ node tools/test-auth-web.mjs
 node tools/test-passkeys.mjs
 node tools/test-shares-ui.mjs
 node tools/test-share-view.mjs
+node tools/test-account-ui.mjs
 
 # first-run onboarding against the preview server
 node tools/test-onboarding.mjs http://127.0.0.1:1430/

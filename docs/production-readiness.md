@@ -97,7 +97,7 @@ skipped. Rust, Cargo and Docker are not installed in this environment.
 | Translation audit | 190/190 keys, 10 languages |
 | Main UI suite | **268/268 pass** |
 | Feature browser suites | save-conflict 11/11, save-retry 4/4, board-selection 4/4, rename 8/8, board-card-title 5/5, column-layout 9/9, column-title 7/7, tool-drop 6/6, wrap 5/5, tooltips 7/7, line-area 6/6, card-features 24/24, fonts 5/5, web-mode 10/10, auth-web 44/44, onboarding pass |
-| Service-backed browser suites | passkeys, shares-ui and share-view pass with a disposable service |
+| Service-backed browser suites | passkeys, shares-ui, share-view and the rewritten account suite (14 checks) pass with a disposable service |
 | Service tests | **69 pass, 6 skipped** (PostgreSQL and Redis integration skipped); **70 pass, 5 skipped** with `TEST_REDIS_URL` set |
 | Web host smoke | `/status` pass, version 0.35.0 on Node 26.13.0 |
 | MCP smoke suite | not run: the MCP binary needs a Rust build |
@@ -110,9 +110,10 @@ skipped. Rust, Cargo and Docker are not installed in this environment.
 - Resolved since the first pass: save-conflict is 11/11, board-selection is 4/4, and the passkey,
   shares and share-view suites start the service successfully. The earlier failures are no longer
   reproducible in this environment.
-- `tools/test-account-ui.mjs` is stale: it still expects the old `/account` page with `#tab-register`,
-  but `/account` now returns 302 to `/admin`. The script is not part of CI. It must be updated to the
-  admin page or retired before it is added to a gate.
+- `tools/test-account-ui.mjs` was rewritten in the same pass: it now covers `/account` redirecting
+  to `/admin`, registration on `/register`, sign-in on `/login`, and the account section of the admin
+  dashboard (sessions, API tokens, password change, sign out everywhere). It runs 14 checks and was
+  added to `.github/workflows/ci.yml`.
 - Rust `legacy_data_folder_is_migrated_to_the_new_identity`: the first pass observed a failure because
   the test created the legacy folder at the same identifier as the new root. It cannot be re-verified
   here without Cargo; fix the test roots and confirm under `cargo test`.
@@ -126,7 +127,7 @@ signing/pen-test/load-test gates remain open.
 
 Minimum before a public production tag:
 
-1. update or retire `tools/test-account-ui.mjs`, then add it to CI if kept;
+1. keep the account UI suite green in CI (rewritten and wired in on 2026-11-11);
 2. fix the legacy migration test and run the full web and Rust suites green in CI;
 3. run service tests against PostgreSQL (Redis already passes locally);
 4. build and scan the service container with Docker/Trivy;
