@@ -101,21 +101,15 @@ jobs:
             target/aarch64-apple-darwin/release/khaoyu-note-mcp \
             target/x86_64-apple-darwin/release/khaoyu-note-mcp \
             -output target/universal-apple-darwin/release/khaoyu-note-mcp
+          chmod +x target/universal-apple-darwin/release/khaoyu-note-mcp
+          test -x target/universal-apple-darwin/release/khaoyu-note-mcp
 
       - name: Build desktop bundles
         working-directory: app
         shell: bash
         env:
           CI: "true"
-          # Unsigned macOS builds. A corrupt/missing Apple certificate makes Tauri fail with
-          # SecKeychainItemImport before it can produce the DMG. Restore the signed values only
-          # after the certificate, password and identity have been re-encoded and verified.
-          APPLE_CERTIFICATE: ""
-          APPLE_CERTIFICATE_PASSWORD: ""
-          APPLE_SIGNING_IDENTITY: ""
-          APPLE_ID: ""
-          APPLE_PASSWORD: ""
-          APPLE_TEAM_ID: ""
+          # Intentionally omit APPLE_* variables: unsigned DMG builds must not import a keychain.
         run: |
           set -o pipefail
           npx tauri build ${{ matrix.args }} 2>&1 | tee tauri-build.log
@@ -126,6 +120,15 @@ jobs:
             echo "::error title=Desktop bundle failed::${detail:0:900}"
           fi
           exit "$status"
+
+      - name: Upload Tauri build log
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: tauri-build-log-${{ matrix.name }}
+          path: app/tauri-build.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload bundled artifacts
         uses: actions/upload-artifact@v7.0.2
