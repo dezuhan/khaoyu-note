@@ -104,6 +104,7 @@ jobs:
 
       - name: Build desktop bundles
         working-directory: app
+        shell: bash
         env:
           CI: "true"
           # Unsigned macOS builds. A corrupt/missing Apple certificate makes Tauri fail with
