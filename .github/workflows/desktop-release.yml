@@ -53,10 +53,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -101,21 +101,15 @@ jobs:
             target/aarch64-apple-darwin/release/khaoyu-note-mcp \
             target/x86_64-apple-darwin/release/khaoyu-note-mcp \
             -output target/universal-apple-darwin/release/khaoyu-note-mcp
+          chmod +x target/universal-apple-darwin/release/khaoyu-note-mcp
+          test -x target/universal-apple-darwin/release/khaoyu-note-mcp
 
       - name: Build desktop bundles
         working-directory: app
         shell: bash
         env:
           CI: "true"
-          # Unsigned macOS builds. A corrupt/missing Apple certificate makes Tauri fail with
-          # SecKeychainItemImport before it can produce the DMG. Restore the signed values only
-          # after the certificate, password and identity have been re-encoded and verified.
-          APPLE_CERTIFICATE: ""
-          APPLE_CERTIFICATE_PASSWORD: ""
-          APPLE_SIGNING_IDENTITY: ""
-          APPLE_ID: ""
-          APPLE_PASSWORD: ""
-          APPLE_TEAM_ID: ""
+          # Intentionally omit APPLE_* variables: unsigned DMG builds must not import a keychain.
         run: |
           set -o pipefail
           npx tauri build ${{ matrix.args }} 2>&1 | tee tauri-build.log
@@ -127,8 +121,17 @@ jobs:
           fi
           exit "$status"
 
+      - name: Upload Tauri build log
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: tauri-build-log-${{ matrix.name }}
+          path: app/tauri-build.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload bundled artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.paths }}
@@ -144,10 +147,10 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Download Linux build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.2
         with:
           name: khaoyu-note-linux-x64
           path: linux-build
@@ -156,20 +159,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --noninteractive flathub org.gnome.Platform//48 org.gnome.Sdk//48
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install --noninteractive flathub org.gnome.Platform//50 org.gnome.Sdk//50
 
-      - name: Prepare AppDir and build Flatpak
+      - name: Prepare DEB and build Flatpak
         run: |
-          appdir="$(find linux-build -type d -name '*.AppDir' | head -n 1)"
-          test -n "$appdir"
+          deb="$(find linux-build -type f -name '*.deb' | head -n 1)"
+          test -n "$deb"
           rm -rf packaging/flatpak/appdir packaging/flatpak/build packaging/flatpak/repo
-          cp -a "$appdir" packaging/flatpak/appdir
-          flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build packaging/flatpak/com.dezuhan.khaoyunote.yml
-          flatpak build-bundle packaging/flatpak/repo "Khaoyu-Note_0.35.0_amd64.flatpak" com.dezuhan.khaoyunote
+          dpkg-deb -x "$deb" packaging/flatpak/appdir
+          chmod +x packaging/flatpak/appdir/usr/bin/*
+          find packaging/flatpak/appdir -maxdepth 4 | sort
+          flatpak-builder --disable-rofiles-fuse --force-clean \
+            --repo=packaging/flatpak/repo packaging/flatpak/build \
+            packaging/flatpak/com.dezuhan.khaoyunote.yml
+          version="$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
+          flatpak build-bundle packaging/flatpak/repo \
+            "Khaoyu-Note_${version}_amd64.flatpak" com.dezuhan.khaoyunote
 
       - name: Upload Flatpak
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: khaoyu-note-linux-flatpak
           path: Khaoyu-Note_*.flatpak
@@ -179,12 +188,12 @@ jobs:
   release:
     name: Publish GitHub release
     needs: [build, flatpak]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.2
         with:
           path: release-input
 
@@ -204,8 +213,17 @@ jobs:
             exit 1
           fi
 
+      - name: Upload release packages
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-packages
+          path: release/
+          retention-days: 14
+
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3.0.4
         with:
           files: |
             release/*

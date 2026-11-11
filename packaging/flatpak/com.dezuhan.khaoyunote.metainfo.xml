@@ -3,6 +3,8 @@
   <id>com.dezuhan.khaoyunote</id>
   <name>Khaoyu Note</name>
   <summary>Local-first visual notes and boards</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
   <description>
     <p>
       Khaoyu Note is a local-first visual workspace with notes, boards, tables, kanban,
@@ -11,9 +13,15 @@
   </description>
   <launchable type="desktop-id">com.dezuhan.khaoyunote.desktop</launchable>
   <url type="homepage">https://github.com/dezuhan/khaoyu-note</url>
+  <developer id="com.dezuhan">
+    <name>Dezuhan Ramadhan</name>
+  </developer>
   <categories>
     <category>Office</category>
     <category>ProjectManagement</category>
   </categories>
   <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.35.0" date="2026-11-10" />
+  </releases>
 </component>
