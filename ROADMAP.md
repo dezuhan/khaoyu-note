@@ -14,11 +14,15 @@ penetration test and production-scale load testing still open. Milestone 7 is li
 credentials and native runners, not by missing code. Milestone 8, the AI assistant, has not been
 started and needs its own consent, tool-gateway and prompt-injection design first.
 
+Verification note: checkboxes were reconciled with the 0.35.0 code and test evidence on 2026-11-11.
+`docs/production-readiness.md` carries the current release verdict.
+
 ## Current state
 
 - [x] Desktop app: Tauri v2, vanilla ES modules, local SQLite.
 - [x] Localhost web host serves the same frontend against the same SQLite database and assets.
-- [x] No account, no cloud, no outbound sync.
+- [x] Local-first boards need no account, no cloud and no outbound sync; the optional self-hosted
+  service adds accounts, sharing and sync.
 - [x] The MCP server runs locally over stdio and shares the same database.
 - [x] Boards, cards and columns are scoped to one local database.
 - [~] First-run database setup shell: single-user Local SQLite works; Turso and collaboration are
@@ -28,20 +32,26 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 ## Product goals
 
 - [x] 1. Keep the local-first desktop experience fully usable without a server.
-- [ ] 2. Offer an optional self-hosted server for teams that want accounts and sharing.
-- [ ] 3. Support login and roles, but never make login mandatory for local boards.
+- [ ] 2. Offer an optional self-hosted server for teams that want accounts and sharing. (`service/`
+  implements this; production readiness is pending, see `docs/production-readiness.md`.)
+- [ ] 3. Support login and roles, but never make login mandatory for local boards. (Local-first guest
+  mode does this; the service requires accounts only for synced projects.)
 - [ ] 4. Share a whole project, a single card, or a column without exposing the rest of the board.
-- [ ] 5. Treat security, privacy and data ownership as first-class requirements.
+  (Implemented in `service/`; the local-first build hides the Share UI.)
+- [ ] 5. Treat security, privacy and data ownership as first-class requirements. (Ongoing; see the
+  security audit and release gates.)
 - [ ] 6. Add an optional AI assistant that can organise, research, browse and edit only with explicit user consent.
 - [ ] 7. Offer a first-run storage choice: local SQLite or Turso for single-user, PostgreSQL + Redis
-  for collaboration.
+  for collaboration. (Local SQLite and the PostgreSQL/Redis team profile exist; the Turso adapter is
+  not implemented.)
 
 ## Milestone 1: Self-hosted service foundation
 
 ### Architecture
 
 - [x] A standalone server process that the operator runs with Docker Compose or a native binary.
-- [x] Restricted network surface: one HTTP(S) port, optional reverse proxy, no direct database port.
+- [x] Restricted network surface: loopback bind by default, optional reverse proxy, no direct
+  database port; the service opens two loopback listeners (frontend proxy and backend API).
 - [x] Relational database for accounts, projects, memberships and audit data.
 - [x] Object storage for uploaded assets, addressed by opaque ids, never by user-supplied paths.
 - [ ] Background worker for email invitations, thumbnails, backups and cleanup jobs (partial: scheduled backups, temp cleanup, audit pruning, email retry queue and session/OTP cleanup implemented; thumbnail jobs pending).
@@ -67,7 +77,8 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 
 ### Account model
 
-- [x] Email and password registration with email verification.
+- [x] Email and password registration. Verification was disabled in 0.29.0: registration returns an
+  immediately usable verified account and `/auth/verify-email` returns 410 `verification_disabled`.
 - [x] Unique, case-normalised email addresses; display name separate from email.
 - [x] Account deletion request with a grace period, export before deletion.
 - [x] Optional second factor: TOTP first, passkeys later (TOTP and WebAuthn passkeys are implemented).
@@ -144,16 +155,20 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 - [x] TLS everywhere; HTTP redirects to HTTPS or refuses to serve.
 - [ ] Encryption at rest for the database volume and object storage where the platform supports it.
 - [ ] Application-level encryption for highly sensitive fields if the deployment requires it.
-- [x] Asset access checked through signed, short-lived URLs or an authenticated proxy.
+- [~] Asset access checked through an authenticated proxy; signed short-lived URLs are not
+  implemented (see `service/README.md`).
 - [x] No asset directory listing and no predictable asset filenames.
 - [x] Database and storage backups encrypted, with documented retention and deletion.
 
 ### Input and output safety
 
-- [ ] Server-side validation for every request body, parameter and upload.
+- [~] Server-side validation for every request body, parameter and upload (implemented across the
+  service routes; per-endpoint completeness is tracked in `docs/security-audit.md`).
 - [x] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks.
-- [ ] Markdown and rich text sanitised on the server before rendering.
-- [ ] Stored XSS prevention through context-aware escaping and a strict CSP.
+- [ ] Markdown and rich text sanitised on the server before rendering. (The service returns JSON and
+  does not render card HTML; required only if a server-rendered share page is added.)
+- [~] Stored XSS prevention through context-aware escaping and a strict CSP (CSP is enforced on every
+  server-rendered response; a dedicated XSS test pass is still open).
 - [x] Parameterised database queries only.
 - [ ] Explicit allowlists for redirects and remote embed hosts (partial: media hosts are matched in the frontend; redirects are not implemented yet).
 - [x] Rate limits and payload limits on all public endpoints.
@@ -191,21 +206,29 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 
 Migrate the self-hosted collaboration layer to a scalable real-time architecture using PostgreSQL and Redis, while preserving SQLite for single-user, zero-account offline use.
 
-- [ ] **Dual database strategy**:
+Status: the service implements most of this block. Realtime transport is SSE plus HTTP operation
+batches; WebSocket remains deferred by design (`docs/backend-postgres-redis.md`). The per-item notes
+record what exists and what is still partial.
+
+- [~] **Dual database strategy** (SQLite and PostgreSQL adapters, the async storage facade and paired
+  reversible migrations are implemented; `migrate-to-postgres` moves durable rows):
   - Keep SQLite as the default, zero-dependency storage engine for the single-user desktop app and no-account mode.
   - Migrate self-hosted collaborative deployments to PostgreSQL for ACID guarantees, relational integrity, and high-concurrency multi-user transactions.
   - Unified repository interface in the service layer to isolate SQLite vs PostgreSQL differences.
   - Reversible schema migration tooling compatible with both SQLite (local) and PostgreSQL (self-hosted).
-- [ ] **Redis for real-time pub/sub and state**:
-  - Redis Pub/Sub backend for broadcasting WebSocket events across server processes and worker nodes.
+- [~] **Redis for real-time pub/sub and state** (event bus, presence, advisory edit locks, worker
+  leader lock and Redis-backed limits are implemented; live cursor/selection presence is partial):
+  - Redis Pub/Sub backend for broadcasting realtime events across server processes and worker nodes.
   - Ephemeral presence tracking (online users, live cursor positions, and active card selection highlights).
   - Distributed lock management for board/column operations and real-time conflict avoidance.
   - Redis-backed rate limiting and session caching for collaborative endpoints.
-- [ ] **Live collaboration protocol**:
+- [~] **Live collaboration protocol** (idempotent op batches, server-sequenced operation log, SSE
+  tickets, revision history and advisory edit locks are implemented; offline merge and cursor
+  awareness are partial):
   - Operational sync protocol for low-latency broadcast of card movements, edits, and column reordering.
   - Heartbeat-driven presence rooms with graceful disconnect handling and state reconciliation.
   - Offline sync merge: replay offline queue from local SQLite into the PostgreSQL project upon reconnection.
-- [ ] **Deployment and operations**:
+- [x] **Deployment and operations**:
   - Updated Docker Compose stack including khaoyu-note-service, PostgreSQL, and Redis.
   - Automated backup and restore tooling (pg_dump coordinated with asset storage).
   - Health checks and readiness probes covering both PostgreSQL and Redis connectivity.
@@ -238,15 +261,18 @@ Migrate the self-hosted collaboration layer to a scalable real-time architecture
 
 ## Decision log
 
-- [ ] Keep local-first as the default and server sync as an option.
-- [ ] Keep local SQLite as the default single-user store; Turso is opt-in and never required.
-- [ ] Keep collaboration on PostgreSQL + Redis; do not offer Turso in collaboration mode.
-- [ ] Maintain SQLite as the zero-dependency, zero-account default for single-user offline boards.
-- [ ] Migrate self-hosted live collaboration to PostgreSQL and Redis for concurrency and pub/sub.
-- [ ] Prefer self-hosted single-tenant deployments before any hosted offer.
-- [ ] Share by scope (project, item, column) rather than by cloning boards.
-- [ ] Server-side authorisation is the source of truth; UI state is never trusted.
-- [ ] Security review gates the public self-hosted release.
+These entries are adopted decisions, not open work items; they are listed without checkboxes so the
+`[x]`/`[ ]` legend keeps meaning "verified" versus "planned".
+
+- Keep local-first as the default and server sync as an option.
+- Keep local SQLite as the default single-user store; Turso is opt-in and never required.
+- Keep collaboration on PostgreSQL + Redis; do not offer Turso in collaboration mode.
+- Maintain SQLite as the zero-dependency, zero-account default for single-user offline boards.
+- Migrate self-hosted live collaboration to PostgreSQL and Redis for concurrency and pub/sub.
+- Prefer self-hosted single-tenant deployments before any hosted offer.
+- Share by scope (project, item, column) rather than by cloning boards.
+- Server-side authorisation is the source of truth; UI state is never trusted.
+- Security review gates the public self-hosted release.
 
 ## Milestone 7: Packaging and platform distribution
 
@@ -256,7 +282,8 @@ runners in CI, not by cross-compiling from a single Windows machine.
 ### Release gates
 
 - [ ] No open P0 or P1 defects.
-- [x] Local-only mode passes the full UI and MCP suites (213 UI checks, 16 MCP checks).
+- [x] Local-only mode passes the full UI and MCP suites (268 UI checks, 16 MCP checks; verified
+  2026-11-11).
 - [ ] Backup and restore verified on each platform (Windows verified; Linux and macOS pending).
 - [ ] Version and changelog frozen for the release.
 - [ ] Signing keys and release secrets available before the first public build.
@@ -265,7 +292,8 @@ runners in CI, not by cross-compiling from a single Windows machine.
 
 - [x] Windows: NSIS, MSI and portable `.exe` artifacts build and are published in `dist/` (unsigned).
 - [ ] Windows: code signing, WebView2 install prompt, per-user install and uninstall cleanup.
-- [ ] Linux: AppImage and Flatpak.
+- [~] Linux: AppImage, `.deb` and portable `.tar.gz` built locally; Flatpak manifest and CI job
+  exist but the Flatpak bundle is not verified yet (rpm comes from CI).
 - [ ] macOS: universal `.dmg` with Developer ID signing and notarisation.
 - [ ] Android: APK/AAB, exploratory.
 - [ ] iOS: TestFlight build, exploratory.
@@ -509,8 +537,9 @@ Turso (libSQL) database. Collaboration keeps PostgreSQL + Redis.
 
 ## Milestone 10: Admin dashboard and roles
 
-Status: **roadmap only**. Collaboration is disabled in the first-run wizard until this milestone is
-implemented. This is deliberately not a runtime feature yet.
+Status: **desktop UI is roadmap only**. The service already ships the `/admin` dashboard and role
+model; the desktop Settings > Administration page and the first-run collaboration enablement remain
+the roadmap work.
 
 Goal: the first user created in a database is the mandatory administrator and the only role with full
 access. The admin surface lives inside Settings rather than as a separate application.

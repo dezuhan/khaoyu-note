@@ -1,13 +1,13 @@
 # Remaining work and blockers
 
-Snapshot date: 2026-11-07. This records why the roadmap is not complete on this machine and what can
-still be implemented later.
+Snapshot date: 2026-11-07; updated 2026-11-11 after the 0.35.0 verification pass. This records why
+the roadmap is not complete on this machine and what can still be implemented later.
 
 ## Implementable in a future session
 
 | Item | Why it remains | Next step |
 | --- | --- | --- |
-| Full account UI | `/account` covers registration, verification, reset, sessions and API tokens, but project/share management pages are missing. | Add project, member and share dialogs with CSRF and CSP tests. |
+| Full account UI | `/account` now redirects to `/admin`, which covers registration, sessions, API tokens and admin actions; project/share management dialogs and the desktop Settings > Administration page are missing. | Add project, member and share dialogs with CSRF and CSP tests. |
 | Asset watermark | Needs an image pipeline and platform decision. | Add a supported image pipeline and per-share watermark rendering with tests. |
 | Encryption at rest | Depends on the database and volume platform. | Document SQLCipher or encrypted-volume deployments and add a startup check. |
 | Application-level encryption | Needs key management and migration design. | Design envelope encryption for sensitive fields and rotation. |
@@ -37,36 +37,38 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 
 ## Current evidence
 
-- Service tests: 48 passing (18 service checks plus 30 auth subtests).
+- Service tests: 69 passing with 6 skipped on SQLite only; 70 passing with 5 skipped when
+  `TEST_REDIS_URL` is set. PostgreSQL integration is still unvalidated locally.
 - Sync engine checks: passing.
-- UI suite: 263 checks defined in `tools/test-ui.mjs`.
+- UI suite: 268 checks defined in `tools/test-ui.mjs`, 268/268 passing on 2026-11-11.
+- Feature browser suites and the passkey, shares, share-view and onboarding suites pass.
 - Live security check: 20 checks.
-- Windows unsigned installers: built and checksummed in `dist/SHA256SUMS.txt` for 0.34.0; signing is
-  still pending.
-- Linux and macOS: matrix workflow defined, never executed on this machine.
+- Linux artifacts: AppImage, `.deb` and portable `.tar.gz` are built and checksummed in
+  `dist/linux/SHA256SUMS.txt` for 0.35.0. Windows installers were built on an earlier Windows
+  machine and are not present in this checkout; signing is still pending.
+- Linux and macOS CI: the matrix workflow is defined; the artifacts have not been produced and
+  verified on this machine.
 
 ## Next items for the next session
 
-1. Add a Restore control to the Backup pane; the `stage_restore` command already validates and stages
-   a backup.
-2. Document that both installers include `khaoyu-note-mcp.exe` beside the desktop executable; the
-   portable build ships both files. Remove the old manual-copy instruction from release notes.
+1. Verify the restore drill on a built 0.36.0 desktop: Settings > Backup > Import database already
+   validates, stages and restarts. Record board/card/asset counts and the `pre-restore-*` copy.
+2. Correct the installer documentation: NSIS and MSI ship only the desktop executable, while the MCP
+   binary is a separate artifact; remove the old "installers include the MCP binary" wording.
 3. Run the Playwright suites and the MCP smoke suite on a machine with a browser and the built binary
-   before tagging 0.34.0.
+   before tagging the next release.
 4. Re-enable the Map, Video and Audio tools once their embed paths are reliable again. The policy
    lives in `app/web/js/limits.js`; removing the entry restores the rail, palette, shortcuts and the
    Settings status in one place.
-5. Publish GitHub Releases for the update check. The repository has no remote yet and
-   `desktop-release.yml` only uploads artifacts for 14 days, so a check currently reports "no published
-   release". Push the repo, create `v*` releases with notes and installers, then the existing check
-   starts reporting versions.
+5. Publish GitHub Releases for the update check. The repository has a remote and `v0.35.0` tag, and
+   `desktop-release.yml` publishes on `v*` tags; the release must still be created and verified.
 6. Add retention for backups. Automatic backups are not pruned, and each one copies the assets folder,
    so a daily interval grows without bound. Keep the newest N automatic backups and leave manual ones
    alone.
-7. Finish local accounts. M1 ships mandatory setup and login, profile, password, history, author
-   snapshots and board activity rows. M2 adds full card-level activity coverage. M3 adds role
-   enforcement in the UI and hosts plus the Admin Panel (users, roles, status, history, database
-   backup).
-8. Wire the hybrid service identity. M4 connects the Settings > Account page to the self-hosted service,
-   creates the first service admin from the app when the service database is empty, and maps project
+7. Finish local accounts. The local-first build intentionally disables login and Settings > Account;
+   the account, activity and role code exists for a future deploy. The remaining desktop work is the
+   Settings > Administration page (users, roles, status, history, database backup) and mapping project
    roles to the app permission helpers.
+8. Wire the hybrid service identity. The desktop Sync control already signs in to the service with a
+   scoped token; remaining work is creating the first service admin from the app when the service
+   database is empty and mapping project roles to the app permission helpers.

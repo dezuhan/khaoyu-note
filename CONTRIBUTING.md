@@ -37,7 +37,8 @@ Scopes:
 Examples:
 
 ```text
-feat(web): add direct tool drop into a columnfix(sheet): allow scrollbar drags inside a column
+feat(web): add direct tool drop into a column
+fix(sheet): allow scrollbar drags inside a column
 docs(roadmap): add AI chatbot milestone
 test(mcp): cover stale write rejection
 ```
@@ -51,7 +52,7 @@ node --experimental-vm-modules scripts/check-web.cjs
 node tools/test-ui.mjs http://127.0.0.1:1430/
 node tools/test-card-features.mjs http://127.0.0.1:1430/
 node tools/test-web-mode.mjs
-node --test service/test/service.test.mjs service/test/auth.test.mjs
+node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs
 ```
 
 Backend changes also run:
@@ -64,6 +65,9 @@ cargo test
 
 Do not commit `dist/`, `target/`, `node_modules/` or editor backup files. They are ignored because
 they are generated locally.
+
+Update the documentation in the same change: README feature tables, `docs/` pages and the
+`ROADMAP.md` checkbox that the change verifies. A stale claim is a defect, not a separate cleanup.
 
 ## Toolbar tools
 
@@ -102,9 +106,7 @@ git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 1. All matching test suites pass.
 2. Installer is rebuilt when the release includes desktop changes.
 3. `CHANGELOG.md` describes user-visible changes.
-4. Version in `package.json`, `service/package.json`, `app/package.json`,
-   `app/src-tauri/tauri.conf.json`, `app/src-tauri/Cargo.toml` and `service/docker-compose.yml`
-   agrees.
+4. Every version field agrees with the full list above; `node tools/test-version.mjs` checks them.
 5. Working tree is clean before tagging.
 6. Tag points at the release commit.
 

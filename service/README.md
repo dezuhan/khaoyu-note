@@ -38,15 +38,15 @@ same ports are written to `<data>/runtime.json`.
 
 `bootstrap` creates a verified owner account and project. Registration through
 `POST /api/v1/auth/register` creates an immediately usable verified account; email verification is
-disabled and its form is hidden. Password reset messages are written to `<data>/outbox/*.json` with
-mode `0600`; the SMTP adapter is not implemented.
+disabled and its form is hidden. Password reset and invitation mail use SMTP when
+`KHAOYU_SERVICE_SMTP_*` is configured and fall back to `<data>/outbox/*.json` (mode `0600`) otherwise.
 
 ## Ports
 
 The service always opens two listeners on different free ports in the 5-digit range 20000 to 59999:
 
-- **Frontend** serves `/login`, `/register`, `/reset`, `/account`, `/passkeys`, `/shares`, `/s/:token`,
-  `/admin` and the static assets.
+- **Frontend** serves `/login`, `/register`, `/reset`, `/account` (redirects to `/admin`),
+  `/passkeys`, `/shares`, `/s/:token`, `/admin` and the static assets.
 - **Backend** serves `/api/v1/*`, `/healthz` and `/readyz`; it refuses page requests.
 
 The browser only uses the frontend origin. The frontend proxies `/api`, `/healthz` and `/readyz` to
@@ -315,8 +315,9 @@ stored as hashes, returned only once, and can be revoked from the account token 
 tokens cannot manage sessions, TOTP or account deletion; those require a user session.
 
 Email verification is disabled. Password reset tokens are single use, short lived and stored as
-hashes. The development mailer writes reset and invitation messages to the outbox instead of sending
-SMTP; treat that directory as sensitive and add an SMTP adapter before production use.
+hashes. SMTP delivery is implemented through `nodemailer`; without SMTP configuration, mail is
+written to the mode `0600` outbox, failed sends are retried from `email_jobs`, and the outbox remains
+sensitive operator data.
 
 Desktop sync signs in with the account email and password. `POST /api/v1/auth/sync-token` returns a
 scoped project token, revoking the previous `app-sync` token on each sign-in, and the client stores it

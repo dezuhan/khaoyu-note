@@ -3,16 +3,25 @@
 ## Local desktop
 
 - Boards, assets and settings stay under the operating system app data directory unless the user
-  enables server sync for a board.
-- Local backups are written next to the app data or to the operator-selected path.
+  enables server sync for a board. `KHAOYU_NOTE_DB_DIR` overrides that folder for portable or
+  isolated runs.
+- Local backups are written next to the app data or to the operator-selected path;
+  `KHAOYU_NOTE_BACKUP_DIR` overrides the backup folder.
 
 ## Self-hosted service
 
-- Database: `KHAOYU_SERVICE_DATA_DIR/khaoyu-service.db`.
+In the default `single-user` profile the service keeps its state under the data directory below.
+The `team` profile additionally requires PostgreSQL and Redis:
+
+- Database: `KHAOYU_SERVICE_DATA_DIR/khaoyu-service.db` for the single-user profile; in the team
+  profile PostgreSQL is the system of record and the operator chooses its host, jurisdiction and
+  backups through `KHAOYU_SERVICE_DATABASE_URL`.
 - Assets: `KHAOYU_SERVICE_DATA_DIR/objects`.
 - Temporary files: `KHAOYU_SERVICE_DATA_DIR/tmp`.
 - Backups: `KHAOYU_SERVICE_DATA_DIR/backups`.
 - Mail fallback outbox: `KHAOYU_SERVICE_DATA_DIR/outbox`, mode `0600`.
+- Redis holds only ephemeral coordination state (events, presence, locks, rate limits) and is not a
+  system of record; losing Redis must never lose board data.
 
 The operator chooses the server and therefore the jurisdiction and backup location. The project does
 not upload telemetry, analytics or usage data to a third party.

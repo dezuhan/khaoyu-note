@@ -37,8 +37,9 @@ Not ready for a production team deployment:
    production-ready.
 6. Encryption at rest, least-privilege database roles and a documented multi-instance backup rehearsal
    remain release gates.
-7. `service/test/*` PostgreSQL and Redis tests are CI-gated and were skipped in this local environment
-   because no disposable PostgreSQL/Redis target was available.
+7. `service/test/*` PostgreSQL and Redis tests are CI-gated. In the 2026-11-11 verification pass the
+   Redis integration passed locally with `TEST_REDIS_URL` set; the PostgreSQL tests stayed skipped
+   because the local test role rejected authentication.
 
 Conclusion: the collaboration backend is a serious beta foundation, but it must not be advertised as
 production-ready until items 1–7 are closed.
@@ -81,10 +82,11 @@ Backup and the export action are preparation only, not a migration implementatio
 - [ ] Turso adapter, token storage and migration tests, or the option hidden;
 - [ ] release signing and version freeze.
 
-## Audit run — 2026-11-11
+## Audit run — 2026-11-11 (verification pass)
 
-Environment: Linux sandbox, Node 26.13.0, local Rust toolchain, no Docker daemon and no running
-PostgreSQL/Redis servers.
+Environment: Linux, Node 26.13.0, Playwright Chromium. PostgreSQL 18 and Redis 7 were running, but
+the local PostgreSQL test role rejected authentication, so the PostgreSQL integration tests stayed
+skipped. Rust, Cargo and Docker are not installed in this environment.
 
 ### Evidence
 
@@ -92,46 +94,42 @@ PostgreSQL/Redis servers.
 | --- | --- |
 | Static modules (`scripts/check-web.cjs`) | 38/38 clean |
 | Version consistency | 0.35.0 pass |
-| Translation audit | 188/188 keys, 10 languages |
+| Translation audit | 190/190 keys, 10 languages |
 | Main UI suite | **268/268 pass** |
-| MCP smoke suite | **15/15 pass** |
-| Service tests | **69 pass, 6 skipped** (PostgreSQL/Redis integration skipped) |
-| Rust release build | **pass** (optimized Linux binary) |
-| `npm audit --omit=dev` for service | **0 vulnerabilities** |
-| Full web audit | 19 suites pass; 5 suites fail (see below) |
-| Rust tests | 20 pass, **1 fail** (`legacy_data_folder_is_migrated_to_the_new_identity`) |
-| `cargo fmt --check` | not run: rustfmt component is not installed |
+| Feature browser suites | save-conflict 11/11, save-retry 4/4, board-selection 4/4, rename 8/8, board-card-title 5/5, column-layout 9/9, column-title 7/7, tool-drop 6/6, wrap 5/5, tooltips 7/7, line-area 6/6, card-features 24/24, fonts 5/5, web-mode 10/10, auth-web 44/44, onboarding pass |
+| Service-backed browser suites | passkeys, shares-ui and share-view pass with a disposable service |
+| Service tests | **69 pass, 6 skipped** (PostgreSQL and Redis integration skipped); **70 pass, 5 skipped** with `TEST_REDIS_URL` set |
+| Web host smoke | `/status` pass, version 0.35.0 on Node 26.13.0 |
+| MCP smoke suite | not run: the MCP binary needs a Rust build |
+| Rust tests, `cargo fmt --check`, `cargo clippy` | not run: Cargo/rustfmt are not installed here |
 | Docker image build + Trivy scan | not run: Docker is not available |
+| `npm audit --omit=dev` for service | not run in this pass |
 
-### Failing checks
+### Notes
 
-- `tools/test-board-selection.mjs`: 1/4. The test seeds `localStorage` and reloads; the app's
-  `beforeunload` save then writes the currently open board back into the index, so the seeded boards
-  are overwritten and Home opens. This is a **test-harness failure**, but CI will treat it as a failing
-  suite and it must be fixed before a release.
-- `tools/test-save-conflict.mjs`: 10/11. “the copy is saved” still reads `Saving...` after the
-  fixed 900 ms wait. Timing-sensitive; rerun needed on CI hardware or replace the sleep with a
-  condition wait.
-- `tools/test-passkeys.mjs`, `tools/test-shares-ui.mjs`, `tools/test-share-view.mjs`: fail because
-  their helper cannot start the service process in this environment.
-- Rust `legacy_data_folder_is_migrated_to_the_new_identity`: creates the legacy folder at the same
-  identifier as the new root, so the migration is a no-op and the assertion fails. The test must use
-  distinct legacy/current roots; the production migration path is not exercised by this test.
+- Resolved since the first pass: save-conflict is 11/11, board-selection is 4/4, and the passkey,
+  shares and share-view suites start the service successfully. The earlier failures are no longer
+  reproducible in this environment.
+- `tools/test-account-ui.mjs` is stale: it still expects the old `/account` page with `#tab-register`,
+  but `/account` now returns 302 to `/admin`. The script is not part of CI. It must be updated to the
+  admin page or retired before it is added to a gate.
+- Rust `legacy_data_folder_is_migrated_to_the_new_identity`: the first pass observed a failure because
+  the test created the legacy folder at the same identifier as the new root. It cannot be re-verified
+  here without Cargo; fix the test roots and confirm under `cargo test`.
 
 ### Verdict
 
 **NO-GO for a public production deployment today.** The single-user local build is usable as a beta
-and its main UI, release build and MCP surface are healthy, but the release cannot be called production
-ready while CI has red suites, PostgreSQL/Redis behavior is unvalidated on this machine, no container
-scan has run, and signing/pen-test/load-test gates remain open.
+and its main UI, web host and service foundation are healthy, but the release cannot be called
+production ready while PostgreSQL integration is unvalidated, no container scan has run, and
+signing/pen-test/load-test gates remain open.
 
 Minimum before a public production tag:
 
-1. fix the board-selection and conflict tests (or the underlying unload-save behavior);
-2. fix the legacy migration test;
-3. run the full web suite and Rust suite green in CI;
-4. run service tests against PostgreSQL and Redis;
-5. build and scan the service container with Docker/Trivy;
-6. execute Linux AppImage/.deb builds on Ubuntu X11 and Wayland;
-7. complete signing/notarisation and the external security review;
-8. decide whether collaboration and Turso stay disabled (currently they do).
+1. update or retire `tools/test-account-ui.mjs`, then add it to CI if kept;
+2. fix the legacy migration test and run the full web and Rust suites green in CI;
+3. run service tests against PostgreSQL (Redis already passes locally);
+4. build and scan the service container with Docker/Trivy;
+5. execute Linux/macOS packaging on native runners;
+6. complete signing/notarisation and the external security review;
+7. decide whether collaboration and Turso stay disabled (currently they do).

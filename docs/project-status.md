@@ -4,14 +4,28 @@ Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
 
 > Status at 0.34.0, which supersedes the numbers below where they disagree:
 >
-> - Backup has its own Settings pane with Back up now and Export ZIP. The restore command validates
->   and stages a backup, but the Backup pane still has no Restore control.
+> - Backup has its own Settings pane with Back up now and Export ZIP. At 0.34.0 the restore command
+>   validated and staged a backup but the Backup pane had no control for it; see the 0.35.0 update
+>   below.
 > - Schema versioning now has unit tests for idempotence and for rejecting a newer database.
 > - Automated checks: 263 UI checks, 17 MCP checks, 13 Rust library tests, 2 MCP unit tests, and the
 >   service suite.
 > - A threat model exists in `docs/threat-model.md`, so the "no threat model" gap below is outdated.
 > - Test counts, source sizes and artifact sizes below are the 0.32.0 snapshot; they are kept as
 >   history rather than restated every release.
+
+## Verification update — 0.35.0 (2026-11-11)
+
+- Settings > Backup now has an **Import database** control (desktop) that picks a backup folder,
+  validates it, asks for confirmation, stages the restore and restarts the app. The earlier
+  "no Restore control" gap is closed; web import remains intentionally disabled.
+- Verification pass in this environment: static modules 38/38, version 0.35.0, i18n 190/190 keys ×
+  10 languages, UI suite 268/268, feature browser suites pass, service suite 69 pass/6 skipped
+  (70/5 with Redis), and the web host `/status` smoke pass.
+- `tools/test-account-ui.mjs` is stale (`/account` now redirects to `/admin`) and is not in CI.
+  Rust and Docker checks were not run because Cargo and Docker are not installed here.
+- Roadmap checkboxes were reconciled with this evidence; see the verification note in `ROADMAP.md`.
+  The 0.32.0 numbers below are historical and superseded by `docs/production-readiness.md`.
 
 ## Technology
 

@@ -104,7 +104,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Design system states | audited: buttons use hover, focus, active and disabled states; inputs use the Khaoyu focus glow; menubar, header search and palette have complete keyboard states; remaining gaps are documented in docs/design-system-audit.md |
 | Single-file header | implemented: multi-project Home gallery is disabled for now; the app opens one active file, the menu-bar logo and Template button open a template library, and the breadcrumb shows only the current file path |
 | Menu bar and command palette | implemented: the fixed menu bar has three columns (logo and menus, centered Search commands, icon actions), grouped command menus, and the command palette with Recently used, Tools, File, Edit, View and Help groups plus arrow keys, Enter and Escape |
-| Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; automatic backups can run daily, every 3, 7 or 14 days, or monthly (30 days) while the app is open, and a missed interval is caught up on the next launch; integrity check runs PRAGMA integrity_check; the restore command validates and stages a backup for the next launch (there is no Restore control in the Backup pane yet); the schema version is checked on open |
+| Data safety | implemented: Settings > Backup creates a consistent SQLite snapshot plus assets under Documents/Khaoyu Note Backups and can export it as one ZIP; automatic backups can run daily, every 3, 7 or 14 days, or monthly (30 days) while the app is open, and a missed interval is caught up on the next launch; integrity check runs PRAGMA integrity_check; the Backup pane's Import database control is available in the desktop app and picks a backup folder, validates it, asks for confirmation, stages it for the next launch and restarts; importing is intentionally unavailable in the web host; the schema version is checked on open |
 | Security hardening | implemented: Tauri CSP is enabled, uploads and native drops are capped at 100 MB, executable and script extensions are blocked, and asset filenames are validated |
 | Local accounts (M1) | disabled in this local-first deploy: boards and settings work without an account, the account button and Settings > Account are hidden, and desktop/web writes no longer require sign-in. Existing account data stays in SQLite but is not used by the UI. |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color and column |
@@ -125,9 +125,9 @@ the app works offline; only optional video and map embeds need the internet.
 | System file drop | implemented: native drag and drop stores dropped files as assets, images open as image cards, audio and video use their media cards, raw files and all other documents become file cards; a drop overlay appears while dragging |
 | Template library | implemented: built-in starters plus custom templates created from any board selection; applying one replaces the active file and can be undone, while a non-empty board asks for overwrite confirmation. Settings > Board templates manages both kinds and can restore deleted built-ins |
 | Labels and reactions | out of scope for this local app |
-| Sharing and sync | disabled in this local-first build: Share and Sync are hidden, Settings > Server shows local runtime only, and no service/account connection is exposed. The `service/` code remains for a future deployment. |
+| Sharing and sync | disabled in this local-first build: Share and Sync are hidden, Settings > Server shows local runtime only, and no service/account connection is exposed. Service-enabled deployments expose these controls; the `service/` code remains for a future deployment. |
 | Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Teams and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, team creation and members, and the full audit feed. |
-| Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, login and sharing architecture (planning only) |
+| Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, accounts, sharing and sync (Milestones 1 to 5 implemented in `service/`; packaging and production gates open) |
 
 ### Settings, GPU and comments
 
@@ -173,7 +173,7 @@ cmd /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxili
 ```
 
 Prerequisites: Rust stable with the MSVC host triple, Visual Studio 2022 C++ build tools, WebView2
-runtime, Node 20+.
+runtime, Node 24+.
 
 Two machine-specific notes:
 
@@ -206,8 +206,9 @@ module. Run `npm install` once so the backup archive can use `fflate`.
 
 - The host binds to `0.0.0.0` by default so devices on the same network can open it. The address bar
   stays on a full board URL such as `http://192.168.1.10:1430/?board=<board-id>`.
-- Share in the header shows that full board URL and a Copy board link action. The host must stay
-  running, and the viewer signs in with an account on this host.
+- Service-enabled builds show Share in the header with that full board URL and a Copy board link
+  action; this local-first build hides Share and Sync (see Sharing and sync above). The host must
+  stay running, and the viewer signs in with an account on this host.
 - `KHAOYU_WEB_HOST` changes the bind address. Set `127.0.0.1` to keep it local-only.
 - `KHAOYU_WEB_PORT` changes the port, default `1430`.
 - `KHAOYU_WEB_PUBLIC_URL` adds a public or DDNS origin (for example `https://notes.example.com`) to
@@ -248,7 +249,8 @@ that disables backdrop blur, shadows, the dot grid and transitions.
 
 ## Self-hosted service foundation and accounts (Milestones 1 and 2)
 
-The `service/` directory contains the self-hosted service: one Node 24 HTTP process, a relational
+The `service/` directory contains the self-hosted service: one Node 24 process with two listeners
+(loopback by default; frontend pages/proxy and backend API), a relational
 SQLite schema for accounts, sessions, projects, memberships, snapshots and audit rows, opaque object
 storage, a maintenance worker, reversible migrations, backup and restore, and a minimal health
 endpoint. The account core includes Argon2id passwords, rotating refresh tokens
@@ -445,6 +447,14 @@ node tools/test-disabled-cards.mjs
 # local accounts on the web host (schema, setup, sessions, CSRF, history)
 node tools/test-auth-web.mjs
 
+# service-backed browser suites (each starts a disposable service on its own ports)
+node tools/test-passkeys.mjs
+node tools/test-shares-ui.mjs
+node tools/test-share-view.mjs
+
+# first-run onboarding against the preview server
+node tools/test-onboarding.mjs http://127.0.0.1:1430/
+
 # self-hosted service and account tests (Node 24, temp databases)
 node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs service/test/storage.test.mjs service/test/storage-migrations.test.mjs service/test/postgres-runtime.test.mjs service/test/redis-bus.test.mjs service/test/config.test.mjs
 
@@ -461,7 +471,9 @@ node tools/test-web-mode.mjs
 
 `.github/workflows/ci.yml` runs the web suites on Ubuntu, the service foundation tests and Docker
 build on Ubuntu, and the Rust plus MCP gates on Windows for every push, pull request and manual
-dispatch. The separate `desktop-release.yml` stays tag-only.
+dispatch. `.github/workflows/desktop-release.yml` stays tag-only and builds/publishes Windows, Linux
+(including Flatpak) and macOS artifacts; `.github/workflows/desktop-matrix.yml` builds unsigned
+Windows, Ubuntu and macOS bundles on manual dispatch.
 
 The UI suite exercises: boot, tool rail, card creation, text editing, drag, resize, undo/redo,
 to-do items, comments, table cells, column drop, zoom, settings modal and custom select, theme
@@ -474,8 +486,8 @@ Built artifacts are copied to `dist/`. The files below are the last built releas
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.35.0_x64-setup.exe` | 4.17 MiB | NSIS installer (app and MCP binary) |
-| `Khaoyu Note_0.35.0_x64_en-US.msi` | 6.78 MiB | MSI installer (app and MCP binary) |
+| `Khaoyu Note_0.35.0_x64-setup.exe` | 4.17 MiB | NSIS installer (app only; the MCP binary ships separately) |
+| `Khaoyu Note_0.35.0_x64_en-US.msi` | 6.78 MiB | MSI installer (app only; the MCP binary ships separately) |
 | `KhaoyuNote.exe` | 13.87 MiB | standalone executable (SQLite bundled, GPU flag aware) |
 | `khaoyu-note-mcp.exe` | 2.71 MiB | standalone MCP server for AI agents |
 
