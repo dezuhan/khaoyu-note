@@ -86,7 +86,8 @@ Backup and the export action are preparation only, not a migration implementatio
 
 Environment: Linux, Node 26.13.0, Playwright Chromium. PostgreSQL 18 and Redis 7 were running, but
 the local PostgreSQL test role rejected authentication, so the PostgreSQL integration tests stayed
-skipped. Rust, Cargo and Docker are not installed in this environment.
+skipped. Rust 1.99.1 and Cargo were installed with rustup, but the Tauri crate needs GTK/ATK
+development libraries that are missing and cannot be installed without root. Docker is not available.
 
 ### Evidence
 
@@ -98,10 +99,11 @@ skipped. Rust, Cargo and Docker are not installed in this environment.
 | Main UI suite | **268/268 pass** |
 | Feature browser suites | save-conflict 11/11, save-retry 4/4, board-selection 4/4, rename 8/8, board-card-title 5/5, column-layout 9/9, column-title 7/7, tool-drop 6/6, wrap 5/5, tooltips 7/7, line-area 6/6, card-features 24/24, fonts 5/5, web-mode 10/10, auth-web 44/44, onboarding pass |
 | Service-backed browser suites | passkeys, shares-ui, share-view and the rewritten account suite (14 checks) pass with a disposable service |
-| Service tests | **69 pass, 6 skipped** (PostgreSQL and Redis integration skipped); **70 pass, 5 skipped** with `TEST_REDIS_URL` set |
+| Service tests | **72 pass, 5 skipped** with `TEST_REDIS_URL` set (PostgreSQL integration skipped); the suite now covers logout CSRF and the invitation rate limit |
 | Web host smoke | `/status` pass, version 0.35.0 on Node 26.13.0 |
-| MCP smoke suite | not run: the MCP binary needs a Rust build |
-| Rust tests, `cargo fmt --check`, `cargo clippy` | not run: Cargo/rustfmt are not installed here |
+| MCP smoke suite | not run: the Tauri crate build needs GTK/ATK development libraries |
+| `cargo fmt --all --check` (app/src-tauri) | pass |
+| Rust tests, `cargo clippy` | blocked: the Tauri crate needs GTK/ATK dev libraries that are unavailable without root |
 | Docker image build + Trivy scan | not run: Docker is not available |
 | `npm audit --omit=dev` for service | not run in this pass |
 

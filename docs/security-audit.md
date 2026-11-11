@@ -74,9 +74,9 @@ A second review of the same code found these issues; each fix has a regression t
   short-lived URLs are not.
 - Backup encryption is optional. When no passphrase is configured, backups remain plaintext in the
   backup directory and depend on host and volume controls.
-- Registration, reset requests and invitations have no dedicated rate limit.
-- Logout is state-changing but does not require the CSRF header. It clears cookies and is bounded to
-  the caller's session.
+- Registration, password-reset request, OTP request, passkey login, share report and invitation
+  creation have bounded rate limits. The registration ceiling is still generous at 60 attempts per
+  15-minute window per IP and should be reviewed with real traffic data.
 - The upgrade path can revoke sessions with `invalidate-sessions`, but it is an operator step rather
   than an automatic migration action.
 - Project shares expose the current snapshot only. Nested board content is not included by policy.
@@ -100,6 +100,9 @@ A second review of the same code found these issues; each fix has a regression t
 - Argon2id password hashing, hashed access/refresh tokens, rotating refresh tokens and family-wide
   reuse revocation.
 - `Secure`, `HttpOnly`, `SameSite=Lax` cookies, double-submit CSRF and strict origin checks.
+  Cookie-session logout also requires the CSRF header.
+- Bounded rate limits for registration, password reset, OTP request, passkey login, share reports and
+  invitation creation.
 - Server-side project membership and role checks, deny-by-default routes, scoped API tokens.
 - Hashed share tokens, expiry, revocation, rotation, passphrase rate limiting and `noindex`.
 - HMAC-hashed audit IPs, structured JSON logs, secret redaction and redacted share paths.

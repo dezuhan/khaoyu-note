@@ -515,6 +515,22 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(stale.status, 409);
   });
 
+  await t.test("logout requires the CSRF header for cookie sessions", async () => {
+    const user = await api.account(`logout-csrf-${crypto.randomUUID()}@example.com`);
+    const blocked = await api.call("/api/v1/auth/logout", {
+      method: "POST",
+      jar: user.jar,
+      csrf: false,
+    });
+    assert.equal(blocked.status, 403);
+    assert.equal(blocked.body.code, "csrf_failed");
+    // A rejected cross-site logout must not end the session.
+    assert.equal((await api.call("/api/v1/auth/sessions", { jar: user.jar })).status, 200);
+    const ok = await api.call("/api/v1/auth/logout", { method: "POST", jar: user.jar });
+    assert.equal(ok.status, 204);
+    assert.equal((await api.call("/api/v1/auth/sessions", { jar: user.jar })).status, 401);
+  });
+
   await t.test("admin audit, abuse and stats endpoints require an operator token", async () => {
     const token = "Admin-5f3c9a7e2b8d4c1f6a0e9d3b7c2f8a4e";
     const denied = await api.raw("/api/v1/admin/stats");
@@ -1096,6 +1112,23 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { accountId: guestId },
     });
     assert.equal(forbiddenTransfer.status, 403);
+  });
+
+  await t.test("invitation creation is rate limited per owner", async () => {
+    const owner = await api.account(`invite-limit-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Invite limit");
+    let response;
+    for (let attempt = 0; attempt < 21; attempt += 1) {
+      response = await api.call(`/api/v1/projects/${projectId}/invitations`, {
+        method: "POST",
+        jar: owner.jar,
+        body: { email: `invite-${attempt}-${crypto.randomUUID()}@example.com`, role: "viewer" },
+      });
+      if (attempt < 20) assert.equal(response.status, 201, JSON.stringify(response.body));
+    }
+    assert.equal(response.status, 429);
+    assert.equal(response.body.code, "rate_limited");
+    assert.ok(Number(response.response.headers.get("retry-after")) >= 1);
   });
 
   await t.test("notifications are scoped, readable and removed with revoked shares", async () => {

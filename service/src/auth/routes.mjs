@@ -298,6 +298,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
   const otpRequestRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const passkeyLoginRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
   const shareReportRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
+  const invitationRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
 
   function enforceRate(limiter, key) {
     const result = limiter.check(key);
@@ -1549,6 +1550,19 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       if (method === "POST" && url.pathname === "/api/v1/auth/logout") {
         const cookies = parseCookies(request.headers.cookie);
         const auth = await authenticateAccess(db, cookies.khaoyu_access);
+        // Logout is a state-changing cookie request, so it carries the same double-submit CSRF
+        // requirement as other cookie writes. Requiring it also stops a cross-site form from
+        // signing the user out silently.
+        if (auth || cookies.khaoyu_refresh) {
+          const header = request.headers["x-csrf-token"];
+          const csrfCookie = cookies.khaoyu_csrf;
+          if (!header || !csrfCookie || header !== csrfCookie) {
+            throw new HttpError(403, "CSRF token missing or invalid", "csrf_failed");
+          }
+          if (auth && hashToken(header) !== auth.session.csrfHash) {
+            throw new HttpError(403, "CSRF token missing or invalid", "csrf_failed");
+          }
+        }
         if (auth) await revokeSession(db, auth.session.id, auth.account.id);
         else await revokeByRefreshToken(db, cookies.khaoyu_refresh);
         clearSessionCookies(response, config);
@@ -2064,6 +2078,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         if (method === "POST" && role !== "owner") {
           throw new HttpError(403, "owner role required", "forbidden");
+        }
+        if (method === "POST") {
+          enforceRate(invitationRate, `${auth.account.id}:${hashIp(ip, config.secret) || "unknown"}`);
         }
         if (method === "GET") {
           const invitations = (await db.all("SELECT id, email, role, created_at, expires_at, accepted_at, revoked_at FROM project_invitations WHERE project_id = ? ORDER BY created_at DESC", [projectId]))

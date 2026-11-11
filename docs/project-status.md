@@ -20,11 +20,12 @@ Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
   validates it, asks for confirmation, stages the restore and restarts the app. The earlier
   "no Restore control" gap is closed; web import remains intentionally disabled.
 - Verification pass in this environment: static modules 38/38, version 0.35.0, i18n 190/190 keys ×
-  10 languages, UI suite 268/268, feature browser suites pass, service suite 69 pass/6 skipped
-  (70/5 with Redis), and the web host `/status` smoke pass.
+  10 languages, UI suite 268/268, feature browser suites pass, service suite 72 pass/5 skipped with
+  Redis (PostgreSQL skipped), and the web host `/status` smoke pass.
 - The stale `tools/test-account-ui.mjs` was rewritten for `/register` → `/login` → `/admin` (14
-  checks) and added to CI. Rust and Docker checks were not run because Cargo and Docker are not
-  installed here.
+  checks) and added to CI. Rust 1.99.1 and Cargo are now installed; `cargo fmt --all --check` passes,
+  but Rust tests and Clippy are blocked by missing GTK/ATK development libraries. Docker and Trivy
+  are unavailable in this environment.
 - Roadmap checkboxes were reconciled with this evidence; see the verification note in `ROADMAP.md`.
   The 0.32.0 numbers below are historical and superseded by `docs/production-readiness.md`.
 
