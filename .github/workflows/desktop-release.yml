@@ -121,9 +121,9 @@ jobs:
           npx tauri build ${{ matrix.args }} 2>&1 | tee tauri-build.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            while IFS= read -r line; do
-              echo "::error title=Desktop bundle failed::$line"
-            done < <(tail -n 80 tauri-build.log)
+            detail="$(grep -m1 -E 'error:|Error:|failed to|Cannot find|cannot|No such file' tauri-build.log || true)"
+            if [ -z "$detail" ]; then detail="$(tail -n 4 tauri-build.log)"; fi
+            echo "::error title=Desktop bundle failed::${detail:0:900}"
           fi
           exit "$status"
 
