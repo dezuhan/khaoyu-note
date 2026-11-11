@@ -156,17 +156,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --noninteractive flathub org.gnome.Platform//48 org.gnome.Sdk//48
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install --noninteractive flathub org.gnome.Platform//48 org.gnome.Sdk//48
 
       - name: Prepare AppDir and build Flatpak
         run: |
+          find linux-build -maxdepth 5 -type f | head -50
           appdir="$(find linux-build -type d -name '*.AppDir' | head -n 1)"
           test -n "$appdir"
           rm -rf packaging/flatpak/appdir packaging/flatpak/build packaging/flatpak/repo
           cp -a "$appdir" packaging/flatpak/appdir
-          flatpak-builder --force-clean --repo=packaging/flatpak/repo packaging/flatpak/build packaging/flatpak/com.dezuhan.khaoyunote.yml
-          flatpak build-bundle packaging/flatpak/repo "Khaoyu-Note_0.35.0_amd64.flatpak" com.dezuhan.khaoyunote
+          # upload-artifact does not preserve executable bits.
+          chmod +x packaging/flatpak/appdir/AppRun
+          find packaging/flatpak/appdir/usr/bin -type f -exec chmod +x {} +
+          flatpak-builder --disable-rofiles-fuse --force-clean \
+            --repo=packaging/flatpak/repo packaging/flatpak/build \
+            packaging/flatpak/com.dezuhan.khaoyunote.yml
+          version="$(node -p "require('./app/src-tauri/tauri.conf.json').version")"
+          flatpak build-bundle packaging/flatpak/repo \
+            "Khaoyu-Note_${version}_amd64.flatpak" com.dezuhan.khaoyunote
 
       - name: Upload Flatpak
         uses: actions/upload-artifact@v7.0.2
