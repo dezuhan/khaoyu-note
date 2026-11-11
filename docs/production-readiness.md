@@ -37,9 +37,8 @@ Not ready for a production team deployment:
    production-ready.
 6. Encryption at rest, least-privilege database roles and a documented multi-instance backup rehearsal
    remain release gates.
-7. `service/test/*` PostgreSQL and Redis tests are CI-gated. In the 2026-11-11 verification pass the
-   Redis integration passed locally with `TEST_REDIS_URL` set; the PostgreSQL tests stayed skipped
-   because the local test role rejected authentication.
+7. `service/test/*` PostgreSQL and Redis tests are CI-gated as well. In the 2026-11-11 verification
+   pass both ran locally against a disposable PostgreSQL 17 container and Redis (77 pass, 0 skipped).
 
 Conclusion: the collaboration backend is a serious beta foundation, but it must not be advertised as
 production-ready until items 1–7 are closed.
@@ -84,10 +83,10 @@ Backup and the export action are preparation only, not a migration implementatio
 
 ## Audit run — 2026-11-11 (verification pass)
 
-Environment: Linux, Node 26.13.0, Playwright Chromium. PostgreSQL 18 and Redis 7 were running, but
-the local PostgreSQL test role rejected authentication, so the PostgreSQL integration tests stayed
-skipped. Rust 1.99.1 and Cargo were installed with rustup, but the Tauri crate needs GTK/ATK
-development libraries that are missing and cannot be installed without root. Docker is not available.
+Environment: Linux, Node 26.13.0, Playwright Chromium. Rust 1.99.1, Cargo and the Tauri system
+libraries were provided through rootless Podman containers (Ubuntu 26.04); PostgreSQL 17 ran in a
+disposable container and Redis 7 ran on the host. Docker is not available, so the container build and
+scan used Podman and Trivy.
 
 ### Evidence
 
@@ -99,13 +98,16 @@ development libraries that are missing and cannot be installed without root. Doc
 | Main UI suite | **268/268 pass** |
 | Feature browser suites | save-conflict 11/11, save-retry 4/4, board-selection 4/4, rename 8/8, board-card-title 5/5, column-layout 9/9, column-title 7/7, tool-drop 6/6, wrap 5/5, tooltips 7/7, line-area 6/6, card-features 24/24, fonts 5/5, web-mode 10/10, auth-web 44/44, onboarding pass |
 | Service-backed browser suites | passkeys, shares-ui, share-view and the rewritten account suite (14 checks) pass with a disposable service |
-| Service tests | **72 pass, 5 skipped** with `TEST_REDIS_URL` set (PostgreSQL integration skipped); the suite now covers logout CSRF and the invitation rate limit |
+| Service tests | **77 pass, 0 skipped** against disposable PostgreSQL 17 and local Redis; the suite covers logout CSRF and the invitation rate limit |
+| PostgreSQL integration | pass (baseline parity, durable copy and storage round-trips included) |
 | Web host smoke | `/status` pass, version 0.35.0 on Node 26.13.0 |
-| MCP smoke suite | not run: the Tauri crate build needs GTK/ATK development libraries |
-| `cargo fmt --all --check` (app/src-tauri) | pass |
-| Rust tests, `cargo clippy` | blocked: the Tauri crate needs GTK/ATK dev libraries that are unavailable without root |
-| Docker image build + Trivy scan | not run: Docker is not available |
-| `npm audit --omit=dev` for service | not run in this pass |
+| MCP smoke suite | **15/15 pass** against a Linux debug build of the MCP binary |
+| `cargo fmt --all --check` | pass |
+| Rust tests | **21 library tests and 2 MCP unit tests pass**, including the legacy migration test |
+| `cargo clippy --all-targets -- -D warnings` | pass |
+| Service image build (Podman) | pass |
+| Trivy image scan (CRITICAL, ignore-unfixed) | **0 findings** |
+| `npm audit --omit=dev` for service | 0 vulnerabilities |
 
 ### Notes
 
@@ -116,23 +118,21 @@ development libraries that are missing and cannot be installed without root. Doc
   to `/admin`, registration on `/register`, sign-in on `/login`, and the account section of the admin
   dashboard (sessions, API tokens, password change, sign out everywhere). It runs 14 checks and was
   added to `.github/workflows/ci.yml`.
-- Rust `legacy_data_folder_is_migrated_to_the_new_identity`: the first pass observed a failure because
-  the test created the legacy folder at the same identifier as the new root. It cannot be re-verified
-  here without Cargo; fix the test roots and confirm under `cargo test`.
+- Rust `legacy_data_folder_is_migrated_to_the_new_identity`: the failure recorded in the first pass is
+  not reproducible; the test passes in the container run.
+- The MCP smoke suite ran against a Linux debug build of `khaoyu-note-mcp`. The Windows CI job remains
+  the authority for the Windows binary.
 
 ### Verdict
 
 **NO-GO for a public production deployment today.** The single-user local build is usable as a beta
-and its main UI, web host and service foundation are healthy, but the release cannot be called
-production ready while PostgreSQL integration is unvalidated, no container scan has run, and
-signing/pen-test/load-test gates remain open.
+and its main UI, web host, service foundation, Rust tests and container image are healthy, but the
+release cannot be called production ready while platform packaging, signing/notarisation and the
+external penetration and load-test gates remain open.
 
 Minimum before a public production tag:
 
-1. keep the account UI suite green in CI (rewritten and wired in on 2026-11-11);
-2. fix the legacy migration test and run the full web and Rust suites green in CI;
-3. run service tests against PostgreSQL (Redis already passes locally);
-4. build and scan the service container with Docker/Trivy;
-5. execute Linux/macOS packaging on native runners;
-6. complete signing/notarisation and the external security review;
-7. decide whether collaboration and Turso stay disabled (currently they do).
+1. run the full web and Rust suites green in CI (locally green on 2026-11-11);
+2. execute Linux and macOS packaging on native runners;
+3. complete signing/notarisation and the external security review plus a production load test;
+4. decide whether collaboration and Turso stay disabled (currently they do).

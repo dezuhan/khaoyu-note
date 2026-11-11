@@ -27,7 +27,7 @@ Document page editor and drawing page editor:
 ![Drawing editor](shots/drawing-editor.png)
 
 Status: working MVP. Every behavior below is covered by an automated Playwright suite (268 checks
-defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (16 checks). Both run in
+defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (15 checks). Both run in
 CI. The menu bar sits above the file header, its Share control manages per-board access, right-clicking
 a card offers Share link, and **Help > Documentation** opens the offline guide.
 
@@ -481,7 +481,7 @@ to-do items, comments, table cells, column drop, zoom, settings modal and custom
 switching, the disabled Home state, nested board breadcrumbs, document editor, drawing editor, context
 menu, and persistence (268 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
 checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
-boards, connections and tree deletion (16 checks).
+boards, connections and tree deletion (15 checks).
 
 Built artifacts are copied to `dist/`. The files below are the last built release (0.35.0):
 

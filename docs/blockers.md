@@ -37,11 +37,14 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 
 ## Current evidence
 
-- Service tests: 69 passing with 6 skipped on SQLite only; 70 passing with 5 skipped when
-  `TEST_REDIS_URL` is set. PostgreSQL integration is still unvalidated locally.
+- Service tests: 77 passing with 0 skipped against a disposable PostgreSQL 17 container and local
+  Redis; the suite covers logout CSRF and the invitation rate limit.
 - Sync engine checks: passing.
 - UI suite: 268 checks defined in `tools/test-ui.mjs`, 268/268 passing on 2026-11-11.
-- Feature browser suites and the passkey, shares, share-view and onboarding suites pass.
+- Feature browser suites plus the passkey, shares, share-view, onboarding and account suites pass.
+- Rust: 21 library tests and 2 MCP unit tests pass; `cargo fmt --all --check` and
+  `cargo clippy --all-targets -- -D warnings` pass. MCP smoke suite: 15/15.
+- Service image builds with Podman; Trivy reports no CRITICAL findings (`--ignore-unfixed`).
 - Live security check: 20 checks.
 - Linux artifacts: AppImage, `.deb` and portable `.tar.gz` are built and checksummed in
   `dist/linux/SHA256SUMS.txt` for 0.35.0. Windows installers were built on an earlier Windows

@@ -282,7 +282,7 @@ runners in CI, not by cross-compiling from a single Windows machine.
 ### Release gates
 
 - [ ] No open P0 or P1 defects.
-- [x] Local-only mode passes the full UI and MCP suites (268 UI checks, 16 MCP checks; verified
+- [x] Local-only mode passes the full UI and MCP suites (268 UI checks, 15 MCP checks; verified
   2026-11-11).
 - [ ] Backup and restore verified on each platform (Windows verified; Linux and macOS pending).
 - [ ] Version and changelog frozen for the release.
