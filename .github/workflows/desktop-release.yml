@@ -160,18 +160,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          sudo flatpak install --noninteractive flathub org.gnome.Platform//48 org.gnome.Sdk//48
+          sudo flatpak install --noninteractive flathub org.gnome.Platform//50 org.gnome.Sdk//50
 
-      - name: Prepare AppDir and build Flatpak
+      - name: Prepare DEB and build Flatpak
         run: |
-          find linux-build -maxdepth 5 -type f | head -50
-          appdir="$(find linux-build -type d -name '*.AppDir' | head -n 1)"
-          test -n "$appdir"
+          deb="$(find linux-build -type f -name '*.deb' | head -n 1)"
+          test -n "$deb"
           rm -rf packaging/flatpak/appdir packaging/flatpak/build packaging/flatpak/repo
-          cp -a "$appdir" packaging/flatpak/appdir
-          # upload-artifact does not preserve executable bits.
-          chmod +x packaging/flatpak/appdir/AppRun
-          find packaging/flatpak/appdir/usr/bin -type f -exec chmod +x {} +
+          dpkg-deb -x "$deb" packaging/flatpak/appdir
+          chmod +x packaging/flatpak/appdir/usr/bin/*
+          find packaging/flatpak/appdir -maxdepth 4 | sort
           flatpak-builder --disable-rofiles-fuse --force-clean \
             --repo=packaging/flatpak/repo packaging/flatpak/build \
             packaging/flatpak/com.dezuhan.khaoyunote.yml

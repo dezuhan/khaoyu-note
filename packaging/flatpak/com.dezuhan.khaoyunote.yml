@@ -1,6 +1,6 @@
 app-id: com.dezuhan.khaoyunote
 runtime: org.gnome.Platform
-runtime-version: "48"
+runtime-version: "50"
 sdk: org.gnome.Sdk
 command: khaoyu-note
 
@@ -18,11 +18,16 @@ modules:
   - name: khaoyu-note
     buildsystem: simple
     build-commands:
-      - mkdir -p /app/bin /app/lib /app/share/applications /app/share/icons /app/share/metainfo
+      - mkdir -p /app/bin /app/share/applications /app/share/icons /app/share/metainfo
       - cp -a appdir/usr/bin/. /app/bin/
-      - cp -a appdir/usr/lib/. /app/lib/
+      - chmod +x /app/bin/*
+      - for icon in appdir/usr/share/icons/hicolor/*/apps/khaoyu-note.png; do
+          size="$(basename "$(dirname "$(dirname "$icon")")")";
+          install -Dm644 "$icon" "/app/share/icons/hicolor/${size}/apps/com.dezuhan.khaoyunote.png";
+        done
       - install -Dm644 "appdir/usr/share/applications/Khaoyu Note.desktop" /app/share/applications/com.dezuhan.khaoyunote.desktop
-      - cp -a appdir/usr/share/icons/. /app/share/icons/
+      - sed -i 's/^Icon=.*/Icon=com.dezuhan.khaoyunote/' /app/share/applications/com.dezuhan.khaoyunote.desktop
+      - sed -i 's/^Exec=.*/Exec=khaoyu-note/' /app/share/applications/com.dezuhan.khaoyunote.desktop
       - install -Dm644 com.dezuhan.khaoyunote.metainfo.xml /app/share/metainfo/com.dezuhan.khaoyunote.metainfo.xml
     sources:
       - type: dir
