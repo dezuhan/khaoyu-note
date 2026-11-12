@@ -232,6 +232,10 @@
   background: var(--ky-control);
 }
 
+.mn-workspace-popover-board.is-active {
+  background: var(--ky-control-active);
+}
+
 .mn-workspace-popover-board span {
   display: block;
   color: var(--ky-muted);
@@ -262,6 +266,7 @@
 
 .mn-workspace-popover-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ky-space-6);
   padding: var(--ky-space-4) var(--ky-space-8);
 }

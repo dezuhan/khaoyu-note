@@ -130,6 +130,9 @@ jobs:
       - name: Remote sync durability suite
         run: node tools/test-sync-remote.mjs http://127.0.0.1:1430/
 
+      - name: Workspace switcher suite
+        run: node tools/test-workspace-ui.mjs http://127.0.0.1:1430/
+
       - name: Update check checks
         run: node tools/test-update.mjs
 

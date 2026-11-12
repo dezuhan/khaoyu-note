@@ -41,6 +41,11 @@ project uses Semantic Versioning.
   adopting a remote document; rebase and live-merge are serialized per board.
 - The sync model documents the causal clocks, the three-way text merge and the remaining
   character-level CRDT prerequisites in `docs/sync-model.md`.
+- The workspace switcher remembers the last opened workspace per server and loads its board list as
+  soon as the popover opens. On a fresh profile the seeded default workspace is not selected
+  automatically while another workspace exists. A workspace detail now offers **New board**, which
+  creates the board inside that workspace (the service accepts `workspaceId` on project creation for
+  workspace owners and admins).
 ## [0.36.0] - 2026-11-12
 
 ### Added

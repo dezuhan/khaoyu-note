@@ -412,6 +412,9 @@ node tools/test-save-retry.mjs
 # durable remote sync: service + preview server, includes an offline period and a reload
 node tools/test-sync-remote.mjs http://127.0.0.1:1430/
 
+# workspace switcher: auto-load preference and New board inside a workspace
+node tools/test-workspace-ui.mjs http://127.0.0.1:1430/
+
 # boot and delete never reopen a trashed board
 node tools/test-board-selection.mjs
 

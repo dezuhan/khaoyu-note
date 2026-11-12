@@ -112,6 +112,40 @@ function writeWorkspaceCache(serverUrl, workspaces) {
   }
 }
 
+const LAST_WORKSPACE_KEY = "ky.workspaceLast";
+
+function readLastWorkspace(serverUrl) {
+  try {
+    const all = JSON.parse(localStorage.getItem(LAST_WORKSPACE_KEY) || "{}");
+    return String(all[serverUrl] || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeLastWorkspace(serverUrl, workspaceId) {
+  try {
+    const all = JSON.parse(localStorage.getItem(LAST_WORKSPACE_KEY) || "{}");
+    all[serverUrl] = workspaceId;
+    localStorage.setItem(LAST_WORKSPACE_KEY, JSON.stringify(all));
+  } catch {
+    /* the preference is optional */
+  }
+}
+
+// Prefer the workspace the user opened last. On a fresh install the seeded default workspace is
+// skipped while another workspace exists, so "Team workspace" is not selected automatically.
+function preferredWorkspace(serverUrl, workspaces) {
+  const lastId = readLastWorkspace(serverUrl);
+  if (lastId) {
+    const last = workspaces.find((workspace) => workspace.id === lastId);
+    if (last) return last;
+  }
+  return (
+    workspaces.find((workspace) => workspace.id !== "workspace_default") || workspaces[0] || null
+  );
+}
+
 function withTimeout(promise, ms = 6000) {
   return Promise.race([
     promise,
@@ -241,6 +275,12 @@ export async function openWorkspacePopover(anchor) {
   }
 }
 
+function workspaceSignature(workspaces) {
+  return (workspaces || [])
+    .map((workspace) => `${workspace.id}:${workspace.name || ""}:${workspace.role || ""}`)
+    .join("|");
+}
+
 async function loadServerWorkspaces(server, section, view) {
   const target = section.querySelector('[data-role="workspaces"]');
   const cached = readWorkspaceCache(server.url);
@@ -248,8 +288,11 @@ async function loadServerWorkspaces(server, section, view) {
   try {
     const data = await withTimeout(jsonFetch(`${server.url}/api/v1/workspaces`, {}, server.token));
     const workspaces = data.workspaces || [];
+    const unchanged = cached?.length && workspaceSignature(cached) === workspaceSignature(workspaces);
     writeWorkspaceCache(server.url, workspaces);
-    renderWorkspaceRows(server, workspaces, target, view);
+    // The cached rows are already rendered and one workspace is auto-loaded; re-rendering would
+    // reload the same board list for no reason.
+    if (!unchanged) renderWorkspaceRows(server, workspaces, target, view);
   } catch (error) {
     if (!cached?.length) {
       target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)} <button type="button" class="mn-btn" data-role="retry">Retry</button></p>`;
@@ -275,11 +318,19 @@ function renderWorkspaceRows(server, workspaces, target, view) {
     .join("")}</div><div data-role="workspace-detail"></div>`;
   for (const button of target.querySelectorAll("[data-workspace]")) {
     const workspace = workspaces.find((entry) => entry.id === button.dataset.workspace);
-    button.addEventListener("click", () => {
-      target.querySelectorAll("[data-workspace]").forEach((entry) => entry.classList.toggle("is-active", entry === button));
-      void loadWorkspaceBoards(server, workspace, target, view);
-    });
+    button.addEventListener("click", () => selectWorkspace(server, workspace, target, view));
   }
+  const preferred = preferredWorkspace(server.url, workspaces);
+  if (preferred) selectWorkspace(server, preferred, target, view, { persist: false });
+}
+
+function selectWorkspace(server, workspace, target, view, { persist = true } = {}) {
+  if (!workspace) return;
+  target
+    .querySelectorAll("[data-workspace]")
+    .forEach((entry) => entry.classList.toggle("is-active", entry.dataset.workspace === workspace.id));
+  if (persist) writeLastWorkspace(server.url, workspace.id);
+  void loadWorkspaceBoards(server, workspace, target, view);
 }
 
 const PROJECTS_CACHE_KEY = "ky.workspaceProjects";
@@ -309,7 +360,7 @@ function writeProjectCache(serverUrl, workspaceId, projects) {
 }
 
 function renderProjectRows(target, server, workspace, projects, root, view, { stale = false } = {}) {
-  target.innerHTML = `<div class="mn-workspace-popover-actions"><button type="button" class="mn-btn" data-role="workspace-members">Members</button><button type="button" class="mn-btn" data-role="workspace-invite">Invite</button></div>${
+  target.innerHTML = `<div class="mn-workspace-popover-actions"><button type="button" class="mn-btn" data-role="workspace-new-board">New board</button><button type="button" class="mn-btn" data-role="workspace-members">Members</button><button type="button" class="mn-btn" data-role="workspace-invite">Invite</button></div>${
     stale ? `<p class="mn-workspace-form-error" style="padding:8px 8px 0">Server unreachable. Showing the last known boards.</p>` : ""
   }<div class="mn-workspace-popover-boards">${
     projects.length
@@ -325,6 +376,9 @@ function renderProjectRows(target, server, workspace, projects, root, view, { st
           .join("")
       : `<p class="mn-server-note" style="padding:8px">No boards in this workspace.</p>`
   }</div>`;
+  target
+    .querySelector('[data-role="workspace-new-board"]')
+    ?.addEventListener("click", () => openCreateWorkspaceBoardDialog(server, workspace, root, view));
   target
     .querySelector('[data-role="workspace-members"]')
     ?.addEventListener("click", () => void openWorkspaceMembers(server, workspace));
@@ -362,6 +416,58 @@ async function loadWorkspaceBoards(server, workspace, root, view) {
       target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
     }
   }
+}
+
+function openCreateWorkspaceBoardDialog(server, workspace, root, view) {
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="New board">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">New board</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+    <div class="mn-modal-body mn-workspace-form">
+      <p class="mn-workspace-form-note">The board is created inside ${escapeText(workspace.name || "this workspace")}.</p>
+      <label>Board name<input class="ky-input" name="title" placeholder="Untitled board" autocomplete="off" required /></label>
+      <p class="mn-workspace-form-error" data-role="error" role="status"></p>
+    </div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Create board</button></footer></form>`;
+  document.body.append(overlay);
+  const form = overlay.querySelector("form");
+  const error = form.querySelector('[data-role="error"]');
+  const close = () => overlay.remove();
+  form.querySelector(".mn-modal-close").addEventListener("click", close);
+  form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  overlay.addEventListener("pointerdown", (event) => {
+    if (event.target === overlay) close();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const title = form.elements.namedItem("title").value.trim() || "Untitled board";
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const created = await withTimeout(
+        jsonFetch(
+          `${server.url}/api/v1/projects`,
+          { method: "POST", body: { title, workspaceId: workspace.id } },
+          server.token
+        )
+      );
+      close();
+      closePopover();
+      await openEditableBoard(
+        server,
+        {
+          id: created.id,
+          name: created.title || title,
+          revision: created.revision || 1,
+          role: created.role || "owner",
+        },
+        server.token
+      );
+    } catch (err) {
+      error.textContent = err.message;
+      submit.disabled = false;
+    }
+  });
 }
 
 function openCreateWorkspaceDialog(serversList, anchor) {
