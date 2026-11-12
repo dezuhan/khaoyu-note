@@ -777,36 +777,242 @@ async function renderActivity({ append = false } = {}) {
   }
 }
 
-async function renderAccount() {
-  pane.innerHTML = `<div class="admin-loading">Loading account...</div>`;
+function pageStatus(message) {
+  const status = document.querySelector(".admin-page-status");
+  if (status) status.textContent = message;
+}
+
+async function readAvatarFile(file) {
+  if (!file) return "";
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Could not read the image"));
+    reader.readAsDataURL(file);
+  });
+  const image = await new Promise((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error("That file is not a readable image"));
+    element.src = dataUrl;
+  });
+  const max = 256;
+  const ratio = Math.min(1, max / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * ratio));
+  canvas.height = Math.max(1, Math.round(image.height * ratio));
+  const context = canvas.getContext("2d");
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+function avatarPerson(person) {
+  return {
+    displayName: person.displayName || person.email,
+    email: person.email,
+    avatarColor: person.avatarColor || person.avatar_color || "",
+    avatarUrl: person.avatarUrl || person.avatar_url || "",
+  };
+}
+
+async function renderProfile() {
+  pane.innerHTML = `<div class="admin-loading">Loading profile...</div>`;
   let sessionData;
-  let tokensData;
+  let dashboardData;
+  let detail;
   try {
-    [sessionData, tokensData] = await Promise.all([
-      api("/api/v1/auth/sessions"),
-      api("/api/v1/account/tokens"),
-    ]);
+    sessionData = await api("/api/v1/auth/sessions");
+    dashboardData = await api("/api/v1/admin/dashboard");
+    detail = await api(`/api/v1/admin/users/${encodeURIComponent(sessionData.account.id)}`);
   } catch (error) {
     if (error instanceof AuthError) return showAuth();
     pane.innerHTML = "";
     return showError(error);
   }
-  const account = sessionData.account;
-  const admin = dashboard?.admin || {};
-  const sessions = (sessionData.sessions || []).filter((entry) => !entry.revoked);
-  const tokens = (tokensData.tokens || []).filter((entry) => !entry.revoked);
+  dashboard = dashboardData;
+  renderIdentity(dashboard.admin);
+  const account = detail.user;
+  const avatar = avatarPerson(account);
+  let avatarData = avatar.avatarUrl;
   pane.innerHTML = `
     <div class="ky-section admin-section">
-      <div class="admin-section-head"><div><h2>Profile</h2><p>The account used by this dashboard.</p></div></div>
-      <div class="admin-user">
-        ${avatarHtml({ displayName: admin.displayName || account.displayName, email: account.email, avatarUrl: admin.avatarUrl })}
-        <span class="admin-user-copy"><strong>${escapeHtml(account.displayName || account.email)}</strong><span>${escapeHtml(account.email)} · Admin</span></span>
+      <div class="admin-section-head"><div><h2>Profile</h2><p>The account and public identity used by this dashboard.</p></div></div>
+      <form data-role="profile-form" class="admin-profile-form">
+        <div class="admin-profile-avatar">
+          <div data-role="profile-avatar">${avatarHtml(avatar)}</div>
+          <label class="ky-button ky-button-quiet admin-file-button">
+            Change picture
+            <input type="file" accept="image/png,image/jpeg,image/webp" data-role="avatar-file" hidden />
+          </label>
+          <button class="ky-button ky-button-quiet" type="button" data-role="avatar-clear"${avatarData ? "" : " disabled"}>Remove picture</button>
+        </div>
+        <div class="admin-form-grid admin-profile-grid">
+          <label class="admin-field"><span>Display name</span><input class="admin-search" name="displayName" maxlength="120" value="${escapeHtml(account.displayName || "")}" required /></label>
+          <label class="admin-field"><span>First name</span><input class="admin-search" name="firstName" maxlength="80" value="${escapeHtml(account.firstName || "")}" /></label>
+          <label class="admin-field"><span>Last name</span><input class="admin-search" name="lastName" maxlength="80" value="${escapeHtml(account.lastName || "")}" /></label>
+          <label class="admin-field"><span>Avatar colour</span><input class="admin-color-input" name="avatarColor" type="color" value="${escapeHtml(account.avatarColor || "#8b5cf6")}" /></label>
+        </div>
+        <div class="admin-actions admin-actions-spaced">
+          <button class="ky-button ky-button-primary" type="submit">Save profile</button>
+          <span class="admin-note admin-page-status" role="status"></span>
+        </div>
+      </form>
+      <div class="admin-detail-grid admin-profile-meta">
+        <div><span>Email</span>${escapeHtml(account.email)}</div>
+        <div><span>Role</span>${escapeHtml(account.role)}</div>
+        <div><span>Account ID</span><code>${escapeHtml(account.id)}</code></div>
+        <div><span>Created</span>${escapeHtml(formatTime(account.createdAt))}</div>
+        <div><span>Last active</span>${escapeHtml(formatTime(account.lastSeenAt))}</div>
       </div>
-      <div class="admin-actions admin-actions-spaced">
-        <a class="ky-button ky-button-quiet" href="/account">Two-factor and passkeys</a>
-      </div>
-    </div>
+    </div>`;
 
+  const form = pane.querySelector('[data-role="profile-form"]');
+  const avatarBox = pane.querySelector('[data-role="profile-avatar"]');
+  const clearButton = pane.querySelector('[data-role="avatar-clear"]');
+  const paintAvatar = () => {
+    avatarBox.innerHTML = avatarHtml({ ...avatar, displayName: form.displayName.value || avatar.displayName, avatarUrl: avatarData });
+    clearButton.disabled = !avatarData;
+  };
+  form.displayName.addEventListener("input", paintAvatar);
+  form.avatarColor.addEventListener("input", () => {
+    avatar.avatarColor = form.avatarColor.value;
+    paintAvatar();
+  });
+  form.querySelector('[data-role="avatar-file"]').addEventListener("change", async (event) => {
+    try {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      avatarData = await readAvatarFile(file);
+      paintAvatar();
+      pageStatus("Picture ready. Save the profile to apply it.");
+    } catch (error) {
+      pageStatus(error.message);
+    }
+  });
+  clearButton.addEventListener("click", () => {
+    avatarData = "";
+    paintAvatar();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await api(`/api/v1/admin/users/${encodeURIComponent(account.id)}`, {
+        method: "PATCH",
+        body: {
+          displayName: form.displayName.value.trim(),
+          firstName: form.firstName.value.trim(),
+          lastName: form.lastName.value.trim(),
+          avatarColor: form.avatarColor.value,
+          avatarUrl: avatarData,
+        },
+      });
+      dashboard = await api("/api/v1/admin/dashboard");
+      renderIdentity(dashboard.admin);
+      pageStatus("Profile saved.");
+    } catch (error) {
+      if (error instanceof AuthError) return showAuth();
+      pageStatus(error.message);
+    }
+  });
+}
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(value) {
+  const padded = String(value).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(value).length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function passkeyCreationOptions(options) {
+  return {
+    ...options,
+    challenge: base64UrlToBytes(options.challenge),
+    user: { ...options.user, id: base64UrlToBytes(options.user.id) },
+    excludeCredentials: (options.excludeCredentials || []).map((entry) => ({
+      ...entry,
+      id: base64UrlToBytes(entry.id),
+    })),
+  };
+}
+
+function serializePasskey(credential) {
+  return {
+    id: credential.id,
+    rawId: bytesToBase64Url(credential.rawId),
+    type: credential.type,
+    response: {
+      clientDataJSON: bytesToBase64Url(credential.response.clientDataJSON),
+      attestationObject: bytesToBase64Url(credential.response.attestationObject),
+      transports: credential.response.getTransports ? credential.response.getTransports() : [],
+    },
+    clientExtensionResults: credential.getClientExtensionResults
+      ? credential.getClientExtensionResults()
+      : {},
+  };
+}
+
+async function loadPasskeyList() {
+  const list = pane.querySelector('[data-role="passkey-list"]');
+  if (!list) return;
+  try {
+    const data = await api("/api/v1/auth/passkeys");
+    const passkeys = (data.passkeys || []).filter((passkey) => !passkey.revoked);
+    list.innerHTML = passkeys.length
+      ? passkeys
+          .map(
+            (passkey) => `<li class="admin-passkey">
+              <div><strong>${escapeHtml(passkey.name || "Passkey")}</strong><span>${escapeHtml(
+                passkey.deviceType || "device"
+              )} · created ${escapeHtml(formatTime(passkey.createdAt))}</span></div>
+              <button class="ky-button ky-button-quiet admin-danger-text" type="button" data-role="passkey-delete" data-id="${escapeHtml(
+                passkey.id
+              )}">Remove</button>
+            </li>`
+          )
+          .join("")
+      : `<li class="admin-note">No passkeys registered.</li>`;
+    for (const button of list.querySelectorAll('[data-role="passkey-delete"]')) {
+      button.addEventListener("click", async () => {
+        if (button.dataset.confirm !== "1") {
+          button.dataset.confirm = "1";
+          button.textContent = "Confirm remove";
+          return;
+        }
+        try {
+          await api(`/api/v1/auth/passkeys/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+          await loadPasskeyList();
+          pageStatus("Passkey removed.");
+        } catch (error) {
+          pageStatus(error.message);
+          button.dataset.confirm = "";
+          button.textContent = "Remove";
+        }
+      });
+    }
+  } catch (error) {
+    list.textContent = error.message;
+  }
+}
+
+async function renderSecurity() {
+  pane.innerHTML = `<div class="admin-loading">Loading security...</div>`;
+  let tokensData;
+  try {
+    tokensData = await api("/api/v1/account/tokens");
+  } catch (error) {
+    if (error instanceof AuthError) return showAuth();
+    pane.innerHTML = "";
+    return showError(error);
+  }
+  const tokens = (tokensData.tokens || []).filter((token) => !token.revoked);
+  pane.innerHTML = `
     <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Password</h2><p>Changing it signs out every other session.</p></div></div>
       <form data-role="password-form" novalidate>
@@ -817,29 +1023,48 @@ async function renderAccount() {
         </div>
         <div class="admin-actions admin-actions-spaced">
           <button class="ky-button ky-button-primary" type="submit">Update password</button>
-          <span class="admin-time" data-role="password-status" role="status"></span>
+          <span class="admin-note admin-page-status" role="status"></span>
         </div>
       </form>
     </div>
 
     <div class="ky-section admin-section">
-      <div class="admin-section-head"><div><h2>Sessions</h2><p>${sessions.length} active session${sessions.length === 1 ? "" : "s"}.</p></div></div>
-      ${
-        sessions.length
-          ? `<table class="ky-table admin-table"><thead><tr><th>Device</th><th>Created</th><th>Last seen</th><th></th></tr></thead><tbody>${sessions
-              .map(
-                (session) => `<tr>
-                  <td>${escapeHtml(session.device)}${session.current ? ' <span class="admin-badge is-active">Current</span>' : ""}</td>
-                  <td class="admin-time">${escapeHtml(formatTime(session.createdAt))}</td>
-                  <td class="admin-time">${escapeHtml(formatTime(session.lastSeenAt))}</td>
-                  <td><button class="admin-danger-button" type="button" data-role="revoke-session" data-id="${escapeHtml(
-                    session.id
-                  )}"${session.current ? " disabled" : ""}>Revoke</button></td>
-                </tr>`
-              )
-              .join("")}</tbody></table>`
-          : `<div class="admin-empty">No active sessions.</div>`
-      }
+      <div class="admin-section-head"><div><h2>Two-factor authentication</h2><p>Add an authenticator app as a second sign-in step.</p></div></div>
+      <p class="admin-note" data-role="totp-status">Checking...</p>
+      <div data-role="totp-setup" hidden>
+        <p class="admin-note">Scan this code with an authenticator app, or enter the secret manually.</p>
+        <div class="admin-totp-qr" data-role="totp-qr" aria-label="Authenticator QR code"></div>
+        <div class="admin-form-grid">
+          <label class="admin-field"><span>Secret</span><input class="admin-search" data-role="totp-secret" readonly /></label>
+          <label class="admin-field"><span>6-digit code</span><input class="admin-search" data-role="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" /></label>
+        </div>
+        <div class="admin-actions admin-actions-spaced">
+          <button class="ky-button ky-button-primary" type="button" data-role="totp-enable">Enable 2FA</button>
+          <button class="ky-button ky-button-quiet" type="button" data-role="totp-cancel">Cancel</button>
+        </div>
+      </div>
+      <div data-role="totp-enabled" hidden>
+        <p class="admin-note">Authenticator app is enabled. Keep a backup device and recovery plan.</p>
+        <button class="ky-button ky-button-danger" type="button" data-role="totp-disable-start">Disable 2FA</button>
+      </div>
+      <div data-role="totp-disable" hidden>
+        <div class="admin-form-grid">
+          <label class="admin-field"><span>Password</span><input class="admin-search" data-role="totp-disable-password" type="password" autocomplete="current-password" /></label>
+          <label class="admin-field"><span>6-digit code</span><input class="admin-search" data-role="totp-disable-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></label>
+        </div>
+        <div class="admin-actions admin-actions-spaced">
+          <button class="ky-button ky-button-danger" type="button" data-role="totp-disable-confirm">Disable 2FA</button>
+          <button class="ky-button ky-button-quiet" type="button" data-role="totp-disable-cancel">Cancel</button>
+        </div>
+      </div>
+      <button class="ky-button ky-button-primary" type="button" data-role="totp-setup-start">Set up authenticator</button>
+    </div>
+
+    <div class="ky-section admin-section">
+      <div class="admin-section-head"><div><h2>Passkeys</h2><p>Register a device credential for passwordless sign-in.</p></div></div>
+      <p class="admin-note" data-role="passkey-readiness"></p>
+      <button class="ky-button ky-button-primary" type="button" data-role="passkey-register">Register a passkey</button>
+      <ul class="admin-passkey-list" data-role="passkey-list"></ul>
     </div>
 
     <div class="ky-section admin-section">
@@ -865,57 +1090,127 @@ async function renderAccount() {
               .join("")}</tbody></table>`
           : `<div class="admin-empty">No API tokens.</div>`
       }
-    </div>
-
-    <div class="ky-section admin-section">
-      <div class="admin-section-head"><div><h2>Sign out</h2><p>End this session or every session on the service.</p></div></div>
-      <div class="admin-actions">
-        <button class="ky-button" type="button" data-role="logout">Sign out</button>
-        <button class="ky-button ky-button-quiet" type="button" data-role="logout-all">Sign out everywhere</button>
-      </div>
     </div>`;
 
-  const passwordStatus = pane.querySelector('[data-role="password-status"]');
-  pane.querySelector('[data-role="password-form"]').addEventListener("submit", async (event) => {
+  const passwordForm = pane.querySelector('[data-role="password-form"]');
+  passwordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const password = form.newPassword.value;
-    if (!form.currentPassword.value) {
-      passwordStatus.textContent = "Enter your current password.";
-      return;
-    }
-    if (password.length < 12) {
-      passwordStatus.textContent = "Use at least 12 characters.";
-      return;
-    }
-    if (password !== form.confirmPassword.value) {
-      passwordStatus.textContent = "The new passwords do not match.";
-      return;
-    }
+    const password = passwordForm.newPassword.value;
+    if (!passwordForm.currentPassword.value) return pageStatus("Enter your current password.");
+    if (password.length < 12) return pageStatus("Use at least 12 characters.");
+    if (password !== passwordForm.confirmPassword.value) return pageStatus("The new passwords do not match.");
     try {
       await api("/api/v1/account/password", {
         method: "POST",
-        body: { currentPassword: form.currentPassword.value, newPassword: password },
+        body: { currentPassword: passwordForm.currentPassword.value, newPassword: password },
       });
-      form.reset();
-      passwordStatus.textContent = "Password updated. Other sessions were signed out.";
-      dashboard = await api("/api/v1/admin/dashboard");
+      passwordForm.reset();
+      pageStatus("Password updated. Other sessions were signed out.");
     } catch (error) {
-      passwordStatus.textContent = error.message;
+      pageStatus(error.message);
     }
   });
 
-  for (const button of pane.querySelectorAll('[data-role="revoke-session"]')) {
-    button.addEventListener("click", async () => {
-      try {
-        await api(`/api/v1/auth/sessions/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
-        await renderAccount();
-      } catch (error) {
-        if (error instanceof AuthError) return showAuth();
-        showError(error);
-      }
-    });
+  const totpStatus = pane.querySelector('[data-role="totp-status"]');
+  const totpSetup = pane.querySelector('[data-role="totp-setup"]');
+  const totpEnabled = pane.querySelector('[data-role="totp-enabled"]');
+  const totpDisable = pane.querySelector('[data-role="totp-disable"]');
+  const totpStart = pane.querySelector('[data-role="totp-setup-start"]');
+  const paintTotp = (enabled) => {
+    totpStatus.textContent = enabled
+      ? "Enabled with an authenticator app."
+      : "Not enabled. Add an authenticator app for a second sign-in step.";
+    totpStart.hidden = enabled;
+    totpEnabled.hidden = !enabled;
+    totpSetup.hidden = true;
+    totpDisable.hidden = true;
+  };
+  try {
+    const status = await api("/api/v1/auth/totp");
+    paintTotp(status.enabled);
+  } catch {
+    totpStatus.textContent = "2FA status unavailable.";
   }
+  totpStart.addEventListener("click", async () => {
+    try {
+      const data = await api("/api/v1/auth/totp/setup", { method: "POST", body: {} });
+      pane.querySelector('[data-role="totp-secret"]').value = data.secret;
+      pane.querySelector('[data-role="totp-code"]').value = "";
+      const qr = pane.querySelector('[data-role="totp-qr"]');
+      qr.textContent = "";
+      if (window.qrcode) {
+        const code = window.qrcode(0, "M");
+        code.addData(data.uri);
+        code.make();
+        qr.innerHTML = code.createSvgTag(4, 2);
+      } else {
+        qr.textContent = "QR preview unavailable. Enter the secret manually.";
+      }
+      totpSetup.hidden = false;
+      totpStart.hidden = true;
+      totpEnabled.hidden = true;
+      pageStatus("Scan the code, then confirm with a 6-digit code.");
+    } catch (error) {
+      pageStatus(error.message);
+    }
+  });
+  pane.querySelector('[data-role="totp-enable"]').addEventListener("click", async () => {
+    const code = pane.querySelector('[data-role="totp-code"]').value.trim();
+    if (!/^\d{6}$/.test(code)) return pageStatus("Enter the 6-digit code from the authenticator app.");
+    try {
+      await api("/api/v1/auth/totp/enable", { method: "POST", body: { code } });
+      paintTotp(true);
+      pageStatus("Two-factor authentication enabled.");
+    } catch (error) {
+      pageStatus(error.message);
+    }
+  });
+  pane.querySelector('[data-role="totp-cancel"]').addEventListener("click", () => paintTotp(false));
+  pane.querySelector('[data-role="totp-disable-start"]').addEventListener("click", () => {
+    totpDisable.hidden = false;
+    totpEnabled.hidden = true;
+  });
+  pane.querySelector('[data-role="totp-disable-cancel"]').addEventListener("click", () => paintTotp(true));
+  pane.querySelector('[data-role="totp-disable-confirm"]').addEventListener("click", async () => {
+    const password = pane.querySelector('[data-role="totp-disable-password"]').value;
+    const code = pane.querySelector('[data-role="totp-disable-code"]').value.trim();
+    if (!password) return pageStatus("Enter your password.");
+    if (!/^\d{6}$/.test(code)) return pageStatus("Enter the current 6-digit code.");
+    try {
+      await api("/api/v1/auth/totp/disable", { method: "POST", body: { password, code } });
+      paintTotp(false);
+      pageStatus("Two-factor authentication disabled.");
+    } catch (error) {
+      pageStatus(error.message);
+    }
+  });
+
+  const passkeyReadiness = pane.querySelector('[data-role="passkey-readiness"]');
+  const passkeyButton = pane.querySelector('[data-role="passkey-register"]');
+  if (!window.PublicKeyCredential || !window.isSecureContext) {
+    passkeyButton.disabled = true;
+    passkeyReadiness.textContent = "Passkeys need a secure context (localhost or HTTPS) and WebAuthn support.";
+  } else {
+    passkeyReadiness.textContent = "Passkeys are available on this device.";
+  }
+  passkeyButton.addEventListener("click", async () => {
+    passkeyButton.disabled = true;
+    try {
+      const { options } = await api("/api/v1/auth/passkeys/register/options", { method: "POST", body: {} });
+      const credential = await navigator.credentials.create({ publicKey: passkeyCreationOptions(options) });
+      await api("/api/v1/auth/passkeys/register/verify", {
+        method: "POST",
+        body: { response: serializePasskey(credential), name: "Admin dashboard" },
+      });
+      await loadPasskeyList();
+      pageStatus("Passkey registered.");
+    } catch (error) {
+      pageStatus(error.message || "Passkey registration was cancelled.");
+    } finally {
+      passkeyButton.disabled = false;
+    }
+  });
+  await loadPasskeyList();
 
   pane.querySelector('[data-role="token-form"]').addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -928,24 +1223,73 @@ async function renderAccount() {
           expiresInDays: 365,
         },
       });
-      await renderAccount();
+      await renderSecurity();
       pane.querySelector('[data-role="token-result"]').textContent = `Copy this token now: ${created.token}`;
     } catch (error) {
       showError(error);
     }
   });
-
   for (const button of pane.querySelectorAll('[data-role="revoke-token"]')) {
     button.addEventListener("click", async () => {
       try {
         await api(`/api/v1/account/tokens/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
-        await renderAccount();
+        await renderSecurity();
       } catch (error) {
         showError(error);
       }
     });
   }
+}
 
+async function renderSessions() {
+  pane.innerHTML = `<div class="admin-loading">Loading sessions...</div>`;
+  let sessionData;
+  try {
+    sessionData = await api("/api/v1/auth/sessions");
+  } catch (error) {
+    if (error instanceof AuthError) return showAuth();
+    pane.innerHTML = "";
+    return showError(error);
+  }
+  const sessions = (sessionData.sessions || []).filter((entry) => !entry.revoked);
+  pane.innerHTML = `
+    <div class="ky-section admin-section">
+      <div class="admin-section-head"><div><h2>Login sessions</h2><p>${sessions.length} active session${
+        sessions.length === 1 ? "" : "s"
+      }. Revoking a session signs that device out.</p></div></div>
+      ${
+        sessions.length
+          ? `<table class="ky-table admin-table"><thead><tr><th>Device</th><th>Created</th><th>Last seen</th><th></th></tr></thead><tbody>${sessions
+              .map(
+                (session) => `<tr>
+                  <td>${escapeHtml(session.device)}${session.current ? ' <span class="admin-badge is-active">Current</span>' : ""}</td>
+                  <td class="admin-time">${escapeHtml(formatTime(session.createdAt))}</td>
+                  <td class="admin-time">${escapeHtml(formatTime(session.lastSeenAt))}</td>
+                  <td><button class="admin-danger-button" type="button" data-role="revoke-session" data-id="${escapeHtml(
+                    session.id
+                  )}"${session.current ? " disabled" : ""}>Revoke</button></td>
+                </tr>`
+              )
+              .join("")}</tbody></table>`
+          : `<div class="admin-empty">No active sessions.</div>`
+      }
+      <div class="admin-actions admin-actions-spaced">
+        <button class="ky-button" type="button" data-role="logout">Sign out</button>
+        <button class="ky-button ky-button-quiet" type="button" data-role="logout-all">Sign out everywhere</button>
+        <span class="admin-note admin-page-status" role="status"></span>
+      </div>
+    </div>`;
+  for (const button of pane.querySelectorAll('[data-role="revoke-session"]')) {
+    button.addEventListener("click", async () => {
+      try {
+        await api(`/api/v1/auth/sessions/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+        await renderSessions();
+      } catch (error) {
+        if (error instanceof AuthError) return showAuth();
+        showError(error);
+      }
+    });
+  }
   pane.querySelector('[data-role="logout"]').addEventListener("click", async () => {
     await api("/api/v1/auth/logout", { method: "POST" });
     window.location.replace("/login?signedout=1");
@@ -1235,7 +1579,9 @@ const COMMANDS = [
   { id: "boards", label: "Go to Boards", hint: "Dashboard", run: () => void go("boards") },
   { id: "activity", label: "Go to Activity", hint: "Dashboard", run: () => void go("activity") },
   { id: "sharing", label: "Go to Sharing", hint: "Dashboard", run: () => void go("sharing") },
-  { id: "account", label: "Open Account settings", hint: "Account", run: () => void go("account") },
+  { id: "profile", label: "Open Profile", hint: "Account Management", run: () => void go("profile") },
+  { id: "security", label: "Open Security", hint: "Account Management", run: () => void go("security") },
+  { id: "sessions", label: "Open Login sessions", hint: "Account Management", run: () => void go("sessions") },
   { id: "theme", label: "Toggle light or dark theme", hint: "View", run: () => toggleTheme() },
   { id: "help", label: "Open help", hint: "Help", run: () => openHelp() },
   { id: "logout", label: "Log out of the service", hint: "Account", run: () => void logout() },
@@ -1282,7 +1628,7 @@ async function logout() {
 function runAccountAction(action) {
   closeAccountMenu();
   if (action === "dashboard") return void go("overview");
-  if (action === "account") return void go("account");
+  if (action === "account") return void go("profile");
   if (action === "help") return openHelp();
   if (action === "logout") return void logout();
 }
@@ -1343,7 +1689,9 @@ const PAGE_TITLES = {
   boards: "Boards",
   activity: "Activity",
   sharing: "Sharing",
-  account: "Account",
+  profile: "Profile",
+  security: "Security",
+  sessions: "Login sessions",
 };
 
 async function go(next) {
@@ -1370,7 +1718,9 @@ async function go(next) {
   if (next === "accounts") return renderAccounts();
   if (next === "boards") return renderTeams();
   if (next === "sharing") return renderSharing();
-  if (next === "account") return renderAccount();
+  if (next === "profile") return renderProfile();
+  if (next === "security") return renderSecurity();
+  if (next === "sessions") return renderSessions();
   return renderActivity();
 }
 

@@ -61,7 +61,7 @@
 
         <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
           <button type="button" role="menuitem" data-action="dashboard">Admin dashboard</button>
-          <button type="button" role="menuitem" data-action="account">Account settings</button>
+          <button type="button" role="menuitem" data-action="account">Profile &amp; security</button>
           <button type="button" role="menuitem" data-action="help">Help</button>
           <div class="admin-menu-sep" role="separator"></div>
           <button type="button" role="menuitem" class="is-danger" data-action="logout">Logout</button>
@@ -91,6 +91,20 @@
           <button type="button" class="admin-nav-item" data-page="sharing">
             <span class="admin-nav-icon" data-icon="share" aria-hidden="true"></span>
             <span>Sharing</span>
+          </button>
+          <div class="admin-nav-sep" role="separator"></div>
+          <p class="admin-nav-title">Account Management</p>
+          <button type="button" class="admin-nav-item" data-page="profile">
+            <span class="admin-nav-icon" data-icon="user" aria-hidden="true"></span>
+            <span>Profile</span>
+          </button>
+          <button type="button" class="admin-nav-item" data-page="security">
+            <span class="admin-nav-icon" data-icon="shield" aria-hidden="true"></span>
+            <span>Security</span>
+          </button>
+          <button type="button" class="admin-nav-item" data-page="sessions">
+            <span class="admin-nav-icon" data-icon="lock" aria-hidden="true"></span>
+            <span>Login sessions</span>
           </button>
         </nav>
       </aside>
@@ -132,12 +146,13 @@
           <li><strong>Boards</strong> — create, rename and delete boards, and add, update or remove members.</li>
           <li><strong>Activity</strong> — audit trail with filters.</li>
           <li><strong>Sharing</strong> — public sharing and scoped share links.</li>
-          <li><strong>Account settings</strong> — profile, password, sessions and API tokens.</li>
+          <li><strong>Account Management</strong> — Profile, Security (password, 2FA, passkeys) and Login sessions.</li>
         </ul>
         <p class="admin-note">Press <kbd>Ctrl K</kbd> to search commands. The Account menu is in the top bar.</p>
       </div>
     </div>
 
+    <script src="/vendor/qrcode.js"></script>
     <script src="/admin.js" type="module"></script>
   </body>
 </html>

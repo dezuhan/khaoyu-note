@@ -127,7 +127,8 @@ the app works offline; only optional video and map embeds need the internet.
 | Template library | implemented: built-in starters plus custom templates created from any board selection; applying one replaces the active file and can be undone, while a non-empty board asks for overwrite confirmation. Settings > Board templates manages both kinds and can restore deleted built-ins |
 | Labels and reactions | out of scope for this local app |
 | Sharing and sync | disabled in this local-first build: Share and Sync are hidden, Settings > Server shows local runtime only, and no service/account connection is exposed. Service-enabled deployments expose these controls; the `service/` code remains for a future deployment. |
-| Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Boards and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, board creation and members, account detail panels, and the full audit feed. |
+| Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Boards and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, board creation and members, account detail panels, an Account Management group with Profile, Security
+(passwords, 2FA, passkeys) and Login sessions pages, and the full audit feed. |
 | Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, accounts, sharing and sync (Milestones 1 to 5 implemented in `service/`; packaging and production gates open) |
 
 ### Settings, GPU and comments

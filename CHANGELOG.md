@@ -72,6 +72,10 @@ project uses Semantic Versioning.
 - The Share dialog is reorganized into clear Board link, Create a share link and Active links
   sections: the board URL and copy action share one row, the form fields align in two columns, and
   Create/Copy actions sit together without the previous empty vertical gaps.
+- The admin dashboard now has an **Account Management** group under the service sections:
+  **Profile** (display name, names, avatar colour/picture), **Security** (password, authenticator QR
+  setup/disable, passkey registration/removal, API tokens) and **Login sessions** (device, created,
+  last seen, revoke and sign-out-all). This replaces the separate /account settings flow for admins.
 - The admin **Teams** area is now **Boards**, matching what it always listed: projects with an owner,
   member count, revision and update time. The API accepts `/api/v1/admin/boards` (the old
   `/admin/teams` paths remain as aliases). Accounts rows gain a Details panel with account metadata,

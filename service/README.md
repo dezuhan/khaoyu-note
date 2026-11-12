@@ -81,6 +81,9 @@ set, fonts and theme tokens.
   soft-delete a board (deleting revokes its share links and invitations and cascades to child boards).
 - Account rows expose a Details panel with account metadata, email/2FA/passkey state, boards and active
   sessions; the admin write endpoints accept the original frontend origin through the proxy.
+- Account Management groups three self-service pages: Profile (display name, names, avatar picture and
+  colour), Security (password, authenticator QR setup/disable, passkey registration/removal and API
+  tokens), and Login sessions (device, created/last seen and revoke/sign-out controls).
   Members expands the member list; admins can add an existing account by email with an
   editor/commenter/viewer role, change that role and remove the member. The owner row is immutable.
 - Activity reads every audit row with actor, action, resource and time, filterable by text and action

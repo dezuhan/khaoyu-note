@@ -18,6 +18,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
 - **Sharing hardening**: optional share-view watermark and per-link download caps, server-side rich
   HTML sanitisation, exact remote-embed host allowlists, optional AES-256-GCM object encryption and
   a data-only PostgreSQL deployment script.
+- **Account Management dashboard**: Profile, Security (password, 2FA, passkeys and API tokens) and
+  Login sessions now live as individual pages in the admin dashboard sidebar.
 - **Admin boards and account detail**: the former Teams page is correctly named Boards, account rows
   open a detail panel, and admin writes work when the dashboard is opened on the frontend port behind
   a configured public URL.

@@ -232,11 +232,13 @@ try {
   await page.locator(".admin-team h3", { hasText: "CRUD team renamed" }).waitFor({ state: "detached" });
   check("board can be deleted from the dashboard", true);
 
-  // The account page inside the dashboard owns sessions, tokens and password changes. It is opened
-  // from the profile button: the Account entry is temporarily out of the menu bar.
+  // Account Management is grouped below the service sections with three individual pages.
   check(
-    "account settings is temporarily out of the menu",
-    (await page.locator('.admin-nav-item[data-page="account"]').count()) === 0
+    "Account Management submenus are grouped below the service sections",
+    (await page.locator(".admin-nav-title").innerText()).toLowerCase().includes("account management") &&
+      (await page.locator('.admin-nav-item[data-page="profile"]').count()) === 1 &&
+      (await page.locator('.admin-nav-item[data-page="security"]').count()) === 1 &&
+      (await page.locator('.admin-nav-item[data-page="sessions"]').count()) === 1
   );
   await page.click("#admin-identity");
   await page.waitForSelector("#admin-account-menu:not([hidden])");
@@ -247,8 +249,18 @@ try {
   });
   check("account menu floats clear of the menubar", menuGap >= 8, `${menuGap}px`);
   await page.click('#admin-account-menu [data-action="account"]');
-  await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("Sessions"));
-  check("account page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
+  await page.waitForSelector('[data-role="profile-form"]');
+  check(
+    "profile page edits the signed-in account",
+    (await page.locator('[data-role="profile-form"] input[name="displayName"]').inputValue()).length > 0
+  );
+  await page.fill('[data-role="profile-form"] input[name="displayName"]', "Admin Updated");
+  await page.click('[data-role="profile-form"] button[type="submit"]');
+  await page.waitForFunction(() => document.querySelector(".admin-page-status")?.textContent.includes("Profile saved"));
+  check("profile save updates the identity", (await page.locator("#admin-name").innerText()).includes("Admin Updated"));
+
+  await page.click('.admin-nav-item[data-page="security"]');
+  await page.waitForSelector('[data-role="password-form"]');
   const passwordBox = await page.locator('[data-role="password-form"] input').first().boundingBox();
   check("password inputs stay compact", passwordBox !== null && passwordBox.height <= 30, String(passwordBox?.height));
   const passwordRects = await page.locator('[data-role="password-form"] input').evaluateAll((inputs) =>
@@ -261,11 +273,12 @@ try {
     "password fields stay inside their grid columns",
     passwordRects.every((rect, index) => index === 0 || rect.x >= passwordRects[index - 1].x + passwordRects[index - 1].width)
   );
-  check(
-    "account page uses the shared design tokens",
-    (await page.locator('link[href="/ky.css"]').count()) === 1 &&
-      (await page.locator(".ky-button").count()) >= 1
-  );
+  check("security page exposes 2FA and passkeys", (await page.locator('[data-role="totp-setup-start"]').count()) === 1 && (await page.locator('[data-role="passkey-register"]').count()) === 1);
+  await page.click('[data-role="totp-setup-start"]');
+  await page.waitForSelector('[data-role="totp-qr"] svg', { timeout: 8000 });
+  check("authenticator setup renders a local QR code", Boolean(await page.locator('[data-role="totp-qr"] svg').boundingBox()));
+  await page.click('[data-role="totp-cancel"]');
+  check("security page uses the shared design tokens", (await page.locator(".ky-button").count()) >= 1);
 
   await page.fill('[data-role="token-form"] input[name="name"]', "Desktop sync");
   await page.click('[data-role="token-form"] button[type="submit"]');
@@ -275,7 +288,6 @@ try {
   );
   check("API token can be created from the browser", true);
   check("API token appears in the list", (await page.locator('[data-role="revoke-token"]').count()) === 1);
-
   await page.click('[data-role="revoke-token"]');
   await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("No API tokens"), {
     timeout: 15000,
@@ -287,11 +299,14 @@ try {
   await page.fill('[data-role="password-form"] input[name="confirmPassword"]', newPassword);
   await page.click('[data-role="password-form"] button[type="submit"]');
   await page.waitForFunction(
-    () => document.querySelector('[data-role="password-status"]').textContent.includes("Password updated"),
+    () => document.querySelector(".admin-page-status")?.textContent.includes("Password updated"),
     { timeout: 15000 }
   );
   check("password change from the browser", true);
 
+  await page.click('.admin-nav-item[data-page="sessions"]');
+  await page.waitForSelector('[data-role="logout-all"]');
+  check("login sessions page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
   await page.click('[data-role="logout-all"]');
   await page.waitForURL(/\/login\?signedout=1/, { timeout: 15000 });
   check("sign out everywhere returns to the login page", true);
