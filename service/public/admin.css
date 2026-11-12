@@ -1540,3 +1540,14 @@ body.admin-body {
   flex: 0 0 auto;
   margin-top: var(--ky-space-8);
 }
+
+/* Keep action buttons clear of explanatory copy inside account sections. */
+.admin-section > .admin-note + .ky-button,
+.admin-section > .admin-note + .admin-actions,
+.admin-section > .ky-button {
+  margin-top: var(--ky-space-10);
+}
+
+.admin-section > .ky-button {
+  align-self: flex-start;
+}

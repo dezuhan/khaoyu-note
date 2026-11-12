@@ -309,6 +309,21 @@ try {
     passwordRects.every((rect, index) => index === 0 || rect.x >= passwordRects[index - 1].x + passwordRects[index - 1].width)
   );
   check("security page exposes 2FA and passkeys", (await page.locator('[data-role="totp-setup-start"]').count()) === 1 && (await page.locator('[data-role="passkey-register"]').count()) === 1);
+  const securityGaps = await page.evaluate(() => {
+    const readiness = document.querySelector('[data-role="passkey-readiness"]').getBoundingClientRect();
+    const passkey = document.querySelector('[data-role="passkey-register"]').getBoundingClientRect();
+    const recovery = document.querySelector('[data-role="recovery-status"]').getBoundingClientRect();
+    const generate = document.querySelector('[data-role="recovery-generate"]').getBoundingClientRect();
+    return {
+      passkey: Math.round(passkey.top - readiness.bottom),
+      recovery: Math.round(generate.top - recovery.bottom),
+    };
+  });
+  check(
+    "security action buttons are separated from their explanatory copy",
+    securityGaps.passkey >= 8 && securityGaps.recovery >= 8,
+    JSON.stringify(securityGaps)
+  );
   await page.click('[data-role="totp-setup-start"]');
   await page.waitForSelector('[data-role="totp-qr"] svg', { timeout: 8000 });
   check("authenticator setup renders a local QR code", Boolean(await page.locator('[data-role="totp-qr"] svg').boundingBox()));
@@ -319,6 +334,10 @@ try {
   await page.waitForSelector(".admin-backup-codes [data-role=\"recovery-list\"] code");
   const backupCodes = await page.locator('[data-role="recovery-list"] code').allInnerTexts();
   check("backup codes are generated as a one-time set", backupCodes.length === 10, String(backupCodes.length));
+  check(
+    "backup code status loads after generation",
+    !(await page.locator('[data-role="recovery-status"]').innerText()).includes("unavailable")
+  );
   const backupCode = backupCodes[0];
 
   await page.fill('[data-role="token-form"] input[name="name"]', "Desktop sync");
