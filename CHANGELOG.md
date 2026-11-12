@@ -77,6 +77,10 @@ project uses Semantic Versioning.
   with an email on the login page as a passwordless fallback. Migration 016 adds `recovery_codes`.
 - The Activity table scrolls inside its rounded section card with a sticky header, so the card outline
   and Load more control remain visible while browsing a long audit trail.
+- Sensitive account endpoints now have bounded rate limits: password change, TOTP setup/enable/
+  disable, passkey registration, backup-code generation, export and account deletion. Added a
+  self-hosted account-security readiness checklist documenting the remaining per-process limiter
+  caveat, TLS/proxy requirements and TOTP-at-rest consideration.
 - Passkeys can be temporarily switched off with `KHAOYU_SERVICE_PASSKEYS_ENABLED=false`. The login
   link, account Security card, passkey page actions and public feature lookup all respect the switch;
   password, TOTP and backup-code sign-in remain available.

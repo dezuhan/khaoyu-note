@@ -1744,6 +1744,26 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(withCode.status, 200);
   });
 
+  await t.test("account security mutations are rate limited", async () => {
+    const user = await api.account(`account-limit-${crypto.randomUUID()}@example.com`);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = await api.call("/api/v1/account/password", {
+        method: "POST",
+        jar: user.jar,
+        body: { currentPassword: "wrong-current", newPassword: "replacement-password-123" },
+      });
+      assert.equal(result.status, 400);
+    }
+    const blocked = await api.call("/api/v1/account/password", {
+      method: "POST",
+      jar: user.jar,
+      body: { currentPassword: "wrong-current", newPassword: "replacement-password-123" },
+    });
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.body.code, "rate_limited");
+    assert.ok(Number(blocked.response.headers.get("retry-after")) > 0);
+  });
+
   await t.test("backup codes are one-time credentials after passkey setup", async () => {
     const user = await api.account(`recovery-${crypto.randomUUID()}@example.com`);
     const guest = await api.call("/api/v1/auth/recovery-codes", { method: "POST", body: {} });

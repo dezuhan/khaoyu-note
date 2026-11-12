@@ -355,9 +355,12 @@ still require TOTP when it is enabled.
 Cookies are `HttpOnly`, `SameSite=Lax` and `Secure` when the public URL is HTTPS. Write requests made
 with cookie authentication must send the CSRF token in `X-CSRF-Token`; the same value is in the
 non-HttpOnly `khaoyu_csrf` cookie. Bearer access tokens skip the CSRF check. Cookie-session logout
-also requires that header, so a cross-site form cannot sign the user out. Registration, password-reset
-request, OTP request, passkey login, share report and invitation creation have bounded per-IP or
-per-owner rate limits with a 15-minute window.
+also requires that header, so a cross-site form cannot sign the user out. Registration, password-reset request and confirm, OTP request, passkey login, share report,
+invitation creation, account password changes, TOTP setup/enable/disable, passkey registration,
+recovery-code generation, account export and account deletion have bounded per-IP, per-owner or
+per-account rate limits. Login throttling is durable in SQLite/PostgreSQL and shared across instances;
+the other limiter maps are per process, so multi-instance deployments should also apply a global limit
+at the reverse proxy.
 
 Scoped API tokens use the `khn_` prefix and the `projects:read` or `projects:write` scopes. They are
 stored as hashes, returned only once, and can be revoked from the account token endpoints. API

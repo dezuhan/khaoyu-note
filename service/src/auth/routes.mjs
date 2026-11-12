@@ -320,6 +320,12 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
   const otpRequestRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const passkeyLoginRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
   const recoveryLoginRate = createRateLimiter({ windowMs: rateWindowMs, max: 10 });
+  const accountSecurityRate = createRateLimiter({ windowMs: rateWindowMs, max: 10 });
+  const accountPasswordRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
+  const passwordResetConfirmRate = createRateLimiter({ windowMs: rateWindowMs, max: 10 });
+  const accountExportRate = createRateLimiter({ windowMs: 60 * 60_000, max: 10 });
+  const accountDestructiveRate = createRateLimiter({ windowMs: 60 * 60_000, max: 5 });
+  const accountKey = (auth, ipHash) => `${auth.account.id}:${ipHash}`;
   const shareReportRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const invitationRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
 
@@ -1403,6 +1409,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/register/options") {
         if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
         const options = await registrationOptions(db, config, auth.account);
         sendJson(response, 200, { options }, config);
         return true;
@@ -1411,6 +1418,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       if (method === "POST" && url.pathname === "/api/v1/auth/passkeys/register/verify") {
         if (!config.passkeysEnabled) throw new HttpError(404, "not found", "not_found");
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
         const body = await readJson(request);
         try {
           const id = await verifyRegistration(db, config, auth.account, body.response, body.name);
@@ -1656,6 +1664,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/auth/recovery-codes") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
         const codes = Array.from({ length: 10 }, () => createRecoveryCode());
         await db.transaction(async (tx) => {
           await tx.run("DELETE FROM recovery_codes WHERE account_id = ?", [auth.account.id]);
@@ -2033,6 +2042,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       }
 
       if (method === "POST" && url.pathname === "/api/v1/auth/password-reset/confirm") {
+        enforceRate(passwordResetConfirmRate, ipHash);
         const body = await readJson(request);
         const token = requireString(body.token, "token", 200);
         const password = requirePassword(body.password);
@@ -2061,6 +2071,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/auth/totp/setup") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
         if (auth.account.totp_enabled_at) throw new HttpError(409, "TOTP is already enabled", "totp_enabled");
         const secret = createTotpSecret();
         (await db.run("UPDATE accounts SET totp_secret = ?, updated_at = ? WHERE id = ?", [secret,
@@ -2077,6 +2088,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/auth/totp/enable") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
         const body = await readJson(request);
         if (!verifyTotp(auth.account.totp_secret, body.code)) {
           throw new HttpError(400, "invalid TOTP code", "invalid_totp");
@@ -2098,6 +2110,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/auth/totp/disable") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
         const body = await readJson(request);
         const account = await accountById(db, auth.account.id);
         if (!(await verifyPassword(body.password, account.password_hash))) {
@@ -2121,6 +2134,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/account/password") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountPasswordRate, accountKey(auth, ipHash));
         const body = await readJson(request);
         const account = await accountById(db, auth.account.id);
         if (!(await verifyPassword(String(body.currentPassword || ""), account.password_hash))) {
@@ -2148,6 +2162,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "GET" && url.pathname === "/api/v1/account/export") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountExportRate, accountKey(auth, ipHash));
         const account = await accountById(db, auth.account.id);
         const projects = (await db.all(`SELECT p.*, m.role FROM projects p JOIN project_members m ON m.project_id = p.id
              WHERE m.account_id = ? AND p.deleted_at IS NULL`, [auth.account.id]));
@@ -2201,6 +2216,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/account/delete") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountDestructiveRate, accountKey(auth, ipHash));
         const body = await readJson(request);
         const account = await accountById(db, auth.account.id);
         if (!(await verifyPassword(body.password, account.password_hash))) {
@@ -2225,6 +2241,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
 
       if (method === "POST" && url.pathname === "/api/v1/account/delete/cancel") {
         const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountDestructiveRate, accountKey(auth, ipHash));
         (await db.run("UPDATE accounts SET deletion_requested_at = NULL, deletion_due_at = NULL, updated_at = ? WHERE id = ?", [now(), auth.account.id]));
         await writeAudit(db, {
           actorAccountId: auth.account.id,
