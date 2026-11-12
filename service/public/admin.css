@@ -1594,3 +1594,61 @@ body.admin-body {
   background: color-mix(in srgb, var(--ky-accent) 14%, var(--ky-surface));
   color: var(--ky-text);
 }
+
+/* Account approval */
+.admin-approval {
+  display: grid;
+  gap: var(--ky-space-6);
+  justify-items: start;
+}
+
+.admin-approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ky-space-6);
+}
+
+.admin-approval-button {
+  min-height: 30px;
+  padding: var(--ky-space-4) var(--ky-space-10);
+  font-size: var(--ky-text-xs);
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: var(--ky-space-20);
+  background: color-mix(in srgb, var(--ky-bg) 55%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.admin-approval-dialog {
+  width: min(440px, 100%);
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-approval-dialog-head {
+  padding: var(--ky-space-16) var(--ky-space-18);
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.admin-approval-dialog-body {
+  padding: var(--ky-space-18);
+}
+
+.admin-approval-dialog-body h2 {
+  margin: 0 0 var(--ky-space-8);
+  font-size: var(--ky-text-lg);
+}
+
+.admin-approval-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ky-space-8);
+  padding: var(--ky-space-12) var(--ky-space-18);
+  border-top: 1px solid var(--ky-stroke);
+}

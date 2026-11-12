@@ -71,7 +71,8 @@ TOTP and backup-code sign-in remain available. Re-enable passkeys with
 The service registration policy defaults to **Private**. New accounts are created with a null
 `approved_at`, cannot authenticate, and appear as Pending in the admin Accounts pane. An admin
 approves or revokes access from that pane or with `PATCH /api/v1/admin/users/:id` and
-`{"approved":true|false}`. The first account is always an approved admin; existing accounts are
+`{"approved":true|false}`. Rejecting a pending account also sets it to `disabled`; approving it again
+sets it back to `active`. The first account is always an approved admin; existing accounts are
 approved by migration. **Public** mode marks new accounts approved immediately, and public share
 viewers offer a Create an account link. The policy is stored in `service_meta.registration_mode`
 and changed through `GET/PATCH /api/v1/admin/settings`.

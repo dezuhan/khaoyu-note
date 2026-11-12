@@ -202,9 +202,19 @@ try {
   const teammateRow = page.locator("tr[data-user]", { hasText: teammateEmail });
   check(
     "private registration marks a new account pending",
-    (await teammateRow.innerText()).includes("Pending")
+    (await teammateRow.innerText()).includes("Awaiting approval")
+  );
+  const approveClass = await teammateRow.locator('[data-role="approve-account"]').getAttribute("class");
+  const rejectClass = await teammateRow.locator('[data-role="reject-account"]').getAttribute("class");
+  check("approve uses primary styling", /ky-button-primary/.test(approveClass || ""));
+  check(
+    "reject uses outline styling",
+    /ky-button/.test(rejectClass || "") && !/ky-button-primary/.test(rejectClass || "")
   );
   await teammateRow.locator('[data-role="approve-account"]').click();
+  await page.waitForSelector(".admin-approval-dialog");
+  check("approval opens a visual confirmation dialog", true);
+  await page.click('.admin-approval-dialog [data-role="confirm"]');
   await page.waitForFunction(
     (email) => {
       const row = [...document.querySelectorAll("tr[data-user]")].find((entry) => entry.textContent.includes(email));
@@ -213,6 +223,43 @@ try {
     teammateEmail
   );
   check("admin can approve a pending account", true);
+
+  const rejectedEmail = `rejected-${crypto.randomUUID()}@example.com`;
+  const rejected = await fetch(`${base}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: rejectedEmail, password: "rejected-password-123", displayName: "Rejected" }),
+  });
+  check("second pending account registered", rejected.status === 202, String(rejected.status));
+  await page.click('.admin-nav-item[data-page="accounts"]');
+  await page.waitForFunction(
+    (email) => [...document.querySelectorAll("tr[data-user]")].some((row) => row.textContent.includes(email)),
+    rejectedEmail
+  );
+  const rejectedRow = page.locator("tr[data-user]", { hasText: rejectedEmail });
+  await rejectedRow.locator('[data-role="reject-account"]').click();
+  await page.waitForSelector(".admin-approval-dialog");
+  await page.click('.admin-approval-dialog [data-role="confirm"]');
+  await page.waitForFunction(
+    (email) => {
+      const row = [...document.querySelectorAll("tr[data-user]")].find((entry) => entry.textContent.includes(email));
+      return row && row.textContent.includes("Disabled");
+    },
+    rejectedEmail
+  );
+  check("admin can reject a pending account", true);
+  const rejectedAgain = page.locator("tr[data-user]", { hasText: rejectedEmail });
+  await rejectedAgain.locator('[data-role="approve-account"]').click();
+  await page.waitForSelector(".admin-approval-dialog");
+  await page.click('.admin-approval-dialog [data-role="confirm"]');
+  await page.waitForFunction(
+    (email) => {
+      const row = [...document.querySelectorAll("tr[data-user]")].find((entry) => entry.textContent.includes(email));
+      return row && row.textContent.includes("Approved") && row.textContent.includes("Active");
+    },
+    rejectedEmail
+  );
+  check("admin can approve a previously rejected account", true);
 
   await page.click('.admin-nav-item[data-page="boards"]');
   await page.waitForSelector('[data-role="team-create"]');

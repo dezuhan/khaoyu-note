@@ -102,6 +102,9 @@ project uses Semantic Versioning.
 - Board viewport position and zoom are now stored per device instead of being written into the board
   row. Opening a board from a phone/tunnel can no longer conflict with a desktop window merely
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
+- Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
+  actions. Both actions open a confirmation dialog; rejection disables the account and approval can
+  re-enable it later.
 - Added a Private/Public registration-access control to the admin dashboard, defaulting to Private.
   Private registrations are pending and cannot sign in until an admin approves them; Public
   registrations are active immediately and public share viewers show a Create an account link.

@@ -77,10 +77,12 @@ set, fonts and theme tokens.
   public share links show a Create an account link. The toggle is stored in `service_meta` as
   `registration_mode`; the first account is always an approved admin.
 - Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
-  approval state, board count, last activity and last update. Admins can create a member account
-  manually (email, display name, temporary password, member/admin role) and change another account's
-  role, status or approval; an account cannot demote, disable or unapprove itself, and the last
-  active admin cannot be removed.
+  approval state, board count, last activity and last update. Pending accounts expose a primary
+  Approve action and an outlined Reject action; both open a confirmation dialog, and rejecting
+  disables the account while keeping it available for later approval. Admins can create a member
+  account manually (email, display name, temporary password, member/admin role) and change another
+  account's role, status or approval; an account cannot demote, disable or unapprove itself, and the
+  last active admin cannot be removed.
 - Boards lists projects with their owner, member count, revision and last update. Create board adds a
   project with a fresh snapshot and the signed-in admin as owner. Rename and Delete update or
   soft-delete a board (deleting revokes its share links and invitations and cascades to child boards).

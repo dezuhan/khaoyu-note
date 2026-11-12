@@ -309,6 +309,65 @@ function accountDetailRows(data) {
     </div>`;
 }
 
+function openApprovalDialog(user, approve, query) {
+  const overlay = document.createElement("div");
+  overlay.className = "admin-modal-backdrop";
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+  const dialog = document.createElement("section");
+  dialog.className = "ky-panel admin-approval-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-label", approve ? "Approve account" : "Reject account");
+  dialog.innerHTML = `
+    <header class="admin-approval-dialog-head">
+      <div class="admin-user">${avatarHtml(user)}<span class="admin-user-copy"><strong>${escapeHtml(
+        displayName(user)
+      )}</strong><span>${escapeHtml(user.email)}</span></span></div>
+    </header>
+    <div class="admin-approval-dialog-body">
+      <h2>${approve ? "Approve this account?" : "Reject this account?"}</h2>
+      <p class="admin-note">${
+        approve
+          ? "This account will be able to sign in and access boards assigned to it."
+          : "The account will remain stored but disabled. An admin can enable and approve it later."
+      }</p>
+    </div>
+    <footer class="admin-approval-dialog-actions">
+      <button class="ky-button" type="button" data-role="cancel">Cancel</button>
+      <button class="ky-button ${approve ? "ky-button-primary" : "admin-danger-text"}" type="button" data-role="confirm">${
+        approve ? "Approve account" : "Reject account"
+      }</button>
+    </footer>`;
+  overlay.append(dialog);
+  document.body.append(overlay);
+  dialog.querySelector('[data-role="cancel"]').addEventListener("click", () => overlay.remove());
+  dialog.querySelector('[data-role="confirm"]').addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await api(`/api/v1/admin/users/${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        body: approve ? { approved: true, status: "active" } : { approved: false, status: "disabled" },
+      });
+      overlay.remove();
+      dashboard = await api("/api/v1/admin/dashboard");
+      await renderAccounts(query);
+    } catch (error) {
+      if (error instanceof AuthError) return showAuth();
+      button.disabled = false;
+      const body = dialog.querySelector(".admin-approval-dialog-body");
+      body.append(
+        Object.assign(document.createElement("p"), {
+          className: "admin-note",
+          textContent: error.message,
+        })
+      );
+    }
+  });
+}
+
 async function renderAccounts(query = "") {
   pane.innerHTML = `<div class="admin-loading">Loading accounts...</div>`;
   let data;
@@ -387,8 +446,13 @@ async function renderAccounts(query = "") {
                 ${
                   user.approved
                     ? `<span class="admin-badge is-active">Approved</span>`
-                    : `<span class="admin-badge is-pending">Pending</span>
-                       <button class="admin-detail-button" type="button" data-role="approve-account" data-user="${escapeHtml(user.id)}">Approve</button>`
+                    : `<div class="admin-approval">
+                         <span class="admin-badge is-pending">Awaiting approval</span>
+                         <div class="admin-approval-actions">
+                           <button class="ky-button ky-button-primary admin-approval-button" type="button" data-role="approve-account" data-user="${escapeHtml(user.id)}">Approve</button>
+                           <button class="ky-button admin-approval-button admin-danger-text" type="button" data-role="reject-account" data-user="${escapeHtml(user.id)}">Reject</button>
+                         </div>
+                       </div>`
                 }
               </td>
               <td>${escapeHtml(user.projectCount)}</td>
@@ -421,22 +485,10 @@ async function renderAccounts(query = "") {
     });
   }
 
-  for (const button of pane.querySelectorAll('[data-role="approve-account"]')) {
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      try {
-        await api(`/api/v1/admin/users/${encodeURIComponent(button.dataset.user)}`, {
-          method: "PATCH",
-          body: { approved: true },
-        });
-        dashboard = await api("/api/v1/admin/dashboard");
-        await renderAccounts(query);
-      } catch (error) {
-        if (error instanceof AuthError) return showAuth();
-        showError(error);
-      } finally {
-        button.disabled = false;
-      }
+  for (const button of pane.querySelectorAll('[data-role="approve-account"], [data-role="reject-account"]')) {
+    button.addEventListener("click", () => {
+      const user = data.users.find((entry) => entry.id === button.dataset.user);
+      if (user) openApprovalDialog(user, button.dataset.role === "approve-account", query);
     });
   }
 
