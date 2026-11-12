@@ -27,7 +27,7 @@ Document page editor and drawing page editor:
 ![Drawing editor](shots/drawing-editor.png)
 
 Status: working MVP. Every behavior below is covered by an automated Playwright suite (270 checks
-defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (15 checks). Both run in
+defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (19 checks). Both run in
 CI. The menu bar sits above the file header, its Share control manages per-board access, right-clicking
 a card offers Share link, and **Help > Documentation** opens the offline guide.
 
@@ -344,10 +344,12 @@ $env:CARGO_TARGET_DIR='C:\temp\mn-target'
 cmd /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat`" && cargo build --release --bin khaoyu-note-mcp"
 ```
 
-The binary lands in `C:\temp\mn-target\release\khaoyu-note-mcp.exe` and is also copied to `dist/`. The
-NSIS and MSI installers currently ship only the app executable, so copy `khaoyu-note-mcp.exe` beside
-it (or to a stable folder such as `%LOCALAPPDATA%\Khaoyu Note\`) and point clients there. Bundling it
-as a Tauri sidecar is still open; see `docs/packaging.md`.
+The binary lands in `C:\temp\mn-target\release\khaoyu-note-mcp.exe` and is also copied to `dist/`.
+On Linux the binary is `dist/khaoyu-note-mcp` (built with the Tauri dependencies installed, then
+copied out of the build container). The NSIS and MSI installers currently ship only the app
+executable, so copy the MCP binary beside it (or to a stable folder such as
+`%LOCALAPPDATA%\Khaoyu Note\` on Windows or `~/.local/bin` on Linux) and point clients there.
+Bundling it as a Tauri sidecar is still open; see `docs/packaging.md`.
 
 ### DeepSeek Harness
 
@@ -361,7 +363,9 @@ Harness plugin manager adds the server to the current profile as `@local/note-st
       config:
         serverName: khaoyu-note
         transport: stdio
-        command: 'C:\Users\<you>\AppData\Local\Khaoyu Note\khaoyu-note-mcp.exe'
+        # Windows: C:\Users\<you>\AppData\Local\Khaoyu Note\khaoyu-note-mcp.exe
+        # Linux:   /home/<you>/.local/bin/khaoyu-note-mcp
+        command: '/absolute/path/to/khaoyu-note-mcp'
         failOnStartupError: true
 ```
 
@@ -382,8 +386,11 @@ Register it in any MCP client (example for a JSON config):
 }
 ```
 
-The database directory defaults to `%APPDATA%\com.dezuhan.khaoyunote`; set `KHAOYU_NOTE_DB_DIR`
-to point the server at a different folder (portable setups, or isolated test runs).
+The database directory matches the desktop app's app-data folder on every platform:
+`%APPDATA%\com.dezuhan.khaoyunote` on Windows, `$XDG_DATA_HOME/com.dezuhan.khaoyunote`
+(`~/.local/share/com.dezuhan.khaoyunote` by default) on Linux and
+`~/Library/Application Support/com.dezuhan.khaoyunote` on macOS. Set `KHAOYU_NOTE_DB_DIR` to point
+the server at a different folder (portable setups, or isolated test runs).
 
 Settings > MCP shows the resolved server binary path, the transport, the database folder and the 14
 tools, plus a copyable client configuration JSON.
@@ -504,8 +511,8 @@ The UI suite exercises: boot, tool rail, card creation, text editing, drag, resi
 to-do items, comments, table cells, column drop, zoom, settings modal and custom select, theme
 switching, the disabled Home state, nested board breadcrumbs, document editor, drawing editor, context
 menu, and persistence (268 checks). The MCP suite spawns `khaoyu-note-mcp.exe` against a temporary database and
-checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
-boards, connections and tree deletion (15 checks).
+checks the JSON-RPC handshake, tool listing, board/card creation, board archive/trash lifecycle,
+updates, comments, search, nested boards, connections and tree deletion (19 checks).
 
 Built artifacts are copied to `dist/`. The 0.36.0 Linux x86_64 packages built from the release
 branch:

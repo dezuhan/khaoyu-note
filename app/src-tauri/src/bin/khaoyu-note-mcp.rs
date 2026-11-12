@@ -174,7 +174,7 @@ fn tool_definitions() -> Vec<Value> {
     vec![
         json!({
             "name": "list_boards",
-            "description": "List every board as a tree: id, title, parentId, updatedAt, card count. Root boards (parentId null) are the projects shown on the home screen.",
+            "description": "List every board as a tree: id, title, parentId, updatedAt, card count, archivedAt and trashedAt. Root boards (parentId null) are the projects shown on the home screen.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
         }),
         json!({
@@ -224,14 +224,16 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_board",
-            "description": "Rename a board or change its grid settings.",
+            "description": "Rename a board, change its grid settings, or archive/trash/restore it (archived/trashed set the timestamp; false clears it).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "board_id": { "type": "string" },
                     "title": { "type": "string" },
                     "grid": { "type": "integer" },
-                    "show_grid": { "type": "boolean" }
+                    "show_grid": { "type": "boolean" },
+                    "archived": { "type": "boolean" },
+                    "trashed": { "type": "boolean" }
                 },
                 "required": ["board_id"],
                 "additionalProperties": false
@@ -384,6 +386,8 @@ fn tool_list_boards(conn: &Connection) -> Result<Value, String> {
                 "title": meta.title,
                 "parentId": meta.parent_id,
                 "updatedAt": meta.updated_at,
+                "archivedAt": meta.archived_at,
+                "trashedAt": meta.trashed_at,
                 "cards": count,
                 "nestedBoards": nested_count(&meta.id),
             })
@@ -424,6 +428,8 @@ fn tool_get_board(conn: &Connection, args: &Value) -> Result<Value, String> {
         "updatedAt": doc.get("updatedAt"),
         "grid": doc.get("grid"),
         "showGrid": doc.get("showGrid"),
+        "archivedAt": doc.get("archivedAt"),
+        "trashedAt": doc.get("trashedAt"),
         "view": doc.get("view"),
         "cards": cards,
         "connections": doc.get("connections").cloned().unwrap_or_else(|| json!([])),
@@ -487,6 +493,26 @@ fn tool_update_board(conn: &Connection, args: &Value) -> Result<Value, String> {
         }
         if let Some(show) = args.get("show_grid").and_then(Value::as_bool) {
             object.insert("showGrid".into(), json!(show));
+        }
+        if let Some(archived) = args.get("archived").and_then(Value::as_bool) {
+            object.insert(
+                "archivedAt".into(),
+                if archived {
+                    json!(now_ms())
+                } else {
+                    Value::Null
+                },
+            );
+        }
+        if let Some(trashed) = args.get("trashed").and_then(Value::as_bool) {
+            object.insert(
+                "trashedAt".into(),
+                if trashed {
+                    json!(now_ms())
+                } else {
+                    Value::Null
+                },
+            );
         }
         object.insert("updatedAt".into(), json!(now_ms()));
     }
@@ -606,6 +632,7 @@ fn tool_add_comment(conn: &Connection, args: &Value) -> Result<Value, String> {
         "id": format!("m_{}", uuid::Uuid::new_v4().simple()),
         "author": author,
         "text": text,
+        "done": false,
         "ts": now_ms(),
     });
     if !card.get("messages").map(Value::is_array).unwrap_or(false) {
@@ -755,8 +782,28 @@ fn data_root() -> PathBuf {
     if let Ok(dir) = std::env::var("KHAOYU_NOTE_DB_DIR") {
         return PathBuf::from(dir);
     }
-    let appdata = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(appdata).join("com.dezuhan.khaoyunote")
+    // Match the platform app-data directory Tauri uses for the desktop app, so the MCP server opens
+    // the same database on every OS (the previous Windows-only APPDATA lookup fell back to
+    // ./com.dezuhan.khaoyunote on Linux and macOS).
+    if cfg!(target_os = "windows") {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return PathBuf::from(appdata).join("com.dezuhan.khaoyunote");
+        }
+    }
+    if cfg!(target_os = "macos") {
+        if let Ok(home) = std::env::var("HOME") {
+            return PathBuf::from(home).join("Library/Application Support/com.dezuhan.khaoyunote");
+        }
+    }
+    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+        if !xdg.is_empty() {
+            return PathBuf::from(xdg).join("com.dezuhan.khaoyunote");
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home).join(".local/share/com.dezuhan.khaoyunote");
+    }
+    PathBuf::from(".").join("com.dezuhan.khaoyunote")
 }
 
 fn now_ms() -> i64 {
@@ -967,6 +1014,7 @@ fn new_card(doc: &Value, card_type: &str, args: &Value) -> Result<Value, String>
                         "id": format!("m_{}", uuid::Uuid::new_v4().simple()),
                         "author": "MCP",
                         "text": text,
+                        "done": false,
                         "ts": now_ms(),
                     })
                 })

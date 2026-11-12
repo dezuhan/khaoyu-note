@@ -52,6 +52,12 @@ project uses Semantic Versioning.
 - The top bar shows up to three avatars of other people currently viewing a synced board, with a +N
   badge for the rest. Presence comes from the existing project SSE roster, excludes the current
   account, dedupes multiple tabs per account and uses a deterministic avatar colour.
+- The MCP server now resolves the desktop app's app-data folder on Linux and macOS as well as
+  Windows, so it opens the same database as the app instead of falling back to
+  `./com.dezuhan.khaoyunote`. Its board tools expose `archivedAt`/`trashedAt`, and `update_board`
+  can archive, trash or restore a board; comment messages carry the current `done` flag. The
+  DeepSeek Harness bundle and README use the current binary path and the smoke suite covers the
+  lifecycle flags (19 checks).
 - The colour picker no longer shows the "Drag the square or the hue bar, or type a HEX value." hint.
 - The workspace switcher remembers the last opened workspace per server and loads its board list as
   soon as the popover opens. On a fresh profile the seeded default workspace is not selected

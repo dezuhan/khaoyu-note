@@ -103,6 +103,25 @@ try {
   const board = await tool("create_board", { title: "MCP test project" });
   check("create_board returns an id", typeof board.board_id === "string" && board.board_id.startsWith("b_"), board.board_id);
 
+  const archived = await tool("update_board", { board_id: board.board_id, archived: true });
+  check("update_board archives a board", archived.updated === true);
+  const archivedRow = (await tool("list_boards", {})).boards.find((row) => row.id === board.board_id);
+  check(
+    "list_boards exposes archivedAt/trashedAt",
+    typeof archivedRow?.archivedAt === "number" && archivedRow?.trashedAt === null,
+    JSON.stringify(archivedRow)
+  );
+  await tool("update_board", { board_id: board.board_id, trashed: true });
+  const trashedRow = (await tool("get_board", { board_id: board.board_id }));
+  check(
+    "get_board shows trashedAt",
+    typeof trashedRow?.trashedAt === "number",
+    JSON.stringify({ archivedAt: trashedRow?.archivedAt, trashedAt: trashedRow?.trashedAt })
+  );
+  await tool("update_board", { board_id: board.board_id, trashed: false });
+  const restoredRow = (await tool("get_board", { board_id: board.board_id }));
+  check("archiving and trashing can be cleared", restoredRow?.trashedAt == null);
+
   const note = await tool("create_card", {
     board_id: board.board_id,
     type: "note",
