@@ -34,6 +34,9 @@ project uses Semantic Versioning.
   plaintext objects stay readable. The worker now revokes expired invitations and share links and
   records `last_worker_at`/`last_worker_summary`, and `service/deploy/postgres-least-privilege.sql`
   documents a data-only PostgreSQL role.
+- Admins can create member accounts manually from the Accounts pane (email, display name,
+  temporary password and member/admin role), with the signup password policy, duplicate-email
+  protection and `admin.user_created` audit entries. Only admin-authenticated sessions can use it.
 - Admins can rename and delete teams from the dashboard. Deleting a team soft-deletes it and its
   child boards, disables public sharing and revokes its share links and invitations. Admins can also
   add an existing account to a team by email with an editor, commenter or viewer role, change that

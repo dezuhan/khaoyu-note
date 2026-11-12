@@ -296,8 +296,8 @@ The first registered account (or the account created by
 command search (Ctrl+K), a host badge, a light/dark toggle and a circular account button next to the
 theme that opens the Account menu (Admin dashboard, Account settings, Help, Logout). The page reuses
 the main app logo, SVG icon set, fonts and theme tokens. Sharing is rendered inside the same page.
-Admins can create, rename and delete teams, add existing accounts to a team, change their team roles
-and remove them, inspect every audit row and change another account's role or status. Share links
+Admins can create member accounts manually, create, rename and delete teams, add accounts to a team,
+change their team roles and remove them, inspect every audit row and change another account's role or status. Share links
 can add a view watermark and a download cap; shared rich text is sanitised server-side, remote embeds
 use an exact host allowlist, and uploaded objects can be encrypted at rest with
 `KHAOYU_SERVICE_OBJECT_KEY`. Desktop boards can opt in to server sync from

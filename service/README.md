@@ -73,8 +73,9 @@ set, fonts and theme tokens.
 - Account settings (opened from the Account menu or profile button) holds the signed-in password
   form, session revocation, scoped API tokens and sign out.
 - Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
-  team count, last activity and last update. Admins can change another account's role or status; an
-  account cannot demote or disable itself, and the last active admin cannot be removed.
+  team count, last activity and last update. Admins can create a member account manually (email,
+  display name, temporary password, member/admin role) and change another account's role or status;
+  an account cannot demote or disable itself, and the last active admin cannot be removed.
 - Teams lists projects with their owner, member count, revision and last update. Create team adds a
   project with a fresh snapshot and the signed-in admin as owner. Rename and Delete update or
   soft-delete a team (deleting revokes its share links and invitations and cascades to child boards).

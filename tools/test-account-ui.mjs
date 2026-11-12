@@ -141,6 +141,21 @@ try {
       }))
   );
 
+  // Admin-only manual account creation from the Accounts pane.
+  await page.click('.admin-nav-item[data-page="accounts"]');
+  await page.waitForSelector('[data-role="account-create"]');
+  const manualEmail = `manual-${crypto.randomUUID()}@example.com`;
+  await page.fill('[data-role="account-create"] input[name="email"]', manualEmail);
+  await page.fill('[data-role="account-create"] input[name="displayName"]', "Manual Member");
+  await page.fill('[data-role="account-create"] input[name="password"]', "manual-password-123");
+  await page.selectOption('[data-role="account-create"] select[name="role"]', "member");
+  await page.click('[data-role="account-create"] button[type="submit"]');
+  await page.waitForFunction(
+    (email) => document.getElementById("admin-pane")?.textContent.includes(email),
+    manualEmail
+  );
+  check("admin can add a member account manually", true);
+
   // Full team CRUD from the admin UI: create, rename, add/update/remove a member, then delete.
   const teammateEmail = `teammate-${crypto.randomUUID()}@example.com`;
   const teammate = await fetch(`${base}/api/v1/auth/register`, {

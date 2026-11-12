@@ -516,6 +516,49 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      if (method === "POST" && url.pathname === "/api/v1/admin/users") {
+        const auth = await requireAdminAccount(request, response, db, config);
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const password = requirePassword(body.password);
+        const displayName =
+          typeof body.displayName === "string" && body.displayName.trim()
+            ? requireString(body.displayName, "displayName", 120)
+            : email.split("@")[0];
+        const role = body.role === undefined ? "member" : String(body.role);
+        if (!["admin", "member"].includes(role)) {
+          throw new HttpError(400, "role is invalid", "invalid_role");
+        }
+        const id = crypto.randomUUID();
+        try {
+          await db.run(
+            `INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, email, displayName, await hashPassword(password), now(), role, now(), now()]
+          );
+        } catch (error) {
+          if (/UNIQUE|duplicate key/i.test(String(error.message || ""))) {
+            throw new HttpError(409, "email is already registered", "email_taken");
+          }
+          throw error;
+        }
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.user_created",
+          resourceType: "account",
+          resourceId: id,
+          metadata: { email, role },
+          ip,
+          secret: config.secret,
+        });
+        const created = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS},
+                    (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS last_seen_at,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.account_id = a.id) AS project_count
+             FROM accounts a WHERE a.id = ?`, [id]));
+        sendJson(response, 201, { user: adminAccount(created) }, config);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/admin/users") {
         await requireAdminAccount(request, response, db, config);
         const q = String(url.searchParams.get("q") || "").trim().toLowerCase();

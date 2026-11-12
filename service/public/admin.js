@@ -256,6 +256,17 @@ async function renderAccounts(query = "") {
         <input class="admin-search" name="q" value="${escapeHtml(query)}" placeholder="Search name, email or username" autocomplete="off" />
         <button class="ky-button ky-button-primary" type="submit">Search</button>
       </form>
+      <form class="admin-toolbar admin-account-create" data-role="account-create">
+        <input class="admin-search" name="email" type="email" placeholder="Member email" maxlength="254" required />
+        <input class="admin-search" name="displayName" placeholder="Display name" maxlength="120" />
+        <input class="admin-search" name="password" type="password" minlength="12" maxlength="200" placeholder="Temporary password (12+ chars)" autocomplete="new-password" required />
+        <select class="admin-select" name="role" aria-label="New member role">
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button class="ky-button ky-button-primary" type="submit">Add member</button>
+        <p class="admin-note" data-role="account-create-status" role="status"></p>
+      </form>
       ${
         data.users.length
           ? `<table class="ky-table admin-table">
@@ -294,6 +305,31 @@ async function renderAccounts(query = "") {
   pane.querySelector('[data-role="account-search"]').addEventListener("submit", (event) => {
     event.preventDefault();
     renderAccounts(event.target.q.value.trim());
+  });
+  pane.querySelector('[data-role="account-create"]').addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const status = form.querySelector('[data-role="account-create-status"]');
+    status.textContent = "Creating account...";
+    try {
+      await api("/api/v1/admin/users", {
+        method: "POST",
+        body: {
+          email: form.email.value.trim(),
+          displayName: form.displayName.value.trim(),
+          password: form.password.value,
+          role: form.role.value,
+        },
+      });
+      form.reset();
+      dashboard = await api("/api/v1/admin/dashboard");
+      await renderAccounts(query);
+      const freshStatus = pane.querySelector('[data-role="account-create-status"]');
+      if (freshStatus) freshStatus.textContent = "Account created. Share the temporary password securely.";
+    } catch (error) {
+      if (error instanceof AuthError) return showAuth();
+      status.textContent = error.message;
+    }
   });
   for (const row of pane.querySelectorAll("tr[data-user]")) {
     const userId = row.dataset.user;

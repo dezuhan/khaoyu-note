@@ -551,7 +551,7 @@ access. The admin surface lives inside Settings rather than as a separate applic
   management, storage settings and destructive database actions.
 - [ ] Settings > Administration page, visible only to an admin:
   - user list with display name, email, role, status and last activity;
-  - create/invite, disable, re-enable and delete users;
+  - create user manually (service dashboard), disable and re-enable users; invite/delete user flows remain planned;
   - role changes with an explicit confirmation and audit entry;
   - active session list and "revoke all sessions" per user;
   - guard against deleting, disabling or demoting the last admin.

@@ -243,6 +243,8 @@ Still blocked by the environment or missing credentials:
 - Operator admin endpoints expose audit export, abuse reports and service counts behind a separate rate-limited token.
 - Service admins can rename and delete teams and manage team membership (add by email, change role,
   remove); deletion cascades to child boards and revokes share links/invitations.
+- Service admins can create member accounts manually with a temporary password; only admin sessions
+  can call the endpoint and every creation is audited.
 - Public shares support an optional view watermark and per-link download cap; shared rich text is
   sanitised server-side and remote video embeds use exact host allowlists. Optional AES-256-GCM
   object encryption and a least-privilege PostgreSQL deployment script are documented.

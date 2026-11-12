@@ -1222,3 +1222,15 @@ button.admin-admin:hover {
 .admin-field select {
   box-sizing: border-box;
 }
+
+.admin-account-create .admin-search {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.admin-account-create .admin-select {
+  flex: 0 1 120px;
+}
+.admin-account-create [data-role="account-create-status"] {
+  flex: 1 1 100%;
+  margin: var(--ky-space-4) 0 0;
+}

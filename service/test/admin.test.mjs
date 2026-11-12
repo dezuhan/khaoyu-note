@@ -179,6 +179,36 @@ test("service admin dashboard API", async (t) => {
     assert.equal(denied.body.code, "admin_required");
   });
 
+  await t.test("an admin can add a member account manually like signup", async () => {
+    const email = `manual-${crypto.randomUUID()}@example.com`;
+    const created = await api.call("/api/v1/admin/users", {
+      method: "POST",
+      jar: admin.jar,
+      body: { email, password: PASSWORD, displayName: "Manual Member", role: "member" },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.user.email, email);
+    assert.equal(created.body.user.role, "member");
+    const duplicate = await api.call("/api/v1/admin/users", {
+      method: "POST",
+      jar: admin.jar,
+      body: { email, password: PASSWORD, displayName: "Duplicate", role: "member" },
+    });
+    assert.equal(duplicate.status, 409);
+    assert.equal(duplicate.body.code, "email_taken");
+    const weak = await api.call("/api/v1/admin/users", {
+      method: "POST",
+      jar: admin.jar,
+      body: { email: `weak-${crypto.randomUUID()}@example.com`, password: "short" },
+    });
+    assert.equal(weak.status, 400);
+    assert.equal(weak.body.code, "weak_password");
+    const login = await api.login(email);
+    assert.equal(login.status, 200, JSON.stringify(login.body));
+    const activity = await api.call("/api/v1/admin/activity?limit=20", { jar: admin.jar });
+    assert.ok(activity.body.entries.some((entry) => entry.action === "admin.user_created"));
+  });
+
   await t.test("teams can be created and listed with members", async () => {
     const created = await api.call("/api/v1/admin/teams", {
       method: "POST",
