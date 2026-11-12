@@ -22,6 +22,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   accepts a backup code with the account email when the passkey device is unavailable.
 - **Activity card**: the audit table scrolls inside its rounded, outlined section with a sticky header,
   keeping the card frame and Load more button visible.
+- **Passkey kill switch**: `KHAOYU_SERVICE_PASSKEYS_ENABLED=false` hides passkey UI and disables the
+  passkey endpoints while leaving password, TOTP and backup-code login available.
 - **Fixed service chrome**: the admin sidebar remains visible while page content scrolls internally;
   account security pages keep the document fixed to the viewport too.
 - **Account Management dashboard**: Profile, Security (password, 2FA, passkeys and API tokens) and

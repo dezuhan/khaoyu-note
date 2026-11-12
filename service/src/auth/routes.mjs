@@ -1511,6 +1511,11 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/auth/features") {
+        sendJson(response, 200, { passkeysEnabled: Boolean(config.passkeysEnabled) }, config);
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/auth/register") {
         enforceRate(registerRate, ipHash);
         const body = await readJson(request);

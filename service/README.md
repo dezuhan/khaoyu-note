@@ -158,7 +158,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_SSO_AUTO_CREATE` | `false` | Create a verified account for an unknown SSO email. |
 | `KHAOYU_SERVICE_REQUIRE_HTTPS` | `false` | Reject plain HTTP unless a trusted proxy reports `x-forwarded-proto: https`. Requires an HTTPS public URL. |
 | `KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND` | empty | Optional scanner executable receiving the temporary upload path; non-zero exit rejects the asset. |
-| `KHAOYU_SERVICE_PASSKEYS_ENABLED` | `true` | Enable WebAuthn passkey registration and login. |
+| `KHAOYU_SERVICE_PASSKEYS_ENABLED` | `true` | Enable WebAuthn passkey registration and login. Set `false` to temporarily hide the passkey UI and return 404 from passkey endpoints. |
 | `KHAOYU_SERVICE_RP_ID` | public hostname | WebAuthn relying-party id; must match the browser origin host. |
 | `KHAOYU_SERVICE_SMTP_HOST` | empty | SMTP host; when empty, messages are written to the outbox. |
 | `KHAOYU_SERVICE_SMTP_PORT` | `587` | SMTP port. |

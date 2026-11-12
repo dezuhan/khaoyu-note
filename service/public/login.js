@@ -54,4 +54,21 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+async function applyAuthFeatures() {
+  try {
+    const response = await fetch("/api/v1/auth/features", { credentials: "same-origin" });
+    if (!response.ok) return;
+    const features = await response.json();
+    if (!features.passkeysEnabled) {
+      const link = document.getElementById("passkey-login-link");
+      const separator = document.getElementById("passkey-login-separator");
+      if (link) link.style.display = "none";
+      if (separator) separator.style.display = "none";
+    }
+  } catch {
+    /* keep the link if the feature endpoint is unavailable */
+  }
+}
+
+void applyAuthFeatures();
 void redirectIfSignedIn();

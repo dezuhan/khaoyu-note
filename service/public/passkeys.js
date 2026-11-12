@@ -188,3 +188,21 @@ document.getElementById("passkey-register").addEventListener("click", registerPa
 document.getElementById("passkey-login").addEventListener("click", loginWithPasskey);
 document.getElementById("logout").addEventListener("click", logout);
 loadPasskeys();
+
+async function applyPasskeyFeature() {
+  try {
+    const response = await fetch("/api/v1/auth/features", { credentials: "same-origin" });
+    if (!response.ok) return;
+    const features = await response.json();
+    if (features.passkeysEnabled) return;
+    const register = document.getElementById("passkey-register");
+    const login = document.getElementById("passkey-login");
+    register.disabled = true;
+    login.disabled = true;
+    setStatus("Passkeys are temporarily disabled by the service operator. Password and backup-code sign-in remain available.");
+  } catch {
+    /* leave the page unchanged if the feature endpoint is unavailable */
+  }
+}
+
+void applyPasskeyFeature();

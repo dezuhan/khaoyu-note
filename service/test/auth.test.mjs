@@ -1716,6 +1716,12 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(reuse.status, 400);
   });
 
+  await t.test("the public feature endpoint reports the passkey switch", async () => {
+    const features = await api.call("/api/v1/auth/features");
+    assert.equal(features.status, 200);
+    assert.equal(features.body.passkeysEnabled, true);
+  });
+
   await t.test("TOTP can be enabled and is required at login", async () => {
     const user = await api.account(`totp-${crypto.randomUUID()}@example.com`);
     const before = await api.call("/api/v1/auth/totp", { jar: user.jar });

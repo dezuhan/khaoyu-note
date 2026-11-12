@@ -22,7 +22,7 @@
         <p id="account-email" class="muted"></p>
         <div class="row">
           <a class="ky-button ky-button-quiet" href="/reset">Reset password</a>
-          <a class="ky-button ky-button-quiet" href="/passkeys">Passkeys</a>
+          <a class="ky-button ky-button-quiet" id="account-passkeys-link" href="/passkeys">Passkeys</a>
           <button id="logout" type="button" class="ky-button ky-button-quiet">Sign out</button>
           <button id="logout-all" type="button" class="ky-button ky-button-danger">Sign out everywhere</button>
         </div>
@@ -62,12 +62,14 @@
         </div>
         <button class="ky-button ky-button-primary" id="totp-setup-start" type="button">Set up authenticator</button>
 
-        <h2 style="margin-top: 18px">Passkeys</h2>
-        <p id="passkey-readiness" class="muted">Checking passkey support...</p>
-        <p class="muted">A passkey is a device credential (Touch ID, Windows Hello, security key or phone) that signs in without a password. Open the passkey page, sign in, then choose Register a passkey.</p>
-        <div class="row">
-          <a class="ky-button ky-button-primary" href="/passkeys">Create or manage passkeys</a>
-        </div>
+        <section id="account-passkeys">
+          <h2 style="margin-top: 18px">Passkeys</h2>
+          <p id="passkey-readiness" class="muted">Checking passkey support...</p>
+          <p class="muted">A passkey is a device credential (Touch ID, Windows Hello, security key or phone) that signs in without a password. Open the passkey page, sign in, then choose Register a passkey.</p>
+          <div class="row">
+            <a class="ky-button ky-button-primary" href="/passkeys">Create or manage passkeys</a>
+          </div>
+        </section>
 
         <h2 style="margin-top: 18px">Sessions</h2>
         <ul id="sessions"></ul>

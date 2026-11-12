@@ -259,5 +259,18 @@ $("totp-disable-cancel").addEventListener("click", () => {
   renderTotp(totpEnabled);
 });
 $("totp-disable-confirm").addEventListener("click", disableTotp);
+async function applyAccountFeatures() {
+  try {
+    const features = await api("/api/v1/auth/features");
+    if (!features.passkeysEnabled) {
+      document.getElementById("account-passkeys")?.setAttribute("hidden", "");
+      document.getElementById("account-passkeys-link")?.setAttribute("hidden", "");
+    }
+  } catch {
+    /* keep passkey UI when the feature endpoint is unavailable */
+  }
+}
+
 window.addEventListener("focus", showPasskeyStatus);
+void applyAccountFeatures();
 refresh();

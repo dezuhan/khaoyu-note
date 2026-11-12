@@ -1006,8 +1006,12 @@ async function loadPasskeyList() {
 async function renderSecurity() {
   pane.innerHTML = `<div class="admin-loading">Loading security...</div>`;
   let tokensData;
+  let features = { passkeysEnabled: true };
   try {
-    tokensData = await api("/api/v1/account/tokens");
+    [tokensData, features] = await Promise.all([
+      api("/api/v1/account/tokens"),
+      api("/api/v1/auth/features").catch(() => ({ passkeysEnabled: true })),
+    ]);
   } catch (error) {
     if (error instanceof AuthError) return showAuth();
     pane.innerHTML = "";
@@ -1063,10 +1067,18 @@ async function renderSecurity() {
     </div>
 
     <div class="ky-section admin-section">
-      <div class="admin-section-head"><div><h2>Passkeys</h2><p>Register a device credential for passwordless sign-in.</p></div></div>
-      <p class="admin-note" data-role="passkey-readiness"></p>
-      <button class="ky-button ky-button-primary" type="button" data-role="passkey-register">Register a passkey</button>
-      <ul class="admin-passkey-list" data-role="passkey-list"></ul>
+      <div class="admin-section-head"><div><h2>Passkeys</h2><p>${
+        features.passkeysEnabled
+          ? "Register a device credential for passwordless sign-in."
+          : "Temporarily disabled by the service operator."
+      }</p></div></div>
+      ${
+        features.passkeysEnabled
+          ? `<p class="admin-note" data-role="passkey-readiness"></p>
+             <button class="ky-button ky-button-primary" type="button" data-role="passkey-register">Register a passkey</button>
+             <ul class="admin-passkey-list" data-role="passkey-list"></ul>`
+          : `<p class="admin-note">Passkey registration and passkey sign-in are switched off for now. Password, authenticator 2FA and backup codes remain available.</p>`
+      }
     </div>
 
     <div class="ky-section admin-section">
@@ -1205,13 +1217,13 @@ async function renderSecurity() {
 
   const passkeyReadiness = pane.querySelector('[data-role="passkey-readiness"]');
   const passkeyButton = pane.querySelector('[data-role="passkey-register"]');
-  if (!window.PublicKeyCredential || !window.isSecureContext) {
+  if (passkeyButton && (!window.PublicKeyCredential || !window.isSecureContext)) {
     passkeyButton.disabled = true;
     passkeyReadiness.textContent = "Passkeys need a secure context (localhost or HTTPS) and WebAuthn support.";
-  } else {
+  } else if (passkeyButton) {
     passkeyReadiness.textContent = "Passkeys are available on this device.";
   }
-  passkeyButton.addEventListener("click", async () => {
+  passkeyButton?.addEventListener("click", async () => {
     passkeyButton.disabled = true;
     try {
       const { options } = await api("/api/v1/auth/passkeys/register/options", { method: "POST", body: {} });
@@ -1229,7 +1241,7 @@ async function renderSecurity() {
       passkeyButton.disabled = false;
     }
   });
-  await loadPasskeyList();
+  if (passkeyButton) await loadPasskeyList();
 
   const recoveryStatus = pane.querySelector('[data-role="recovery-status"]');
   const recoveryBox = pane.querySelector('[data-role="recovery-codes"]');
