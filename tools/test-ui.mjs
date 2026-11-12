@@ -2114,6 +2114,15 @@ check(
 await page.click("#settings-btn");
 await page.waitForTimeout(400);
 check("Settings dialog opens", await page.locator(".mn-prefs-dialog").isVisible());
+const overlayLayers = await page.evaluate(() => ({
+  overlay: Number(getComputedStyle(document.querySelector(".mn-prefs-overlay")).zIndex),
+  rail: Number(getComputedStyle(document.querySelector(".mn-toolrail")).zIndex),
+}));
+check(
+  "Settings overlay covers and blurs the floating tool rail",
+  overlayLayers.overlay > overlayLayers.rail,
+  `${overlayLayers.overlay} > ${overlayLayers.rail}`
+);
 const settingsGeometry = await page.evaluate(() => {
   const dialog = document.querySelector(".mn-prefs-dialog").getBoundingClientRect();
   const content = document.querySelector(".mn-prefs-content");
@@ -2170,7 +2179,8 @@ check(
   "Server page shows local runtime details and service connection options",
   (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
     (await page.locator('[data-role="content"]').innerText()).includes("Connection details for this computer") &&
-    (await page.locator(".mn-account-card").count()) === 3
+    (await page.locator(".mn-account-card").count()) === 2 &&
+    (await page.locator('.mn-account-card[data-action="passkeys"]').count()) === 0
 );
 check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
 await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();

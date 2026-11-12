@@ -28,6 +28,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   navigation is hidden and admin APIs remain protected. Profile editing uses the new self endpoint.
 - **Role-aware login**: admins land on the dashboard and members land on account security, with no
   redirect loop between `/login` and `/admin`.
+- **Settings layering and passkey visibility**: the dialog now covers/blurs the floating tool rail,
+  and the passkey action is hidden while the service operator switch is off.
 - **Fixed service chrome**: the admin sidebar remains visible while page content scrolls internally;
   account security pages keep the document fixed to the viewport too.
 - **Account Management dashboard**: Profile, Security (password, 2FA, passkeys and API tokens) and

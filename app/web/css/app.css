@@ -2785,7 +2785,7 @@ html[data-reduce-motion="true"] .mn-cards * {
 .mn-prefs-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1100;
   display: grid;
   place-items: center;
   padding: 56px 16px 24px;

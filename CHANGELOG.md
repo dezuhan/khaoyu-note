@@ -94,6 +94,9 @@ project uses Semantic Versioning.
 - Login now lands by role: admins go to `/admin`, members go to `/account`. A signed-in member can no
   longer bounce between `/login` and `/admin`; direct admin access redirects members to their security
   page.
+- Settings now sits above the floating tool rail (z-index) so the rail is dimmed/blurred behind the
+  dialog instead of floating above it. The Settings > Server passkey action card is hidden when the
+  service feature endpoint reports passkeys disabled, or when no service is connected.
 - The admin dashboard now owns the viewport: the service sidebar and menubar stay fixed while the active
   page scrolls inside the content pane. Account security pages use the same fixed-viewport model, so
   long pages no longer scroll the whole document.

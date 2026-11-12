@@ -1770,14 +1770,10 @@ function renderServerPage(content) {
 
   const grid = document.createElement("div");
   grid.className = "mn-account-grid";
-  const actions = [
-    ["Open account", "Create or sign in, reset password, manage sessions and API tokens.", "/account"],
-    ["Passkeys", "Register or use a WebAuthn passkey.", "/passkeys"],
-    ["Sharing", "Create and revoke public board or card links.", "/shares"],
-  ];
-  for (const [title, description, path] of actions) {
+  const addActionCard = (title, description, path, role = "") => {
     const card = document.createElement("div");
     card.className = "mn-account-card";
+    if (role) card.dataset.action = role;
     const headingEl = document.createElement("strong");
     headingEl.textContent = title;
     const text = document.createElement("p");
@@ -1789,9 +1785,42 @@ function renderServerPage(content) {
     button.textContent = "Open";
     button.addEventListener("click", () => bridge.openExternal(serviceBase() + path));
     card.append(headingEl, text, button);
-    grid.append(card);
-  }
+    return card;
+  };
+  grid.append(
+    addActionCard(
+      "Open account",
+      "Create or sign in, reset password, manage sessions and API tokens.",
+      "/admin"
+    )
+  );
+  const shareCard = addActionCard(
+    "Sharing",
+    "Create and revoke public board or card links.",
+    "/shares"
+  );
+  grid.append(shareCard);
   content.append(grid);
+
+  // Passkeys can be switched off by the service operator; hide the entry instead of opening a 404.
+  // Without a connected service the account/passkey actions are not usable, so keep them hidden.
+  void (async () => {
+    if (!config.url || !config.token) return;
+    try {
+      const response = await fetch(`${serviceBase()}/api/v1/auth/features`, {
+        signal: AbortSignal.timeout(2500),
+      });
+      if (!response.ok) return;
+      const features = await response.json();
+      if (!features.passkeysEnabled) return;
+      grid.insertBefore(
+        addActionCard("Passkeys", "Register or use a WebAuthn passkey.", "/passkeys", "passkeys"),
+        shareCard
+      );
+    } catch {
+      /* feature endpoint unreachable: keep passkeys hidden */
+    }
+  })();
 
   const connect = document.createElement("button");
   connect.type = "button";
