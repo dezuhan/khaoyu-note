@@ -30,6 +30,15 @@ Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
 - Roadmap checkboxes were reconciled with this evidence; see the verification note in `ROADMAP.md`.
   The 0.32.0 numbers below are historical and superseded by `docs/production-readiness.md`.
 
+## 0.36.0 release preparation (2026-11-12)
+
+- Version fields are bumped to 0.36.0 and the release notes draft is in `docs/release-0.36.0.md`.
+- 0.36.0 adds automatic backup retention (newest seven automatic copies; manual backups untouched)
+  and service security hardening (CSRF on logout, invitation rate limit).
+- Linux `.deb`, AppImage and portable archives are built from `release/0.36.0`, checksummed in
+  `dist/linux/`, and the web host reports 0.36.0; Windows/macOS artifacts and signing remain CI and
+  release gates.
+
 ## Technology
 
 | Area | Choice |

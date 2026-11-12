@@ -483,16 +483,22 @@ menu, and persistence (268 checks). The MCP suite spawns `khaoyu-note-mcp.exe` a
 checks the JSON-RPC handshake, tool listing, board/card creation, updates, comments, search, nested
 boards, connections and tree deletion (15 checks).
 
-Built artifacts are copied to `dist/`. The files below are the last built release (0.35.0):
+Built artifacts are copied to `dist/`. The 0.36.0 Linux x86_64 packages built from the release
+branch:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu Note_0.35.0_x64-setup.exe` | 4.17 MiB | NSIS installer (app only; the MCP binary ships separately) |
-| `Khaoyu Note_0.35.0_x64_en-US.msi` | 6.78 MiB | MSI installer (app only; the MCP binary ships separately) |
-| `KhaoyuNote.exe` | 13.87 MiB | standalone executable (SQLite bundled, GPU flag aware) |
-| `khaoyu-note-mcp.exe` | 2.71 MiB | standalone MCP server for AI agents |
+| `Khaoyu-Note_0.36.0_amd64.deb` | 7.95 MiB | Debian/Ubuntu installer |
+| `Khaoyu-Note_0.36.0_amd64.AppImage` | 87.08 MiB | portable AppImage |
+| `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz` | 7.81 MiB | portable archive with the desktop and MCP binaries, README, changelog and license |
+| `khaoyu-note-mcp` (Linux) | 4.5 MiB | standalone MCP server, also included in the archive |
 
-Rebuild them with `npx tauri build` (with `CARGO_TARGET_DIR` set as above).
+Windows installers are produced by the release workflow as `Khaoyu Note_0.36.0_x64-setup.exe`,
+`Khaoyu Note_0.36.0_x64_en-US.msi`, the portable `KhaoyuNote.exe` and `khaoyu-note-mcp.exe`. macOS
+bundles are built on macOS runners; unsigned artifacts are for development testing only.
+
+Rebuild the Linux packages with `npx tauri build` in an environment that has the Tauri Linux
+dependencies (see docs/packaging.md).
 
 ## Design tokens
 

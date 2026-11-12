@@ -31,8 +31,8 @@ cmd /c "call ""C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxili
 
 Outputs:
 
-- `src-tauri/target/release/bundle/nsis/Khaoyu Note_0.35.0_x64-setup.exe`
-- `src-tauri/target/release/bundle/msi/Khaoyu Note_0.35.0_x64_en-US.msi`
+- `src-tauri/target/release/bundle/nsis/Khaoyu Note_0.36.0_x64-setup.exe`
+- `src-tauri/target/release/bundle/msi/Khaoyu Note_0.36.0_x64_en-US.msi`
 - `src-tauri/target/release/khaoyu-note.exe`
 - `src-tauri/target/release/khaoyu-note-mcp.exe`
 
@@ -55,19 +55,18 @@ Outputs:
 AppImage should be built on the oldest supported Ubuntu runner. Verify X11, Wayland, file drops and
 open-with-default-app behaviour before release.
 
-Local 0.35.0 build evidence (Linux x86_64):
+Local 0.36.0 build evidence (Linux x86_64, Ubuntu 26.04 container):
 
-- `Khaoyu-Note_0.35.0_amd64.deb` built with Tauri and verified by extracting and launching the binary;
-- `Khaoyu-Note_0.35.0_linux-x86_64.tar.gz` contains the desktop and MCP binaries, README, changelog and
-  license;
-- checksums are written to `dist/linux/SHA256SUMS.txt`;
-- `Khaoyu-Note_0.35.0_amd64.AppImage` was packaged from the linuxdeploy AppDir with
-  `appimagetool` after fixing the AppRun permissions; it starts and initializes the database, though the
-  sandbox reports `GStreamer element appsink not found` (a media-runtime warning, not a startup crash);
+- `Khaoyu-Note_0.36.0_amd64.deb` (7.95 MiB) built with Tauri;
+- `Khaoyu-Note_0.36.0_amd64.AppImage` (87.08 MiB) bundled with the Tauri appimage bundler;
+- `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz` (7.81 MiB) contains the desktop and release MCP binaries,
+  README, changelog and license;
+- checksums are written to `dist/linux/SHA256SUMS.txt` and verified with `sha256sum -c`;
+- runtime launch verification on X11 and Wayland (file drops, default-app opening) remains pending;
 - Flatpak manifest is in `packaging/flatpak/com.dezuhan.khaoyunote.yml` and is built by the
   `Linux Flatpak` job in `.github/workflows/desktop-release.yml`; it still needs a CI run to verify
   the runtime/AppDir combination.
-- `desktop-release.yml` now builds Linux `deb`, `rpm`, `AppImage`, Flatpak, Windows NSIS/MSI and macOS
+- `desktop-release.yml` builds Linux `deb`, `rpm`, `AppImage`, Flatpak, Windows NSIS/MSI and macOS
   DMG/app artifacts.
 
 ## Flatpak

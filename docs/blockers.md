@@ -47,8 +47,8 @@ gateway, browser isolation, audit and prompt-injection test design before any im
 - Service image builds with Podman; Trivy reports no CRITICAL findings (`--ignore-unfixed`).
 - Live security check: 20 checks.
 - Linux artifacts: AppImage, `.deb` and portable `.tar.gz` are built and checksummed in
-  `dist/linux/SHA256SUMS.txt` for 0.35.0. Windows installers were built on an earlier Windows
-  machine and are not present in this checkout; signing is still pending.
+  `dist/linux/SHA256SUMS.txt` for 0.36.0. Windows installers are produced by the release workflow;
+  signing is still pending, and X11/Wayland launch checks remain.
 - Linux and macOS CI: the matrix workflow is defined; the artifacts have not been produced and
   verified on this machine.
 

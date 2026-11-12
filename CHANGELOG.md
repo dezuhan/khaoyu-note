@@ -5,11 +5,20 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
-### Changed
+## [0.36.0] - 2026-11-12
 
-- Automatic backups now use a distinct folder prefix and keep only the newest seven copies;
-  older automatic folders are pruned after a successful backup. Manual backups and the folders
-  imported through the Backup pane are never removed automatically.
+### Added
+
+- Automatic backups now use a distinct folder prefix and keep only the newest seven copies; older
+  automatic folders are pruned after a successful backup. Manual backups and the folders imported
+  through the Backup pane are never removed automatically.
+- The Backup pane describes the retention rule in all ten UI languages.
+
+### Security
+
+- Logout over a cookie session now requires the double-submit CSRF header, so a cross-site form
+  cannot sign the user out.
+- Invitation creation is rate limited to 20 requests per 15-minute window per owner and IP.
 
 ## [0.35.0] - 2026-11-10
 

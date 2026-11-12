@@ -1,6 +1,6 @@
 # Production readiness audit
 
-Snapshot: **0.35.0**, 2026-11-11. This is an engineering audit, not a release approval.
+Snapshot: **0.36.0**, 2026-11-12. This is an engineering audit, not a release approval.
 
 ## Verdict
 
@@ -93,19 +93,20 @@ scan used Podman and Trivy.
 | Check | Result |
 | --- | --- |
 | Static modules (`scripts/check-web.cjs`) | 38/38 clean |
-| Version consistency | 0.35.0 pass |
+| Version consistency | 0.36.0 pass |
 | Translation audit | 190/190 keys, 10 languages |
 | Main UI suite | **268/268 pass** |
 | Feature browser suites | save-conflict 11/11, save-retry 4/4, board-selection 4/4, rename 8/8, board-card-title 5/5, column-layout 9/9, column-title 7/7, tool-drop 6/6, wrap 5/5, tooltips 7/7, line-area 6/6, card-features 24/24, fonts 5/5, web-mode 10/10, auth-web 44/44, onboarding pass |
 | Service-backed browser suites | passkeys, shares-ui, share-view and the rewritten account suite (14 checks) pass with a disposable service |
 | Service tests | **77 pass, 0 skipped** against disposable PostgreSQL 17 and local Redis; the suite covers logout CSRF and the invitation rate limit |
 | PostgreSQL integration | pass (baseline parity, durable copy and storage round-trips included) |
-| Web host smoke | `/status` pass, version 0.35.0 on Node 26.13.0 |
+| Web host smoke | `/status` pass, version 0.36.0 on Node 26.13.0 |
 | MCP smoke suite | **15/15 pass** against a Linux debug build of the MCP binary |
 | `cargo fmt --all --check` | pass |
 | Rust tests | **21 library tests and 2 MCP unit tests pass**, including the legacy migration test |
 | `cargo clippy --all-targets -- -D warnings` | pass |
 | Service image build (Podman) | pass |
+| Linux packages (0.36.0) | `.deb` 7.95 MiB, AppImage 87.08 MiB, portable `.tar.gz` 7.81 MiB built and checksummed; runtime launch on X11/Wayland pending |
 | Trivy image scan (CRITICAL, ignore-unfixed) | **0 findings** |
 | `npm audit --omit=dev` for service | 0 vulnerabilities |
 

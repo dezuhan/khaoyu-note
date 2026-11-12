@@ -1,7 +1,7 @@
 {
   "name": "khaoyu-note-web",
   "private": true,
-  "version": "0.35.0",
+  "version": "0.36.0",
   "type": "module",
   "description": "Local web host for Khaoyu Note, backed by the same SQLite database as the desktop app",
   "license": "AGPL-3.0-only",

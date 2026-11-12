@@ -14,7 +14,7 @@ penetration test and production-scale load testing still open. Milestone 7 is li
 credentials and native runners, not by missing code. Milestone 8, the AI assistant, has not been
 started and needs its own consent, tool-gateway and prompt-injection design first.
 
-Verification note: checkboxes were reconciled with the 0.35.0 code and test evidence on 2026-11-11.
+Verification note: checkboxes were reconciled with the 0.36.0 code and test evidence on 2026-11-12.
 `docs/production-readiness.md` carries the current release verdict.
 
 ## Current state
