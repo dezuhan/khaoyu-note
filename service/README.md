@@ -63,22 +63,24 @@ redirects straight to `/login`; it requires an account with the global `admin` r
 registration and reset pages reuse the main app logo, fonts and theme icons. The first account created by `bootstrap`, or the first account registered
 on a fresh database, becomes an admin; migration 13 also promotes the oldest existing account.
 
-The dashboard keeps the left rail (Overview, Accounts, Teams, Activity, Sharing) and adds a top menu
+The dashboard keeps the left rail (Overview, Accounts, Boards, Activity, Sharing) and adds a top menu
 bar above the content pane: Dashboard and Help, a command search with Ctrl+K, the host badge, the
 light/dark toggle and a circular account button next to it that opens the Account menu (Admin
 dashboard, Account settings, Help, Logout). The top bar and rail reuse the main app logo, SVG icon
 set, fonts and theme tokens.
 
-- Overview shows account, team, share-link and audit counts plus recent activity and signups.
+- Overview shows account, board, share-link and audit counts plus recent activity and signups.
 - Account settings (opened from the Account menu or profile button) holds the signed-in password
   form, session revocation, scoped API tokens and sign out.
 - Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
-  team count, last activity and last update. Admins can create a member account manually (email,
+  board count, last activity and last update. Admins can create a member account manually (email,
   display name, temporary password, member/admin role) and change another account's role or status;
   an account cannot demote or disable itself, and the last active admin cannot be removed.
-- Teams lists projects with their owner, member count, revision and last update. Create team adds a
+- Boards lists projects with their owner, member count, revision and last update. Create board adds a
   project with a fresh snapshot and the signed-in admin as owner. Rename and Delete update or
-  soft-delete a team (deleting revokes its share links and invitations and cascades to child boards).
+  soft-delete a board (deleting revokes its share links and invitations and cascades to child boards).
+- Account rows expose a Details panel with account metadata, email/2FA/passkey state, boards and active
+  sessions; the admin write endpoints accept the original frontend origin through the proxy.
   Members expands the member list; admins can add an existing account by email with an
   editor/commenter/viewer role, change that role and remove the member. The owner row is immutable.
 - Activity reads every audit row with actor, action, resource and time, filterable by text and action

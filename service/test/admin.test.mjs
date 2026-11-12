@@ -209,6 +209,16 @@ test("service admin dashboard API", async (t) => {
     assert.ok(activity.body.entries.some((entry) => entry.action === "admin.user_created"));
   });
 
+  await t.test("account management exposes account, security, board and session detail", async () => {
+    const detail = await api.call(`/api/v1/admin/users/${admin.body.account.id}`, { jar: admin.jar });
+    assert.equal(detail.status, 200, JSON.stringify(detail.body));
+    assert.equal(detail.body.user.email, admin.body.account.email);
+    assert.equal(detail.body.security.totpEnabled, false);
+    assert.equal(detail.body.security.emailVerified, true);
+    assert.ok(Array.isArray(detail.body.projects));
+    assert.ok(detail.body.sessions.length > 0);
+  });
+
   await t.test("teams can be created and listed with members", async () => {
     const created = await api.call("/api/v1/admin/teams", {
       method: "POST",
@@ -221,6 +231,10 @@ test("service admin dashboard API", async (t) => {
     assert.equal(teams.body.total, 1);
     assert.equal(teams.body.teams[0].name, "Design team");
     assert.equal(teams.body.teams[0].member_count, 1);
+    const boards = await api.call("/api/v1/admin/boards", { jar: admin.jar });
+    assert.equal(boards.status, 200);
+    assert.equal(boards.body.total, 1);
+    assert.equal(boards.body.boards[0].name, "Design team");
     const members = await api.call(`/api/v1/admin/teams/${created.body.id}/members`, {
       jar: admin.jar,
     });

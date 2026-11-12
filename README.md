@@ -127,7 +127,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Template library | implemented: built-in starters plus custom templates created from any board selection; applying one replaces the active file and can be undone, while a non-empty board asks for overwrite confirmation. Settings > Board templates manages both kinds and can restore deleted built-ins |
 | Labels and reactions | out of scope for this local app |
 | Sharing and sync | disabled in this local-first build: Share and Sync are hidden, Settings > Server shows local runtime only, and no service/account connection is exposed. Service-enabled deployments expose these controls; the `service/` code remains for a future deployment. |
-| Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Teams and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, team creation and members, and the full audit feed. |
+| Service admin dashboard | separate self-hosted service, not enabled by this local-first build: left rail with Overview, Accounts, Boards and Activity, light and dark themes, profile pictures or initials, role and active/disabled status, board creation and members, account detail panels, and the full audit feed. |
 | Roadmap | [ROADMAP.md](ROADMAP.md): self-hosted service, accounts, sharing and sync (Milestones 1 to 5 implemented in `service/`; packaging and production gates open) |
 
 ### Settings, GPU and comments
@@ -292,11 +292,11 @@ password changes and sign out. Login, signup and reset use
 separate centred pages; password reset asks for the current password and never sends an email token.
 The first registered account (or the account created by
 `bootstrap`) is the service admin. `/admin` uses the same signed-in session, keeps the left rail
-(Overview, Accounts, Teams, Activity, Sharing) and adds a top menu bar with Dashboard and Help,
+(Overview, Accounts, Boards, Activity, Sharing) and adds a top menu bar with Dashboard and Help,
 command search (Ctrl+K), a host badge, a light/dark toggle and a circular account button next to the
 theme that opens the Account menu (Admin dashboard, Account settings, Help, Logout). The page reuses
 the main app logo, SVG icon set, fonts and theme tokens. Sharing is rendered inside the same page.
-Admins can create member accounts manually, create, rename and delete teams, add accounts to a team,
+Admins can create member accounts manually, create, rename and delete boards, add accounts to a board,
 change their team roles and remove them, inspect every audit row and change another account's role or status. Share links
 can add a view watermark and a download cap; shared rich text is sanitised server-side, remote embeds
 use an exact host allowlist, and uploaded objects can be encrypted at rest with

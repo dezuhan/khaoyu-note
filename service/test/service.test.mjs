@@ -20,7 +20,7 @@ import { createSmtpMailer } from "../src/auth/mailer.mjs";
 import { createFileMailer } from "../src/auth/mailer.mjs";
 import { createQueuedMailer } from "../src/auth/mailer.mjs";
 import { scanUpload, validateUpload } from "../src/uploads.mjs";
-import { sendBinary } from "../src/http.mjs";
+import { assertSameOrigin, sendBinary } from "../src/http.mjs";
 import http from "node:http";
 import { sendAlert } from "../src/alerts.mjs";
 import { createEventHub } from "../src/events.mjs";
@@ -128,6 +128,27 @@ test("the service picks two distinct 5-digit ports", async () => {
   assert.match(String(frontendPort), /^\d{5}$/);
   assert.match(String(backendPort), /^\d{5}$/);
   assert.notEqual(frontendPort, backendPort);
+});
+
+test("same-origin accepts the forwarded frontend host", () => {
+  const config = { publicUrl: "http://127.0.0.1:8080", corsOrigins: [] };
+  assert.doesNotThrow(() =>
+    assertSameOrigin(
+      { headers: { origin: "http://127.0.0.1:18080", "x-forwarded-host": "127.0.0.1:18080" } },
+      config
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertSameOrigin({ headers: { origin: "http://127.0.0.1:8080" } }, config)
+  );
+  assert.throws(
+    () =>
+      assertSameOrigin(
+        { headers: { origin: "https://evil.example", "x-forwarded-host": "127.0.0.1:18080" } },
+        config
+      ),
+    /origin not allowed/
+  );
 });
 
 test("share tokens are redacted from request logs", () => {

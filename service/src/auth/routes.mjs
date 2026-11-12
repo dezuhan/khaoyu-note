@@ -483,6 +483,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
               activeAccounts: await count(
                 "SELECT COUNT(*) AS count FROM accounts WHERE deleted_at IS NULL AND status = 'active'"
               ),
+              boards: await count("SELECT COUNT(*) AS count FROM projects WHERE deleted_at IS NULL"),
               teams: await count("SELECT COUNT(*) AS count FROM projects WHERE deleted_at IS NULL"),
               auditEntries: await count("SELECT COUNT(*) AS count FROM audit_log"),
               shareLinks: await count("SELECT COUNT(*) AS count FROM share_links WHERE revoked_at IS NULL"),
@@ -588,6 +589,44 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       }
 
       const adminUserMatch = url.pathname.match(/^\/api\/v1\/admin\/users\/([^/]+)$/);
+      if (method === "GET" && adminUserMatch) {
+        await requireAdminAccount(request, response, db, config);
+        const targetId = decodeURIComponent(adminUserMatch[1]);
+        const user = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS}, a.totp_enabled_at, a.email_verified_at,
+                    (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS last_seen_at,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.account_id = a.id) AS project_count
+             FROM accounts a WHERE a.id = ? AND a.deleted_at IS NULL`, [targetId]));
+        if (!user) throw new HttpError(404, "account not found", "not_found");
+        const sessions = await listSessions(db, targetId);
+        const projects = await db.all(
+          `SELECT p.id, p.name, p.revision, p.updated_at, m.role
+           FROM project_members m JOIN projects p ON p.id = m.project_id
+           WHERE m.account_id = ? AND p.deleted_at IS NULL
+           ORDER BY p.updated_at DESC LIMIT 50`,
+          [targetId]
+        );
+        const passkeys = Number(
+          (await db.get("SELECT COUNT(*) AS count FROM passkey_credentials WHERE account_id = ?", [targetId])).count
+        );
+        sendJson(response, 200, {
+          user: adminAccount(user),
+          security: {
+            totpEnabled: Boolean(user.totp_enabled_at),
+            passkeyCount: passkeys,
+            emailVerified: Boolean(user.email_verified_at),
+          },
+          sessions,
+          projects: projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            revision: project.revision,
+            role: project.role,
+            updatedAt: project.updated_at,
+          })),
+        }, config);
+        return true;
+      }
+
       if (method === "PATCH" && adminUserMatch) {
         const auth = await requireAdminAccount(request, response, db, config);
         const targetId = decodeURIComponent(adminUserMatch[1]);
@@ -665,7 +704,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
-      if (method === "GET" && url.pathname === "/api/v1/admin/teams") {
+      if (method === "GET" && (url.pathname === "/api/v1/admin/teams" || url.pathname === "/api/v1/admin/boards")) {
         await requireAdminAccount(request, response, db, config);
         const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
         const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit")) || 50));
@@ -688,11 +727,11 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
                     (SELECT COUNT(*) FROM project_snapshots s WHERE s.project_id = p.id) AS snapshot_count
              FROM projects p JOIN accounts a ON a.id = p.owner_account_id
              WHERE ${where} ORDER BY p.updated_at DESC LIMIT ? OFFSET ?`, [...params, limit, offset]));
-        sendJson(response, 200, { teams, total, limit, offset }, config);
+        sendJson(response, 200, { boards: teams, teams, total, limit, offset }, config);
         return true;
       }
 
-      if (method === "POST" && url.pathname === "/api/v1/admin/teams") {
+      if (method === "POST" && (url.pathname === "/api/v1/admin/teams" || url.pathname === "/api/v1/admin/boards")) {
         const auth = await requireAdminAccount(request, response, db, config);
         const body = await readJson(request);
         const name = requireString(body.name ?? body.title, "name", 120);
@@ -735,7 +774,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
-      const adminTeamMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)$/);
+      const adminTeamMatch = url.pathname.match(/^\/api\/v1\/admin\/(?:teams|boards)\/([^/]+)$/);
       if (method === "PATCH" && adminTeamMatch) {
         const auth = await requireAdminAccount(request, response, db, config);
         const projectId = decodeURIComponent(adminTeamMatch[1]);
@@ -803,7 +842,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
-      const adminTeamMembersMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)\/members$/);
+      const adminTeamMembersMatch = url.pathname.match(/^\/api\/v1\/admin\/(?:teams|boards)\/([^/]+)\/members$/);
       if (method === "POST" && adminTeamMembersMatch) {
         const auth = await requireAdminAccount(request, response, db, config);
         const projectId = decodeURIComponent(adminTeamMembersMatch[1]);
@@ -853,7 +892,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       }
 
 
-      const adminTeamMemberMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)\/members\/([^/]+)$/);
+      const adminTeamMemberMatch = url.pathname.match(/^\/api\/v1\/admin\/(?:teams|boards)\/([^/]+)\/members\/([^/]+)$/);
       if ((method === "PATCH" || method === "DELETE") && adminTeamMemberMatch) {
         const auth = await requireAdminAccount(request, response, db, config);
         const projectId = decodeURIComponent(adminTeamMemberMatch[1]);

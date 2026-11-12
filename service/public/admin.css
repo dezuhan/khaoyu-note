@@ -1234,3 +1234,107 @@ button.admin-admin:hover {
   flex: 1 1 100%;
   margin: var(--ky-space-4) 0 0;
 }
+
+.admin-detail-button {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ky-accent);
+  font: inherit;
+  font-size: var(--ky-text-2xs);
+  cursor: pointer;
+}
+
+.admin-detail-button:hover {
+  text-decoration: underline;
+}
+
+.admin-user-detail > td {
+  padding: 0 !important;
+  background: var(--ky-surface);
+}
+
+.admin-account-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-space-12);
+  padding: var(--ky-space-14);
+  border-top: 1px solid var(--ky-stroke);
+  background: var(--ky-control);
+}
+
+.admin-account-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ky-space-12);
+}
+
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--ky-space-8) var(--ky-space-14);
+}
+
+.admin-detail-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-space-2);
+  min-width: 0;
+  color: var(--ky-text);
+  font-size: var(--ky-text-xs);
+}
+
+.admin-detail-grid span {
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+.admin-detail-grid code {
+  overflow-wrap: anywhere;
+  color: var(--ky-soft);
+  font-family: var(--ky-mono);
+  font-size: var(--ky-text-2xs);
+}
+
+.admin-detail-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ky-space-14);
+}
+
+.admin-detail-columns h4 {
+  margin: 0 0 var(--ky-space-6);
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-detail-list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-space-1);
+  min-width: 0;
+  color: var(--ky-text);
+  font-size: var(--ky-text-xs);
+}
+
+.admin-detail-list li span {
+  overflow: hidden;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

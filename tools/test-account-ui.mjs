@@ -156,7 +156,24 @@ try {
   );
   check("admin can add a member account manually", true);
 
-  // Full team CRUD from the admin UI: create, rename, add/update/remove a member, then delete.
+  // Account management detail: account fields, 2FA/passkey state, boards and sessions.
+  await page.click('.admin-nav-item[data-page="accounts"]');
+  await page.waitForSelector('button[data-role="account-detail"]');
+  await page.locator('button[data-role="account-detail"]').first().click();
+  await page.waitForSelector(".admin-account-detail");
+  const detailText = await page.locator(".admin-account-detail").innerText();
+  const detailLower = detailText.toLowerCase();
+  check(
+    "account detail shows security, boards and sessions",
+    detailLower.includes("2fa") &&
+      detailLower.includes("passkeys") &&
+      detailLower.includes("boards") &&
+      detailLower.includes("active sessions"),
+    detailText.slice(0, 240)
+  );
+  await page.locator('.admin-account-detail [data-role="detail-close"]').click();
+
+  // Full board CRUD from the admin UI: create, rename, add/update/remove a member, then delete.
   const teammateEmail = `teammate-${crypto.randomUUID()}@example.com`;
   const teammate = await fetch(`${base}/api/v1/auth/register`, {
     method: "POST",
@@ -164,12 +181,12 @@ try {
     body: JSON.stringify({ email: teammateEmail, password: "teammate-password-123", displayName: "Teammate" }),
   });
   check("teammate account registered", teammate.status === 202, String(teammate.status));
-  await page.click('.admin-nav-item[data-page="teams"]');
+  await page.click('.admin-nav-item[data-page="boards"]');
   await page.waitForSelector('[data-role="team-create"]');
   await page.fill('[data-role="team-create"] input[name="name"]', "CRUD team");
   await page.click('[data-role="team-create"] button[type="submit"]');
   await page.locator(".admin-team h3", { hasText: "CRUD team" }).waitFor();
-  check("team can be created from the dashboard", true);
+  check("board can be created from the dashboard", true);
 
   const renameButton = page.locator(".admin-team", { hasText: "CRUD team" }).locator('button[data-role="rename"]');
   await renameButton.click();
@@ -177,7 +194,7 @@ try {
   await renameForm.locator('input[name="name"]').fill("CRUD team renamed");
   await renameForm.locator('button[type="submit"]').click();
   await page.locator(".admin-team h3", { hasText: "CRUD team renamed" }).waitFor();
-  check("team can be renamed from the dashboard", true);
+  check("board can be renamed from the dashboard", true);
 
   const teamCard = page.locator(".admin-team", { hasText: "CRUD team renamed" });
   await teamCard.locator('button[data-role="members"]').click();
@@ -185,9 +202,9 @@ try {
   await teamCard.locator('[data-role="member-add"] select[name="role"]').selectOption("editor");
   await teamCard.locator('[data-role="member-add"] button[type="submit"]').click();
   await teamCard.locator("tbody tr", { hasText: teammateEmail }).waitFor();
-  check("admin can add a team member manually", true);
+  check("admin can add a board member manually", true);
   check(
-    "team member count updates after adding a member",
+    "board member count updates after adding a member",
     (await teamCard.locator('[data-role="team-member-count"]').innerText()).startsWith("2")
   );
 
@@ -203,9 +220,9 @@ try {
   await removeButton.click();
   await removeButton.click();
   await teamCard.locator("tbody tr", { hasText: teammateEmail }).waitFor({ state: "detached" });
-  check("admin can remove a team member", true);
+  check("admin can remove a board member", true);
   check(
-    "team member count updates after removing a member",
+    "board member count updates after removing a member",
     (await teamCard.locator('[data-role="team-member-count"]').innerText()).startsWith("1")
   );
 
@@ -213,7 +230,7 @@ try {
   await deleteButton.click();
   await deleteButton.click();
   await page.locator(".admin-team h3", { hasText: "CRUD team renamed" }).waitFor({ state: "detached" });
-  check("team can be deleted from the dashboard", true);
+  check("board can be deleted from the dashboard", true);
 
   // The account page inside the dashboard owns sessions, tokens and password changes. It is opened
   // from the profile button: the Account entry is temporarily out of the menu bar.

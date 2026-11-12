@@ -187,7 +187,14 @@ export function createFrontendServer({ handler, backendHost, backendPort, logger
       void handler(request, response);
       return;
     }
-    const headers = { ...request.headers, host: `${backendHost}:${backendPort}` };
+    const headers = {
+      ...request.headers,
+      host: `${backendHost}:${backendPort}`,
+      "x-forwarded-host": request.headers.host || "",
+      "x-forwarded-proto":
+        request.headers["x-forwarded-proto"] ||
+        (request.socket.encrypted ? "https" : "http"),
+    };
     const proxy = http.request(
       {
         host: backendHost,

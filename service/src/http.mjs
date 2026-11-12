@@ -124,9 +124,20 @@ export function assertSameOrigin(request, config) {
   } catch {
     allowed = config.publicUrl;
   }
-  if (origin !== allowed && !config.corsOrigins?.includes(origin)) {
-    throw new HttpError(403, "origin not allowed", "origin_denied");
-  }}
+  if (origin === allowed || config.corsOrigins?.includes(origin)) return;
+  // The browser talks to the frontend listener, which proxies API writes to the backend
+  // listener and rewrites Host. Accept an Origin that matches the original frontend Host so
+  // direct frontend-port access (and LAN/tunnel hosts) can still perform CSRF-protected writes.
+  const forwardedHost = String(request.headers["x-forwarded-host"] || "").split(",")[0].trim();
+  if (forwardedHost) {
+    try {
+      if (new URL(origin).host === forwardedHost) return;
+    } catch {
+      /* fall through to the deny */
+    }
+  }
+  throw new HttpError(403, "origin not allowed", "origin_denied");
+}
 
 export function requireString(value, field, maximum = 200) {
   if (typeof value !== "string") throw new HttpError(400, `${field} is required`, "invalid_input");

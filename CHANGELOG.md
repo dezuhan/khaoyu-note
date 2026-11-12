@@ -72,6 +72,13 @@ project uses Semantic Versioning.
 - The Share dialog is reorganized into clear Board link, Create a share link and Active links
   sections: the board URL and copy action share one row, the form fields align in two columns, and
   Create/Copy actions sit together without the previous empty vertical gaps.
+- The admin **Teams** area is now **Boards**, matching what it always listed: projects with an owner,
+  member count, revision and update time. The API accepts `/api/v1/admin/boards` (the old
+  `/admin/teams` paths remain as aliases). Accounts rows gain a Details panel with account metadata,
+  2FA/passkey state, boards and active sessions.
+- Admin writes made through the frontend listener no longer fail with `admin access required` when
+  `KHAOYU_SERVICE_PUBLIC_URL` points at a proxy: the proxy forwards the original host and the
+  same-origin check accepts it. This fixes deleting boards from the dashboard on the frontend port.
 - The Settings dialog now sizes itself below the top toolbar (`min(760px, 100vh - 96px)`), keeps its
   content scroller bounded, and resets the content scroll position when switching pages so the first
   section is never clipped.

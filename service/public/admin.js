@@ -205,7 +205,7 @@ function renderOverview() {
     ${statCards([
       ["Accounts", counts.accounts],
       ["Active accounts", counts.activeAccounts],
-      ["Teams", counts.teams],
+      ["Boards", counts.boards ?? counts.teams],
       ["Activity entries", counts.auditEntries],
     ])}
     <div class="ky-section admin-section">
@@ -232,6 +232,67 @@ function renderOverview() {
           </div>`
           )
           .join("")}
+      </div>
+    </div>`;
+}
+
+function accountDetailRows(data) {
+  const user = data.user;
+  const security = data.security || {};
+  const sessions = (data.sessions || []).filter((session) => !session.revoked);
+  const projects = data.projects || [];
+  return `
+    <div class="admin-account-detail">
+      <div class="admin-account-detail-head">
+        <div class="admin-user">${avatarHtml(user)}<span class="admin-user-copy"><strong>${escapeHtml(
+          displayName(user)
+        )}</strong><span>${escapeHtml(user.email)}</span></span></div>
+        <button class="ky-button ky-button-quiet" type="button" data-role="detail-close">Close</button>
+      </div>
+      <div class="admin-detail-grid">
+        <div><span>Account ID</span><code>${escapeHtml(user.id)}</code></div>
+        <div><span>Role</span>${escapeHtml(user.role)}</div>
+        <div><span>Status</span>${escapeHtml(user.status)}</div>
+        <div><span>Created</span>${escapeHtml(formatTime(user.createdAt))}</div>
+        <div><span>Updated</span>${escapeHtml(formatTime(user.updatedAt))}</div>
+        <div><span>Last active</span>${escapeHtml(formatTime(user.lastSeenAt))}</div>
+        <div><span>Email verified</span>${security.emailVerified ? "Yes" : "No"}</div>
+        <div><span>2FA</span>${security.totpEnabled ? "Authenticator enabled" : "Not enabled"}</div>
+        <div><span>Passkeys</span>${escapeHtml(security.passkeyCount ?? 0)}</div>
+        <div><span>Boards</span>${escapeHtml(user.projectCount ?? projects.length)}</div>
+      </div>
+      <div class="admin-detail-columns">
+        <section>
+          <h4>Boards</h4>
+          ${
+            projects.length
+              ? `<ul class="admin-detail-list">${projects
+                  .map(
+                    (project) =>
+                      `<li><strong>${escapeHtml(project.name)}</strong><span>${escapeHtml(
+                        project.role
+                      )} · rev ${escapeHtml(project.revision)} · ${escapeHtml(formatTime(project.updatedAt))}</span></li>`
+                  )
+                  .join("")}</ul>`
+              : `<p class="admin-note">No boards.</p>`
+          }
+        </section>
+        <section>
+          <h4>Active sessions</h4>
+          ${
+            sessions.length
+              ? `<ul class="admin-detail-list">${sessions
+                  .slice(0, 6)
+                  .map(
+                    (session) =>
+                      `<li><strong>${escapeHtml(session.device)}${session.current ? " (current)" : ""}</strong><span>Last seen ${escapeHtml(
+                        formatTime(session.lastSeenAt)
+                      )}</span></li>`
+                  )
+                  .join("")}</ul>`
+              : `<p class="admin-note">No active sessions.</p>`
+          }
+        </section>
       </div>
     </div>`;
 }
@@ -270,7 +331,7 @@ async function renderAccounts(query = "") {
       ${
         data.users.length
           ? `<table class="ky-table admin-table">
-        <thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Teams</th><th>Last active</th><th>Updated</th></tr></thead>
+        <thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Boards</th><th>Last active</th><th>Updated</th></tr></thead>
         <tbody>
           ${data.users
             .map(
@@ -278,7 +339,9 @@ async function renderAccounts(query = "") {
             <tr data-user="${escapeHtml(user.id)}">
               <td><div class="admin-user">${avatarHtml(user)}<span class="admin-user-copy"><strong>${escapeHtml(
                 displayName(user)
-              )}</strong><span>${escapeHtml(user.email)}</span></span></div></td>
+              )}</strong><span>${escapeHtml(user.email)}</span></span><button class="admin-detail-button" type="button" data-role="account-detail" data-user="${escapeHtml(
+                user.id
+              )}">Details</button></div></td>
               <td>
                 <select class="admin-select" data-role="role" ${user.id === selfId ? "disabled" : ""}>
                   <option value="member"${user.role === "member" ? " selected" : ""}>Member</option>
@@ -331,6 +394,32 @@ async function renderAccounts(query = "") {
       status.textContent = error.message;
     }
   });
+  for (const button of pane.querySelectorAll('button[data-role="account-detail"]')) {
+    button.addEventListener("click", async () => {
+      const row = button.closest("tr[data-user]");
+      if (!row) return;
+      const next = row.nextElementSibling;
+      if (next?.classList.contains("admin-user-detail")) {
+        next.remove();
+        return;
+      }
+      button.disabled = true;
+      try {
+        const data = await api(`/api/v1/admin/users/${encodeURIComponent(button.dataset.user)}`);
+        const detail = document.createElement("tr");
+        detail.className = "admin-user-detail";
+        detail.innerHTML = `<td colspan="${row.children.length}">${accountDetailRows(data)}</td>`;
+        detail.querySelector('[data-role="detail-close"]').addEventListener("click", () => detail.remove());
+        row.after(detail);
+      } catch (error) {
+        if (error instanceof AuthError) return showAuth();
+        showError(error);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   for (const row of pane.querySelectorAll("tr[data-user]")) {
     const userId = row.dataset.user;
     for (const select of row.querySelectorAll("select[data-role]")) {
@@ -352,10 +441,10 @@ async function renderAccounts(query = "") {
 }
 
 async function renderTeams() {
-  pane.innerHTML = `<div class="admin-loading">Loading teams...</div>`;
+  pane.innerHTML = `<div class="admin-loading">Loading boards...</div>`;
   let data;
   try {
-    data = await api("/api/v1/admin/teams?limit=100");
+    data = await api("/api/v1/admin/boards?limit=100");
   } catch (error) {
     if (error instanceof AuthError) return showAuth();
     pane.innerHTML = "";
@@ -363,16 +452,16 @@ async function renderTeams() {
   }
   pane.innerHTML = `
     <div class="ky-section admin-section">
-      <div class="admin-section-head"><div><h2>Teams</h2><p>${data.total} project${
+      <div class="admin-section-head"><div><h2>Boards</h2><p>${data.total} board${
         data.total === 1 ? "" : "s"
       } owned by service accounts.</p></div></div>
       <form class="admin-toolbar admin-team-create" data-role="team-create">
-        <input class="admin-search" name="name" placeholder="New team name" maxlength="120" required />
-        <button class="ky-button ky-button-primary" type="submit">Create team</button>
+        <input class="admin-search" name="name" placeholder="New board name" maxlength="120" required />
+        <button class="ky-button ky-button-primary" type="submit">Create board</button>
       </form>
       ${
-        data.teams.length
-          ? `<div class="admin-team-grid">${data.teams
+        (data.boards || data.teams).length
+          ? `<div class="admin-team-grid">${(data.boards || data.teams)
               .map(
                 (team) => `
             <div class="admin-team">
@@ -412,7 +501,7 @@ async function renderTeams() {
             </div>`
               )
               .join("")}</div>`
-          : `<div class="admin-empty">No teams yet. Create the first one above.</div>`
+          : `<div class="admin-empty">No boards yet. Create the first one above.</div>`
       }
     </div>`;
 
@@ -421,7 +510,7 @@ async function renderTeams() {
     const name = event.target.name.value.trim();
     if (!name) return;
     try {
-      await api("/api/v1/admin/teams", { method: "POST", body: { name } });
+      await api("/api/v1/admin/boards", { method: "POST", body: { name } });
       await renderTeams();
     } catch (error) {
       if (error instanceof AuthError) return showAuth();
@@ -432,7 +521,7 @@ async function renderTeams() {
   async function loadMembers(teamId, box) {
     box.textContent = "Loading members...";
     try {
-      const data = await api(`/api/v1/admin/teams/${encodeURIComponent(teamId)}/members`);
+      const data = await api(`/api/v1/admin/boards/${encodeURIComponent(teamId)}/members`);
       const countEl = box.closest(".admin-team")?.querySelector('[data-role="team-member-count"]');
       if (countEl) {
         countEl.textContent = `${data.members.length} member${data.members.length === 1 ? "" : "s"}`;
@@ -485,7 +574,7 @@ async function renderTeams() {
           const previous = select.dataset.previous;
           try {
             await api(
-              `/api/v1/admin/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(select.dataset.member)}`,
+              `/api/v1/admin/boards/${encodeURIComponent(teamId)}/members/${encodeURIComponent(select.dataset.member)}`,
               { method: "PATCH", body: { role: select.value } }
             );
             select.dataset.previous = select.value;
@@ -509,7 +598,7 @@ async function renderTeams() {
           }
           try {
             await api(
-              `/api/v1/admin/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(button.dataset.member)}`,
+              `/api/v1/admin/boards/${encodeURIComponent(teamId)}/members/${encodeURIComponent(button.dataset.member)}`,
               { method: "DELETE" }
             );
             await loadMembers(teamId, box);
@@ -524,7 +613,7 @@ async function renderTeams() {
         const email = String(form.email.value || "").trim();
         if (!email) return;
         try {
-          await api(`/api/v1/admin/teams/${encodeURIComponent(teamId)}/members`, {
+          await api(`/api/v1/admin/boards/${encodeURIComponent(teamId)}/members`, {
             method: "POST",
             body: { email, role: form.role.value },
           });
@@ -568,7 +657,7 @@ async function renderTeams() {
       const name = event.target.name.value.trim();
       if (!name) return;
       try {
-        await api(`/api/v1/admin/teams/${encodeURIComponent(form.dataset.rename)}`, {
+        await api(`/api/v1/admin/boards/${encodeURIComponent(form.dataset.rename)}`, {
           method: "PATCH",
           body: { name },
         });
@@ -591,7 +680,7 @@ async function renderTeams() {
         return;
       }
       try {
-        await api(`/api/v1/admin/teams/${encodeURIComponent(button.dataset.team)}`, { method: "DELETE" });
+        await api(`/api/v1/admin/boards/${encodeURIComponent(button.dataset.team)}`, { method: "DELETE" });
         await renderTeams();
       } catch (error) {
         showError(error);
@@ -1143,7 +1232,7 @@ async function renderSharing() {
 const COMMANDS = [
   { id: "overview", label: "Go to Overview", hint: "Dashboard", run: () => void go("overview") },
   { id: "accounts", label: "Go to Accounts", hint: "Dashboard", run: () => void go("accounts") },
-  { id: "teams", label: "Go to Teams", hint: "Dashboard", run: () => void go("teams") },
+  { id: "boards", label: "Go to Boards", hint: "Dashboard", run: () => void go("boards") },
   { id: "activity", label: "Go to Activity", hint: "Dashboard", run: () => void go("activity") },
   { id: "sharing", label: "Go to Sharing", hint: "Dashboard", run: () => void go("sharing") },
   { id: "account", label: "Open Account settings", hint: "Account", run: () => void go("account") },
@@ -1251,7 +1340,7 @@ function runCommand(id) {
 const PAGE_TITLES = {
   overview: "Overview",
   accounts: "Accounts",
-  teams: "Teams",
+  boards: "Boards",
   activity: "Activity",
   sharing: "Sharing",
   account: "Account",
@@ -1279,7 +1368,7 @@ async function go(next) {
     return;
   }
   if (next === "accounts") return renderAccounts();
-  if (next === "teams") return renderTeams();
+  if (next === "boards") return renderTeams();
   if (next === "sharing") return renderSharing();
   if (next === "account") return renderAccount();
   return renderActivity();

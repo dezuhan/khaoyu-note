@@ -69,6 +69,9 @@ async function main() {
     config.publicUrl = frontendUrl;
   }
   config.port = backendPort;
+  config.corsOrigins = [
+    ...new Set([...(config.corsOrigins || []), frontendUrl, backendUrl]),
+  ];
 
   const handler = createServiceHandler({ config, db, logger, mailer, events, coordination });
   const backend = http.createServer((request, response) => {
