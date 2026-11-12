@@ -2,8 +2,8 @@
 // The token vocabulary lives in ky.css; this module only resolves and persists the active skin.
 //
 // Storage keys are per origin, so every deployment (Tauri webview, local web host, self-hosted
-// service) stores its own choice. Service pages share one `khaoyu.theme` key; the app keeps the
-// historical `mn.theme` key.
+// service) stores its own choice. Service pages share one `khaoyu.theme` key; the app stores the
+// choice under `ky.theme`, after the historical `mn.theme` key is migrated by storage-keys.js.
 
 export const SKINS = ["light", "softLight", "softDark", "dark"];
 export const DEFAULT_THEME = "light";
