@@ -23,6 +23,11 @@ project uses Semantic Versioning.
   gutter), and the rail cannot be dragged.
 - The web app and every service page declare SVG and PNG favicons rendered from the shared brand
   mark, so browser tabs and touch shortcuts show the Khaoyu icon.
+- Admins can rename and delete teams from the dashboard. Deleting a team soft-deletes it and its
+  child boards, disables public sharing and revokes its share links and invitations. Admins can also
+  add an existing account to a team by email with an editor, commenter or viewer role, change that
+  role and remove the member; the owner row is immutable. Every action writes an `admin.*` audit row
+  and all endpoints require the admin role and CSRF token.
 - `shared/theme/` is now the single source for the token stylesheet, fonts, SVG icon set, brand mark
   and theme runtime. `npm run theme:sync` generates the app and service copies, and CI runs
   `npm run theme:check` to fail on drift.

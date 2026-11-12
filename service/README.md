@@ -76,7 +76,10 @@ set, fonts and theme tokens.
   team count, last activity and last update. Admins can change another account's role or status; an
   account cannot demote or disable itself, and the last active admin cannot be removed.
 - Teams lists projects with their owner, member count, revision and last update. Create team adds a
-  project with a fresh snapshot and the signed-in admin as owner. Members expands the member list.
+  project with a fresh snapshot and the signed-in admin as owner. Rename and Delete update or
+  soft-delete a team (deleting revokes its share links and invitations and cascades to child boards).
+  Members expands the member list; admins can add an existing account by email with an
+  editor/commenter/viewer role, change that role and remove the member. The owner row is immutable.
 - Activity reads every audit row with actor, action, resource and time, filterable by text and action
   prefix, with Load more pagination.
 - Sharing lists accessible projects, enables or disables public sharing with an acknowledgement and

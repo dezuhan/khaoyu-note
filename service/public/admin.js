@@ -340,7 +340,20 @@ async function renderTeams() {
               .map(
                 (team) => `
             <div class="admin-team">
-              <h3>${escapeHtml(team.name)}</h3>
+              <div class="admin-team-head">
+                <h3>${escapeHtml(team.name)}</h3>
+                <div class="admin-team-actions">
+                  <button class="ky-button ky-button-quiet" type="button" data-role="members" data-team="${escapeHtml(
+                    team.id
+                  )}">Members</button>
+                  <button class="ky-button ky-button-quiet" type="button" data-role="rename" data-team="${escapeHtml(
+                    team.id
+                  )}">Rename</button>
+                  <button class="ky-button ky-button-quiet admin-danger-text" type="button" data-role="delete" data-team="${escapeHtml(
+                    team.id
+                  )}">Delete</button>
+                </div>
+              </div>
               <div class="admin-user">${avatarHtml({
                 displayName: team.owner_name,
                 email: team.owner_email,
@@ -350,13 +363,15 @@ async function renderTeams() {
                 team.owner_email
               )}</span></span></div>
               <div class="admin-team-meta">
-                <span>${team.member_count} member${team.member_count === 1 ? "" : "s"}</span>
+                <span data-role="team-member-count">${team.member_count} member${team.member_count === 1 ? "" : "s"}</span>
                 <span>rev ${team.revision}</span>
                 <span>Updated ${escapeHtml(formatTime(team.updated_at))}</span>
               </div>
-              <div class="admin-actions"><button class="ky-button ky-button-quiet" type="button" data-role="members" data-team="${escapeHtml(
-                team.id
-              )}">Members</button></div>
+              <form class="admin-team-rename" data-rename="${escapeHtml(team.id)}" hidden>
+                <input class="admin-search" name="name" value="${escapeHtml(team.name)}" maxlength="120" required />
+                <button class="ky-button ky-button-primary" type="submit">Save</button>
+                <button class="ky-button ky-button-quiet" type="button" data-cancel>Cancel</button>
+              </form>
               <div class="admin-members" data-members="${escapeHtml(team.id)}"></div>
             </div>`
               )
@@ -364,6 +379,7 @@ async function renderTeams() {
           : `<div class="admin-empty">No teams yet. Create the first one above.</div>`
       }
     </div>`;
+
   pane.querySelector('[data-role="team-create"]').addEventListener("submit", async (event) => {
     event.preventDefault();
     const name = event.target.name.value.trim();
@@ -376,6 +392,116 @@ async function renderTeams() {
       showError(error);
     }
   });
+
+  async function loadMembers(teamId, box) {
+    box.textContent = "Loading members...";
+    try {
+      const data = await api(`/api/v1/admin/teams/${encodeURIComponent(teamId)}/members`);
+      const countEl = box.closest(".admin-team")?.querySelector('[data-role="team-member-count"]');
+      if (countEl) {
+        countEl.textContent = `${data.members.length} member${data.members.length === 1 ? "" : "s"}`;
+      }
+      const roles = ["editor", "commenter", "viewer"];
+      box.innerHTML = `
+        <table class="ky-table admin-table"><thead><tr><th>Member</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
+          ${data.members
+            .map(
+              (member) => `<tr>
+                <td><div class="admin-user">${avatarHtml(member)}<span class="admin-user-copy"><strong>${escapeHtml(
+                  displayName(member)
+                )}</strong><span>${escapeHtml(member.email)}</span></span></div></td>
+                <td>${
+                  member.role === "owner"
+                    ? `<span class="admin-role-owner">Owner</span>`
+                    : `<select class="admin-select" data-role="member-role" data-member="${escapeHtml(
+                        member.id
+                      )}" aria-label="Role for ${escapeHtml(member.email)}">${roles
+                        .map(
+                          (role) =>
+                            `<option value="${role}"${role === member.role ? " selected" : ""}>${role}</option>`
+                        )
+                        .join("")}</select>`
+                }</td>
+                <td>${escapeHtml(member.status)}</td>
+                <td>${
+                  member.role === "owner"
+                    ? ""
+                    : `<button class="ky-button ky-button-quiet admin-danger-text" type="button" data-role="member-remove" data-member="${escapeHtml(
+                        member.id
+                      )}">Remove</button>`
+                }</td>
+              </tr>`
+            )
+            .join("")}
+        </tbody></table>
+        <form class="admin-member-add admin-toolbar" data-role="member-add">
+          <input class="admin-search" name="email" type="email" placeholder="Member email" maxlength="320" required />
+          <select class="admin-select" name="role" aria-label="New member role">${roles
+            .map((role) => `<option value="${role}">${role}</option>`)
+            .join("")}</select>
+          <button class="ky-button ky-button-primary" type="submit">Add member</button>
+        </form>
+        <p class="admin-note" data-role="member-status" role="status"></p>`;
+      const status = box.querySelector('[data-role="member-status"]');
+      for (const select of box.querySelectorAll('select[data-role="member-role"]')) {
+        select.dataset.previous = select.value;
+        select.addEventListener("change", async () => {
+          const previous = select.dataset.previous;
+          try {
+            await api(
+              `/api/v1/admin/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(select.dataset.member)}`,
+              { method: "PATCH", body: { role: select.value } }
+            );
+            select.dataset.previous = select.value;
+            status.textContent = "Member role updated.";
+          } catch (error) {
+            select.value = previous;
+            status.textContent = error.message;
+          }
+        });
+      }
+      for (const button of box.querySelectorAll('button[data-role="member-remove"]')) {
+        button.addEventListener("click", async () => {
+          if (button.dataset.confirm !== "1") {
+            button.dataset.confirm = "1";
+            button.textContent = "Confirm remove";
+            setTimeout(() => {
+              button.dataset.confirm = "";
+              button.textContent = "Remove";
+            }, 4000);
+            return;
+          }
+          try {
+            await api(
+              `/api/v1/admin/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(button.dataset.member)}`,
+              { method: "DELETE" }
+            );
+            await loadMembers(teamId, box);
+          } catch (error) {
+            status.textContent = error.message;
+          }
+        });
+      }
+      box.querySelector('[data-role="member-add"]').addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const email = String(form.email.value || "").trim();
+        if (!email) return;
+        try {
+          await api(`/api/v1/admin/teams/${encodeURIComponent(teamId)}/members`, {
+            method: "POST",
+            body: { email, role: form.role.value },
+          });
+          await loadMembers(teamId, box);
+        } catch (error) {
+          status.textContent = error.message;
+        }
+      });
+    } catch (error) {
+      box.textContent = error.message;
+    }
+  }
+
   for (const button of pane.querySelectorAll('button[data-role="members"]')) {
     button.addEventListener("click", async () => {
       const box = pane.querySelector(`[data-members="${CSS.escape(button.dataset.team)}"]`);
@@ -384,23 +510,55 @@ async function renderTeams() {
         box.dataset.open = "0";
         return;
       }
-      box.textContent = "Loading members...";
+      box.dataset.open = "1";
+      await loadMembers(button.dataset.team, box);
+    });
+  }
+
+  for (const button of pane.querySelectorAll('button[data-role="rename"]')) {
+    button.addEventListener("click", () => {
+      const form = pane.querySelector(`form[data-rename="${CSS.escape(button.dataset.team)}"]`);
+      form.hidden = !form.hidden;
+      if (!form.hidden) form.querySelector("input").focus();
+    });
+  }
+
+  for (const form of pane.querySelectorAll("form.admin-team-rename")) {
+    form.querySelector("[data-cancel]").addEventListener("click", () => {
+      form.hidden = true;
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const name = event.target.name.value.trim();
+      if (!name) return;
       try {
-        const members = await api(
-          `/api/v1/admin/teams/${encodeURIComponent(button.dataset.team)}/members`
-        );
-        box.innerHTML = `<table class="ky-table admin-table"><thead><tr><th>Member</th><th>Role</th><th>Status</th></tr></thead><tbody>${members.members
-          .map(
-            (member) => `<tr><td><div class="admin-user">${avatarHtml(member)}<span class="admin-user-copy"><strong>${escapeHtml(
-              displayName(member)
-            )}</strong><span>${escapeHtml(member.email)}</span></span></div></td><td>${escapeHtml(
-              member.role
-            )}</td><td>${escapeHtml(member.status)}</td></tr>`
-          )
-          .join("")}</tbody></table>`;
-        box.dataset.open = "1";
+        await api(`/api/v1/admin/teams/${encodeURIComponent(form.dataset.rename)}`, {
+          method: "PATCH",
+          body: { name },
+        });
+        await renderTeams();
       } catch (error) {
-        box.textContent = error.message;
+        showError(error);
+      }
+    });
+  }
+
+  for (const button of pane.querySelectorAll('button[data-role="delete"]')) {
+    button.addEventListener("click", async () => {
+      if (button.dataset.confirm !== "1") {
+        button.dataset.confirm = "1";
+        button.textContent = "Confirm delete";
+        setTimeout(() => {
+          button.dataset.confirm = "";
+          button.textContent = "Delete";
+        }, 4000);
+        return;
+      }
+      try {
+        await api(`/api/v1/admin/teams/${encodeURIComponent(button.dataset.team)}`, { method: "DELETE" });
+        await renderTeams();
+      } catch (error) {
+        showError(error);
       }
     });
   }

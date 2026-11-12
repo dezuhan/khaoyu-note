@@ -433,8 +433,71 @@ html[data-ky-theme="softLight"] {
   font-size: var(--ky-text-2xs);
 }
 
+.admin-team-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ky-space-8);
+}
+
+.admin-team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ky-space-4);
+}
+
+.admin-team-actions .ky-button {
+  height: var(--ky-control-height);
+  padding: 0 var(--ky-space-8);
+  font-size: var(--ky-text-2xs);
+}
+
+.admin-team-rename {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ky-space-6);
+}
+
+.admin-team-rename[hidden] {
+  display: none;
+}
+
+.admin-team-rename .admin-search {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
 .admin-members {
   margin-top: var(--ky-space-10);
+  overflow-x: auto;
+}
+
+.admin-member-add {
+  gap: var(--ky-space-6);
+  margin-top: var(--ky-space-8);
+}
+
+.admin-member-add .admin-search {
+  flex: 1 1 160px;
+}
+
+.admin-member-add .admin-select {
+  flex: 0 1 120px;
+}
+
+.admin-role-owner {
+  color: var(--ky-muted);
+  font-size: var(--ky-text-sm);
+}
+
+.ky-button.admin-danger-text {
+  color: var(--ky-danger);
+}
+
+.admin-note[data-role="member-status"] {
+  margin: var(--ky-space-6) 0 0;
 }
 
 .admin-auth {
@@ -681,7 +744,7 @@ button.admin-admin:hover {
 }
 
 .admin-team-grid {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
 .admin-team-create {

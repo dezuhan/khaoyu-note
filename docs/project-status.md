@@ -241,6 +241,8 @@ Still blocked by the environment or missing credentials:
 - Service mail now supports SMTP with an outbox fallback, opt-in notification email, signed unsubscribe links and a five minute notification email rate limit.
 - Desktop boards support opt-in server sync with explicit status, revision conflict choices, an offline queue, scoped API tokens and a local-only disable that never deletes server data.
 - Operator admin endpoints expose audit export, abuse reports and service counts behind a separate rate-limited token.
+- Service admins can rename and delete teams and manage team membership (add by email, change role,
+  remove); deletion cascades to child boards and revokes share links/invitations.
 - Threat model, disclosure policy, incident response, release checklist and data residency docs are in the repository.
 - Backups can be encrypted with a scrypt-derived AES-256-GCM key, and login blocks can post a structured alert to an operator webhook.
 - Optional trusted-proxy SSO signs the proxy email with HMAC, can auto-create verified accounts and audits SSO sessions.

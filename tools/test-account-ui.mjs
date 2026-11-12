@@ -141,6 +141,65 @@ try {
       }))
   );
 
+  // Full team CRUD from the admin UI: create, rename, add/update/remove a member, then delete.
+  const teammateEmail = `teammate-${crypto.randomUUID()}@example.com`;
+  const teammate = await fetch(`${base}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: teammateEmail, password: "teammate-password-123", displayName: "Teammate" }),
+  });
+  check("teammate account registered", teammate.status === 202, String(teammate.status));
+  await page.click('.admin-nav-item[data-page="teams"]');
+  await page.waitForSelector('[data-role="team-create"]');
+  await page.fill('[data-role="team-create"] input[name="name"]', "CRUD team");
+  await page.click('[data-role="team-create"] button[type="submit"]');
+  await page.locator(".admin-team h3", { hasText: "CRUD team" }).waitFor();
+  check("team can be created from the dashboard", true);
+
+  const renameButton = page.locator(".admin-team", { hasText: "CRUD team" }).locator('button[data-role="rename"]');
+  await renameButton.click();
+  const renameForm = page.locator(".admin-team", { hasText: "CRUD team" }).locator("form.admin-team-rename");
+  await renameForm.locator('input[name="name"]').fill("CRUD team renamed");
+  await renameForm.locator('button[type="submit"]').click();
+  await page.locator(".admin-team h3", { hasText: "CRUD team renamed" }).waitFor();
+  check("team can be renamed from the dashboard", true);
+
+  const teamCard = page.locator(".admin-team", { hasText: "CRUD team renamed" });
+  await teamCard.locator('button[data-role="members"]').click();
+  await teamCard.locator('[data-role="member-add"] input[name="email"]').fill(teammateEmail);
+  await teamCard.locator('[data-role="member-add"] select[name="role"]').selectOption("editor");
+  await teamCard.locator('[data-role="member-add"] button[type="submit"]').click();
+  await teamCard.locator("tbody tr", { hasText: teammateEmail }).waitFor();
+  check("admin can add a team member manually", true);
+  check(
+    "team member count updates after adding a member",
+    (await teamCard.locator('[data-role="team-member-count"]').innerText()).startsWith("2")
+  );
+
+  const memberRow = teamCard.locator("tbody tr", { hasText: teammateEmail });
+  await memberRow.locator('select[data-role="member-role"]').selectOption("viewer");
+  await page.waitForFunction(() =>
+    document.querySelector('[data-role="member-status"]')?.textContent.includes("updated")
+  );
+  const memberStatus = teamCard.locator('[data-role="member-status"]');
+  check("admin can change a member role", (await memberStatus.innerText()).includes("updated"));
+
+  const removeButton = memberRow.locator('button[data-role="member-remove"]');
+  await removeButton.click();
+  await removeButton.click();
+  await teamCard.locator("tbody tr", { hasText: teammateEmail }).waitFor({ state: "detached" });
+  check("admin can remove a team member", true);
+  check(
+    "team member count updates after removing a member",
+    (await teamCard.locator('[data-role="team-member-count"]').innerText()).startsWith("1")
+  );
+
+  const deleteButton = teamCard.locator('button[data-role="delete"]');
+  await deleteButton.click();
+  await deleteButton.click();
+  await page.locator(".admin-team h3", { hasText: "CRUD team renamed" }).waitFor({ state: "detached" });
+  check("team can be deleted from the dashboard", true);
+
   // The account page inside the dashboard owns sessions, tokens and password changes. It is opened
   // from the profile button: the Account entry is temporarily out of the menu bar.
   check(

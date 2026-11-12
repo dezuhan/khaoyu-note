@@ -198,6 +198,99 @@ test("service admin dashboard API", async (t) => {
     assert.equal(members.body.members[0].role, "owner");
   });
 
+  await t.test("teams support update and delete, and admins manage members manually", async () => {
+    const created = await api.call("/api/v1/admin/teams", {
+      method: "POST",
+      jar: admin.jar,
+      body: { name: "Operations team" },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+
+    await api.register("teammate@example.com");
+    const added = await api.call(`/api/v1/admin/teams/${created.body.id}/members`, {
+      method: "POST",
+      jar: admin.jar,
+      body: { email: "teammate@example.com", role: "editor" },
+    });
+    assert.equal(added.status, 201, JSON.stringify(added.body));
+    assert.equal(added.body.member.role, "editor");
+    const duplicate = await api.call(`/api/v1/admin/teams/${created.body.id}/members`, {
+      method: "POST",
+      jar: admin.jar,
+      body: { email: "teammate@example.com", role: "viewer" },
+    });
+    assert.equal(duplicate.status, 409);
+    assert.equal(duplicate.body.code, "already_member");
+
+    const members = await api.call(`/api/v1/admin/teams/${created.body.id}/members`, { jar: admin.jar });
+    assert.equal(members.body.members.length, 2);
+    const teammate = members.body.members.find((member) => member.email === "teammate@example.com");
+    const owner = members.body.members.find((member) => member.role === "owner");
+    assert.ok(teammate && owner);
+
+    const updated = await api.call(
+      `/api/v1/admin/teams/${created.body.id}/members/${teammate.id}`,
+      { method: "PATCH", jar: admin.jar, body: { role: "viewer" } }
+    );
+    assert.equal(updated.status, 200, JSON.stringify(updated.body));
+    assert.equal(updated.body.role, "viewer");
+    const ownerEdit = await api.call(
+      `/api/v1/admin/teams/${created.body.id}/members/${owner.id}`,
+      { method: "PATCH", jar: admin.jar, body: { role: "viewer" } }
+    );
+    assert.equal(ownerEdit.status, 400);
+    assert.equal(ownerEdit.body.code, "owner_immutable");
+
+    const renamed = await api.call(`/api/v1/admin/teams/${created.body.id}`, {
+      method: "PATCH",
+      jar: admin.jar,
+      body: { name: "Operations renamed" },
+    });
+    assert.equal(renamed.status, 200, JSON.stringify(renamed.body));
+    assert.equal(renamed.body.name, "Operations renamed");
+
+    const member = await api.login("member@example.com");
+    const deniedAdd = await api.call(`/api/v1/admin/teams/${created.body.id}/members`, {
+      method: "POST",
+      jar: member.jar,
+      body: { email: "admin@example.com", role: "viewer" },
+    });
+    assert.equal(deniedAdd.status, 403);
+    assert.equal(deniedAdd.body.code, "admin_required");
+
+    const removed = await api.call(
+      `/api/v1/admin/teams/${created.body.id}/members/${teammate.id}`,
+      { method: "DELETE", jar: admin.jar }
+    );
+    assert.equal(removed.status, 200, JSON.stringify(removed.body));
+    const afterRemove = await api.call(`/api/v1/admin/teams/${created.body.id}/members`, { jar: admin.jar });
+    assert.equal(afterRemove.body.members.length, 1);
+    const ownerRemove = await api.call(
+      `/api/v1/admin/teams/${created.body.id}/members/${owner.id}`,
+      { method: "DELETE", jar: admin.jar }
+    );
+    assert.equal(ownerRemove.status, 400);
+
+    const deleted = await api.call(`/api/v1/admin/teams/${created.body.id}`, {
+      method: "DELETE",
+      jar: admin.jar,
+    });
+    assert.equal(deleted.status, 200, JSON.stringify(deleted.body));
+    assert.equal(deleted.body.deleted, true);
+    const teams = await api.call("/api/v1/admin/teams", { jar: admin.jar });
+    assert.equal(teams.body.teams.some((team) => team.id === created.body.id), false);
+    const activity = await api.call("/api/v1/admin/activity?limit=40", { jar: admin.jar });
+    for (const action of [
+      "admin.team_member_added",
+      "admin.team_member_updated",
+      "admin.team_member_removed",
+      "admin.team_updated",
+      "admin.team_deleted",
+    ]) {
+      assert.ok(activity.body.entries.some((entry) => entry.action === action), action);
+    }
+  });
+
   await t.test("role and status changes are audited and enforce the last admin", async () => {
     const self = await api.call(`/api/v1/admin/users/${admin.body.account.id}`, {
       method: "PATCH",

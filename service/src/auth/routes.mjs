@@ -686,7 +686,108 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      const adminTeamMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)$/);
+      if (method === "PATCH" && adminTeamMatch) {
+        const auth = await requireAdminAccount(request, response, db, config);
+        const projectId = decodeURIComponent(adminTeamMatch[1]);
+        const project = (await db.get("SELECT id, name FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+        if (!project) throw new HttpError(404, "team not found", "not_found");
+        const body = await readJson(request);
+        const name = requireString(body.name, "name", 120);
+        await db.run("UPDATE projects SET name = ?, updated_at = ? WHERE id = ?", [name, now(), projectId]);
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.team_updated",
+          resourceType: "project",
+          resourceId: projectId,
+          metadata: { name, previousName: project.name },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { id: projectId, name }, config);
+        return true;
+      }
+
+      if (method === "DELETE" && adminTeamMatch) {
+        const auth = await requireAdminAccount(request, response, db, config);
+        const projectId = decodeURIComponent(adminTeamMatch[1]);
+        const project = (await db.get("SELECT id, name FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+        if (!project) throw new HttpError(404, "team not found", "not_found");
+        const ids = [projectId];
+        let frontier = [projectId];
+        while (frontier.length) {
+          const marks = frontier.map(() => "?").join(",");
+          const children = await db.all(
+            `SELECT id FROM projects WHERE parent_project_id IN (${marks}) AND deleted_at IS NULL`,
+            frontier
+          );
+          const next = children.map((row) => row.id).filter((id) => !ids.includes(id));
+          ids.push(...next);
+          frontier = next;
+        }
+        const at = now();
+        await db.transaction(async (tx) => {
+          const marks = ids.map(() => "?").join(",");
+          await tx.run(
+            `UPDATE projects SET deleted_at = ?, updated_at = ?, public_sharing_enabled = 0 WHERE id IN (${marks})`,
+            [at, at, ...ids]
+          );
+          await tx.run(
+            `UPDATE share_links SET revoked_at = ? WHERE project_id IN (${marks}) AND revoked_at IS NULL`,
+            [at, ...ids]
+          );
+          await tx.run(
+            `UPDATE project_invitations SET revoked_at = ? WHERE project_id IN (${marks}) AND revoked_at IS NULL`,
+            [at, ...ids]
+          );
+        });
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.team_deleted",
+          resourceType: "project",
+          resourceId: projectId,
+          metadata: { name: project.name, cascaded: ids.length - 1 },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { id: projectId, deleted: true, cascaded: ids.length - 1 }, config);
+        return true;
+      }
+
       const adminTeamMembersMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)\/members$/);
+      if (method === "POST" && adminTeamMembersMatch) {
+        const auth = await requireAdminAccount(request, response, db, config);
+        const projectId = decodeURIComponent(adminTeamMembersMatch[1]);
+        const project = (await db.get("SELECT id, name FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+        if (!project) throw new HttpError(404, "team not found", "not_found");
+        const body = await readJson(request);
+        const role = String(body.role || "viewer").toLowerCase();
+        if (!["editor", "commenter", "viewer"].includes(role)) {
+          throw new HttpError(400, "role must be editor, commenter or viewer", "invalid_role");
+        }
+        const accountId = body.accountId ? requireString(body.accountId, "accountId", 200) : null;
+        const email = body.email ? requireString(body.email, "email", 320).trim().toLowerCase() : null;
+        if (!accountId && !email) throw new HttpError(400, "email is required", "email_required");
+        const account = accountId
+          ? await db.get("SELECT id, email, display_name, status FROM accounts WHERE id = ? AND deleted_at IS NULL", [accountId])
+          : await db.get("SELECT id, email, display_name, status FROM accounts WHERE email = ? AND deleted_at IS NULL", [email]);
+        if (!account) throw new HttpError(404, "account not found", "account_not_found");
+        if (account.status !== "active") throw new HttpError(400, "account is not active", "account_inactive");
+        const existing = await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, account.id]);
+        if (existing) throw new HttpError(409, "account is already a member", "already_member");
+        await db.run("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, ?, ?)", [projectId, account.id, role, now()]);
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.team_member_added",
+          resourceType: "project",
+          resourceId: projectId,
+          metadata: { accountId: account.id, email: account.email, role },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { project: { id: project.id, name: project.name }, member: { id: account.id, email: account.email, displayName: account.display_name, role } }, config);
+        return true;
+      }
       if (method === "GET" && adminTeamMembersMatch) {
         await requireAdminAccount(request, response, db, config);
         const projectId = decodeURIComponent(adminTeamMembersMatch[1]);
@@ -699,6 +800,50 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
              ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 WHEN 'commenter' THEN 2 ELSE 3 END,
                       a.display_name`, [projectId]));
         sendJson(response, 200, { project, members }, config);
+        return true;
+      }
+
+
+      const adminTeamMemberMatch = url.pathname.match(/^\/api\/v1\/admin\/teams\/([^/]+)\/members\/([^/]+)$/);
+      if ((method === "PATCH" || method === "DELETE") && adminTeamMemberMatch) {
+        const auth = await requireAdminAccount(request, response, db, config);
+        const projectId = decodeURIComponent(adminTeamMemberMatch[1]);
+        const accountId = decodeURIComponent(adminTeamMemberMatch[2]);
+        const project = (await db.get("SELECT id, name FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+        if (!project) throw new HttpError(404, "team not found", "not_found");
+        const member = (await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, accountId]));
+        if (!member) throw new HttpError(404, "member not found", "not_found");
+        if (member.role === "owner") throw new HttpError(400, "the team owner cannot be changed or removed", "owner_immutable");
+        if (method === "PATCH") {
+          const body = await readJson(request);
+          const role = String(body.role || "").toLowerCase();
+          if (!["editor", "commenter", "viewer"].includes(role)) {
+            throw new HttpError(400, "role must be editor, commenter or viewer", "invalid_role");
+          }
+          await db.run("UPDATE project_members SET role = ? WHERE project_id = ? AND account_id = ?", [role, projectId, accountId]);
+          await writeAudit(db, {
+            actorAccountId: auth.account.id,
+            action: "admin.team_member_updated",
+            resourceType: "project",
+            resourceId: projectId,
+            metadata: { accountId, role },
+            ip,
+            secret: config.secret,
+          });
+          sendJson(response, 200, { projectId, accountId, role }, config);
+          return true;
+        }
+        await db.run("DELETE FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, accountId]);
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.team_member_removed",
+          resourceType: "project",
+          resourceId: projectId,
+          metadata: { accountId },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { projectId, accountId, removed: true }, config);
         return true;
       }
 
