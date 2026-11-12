@@ -1,4 +1,5 @@
 import { icon } from "./icons.js";
+import { SERVICE_LEGACY_KEYS, THEME_KEY, readStoredTheme, setTheme as persistTheme, systemTheme, toggleTheme as nextTheme } from "./theme.js";
 // Self-hosted service admin dashboard. The page uses the account session and requires the admin role.
 
 const pane = document.getElementById("admin-pane");
@@ -15,7 +16,7 @@ const commandList = document.getElementById("admin-command-list");
 const helpLayer = document.getElementById("admin-help-layer");
 const helpClose = document.getElementById("admin-help-close");
 
-const THEME_KEY = "khaoyu.admin.theme";
+const LEGACY_THEME_KEYS = SERVICE_LEGACY_KEYS;
 let page = "overview";
 let dashboard = null;
 let activityOffset = 0;
@@ -136,24 +137,23 @@ function renderIdentity(admin) {
 }
 
 function setTheme(theme) {
-  document.documentElement.dataset.kyTheme = theme;
-  localStorage.setItem(THEME_KEY, theme);
-  themeButton.innerHTML = icon(theme === "dark" ? "sun" : "moon", 16);
-  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  const applied = persistTheme(theme, { key: THEME_KEY });
+  const dark = applied === "dark" || applied === "softDark";
+  themeButton.innerHTML = icon(dark ? "sun" : "moon", 16);
+  const label = dark ? "Switch to light mode" : "Switch to dark mode";
   themeButton.title = label;
   themeButton.setAttribute("aria-label", label);
 }
 
 function initTheme() {
-  const stored = localStorage.getItem(THEME_KEY);
-  const theme = stored === "light" || stored === "dark"
-    ? stored
-    : matchMedia("(prefers-color-scheme: light)").matches
-      ? "light"
-      : "dark";
+  const theme = readStoredTheme({
+    key: THEME_KEY,
+    legacyKeys: LEGACY_THEME_KEYS,
+    fallback: systemTheme(),
+  });
   setTheme(theme);
   themeButton.addEventListener("click", () => {
-    setTheme(document.documentElement.dataset.kyTheme === "dark" ? "light" : "dark");
+    setTheme(nextTheme(document.documentElement.dataset.kyTheme));
   });
 }
 
@@ -963,7 +963,7 @@ function closeHelp() {
 }
 
 function toggleTheme() {
-  setTheme(document.documentElement.dataset.kyTheme === "dark" ? "light" : "dark");
+  setTheme(nextTheme(document.documentElement.dataset.kyTheme));
 }
 
 async function logout() {

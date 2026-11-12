@@ -26,7 +26,7 @@ Document page editor and drawing page editor:
 
 ![Drawing editor](shots/drawing-editor.png)
 
-Status: working MVP. Every behavior below is covered by an automated Playwright suite (268 checks
+Status: working MVP. Every behavior below is covered by an automated Playwright suite (270 checks
 defined in `tools/test-ui.mjs`) and the MCP server has its own smoke suite (15 checks). Both run in
 CI. The menu bar sits above the file header, its Share control manages per-board access, right-clicking
 a card offers Share link, and **Help > Documentation** opens the offline guide.
@@ -39,12 +39,13 @@ khaoyu-note/
   package.json               localhost web host scripts
   server.mjs                 Node web host: static UI plus SQLite JSON bridge
   service/                   self-hosted service: accounts, sharing, sync, admin (Milestones 1 to 5)
+  shared/theme/              single source: tokens, fonts, icons, logo, theme runtime
   app/                       the Tauri v2 application
     src-tauri/               Rust backend: SQLite storage, window, bundle config
       src/bin/khaoyu-note-mcp.rs  stdio MCP server binary (14 board tools)
     web/                     frontend (HTML, CSS, ES modules)
       js/                    store, render, interact, ui, home, document-editor, drawing-editor
-      vendor/                design-token stylesheet (ky.css, ky.js, unmodified copies)
+      vendor/                generated copies of shared/theme (ky.css, ky.js)
   docs/
     architecture.md          module map, data flow, storage, design decisions
     security-audit.md        Milestones 1 to 7 security and architecture audit
@@ -509,20 +510,22 @@ dependencies (see docs/packaging.md).
 
 ## Design tokens
 
-The app chrome uses a vendored token stylesheet (`vendor/ky.css`, `vendor/ky.js`, unmodified
-copies). That means 24 px controls, 7 px control radius, 12 px floating radius, 12/17 body text,
-custom select dropdowns, and four host skins (`light`, `softLight`, `softDark`, `dark`) driven by
-`--ph-*` tokens.
+The app chrome and service pages use one shared theme source in `shared/theme/`: `ky.css`, the
+font files, the SVG icon set, the brand mark and the `theme.js` runtime. `npm run theme:sync`
+generates the app and service copies, and CI runs `npm run theme:check` so they cannot drift. That
+means 24 px controls, 7 px control radius, 12 px floating radius, 12/17 body text, custom select
+dropdowns, and four host skins (`light`, `softLight`, `softDark`, `dark`) driven by
+`--ky-palette-*` tokens.
 
-Colour is always a `--ky-*` / `--ph-*` token or a `var()` fallback. One intentional content-level
+Colour is always a `--ky-*` / `--ky-palette-*` token or a `var()` fallback. One intentional content-level
 exception: the Heading card and column titles use a serif stack (Georgia, Times), because editorial
 serif headings separate board titles from body text. UI chrome, controls and card body text stay on
 the shared token scale.
 
 Typography uses three swappable families: Plus Jakarta Sans for body text, Space Mono for code and
 numeric codes (colour HEX/RGB/CMYK, sizes), and Georgia as the default editorial serif for headings.
-The Google Fonts woff2 files are vendored in `app/web/fonts` (no runtime network needed) and declared
-in `css/fonts.css`. DM Sans, Playfair Display and Plus Jakarta Sans are variable fonts, so each family
+The Google Fonts woff2 files live in `shared/theme/fonts` (no runtime network needed) and are
+generated into `app/web/fonts` and `service/public/fonts`; `shared/theme/fonts.css` declares them. DM Sans, Playfair Display and Plus Jakarta Sans are variable fonts, so each family
 ships one file with a `font-weight` range; Space Mono keeps its two static weights. Settings >
 Appearance exposes Heading font, Body font and Code font selects; each one can be switched between the
 bundled Google families (Plus Jakarta Sans, DM Sans, Playfair Display, Space Mono) and, for headings,

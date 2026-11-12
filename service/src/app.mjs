@@ -28,6 +28,8 @@ const AUTH_PAGES = {
   "/ui.css": ["ui.css", "text/css; charset=utf-8"],
   "/ky.css": ["ky.css", "text/css; charset=utf-8"],
   "/icons.js": ["icons.js", "text/javascript; charset=utf-8"],
+  "/theme.js": ["theme.js", "text/javascript; charset=utf-8"],
+  "/theme-init.js": ["theme-init.js", "text/javascript; charset=utf-8"],
   "/khaoyu-note.svg": ["khaoyu-note.svg", "image/svg+xml"],
   "/fonts.css": ["fonts.css", "text/css; charset=utf-8"],
   "/fonts/DMSans-400.woff2": ["fonts/DMSans-400.woff2", "font/woff2"],

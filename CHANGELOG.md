@@ -21,6 +21,12 @@ project uses Semantic Versioning.
 - The main editor tool rail is now a floating inset panel: fixed at 12 px from the left, top and
   bottom edges, rounded and shadowed above the canvas. The canvas runs beneath it (no reserved
   gutter), and the rail cannot be dragged.
+- `shared/theme/` is now the single source for the token stylesheet, fonts, SVG icon set, brand mark
+  and theme runtime. `npm run theme:sync` generates the app and service copies, and CI runs
+  `npm run theme:check` to fail on drift.
+- The palette token layer was renamed from `--ph-*` to `--ky-palette-*`, so colour uses one `--ky-*`
+  namespace in the app and the service. Service pages share the `khaoyu.theme` key and migrate the
+  old admin/auth keys; the app keeps `mn.theme`.
 
 ### Fixed
 

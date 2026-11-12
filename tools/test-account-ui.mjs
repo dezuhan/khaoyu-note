@@ -63,6 +63,7 @@ try {
   await waitForReady();
   browser = await chromium.launch();
   const page = await browser.newPage();
+  await page.addInitScript(() => localStorage.setItem("khaoyu.auth.theme", "dark"));
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
@@ -104,6 +105,16 @@ try {
   await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
   check("password login shows the signed-in account", (await page.locator("#admin-email").innerText()).includes(email));
+  const themeState = await page.evaluate(() => ({
+    applied: document.documentElement.dataset.kyTheme,
+    stored: localStorage.getItem("khaoyu.theme"),
+    legacy: localStorage.getItem("khaoyu.auth.theme"),
+  }));
+  check(
+    "service pages share and migrate the theme preference",
+    themeState.applied === "dark" && themeState.stored === "dark",
+    JSON.stringify(themeState)
+  );
   check(
     "admin chrome reuses the main UI logo, SVG icons and fonts",
     (await page.locator(".admin-logo img[src=\"/khaoyu-note.svg\"]").count()) === 1 &&

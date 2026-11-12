@@ -8,11 +8,11 @@
  *   <body class="ky-scope">          ← applies typography + box sizing
  *   <main class="ky-panel ky-scope"> ← plugin panel shell
  *
- * Inside Photon Studio the host injects the real --ph-* theme tokens, so plugins should NOT set
- * data-ky-theme: the framework tokens follow --ph-* automatically. The bundled theme blocks only
+ * Inside Photon Studio the host injects the real --ky-palette-* theme tokens, so plugins should NOT set
+ * data-ky-theme: the framework tokens follow --ky-palette-* automatically. The bundled theme blocks only
  * exist so the preview (and standalone docs) render without the host.
  *
- * Only --ky-* / --ph-* variables are used for colour. Geometry and type are framework constants.
+ * Only --ky-* / --ky-palette-* variables are used for colour. Geometry and type are framework constants.
  */
 
 /* ============================================================== tokens */
@@ -20,58 +20,58 @@
 :root {
   /* Host fallbacks = Photon Studio `dark` skin (Khaoyu design notes §3 "Shared palette — resolved per skin").
      In Photon the host injects the real tokens; these blocks only power the standalone preview. */
-  --ph-black-0: #000000;
-  --ph-black-1: #050505;
-  --ph-black-2: #090909;
-  --ph-black-3: #0d0d0d;
-  --ph-black-4: #111111;
-  --ph-black-5: #151515;
-  --ph-black-6: #1b1b1b;
-  --ph-black-7: #222222;
-  --ph-black-8: #2b2b2b;
-  --ph-bg: var(--ph-black-0);
-  --ph-chrome: var(--ph-black-4);
-  --ph-window: var(--ph-black-5);
-  --ph-text: #f7f7f7;
-  --ph-muted: #a4a4a4;
-  --ph-soft: #6b6b6b;
-  --ph-accent: #ecebe7;
-  --ph-accent-bright: #ffffff;
-  --ph-on-accent: #0c0c0d;
-  --ph-danger: #f5566f;
-  --ph-control: rgba(255, 255, 255, 0.055);
-  --ph-control-hover: rgba(255, 255, 255, 0.1);
-  --ph-control-active: rgba(255, 255, 255, 0.14);
-  --ph-stroke: rgba(255, 255, 255, 0.07);
-  --ph-stroke-strong: rgba(255, 255, 255, 0.12);
-  --ph-hairline: inset 0 0 0 1px var(--ph-stroke);
-  --ph-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%);
-  --ph-glass: rgba(255, 255, 255, 0.075);
-  --ph-glass-plate-strong: rgba(10, 10, 10, 0.86);
-  --ph-glow-input-focus: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 18px rgba(255, 255, 255, 0.045), 0 0 20px rgba(255, 255, 255, 0.06);
-  --ph-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.75);
+  --ky-palette-black-0: #000000;
+  --ky-palette-black-1: #050505;
+  --ky-palette-black-2: #090909;
+  --ky-palette-black-3: #0d0d0d;
+  --ky-palette-black-4: #111111;
+  --ky-palette-black-5: #151515;
+  --ky-palette-black-6: #1b1b1b;
+  --ky-palette-black-7: #222222;
+  --ky-palette-black-8: #2b2b2b;
+  --ky-palette-bg: var(--ky-palette-black-0);
+  --ky-palette-chrome: var(--ky-palette-black-4);
+  --ky-palette-window: var(--ky-palette-black-5);
+  --ky-palette-text: #f7f7f7;
+  --ky-palette-muted: #a4a4a4;
+  --ky-palette-soft: #6b6b6b;
+  --ky-palette-accent: #ecebe7;
+  --ky-palette-accent-bright: #ffffff;
+  --ky-palette-on-accent: #0c0c0d;
+  --ky-palette-danger: #f5566f;
+  --ky-palette-control: rgba(255, 255, 255, 0.055);
+  --ky-palette-control-hover: rgba(255, 255, 255, 0.1);
+  --ky-palette-control-active: rgba(255, 255, 255, 0.14);
+  --ky-palette-stroke: rgba(255, 255, 255, 0.07);
+  --ky-palette-stroke-strong: rgba(255, 255, 255, 0.12);
+  --ky-palette-hairline: inset 0 0 0 1px var(--ky-palette-stroke);
+  --ky-palette-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%);
+  --ky-palette-glass: rgba(255, 255, 255, 0.075);
+  --ky-palette-glass-plate-strong: rgba(10, 10, 10, 0.86);
+  --ky-palette-glow-input-focus: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 18px rgba(255, 255, 255, 0.045), 0 0 20px rgba(255, 255, 255, 0.06);
+  --ky-palette-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.75);
 
   /* framework aliases */
-  --ky-bg: var(--ph-chrome);
-  --ky-surface: var(--ph-window);
-  --ky-text: var(--ph-text);
-  --ky-muted: var(--ph-muted);
-  --ky-soft: var(--ph-soft);
-  --ky-control: var(--ph-control);
-  --ky-control-hover: var(--ph-control-hover);
-  --ky-control-active: var(--ph-control-active);
-  --ky-raise: var(--ph-raise);
-  --ky-hairline: var(--ph-hairline);
-  --ky-stroke: var(--ph-stroke);
-  --ky-line-strong: var(--ph-stroke-strong);
-  --ky-accent: var(--ph-accent);
-  --ky-accent-bright: var(--ph-accent-bright);
-  --ky-on-accent: var(--ph-on-accent);
-  --ky-danger: var(--ph-danger);
-  --ky-popup-bg: var(--ph-glass-plate-strong);
-  --ky-glass: var(--ph-glass);
-  --ky-shadow-popup: var(--ph-depth-raised);
-  --ky-glow-input-focus: var(--ph-glow-input-focus);
+  --ky-bg: var(--ky-palette-chrome);
+  --ky-surface: var(--ky-palette-window);
+  --ky-text: var(--ky-palette-text);
+  --ky-muted: var(--ky-palette-muted);
+  --ky-soft: var(--ky-palette-soft);
+  --ky-control: var(--ky-palette-control);
+  --ky-control-hover: var(--ky-palette-control-hover);
+  --ky-control-active: var(--ky-palette-control-active);
+  --ky-raise: var(--ky-palette-raise);
+  --ky-hairline: var(--ky-palette-hairline);
+  --ky-stroke: var(--ky-palette-stroke);
+  --ky-line-strong: var(--ky-palette-stroke-strong);
+  --ky-accent: var(--ky-palette-accent);
+  --ky-accent-bright: var(--ky-palette-accent-bright);
+  --ky-on-accent: var(--ky-palette-on-accent);
+  --ky-danger: var(--ky-palette-danger);
+  --ky-popup-bg: var(--ky-palette-glass-plate-strong);
+  --ky-glass: var(--ky-palette-glass);
+  --ky-shadow-popup: var(--ky-palette-depth-raised);
+  --ky-glow-input-focus: var(--ky-palette-glow-input-focus);
 
   /* geometry */
   --ky-radius-control: 7px;
@@ -108,78 +108,78 @@ html[data-ky-theme="dark"] {
 
 html[data-ky-theme="softDark"] {
   color-scheme: dark;
-  --ph-black-0: #202022;
-  --ph-black-1: #242426;
-  --ph-black-2: #28282a;
-  --ph-black-3: #2c2c2e;
-  --ph-black-4: #303033;
-  --ph-black-5: #343437;
-  --ph-black-6: #3a3a3d;
-  --ph-black-7: #414144;
-  --ph-black-8: #49494c;
-  --ph-text: #ededee;
-  --ph-muted: #b4b4b9;
-  --ph-soft: #9c9ca3;
-  --ph-accent: #ecebe7;
-  --ph-accent-bright: #ffffff;
-  --ph-on-accent: #0c0c0d;
-  --ph-control: rgba(255, 255, 255, 0.055);
-  --ph-control-hover: rgba(255, 255, 255, 0.1);
-  --ph-control-active: rgba(255, 255, 255, 0.14);
-  --ph-stroke: rgba(255, 255, 255, 0.07);
-  --ph-stroke-strong: rgba(255, 255, 255, 0.12);
-  --ph-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%);
-  --ph-glass: rgba(255, 255, 255, 0.075);
-  --ph-glass-plate-strong: rgba(40, 40, 42, 0.94);
-  --ph-glow-input-focus: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 18px rgba(255, 255, 255, 0.045), 0 0 20px rgba(255, 255, 255, 0.06);
-  --ph-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.75);
+  --ky-palette-black-0: #202022;
+  --ky-palette-black-1: #242426;
+  --ky-palette-black-2: #28282a;
+  --ky-palette-black-3: #2c2c2e;
+  --ky-palette-black-4: #303033;
+  --ky-palette-black-5: #343437;
+  --ky-palette-black-6: #3a3a3d;
+  --ky-palette-black-7: #414144;
+  --ky-palette-black-8: #49494c;
+  --ky-palette-text: #ededee;
+  --ky-palette-muted: #b4b4b9;
+  --ky-palette-soft: #9c9ca3;
+  --ky-palette-accent: #ecebe7;
+  --ky-palette-accent-bright: #ffffff;
+  --ky-palette-on-accent: #0c0c0d;
+  --ky-palette-control: rgba(255, 255, 255, 0.055);
+  --ky-palette-control-hover: rgba(255, 255, 255, 0.1);
+  --ky-palette-control-active: rgba(255, 255, 255, 0.14);
+  --ky-palette-stroke: rgba(255, 255, 255, 0.07);
+  --ky-palette-stroke-strong: rgba(255, 255, 255, 0.12);
+  --ky-palette-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%);
+  --ky-palette-glass: rgba(255, 255, 255, 0.075);
+  --ky-palette-glass-plate-strong: rgba(40, 40, 42, 0.94);
+  --ky-palette-glow-input-focus: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 18px rgba(255, 255, 255, 0.045), 0 0 20px rgba(255, 255, 255, 0.06);
+  --ky-palette-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.75);
 }
 
 html[data-ky-theme="light"],
 html[data-ky-theme="softLight"] {
   color-scheme: light;
-  --ph-black-0: #eeeeee;
-  --ph-black-1: #e7e7e7;
-  --ph-black-2: #f0f0f0;
-  --ph-black-3: #f3f3f3;
-  --ph-black-4: #f7f7f7;
-  --ph-black-5: #fafafa;
-  --ph-black-6: #fdfdfd;
-  --ph-black-7: #ffffff;
-  --ph-black-8: #ffffff;
-  --ph-text: #17171a;
-  --ph-muted: #4f4f57;
-  --ph-soft: #6f6f78;
-  --ph-accent: #26262b;
-  --ph-accent-bright: #0c0c0d;
-  --ph-on-accent: #ffffff;
-  --ph-danger: #f5566f;
-  --ph-control: rgba(0, 0, 0, 0.055);
-  --ph-control-hover: rgba(0, 0, 0, 0.09);
-  --ph-control-active: rgba(0, 0, 0, 0.13);
-  --ph-stroke: rgba(0, 0, 0, 0.09);
-  --ph-stroke-strong: rgba(0, 0, 0, 0.14);
-  --ph-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%);
-  --ph-glass: rgba(255, 255, 255, 0.5);
-  --ph-glass-plate-strong: rgba(253, 253, 253, 0.88);
-  --ph-glow-input-focus: inset 0 0 0 1px rgba(0, 0, 0, 0.2), 0 0 14px rgba(0, 0, 0, 0.05);
-  --ph-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.2);
+  --ky-palette-black-0: #eeeeee;
+  --ky-palette-black-1: #e7e7e7;
+  --ky-palette-black-2: #f0f0f0;
+  --ky-palette-black-3: #f3f3f3;
+  --ky-palette-black-4: #f7f7f7;
+  --ky-palette-black-5: #fafafa;
+  --ky-palette-black-6: #fdfdfd;
+  --ky-palette-black-7: #ffffff;
+  --ky-palette-black-8: #ffffff;
+  --ky-palette-text: #17171a;
+  --ky-palette-muted: #4f4f57;
+  --ky-palette-soft: #6f6f78;
+  --ky-palette-accent: #26262b;
+  --ky-palette-accent-bright: #0c0c0d;
+  --ky-palette-on-accent: #ffffff;
+  --ky-palette-danger: #f5566f;
+  --ky-palette-control: rgba(0, 0, 0, 0.055);
+  --ky-palette-control-hover: rgba(0, 0, 0, 0.09);
+  --ky-palette-control-active: rgba(0, 0, 0, 0.13);
+  --ky-palette-stroke: rgba(0, 0, 0, 0.09);
+  --ky-palette-stroke-strong: rgba(0, 0, 0, 0.14);
+  --ky-palette-raise: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%);
+  --ky-palette-glass: rgba(255, 255, 255, 0.5);
+  --ky-palette-glass-plate-strong: rgba(253, 253, 253, 0.88);
+  --ky-palette-glow-input-focus: inset 0 0 0 1px rgba(0, 0, 0, 0.2), 0 0 14px rgba(0, 0, 0, 0.05);
+  --ky-palette-depth-raised: 0 12px 34px rgba(0, 0, 0, 0.2);
 }
 
 html[data-ky-theme="softLight"] {
-  --ph-black-0: #c4c4c8;
-  --ph-black-1: #bdbdc2;
-  --ph-black-2: #cacace;
-  --ph-black-3: #d0d0d4;
-  --ph-black-4: #d6d6da;
-  --ph-black-5: #dfdfe3;
-  --ph-black-6: #e6e6ea;
-  --ph-black-7: #ededf0;
-  --ph-black-8: #f1f1f3;
-  --ph-muted: #484850;
-  --ph-soft: #606069;
-  --ph-glass: rgba(230, 230, 234, 0.5);
-  --ph-glass-plate-strong: rgba(224, 224, 228, 0.94);
+  --ky-palette-black-0: #c4c4c8;
+  --ky-palette-black-1: #bdbdc2;
+  --ky-palette-black-2: #cacace;
+  --ky-palette-black-3: #d0d0d4;
+  --ky-palette-black-4: #d6d6da;
+  --ky-palette-black-5: #dfdfe3;
+  --ky-palette-black-6: #e6e6ea;
+  --ky-palette-black-7: #ededf0;
+  --ky-palette-black-8: #f1f1f3;
+  --ky-palette-muted: #484850;
+  --ky-palette-soft: #606069;
+  --ky-palette-glass: rgba(230, 230, 234, 0.5);
+  --ky-palette-glass-plate-strong: rgba(224, 224, 228, 0.94);
 }
 
 /* ============================================================== base scope */
@@ -680,7 +680,7 @@ html[data-ky-theme="softLight"] {
 }
 
 .ky-select select option {
-  background: var(--ph-black-5, #151515);
+  background: var(--ky-palette-black-5, #151515);
   color: var(--ky-text);
 }
 

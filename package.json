@@ -39,7 +39,10 @@
     "test:onboarding": "node tools/test-onboarding.mjs",
     "dist:checksums": "node tools/checksums.mjs --dir dist",
     "i18n:audit": "node tools/i18n-audit.mjs",
-    "test:theme": "node tools/test-theme-global.mjs"
+    "test:theme": "node tools/test-theme-global.mjs",
+    "theme:sync": "node tools/sync-theme.mjs",
+    "theme:check": "node tools/sync-theme.mjs --check",
+    "test:theme-module": "node --test tools/test-theme-module.test.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3"

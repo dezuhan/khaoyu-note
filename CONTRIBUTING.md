@@ -50,6 +50,7 @@ Run the checks that match the change:
 ```powershell
 node --experimental-vm-modules scripts/check-web.cjs
 node tools/test-ui.mjs http://127.0.0.1:1430/
+npm run theme:check
 node tools/test-card-features.mjs http://127.0.0.1:1430/
 node tools/test-web-mode.mjs
 node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs

@@ -258,6 +258,8 @@ Still blocked by the environment or missing credentials:
 - Settings navigation is Account, divider, General, Appearance, Tools, Performance, divider, MCP, About. Language and Canvas are merged, Tools is a two-column icon grid, and Account links the service pages.
 - The desktop app and service account, passkey, sharing and share viewer pages use the same framework stylesheet (`ky.css`); the service adds only an auth-panel layout layer.
 - Account browser checks now include the shared service design tokens.
+- `shared/theme/` is the single source for tokens, fonts, icons, the brand mark and the theme runtime;
+  generated app/service copies are checked in CI, and the palette layer uses `--ky-palette-*`.
 - Link header images and image cards support free crop with a Fit to image reset, applied from the context menu; the crop dialog fits the whole image on screen before editing.
 - Audio editing uses a clip-only upload button and Submit; uploading again while editing replaces the source before submit.
 - Audio playback supports MP3, WAV, M4A, AAC, OGG, Opus and FLAC MIME types in the web host and preview fallback, with a visible error toast for unsupported files.

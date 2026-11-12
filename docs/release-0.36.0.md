@@ -12,6 +12,9 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   is rate limited to 20 requests per 15-minute window per owner and IP.
 - **Global light/dark theme**: the theme is now an app-wide preference. Boards no longer store or
   apply their own theme, so switching boards or reloading keeps the chosen mode.
+- **Shared theme source**: `shared/theme/` now owns the token stylesheet, fonts, icons, brand mark
+  and theme runtime. `npm run theme:sync` generates the app/service copies and CI runs
+  `npm run theme:check`; palette tokens use the `--ky-palette-*` namespace.
 - **Service dashboard refresh**: unauthenticated visits redirect straight to `/login`, and the login,
   registration and reset pages reuse the main app logo, fonts and theme icons. The admin page keeps
   the left rail and adds a top menu bar in the app's chrome style with the same logo, SVG icon set and fonts, Dashboard/Help menus, command search

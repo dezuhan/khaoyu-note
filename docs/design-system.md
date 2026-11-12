@@ -6,8 +6,8 @@ Khaoyu Note uses one token vocabulary across the desktop app and the optional se
 
 | Token | Dark default | Use |
 | --- | --- | --- |
-| `--ky-bg` | `#111111` (`--ph-chrome`) | Window and page background |
-| `--ky-surface` | `#151515` (`--ph-window`) | Cards, dialogs, settings panes |
+| `--ky-bg` | `#111111` (`--ky-palette-chrome`) | Window and page background |
+| `--ky-surface` | `#151515` (`--ky-palette-window`) | Cards, dialogs, settings panes |
 | `--ky-control` | `rgba(255, 255, 255, 0.055)` | Icon wells, inactive controls |
 | `--ky-control-hover` | `rgba(255, 255, 255, 0.1)` | Hovered controls |
 | `--ky-control-active` | `rgba(255, 255, 255, 0.14)` | Pressed controls |
@@ -26,9 +26,18 @@ Khaoyu Note uses one token vocabulary across the desktop app and the optional se
 | `--ky-font` | Inter stack, overridden to Plus Jakarta Sans by `app.css` | UI text |
 | `--ky-mono` | monospace stack, overridden to Space Mono by `app.css` | Code and IDs |
 
-`--ky-*` values are aliases into the per-skin `--ph-*` palette, so restyling a skin restyles every
-component. The table above resolves the dark fallback skin. There is no `--ky-surface-raised`,
+`--ky-*` values are aliases into the per-skin `--ky-palette-*` tokens, so restyling a skin restyles
+every component. The table above resolves the dark fallback skin. There is no `--ky-surface-raised`,
 `--ky-accent-strong` or `--ky-font-code`; use `--ky-raise`, `--ky-accent-bright` and `--ky-mono`.
+
+## Source of truth
+
+`shared/theme/` owns the design system: `ky.css` and `ky.js` (token vocabulary and vendored component runtime), `fonts.css` and
+`fonts/`, `icons.js`, `theme.js` (the shared runtime) and the brand mark. `npm run theme:sync`
+generates `app/web/vendor/ky.css`, `service/public/ky.css`, the app font/icon/logo files and the
+service copies; `npm run theme:check` runs in CI and fails when a generated copy drifts. Edit the
+shared source, never the generated copies. Service pages use one `khaoyu.theme` storage key (legacy
+`khaoyu.admin.theme` and `khaoyu.auth.theme` values are migrated on read); the app keeps `mn.theme`.
 
 The desktop app also exposes theme variants (`light`, `softLight`, `softDark`, `dark`) through its
 `ky.css` token layer. New UI must reference tokens, not literal colors.
@@ -46,14 +55,14 @@ The desktop app also exposes theme variants (`light`, `softLight`, `softDark`, `
 
 ## Service pages
 
-`service/public/ky.css` is the same framework stylesheet used by the desktop app
-(`app/web/vendor/ky.css`). Every service page loads it first, then `service/public/ui.css`, a small
-layout layer for the auth panel. Pages use the real `.ky-scope`, `.ky-panel`, `.ky-title`,
+`shared/theme/ky.css` is the framework stylesheet; `npm run theme:sync` writes the desktop copy
+(`app/web/vendor/ky.css`) and the service copy (`service/public/ky.css`). Every service page loads it
+first, then `service/public/ui.css`, a small layout layer for the auth panel. Pages use the real `.ky-scope`, `.ky-panel`, `.ky-title`,
 `.ky-label`, `.ky-input` and `.ky-button` components, so buttons, inputs, typography, focus rings and
 surfaces match the app rather than a hand-written token copy.
 
-When the vendored framework changes, copy it to `service/public/ky.css` and re-run the account,
-passkey, sharing and share viewer suites. The service CSP allows `style-src 'self' 'unsafe-inline'`
+When the shared framework changes, run `npm run theme:sync`, commit the generated copies and re-run
+the account, passkey, sharing and share viewer suites; `npm run theme:check` enforces the sync in CI. The service CSP allows `style-src 'self' 'unsafe-inline'`
 for the stylesheet links and any page-level inline attributes.
 
 ## Settings structure

@@ -7,9 +7,10 @@
 | Shell | Tauri v2 (Rust) | small binary, native WebView2, first-class Rust commands, cross-platform |
 | Storage | SQLite via `rusqlite` (bundled) | single local database, transactions, queryable geometry; JSON boards from the first version migrate automatically |
 | Frontend | vanilla ES modules | no build step: the webview loads the source directly, so dev iteration and Playwright tests need no bundler |
+| Theme | shared source + generated copies | `shared/theme/` owns tokens, fonts, icons, logo and `theme.js`; `tools/sync-theme.mjs` writes the app/service copies and CI verifies them |
 | Board rendering | DOM + CSS transforms | text editing, selection, accessibility and pixel fidelity for free |
 | Drawing | Canvas2D per sketch card | strokes are simple polylines; Canvas2D needs no GPU setup |
-| Design system | vendored token stylesheet (`ky.css`, `ky.js`) | user requirement: shared token language and component contract |
+| Design system | `shared/theme/` with generated app/service copies | one token language, font, icon and theme runtime source; `tools/sync-theme.mjs` writes the copies |
 
 WebGPU is deliberately not used. The board is a few hundred DOM nodes; the bottleneck in this kind of
 app is text editing and layout, not pixels. A GPU renderer would mean losing native text editing and

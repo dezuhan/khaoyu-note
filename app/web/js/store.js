@@ -2,6 +2,7 @@
 
 import * as bridge from "./bridge.js";
 import { createCard, layoutColumns, migrateLegacyKanban, newBoardDoc, uid, welcomeBoard } from "./model.js";
+import { applyTheme as applyDocumentTheme, readStoredTheme, storeTheme } from "./theme.js";
 
 export const state = {
   board: null,
@@ -310,8 +311,8 @@ export function firstOpenableBoard() {
 
 function applyTheme(theme) {
   state.theme = theme;
-  document.documentElement.dataset.kyTheme = theme;
-  localStorage.setItem("mn.theme", theme);
+  applyDocumentTheme(theme);
+  storeTheme(theme, { key: "mn.theme" });
   notify("theme");
 }
 
@@ -467,8 +468,7 @@ export async function removeBoard(id, options = {}) {
 }
 
 export function initTheme() {
-  const stored = localStorage.getItem("mn.theme") || "light";
-  applyTheme(stored);
+  applyTheme(readStoredTheme({ key: "mn.theme", fallback: "light" }));
 }
 
 export async function exportCurrentBoard() {

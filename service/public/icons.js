@@ -1,4 +1,3 @@
-// Mirror of app/web/js/icons.js for the service pages. Keep both copies in sync.
 // Inline SVG icon set. Stroke-based, 24x24 viewBox, currentColor.
 
 const P = (inner, extra = "") =>

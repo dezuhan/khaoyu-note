@@ -3,21 +3,21 @@
 import { isTemporarilyDisabledType } from "./limits.js";
 
 export const PREVIEW_TYPE_COLORS = {
-  note: "var(--ph-black-7, #ffffff)",
-  heading: "var(--ph-black-7, #ffffff)",
-  link: "var(--ph-black-7, #ffffff)",
-  todo: "var(--ph-black-7, #ffffff)",
-  document: "var(--ph-black-7, #ffffff)",
-  comment: "var(--ph-black-7, #ffffff)",
-  table: "var(--ph-black-7, #ffffff)",
-  sketch: "var(--ph-black-6, #fdfdfd)",
+  note: "var(--ky-palette-black-7, #ffffff)",
+  heading: "var(--ky-palette-black-7, #ffffff)",
+  link: "var(--ky-palette-black-7, #ffffff)",
+  todo: "var(--ky-palette-black-7, #ffffff)",
+  document: "var(--ky-palette-black-7, #ffffff)",
+  comment: "var(--ky-palette-black-7, #ffffff)",
+  table: "var(--ky-palette-black-7, #ffffff)",
+  sketch: "var(--ky-palette-black-6, #fdfdfd)",
   image: "var(--ky-control-active, rgba(0,0,0,.1))",
   video: "var(--ky-control-active, rgba(0,0,0,.1))",
   map: "var(--ky-control-active, rgba(0,0,0,.1))",
   audio: "var(--ky-control, rgba(0,0,0,.05))",
   file: "var(--ky-control, rgba(0,0,0,.05))",
   board: "var(--ky-control, rgba(0,0,0,.05))",
-  column: "var(--ph-black-6, #fdfdfd)",
+  column: "var(--ky-palette-black-6, #fdfdfd)",
 };
 
 export function paintBoardPreview(container, doc, { emptyLabel = "Empty board", maxScale = 0.16 } = {}) {
@@ -57,7 +57,7 @@ export function paintBoardPreview(container, doc, { emptyLabel = "Empty board", 
     if (card.type === "color" && card.color) {
       shape.style.background = card.color;
     } else {
-      shape.style.background = PREVIEW_TYPE_COLORS[card.type] || "var(--ph-black-7, #ffffff)";
+      shape.style.background = PREVIEW_TYPE_COLORS[card.type] || "var(--ky-palette-black-7, #ffffff)";
       shape.style.boxShadow = "inset 0 0 0 1px var(--ky-stroke)";
     }
     if (card.type === "column") shape.style.opacity = "0.55";

@@ -1,4 +1,5 @@
 import { icon } from "./icons.js";
+import { SERVICE_LEGACY_KEYS, THEME_KEY, readStoredTheme, setTheme as applyAndStoreTheme, systemTheme, toggleTheme } from "./theme.js";
 // Shared helpers for the standalone service auth pages.
 
 const STATUS_CLASSES = ["is-error", "is-success"];
@@ -82,28 +83,24 @@ export function queryMessage() {
 }
 
 export function initTheme() {
-  const key = "khaoyu.auth.theme";
-  const stored = localStorage.getItem(key);
-  const theme = stored === "light" || stored === "dark"
-    ? stored
-    : window.matchMedia("(prefers-color-scheme: light)").matches
-      ? "light"
-      : "dark";
-  document.documentElement.dataset.kyTheme = theme;
+  const theme = readStoredTheme({
+    key: THEME_KEY,
+    legacyKeys: SERVICE_LEGACY_KEYS,
+    fallback: systemTheme(),
+  });
   const button = $("auth-theme");
-  if (!button) return;
   const paint = (value) => {
-    button.innerHTML = icon(value === "dark" ? "sun" : "moon", 14);
-    const label = value === "dark" ? "Switch to light mode" : "Switch to dark mode";
+    applyAndStoreTheme(value, { key: THEME_KEY });
+    if (!button) return;
+    const dark = value === "dark" || value === "softDark";
+    button.innerHTML = icon(dark ? "sun" : "moon", 14);
+    const label = dark ? "Switch to light mode" : "Switch to dark mode";
     button.title = label;
     button.setAttribute("aria-label", label);
   };
   paint(theme);
-  button.addEventListener("click", () => {
-    const next = document.documentElement.dataset.kyTheme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.kyTheme = next;
-    localStorage.setItem(key, next);
-    paint(next);
+  button?.addEventListener("click", () => {
+    paint(toggleTheme(document.documentElement.dataset.kyTheme));
   });
 }
 
