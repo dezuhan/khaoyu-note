@@ -22,6 +22,30 @@ test("memory coordination handles tickets, locks, presence and leadership", asyn
   await coordination.joinPresence({ projectId: "p1", accountId: "a1", connectionId: "c1" });
   await coordination.joinPresence({ projectId: "p1", accountId: "a1", connectionId: "c2" });
   await coordination.joinPresence({ projectId: "p1", accountId: "a2", connectionId: "c3" });
+  assert.equal(
+    await coordination.updatePresence({
+      projectId: "p1",
+      accountId: "a1",
+      connectionId: "c1",
+      name: "Ada",
+      cursor: { cardId: "card-1", field: "text", offset: 4, length: 2 },
+    }),
+    true
+  );
+  const roster = await coordination.presenceState("p1");
+  const ada = roster.find((entry) => entry.connectionId === "c1");
+  assert.equal(ada.name, "Ada");
+  assert.deepEqual(ada.cursor, { cardId: "card-1", field: "text", offset: 4, length: 2 });
+  assert.equal(
+    await coordination.updatePresence({
+      projectId: "p1",
+      accountId: "a1",
+      connectionId: "c1",
+      cursor: null,
+    }),
+    true
+  );
+  assert.equal((await coordination.presenceState("p1")).find((entry) => entry.connectionId === "c1").cursor, null);
   assert.deepEqual(await coordination.presenceCount("p1"), { accounts: 2, connections: 3 });
   await coordination.leavePresence({ projectId: "p1", connectionId: "c2" });
   assert.deepEqual(await coordination.presenceCount("p1"), { accounts: 2, connections: 2 });
@@ -56,6 +80,19 @@ test(
 
       await first.joinPresence({ projectId: "p1", accountId: "a1", connectionId: "c1" });
       await second.joinPresence({ projectId: "p1", accountId: "a2", connectionId: "c2" });
+      await first.updatePresence({
+        projectId: "p1",
+        accountId: "a1",
+        connectionId: "c1",
+        name: "Ada",
+        cursor: { cardId: "card-1", field: "text", offset: 2, length: 0 },
+      });
+      const redisRoster = await second.presenceState("p1");
+      assert.equal(redisRoster.find((entry) => entry.connectionId === "c1").name, "Ada");
+      assert.deepEqual(
+        redisRoster.find((entry) => entry.connectionId === "c1").cursor,
+        { cardId: "card-1", field: "text", offset: 2, length: 0 }
+      );
       assert.deepEqual(await first.presenceCount("p1"), { accounts: 2, connections: 2 });
       await second.leavePresence({ projectId: "p1", connectionId: "c2" });
       assert.deepEqual(await first.presenceCount("p1"), { accounts: 1, connections: 1 });

@@ -3,6 +3,7 @@
 import * as bridge from "./bridge.js";
 import { adoptRemoteBoard, persistBoardSnapshot, state } from "./store.js";
 import * as sync from "./sync.js";
+import { clearRemoteCursors, renderRemoteCursors } from "./remote-cursors.js";
 
 let refs = null;
 let overlay = null;
@@ -11,6 +12,12 @@ let running = false;
 let realtime = null;
 let realtimeBoardId = null;
 let realtimeStarting = false;
+let lockTimer = 0;
+let cursorTimer = 0;
+let realtimeConnectionId = null;
+let lockCardId = null;
+let lockBoardId = null;
+let lockBoardRef = null;
 
 function toast(message) {
   window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message } }));
@@ -24,6 +31,32 @@ export function initSyncUI(uiRefs) {
     sync.flushQueue().finally(refresh);
   });
   window.addEventListener("beforeunload", closeRealtime);
+  document.addEventListener("selectionchange", scheduleCursorSend);
+  document.addEventListener("focusin", scheduleCursorSend);
+  document.addEventListener("focusout", () => {
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(sendCursor, 160);
+  });
+  window.addEventListener("beforeunload", () => void sync.releaseEditLock(state.board));
+  document.addEventListener("focusin", (event) => {
+    const card = editableCard(event.target);
+    if (card) void acquireLockFor(card);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    const card = editableCard(event.target);
+    if (card) {
+      void acquireLockFor(card);
+    } else if (!event.target.closest?.(".mn-card[data-id]")) {
+      void releaseActiveLock();
+    }
+  });
+  document.addEventListener("focusout", (event) => {
+    const card = editableCard(event.target);
+    if (!card) return;
+    const next = event.relatedTarget;
+    if (next && card.contains(next)) return;
+    scheduleLockRelease(card.dataset.id);
+  });
   if (localStorage.getItem("mn.setupCollaboration") === "1") {
     localStorage.removeItem("mn.setupCollaboration");
     const openAfterBoard = (attempt = 0) => {
@@ -58,6 +91,58 @@ function closeRealtime() {
   realtime = null;
   realtimeBoardId = null;
   realtimeStarting = false;
+  realtimeConnectionId = null;
+  clearRemoteCursors();
+}
+
+function releaseActiveLock() {
+  clearTimeout(lockTimer);
+  lockTimer = 0;
+  lockCardId = null;
+  lockBoardId = null;
+  const board = lockBoardRef;
+  lockBoardRef = null;
+  return sync.releaseEditLock(board);
+}
+
+function editableCard(target) {
+  const editable = target?.closest?.(
+    '[contenteditable="true"], input, textarea, [data-field]'
+  );
+  return editable?.closest?.(".mn-card[data-id]") || null;
+}
+
+async function acquireLockFor(cardEl) {
+  if (!cardEl || !state.board || !sync.syncEnabled(state.board)) return;
+  const cardId = cardEl.dataset.id;
+  if (lockCardId === cardId && lockBoardId === state.board.id) return;
+  await releaseActiveLock();
+  try {
+    const lock = await sync.acquireEditLock(state.board, cardId);
+    if (!lock) {
+      window.dispatchEvent(
+        new CustomEvent("mn:toast", { detail: { message: "This card is being edited by another user" } })
+      );
+      return;
+    }
+    lockCardId = cardId;
+    lockBoardId = state.board.id;
+    lockBoardRef = state.board;
+  } catch (error) {
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", { detail: { message: error.message || "Could not lock this card" } })
+    );
+  }
+}
+
+function scheduleLockRelease(cardId) {
+  clearTimeout(lockTimer);
+  lockTimer = setTimeout(() => {
+    if (lockCardId !== cardId || lockBoardId !== state.board?.id) return;
+    const active = editableCard(document.activeElement);
+    if (active?.dataset.id === cardId) return;
+    void releaseActiveLock();
+  }, 350);
 }
 
 function ensureRealtime() {
@@ -71,6 +156,10 @@ function ensureRealtime() {
   realtimeStarting = true;
   sync
     .openRealtime(board, {
+      onReady: ({ connectionId }) => {
+        realtimeConnectionId = connectionId;
+        sendCursor();
+      },
       onUpdate: async ({ type, data }) => {
         if (type === "presence") {
           if (Number.isFinite(Number(data?.accounts))) {
@@ -80,6 +169,7 @@ function ensureRealtime() {
               `${data.accounts} user${data.accounts === 1 ? "" : "s"} in this project`
             );
           }
+          renderRemoteCursors(data?.users || [], realtimeConnectionId);
           return;
         }
         if (type === "ops") {
@@ -130,6 +220,47 @@ function ensureRealtime() {
     });
 }
 
+function currentCursor() {
+  const active = document.activeElement;
+  if (!active || !state.board) return null;
+  const field = active.closest?.('[contenteditable="true"], textarea, input');
+  const card = field?.closest?.(".mn-card[data-id]");
+  if (!field || !card) return null;
+  let offset = 0;
+  let length = 0;
+  if (field.tagName === "INPUT" || field.tagName === "TEXTAREA") {
+    offset = field.selectionStart || 0;
+    length = Math.max(0, (field.selectionEnd || offset) - offset);
+  } else {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || !field.contains(selection.anchorNode)) return null;
+    const range = selection.getRangeAt(0);
+    const before = document.createRange();
+    before.selectNodeContents(field);
+    before.setEnd(range.startContainer, range.startOffset);
+    offset = before.toString().length;
+    length = range.toString().length;
+  }
+  return {
+    cardId: card.dataset.id,
+    field: field.dataset.field || "text",
+    offset,
+    length,
+  };
+}
+
+function sendCursor() {
+  if (!state.board || !realtimeConnectionId || !sync.syncEnabled(state.board)) return;
+  const cursor = currentCursor();
+  const config = sync.loadSyncConfig();
+  void sync.sendPresence(state.board, realtimeConnectionId, cursor, config.email || "Guest");
+}
+
+function scheduleCursorSend() {
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(sendCursor, 120);
+}
+
 function onBoardSaved(event) {
   if (event.detail?.boardId !== state.board?.id) return;
   if (!sync.syncEnabled(state.board)) return;
@@ -148,6 +279,10 @@ function onBoardSaved(event) {
       if (error.offline) {
         sync.enqueueForOffline(state.board);
         refresh();
+      } else if (error.code === "card_locked") {
+        window.dispatchEvent(
+          new CustomEvent("mn:toast", { detail: { message: "A card is locked by another editor" } })
+        );
       }
     }
   }, 500);

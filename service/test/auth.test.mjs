@@ -371,6 +371,41 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(invalid.status, 400);
     assert.equal(invalid.body.code, "op_invalid");
 
+    const editor = await api.account(`ops-editor-${crypto.randomUUID()}@example.com`);
+    api.db
+      .prepare("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'editor', ?)")
+      .run(projectId, editor.account.id, Date.now());
+    const lock = await api.call(`/api/v1/projects/${projectId}/locks`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { key: "card:n1" },
+    });
+    assert.equal(lock.status, 201);
+    const blocked = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: editor.jar,
+      body: { baseSeq: 3, ops: [{ opId: "op-locked", type: "card.update", payload: { id: "n1", patch: { text: "blocked" } } }] },
+    });
+    assert.equal(blocked.status, 423);
+    assert.equal(blocked.body.code, "card_locked");
+    const allowed = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { baseSeq: 3, ops: [{ opId: "op-owner-update", type: "card.update", payload: { id: "n1", patch: { text: "owner edit" } } }] },
+    });
+    assert.equal(allowed.status, 200);
+    await api.call(`/api/v1/projects/${projectId}/locks`, {
+      method: "DELETE",
+      jar: owner.jar,
+      body: { key: "card:n1", token: lock.body.token },
+    });
+    const unlocked = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: editor.jar,
+      body: { baseSeq: 4, ops: [{ opId: "op-editor-update", type: "card.update", payload: { id: "n1", patch: { text: "editor edit" } } }] },
+    });
+    assert.equal(unlocked.status, 200);
+
     const viewer = await api.account(`ops-viewer-${crypto.randomUUID()}@example.com`);
     api.db
       .prepare("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'viewer', ?)")

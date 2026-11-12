@@ -7668,3 +7668,34 @@ html[data-performance="true"] *::after {
 .mn-public-share .mn-prefs-note {
   margin: 0;
 }
+
+/* Remote collaboration carets. */
+.mn-remote-caret {
+  position: absolute;
+  z-index: 30;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--remote-color, var(--ky-accent));
+  pointer-events: none;
+}
+
+.mn-remote-caret > span {
+  position: absolute;
+  top: -17px;
+  left: -1px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--remote-color, var(--ky-accent));
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.mn-remote-selection {
+  position: absolute;
+  z-index: 29;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--remote-color, var(--ky-accent)) 22%, transparent);
+  pointer-events: none;
+}

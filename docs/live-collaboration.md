@@ -18,20 +18,36 @@ persisted in PostgreSQL/SQLite before broadcast.
    was pruned they fetch the snapshot and resync.
 6. Presence counts are tracked in Redis; the client refreshes its connection TTL periodically.
 
-## Conflict model
+## Conflict model and locks
 
 - Operations are ordered by the server, so all clients converge on the same card list.
-- Distinct cards/fields merge naturally.
-- **Same text field edited concurrently is last-writer-wins.** There is no character-level CRDT/OT or
-  cursor/selection awareness yet. Treat highly concurrent prose editing as beta.
+- Distinct cards merge naturally.
+- The app acquires a **hard card lock** while an editable field has focus. A second editor receives a
+  toast and the server rejects card updates for that lock with `423 card_locked`; updates by the lock
+  owner pass.
+- This deliberately prevents concurrent same-card text editing instead of silently applying
+  last-writer-wins. Character-level CRDT/OT merging is still not implemented, so true simultaneous
+  prose editing remains a future editor-layer project.
 - A stale `baseSeq` gets `409 seq_conflict`; the client replays newer operations, rebases its local
   diff and retries.
-- Local lock presence is advisory; it does not reject writes.
+- Locks have a TTL and are heartbeat refreshed; stale locks expire automatically.
+
+## Cursor/selection presence
+
+- Each SSE connection receives a `ready` event with its connection id.
+- The client posts its current card/field/offset/length to
+  `POST /projects/:id/presence` (debounced on selection changes).
+- The server keeps the cursor in the Redis/memory presence entry and broadcasts the user roster.
+- Other clients render a remote caret and selection highlight over the editable field, with the
+  user's name label. Presence entries expire when the connection closes.
 
 ## Operational readiness
 
 - Server-side SSE fanout, tickets, global presence, operation sequencing and Redis cross-instance
   forwarding are implemented and tested.
 - Two browser clients have been verified editing distinct cards on the same board live.
-- Production load testing and CRDT/OT text merging are still release gates; see
-  `docs/production-readiness.md`.
+- Synthetic concurrent load: **360 operations, 6 clients, ~986 ops/s locally, p95 8 ms, 64 retried
+  sequence conflicts, log/card counts consistent** (`npm run test:collab-load`). This is a
+  local smoke benchmark, not a production-scale load test.
+- Production-scale load testing, penetration testing and CRDT/OT text merging remain release gates;
+  see `docs/production-readiness.md`.

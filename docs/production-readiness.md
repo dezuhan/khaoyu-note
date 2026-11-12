@@ -39,8 +39,8 @@ Not ready for a production team deployment:
 4. [verified 2026-11-12] Two-instance PostgreSQL 18 + Redis validation passed for ticket-authenticated
    SSE, global presence, operation propagation/replay, cross-instance lock conflict and readiness.
    The desktop/web client now diffs local saves into granular card operations and applies remote SSE
-   operations live. Same-field text edits are last-writer-wins; CRDT/OT merging, cursor/selection
-   presence and full production load testing remain pending.
+   operations live, with hard per-card locks, remote caret/selection presence and a synthetic
+   6-client/360-op load check. CRDT/OT text merging and production-scale load testing remain pending.
 5. Asset storage is local to the service instance; shared/object storage and asset migration are not
    production-ready.
 6. Object/backup encryption and a least-privilege PostgreSQL role script are implemented; encrypted

@@ -51,6 +51,11 @@ function memoryCoordination(ttl) {
       current.expiresAt = Date.now() + ttlMs;
       return true;
     },
+    async lockOwner({ projectId, key }) {
+      const lockKey = `${projectId}:${key}`;
+      const current = locks.get(lockKey);
+      return alive(current) ? { accountId: current.accountId, expiresAt: current.expiresAt } : null;
+    },
     async releaseLock({ projectId, key, token }) {
       const lockKey = `${projectId}:${key}`;
       const current = locks.get(lockKey);
@@ -59,24 +64,46 @@ function memoryCoordination(ttl) {
       return true;
     },
     async joinPresence({ projectId, accountId, connectionId, ttlMs = ttl.presence }) {
-      presence.set(`${projectId}:${connectionId}`, { accountId, expiresAt: Date.now() + ttlMs });
+      presence.set(`${projectId}:${connectionId}`, {
+        accountId,
+        name: "",
+        cursor: null,
+        expiresAt: Date.now() + ttlMs,
+      });
+    },
+    async updatePresence({ projectId, accountId, connectionId, name, cursor, ttlMs = ttl.presence }) {
+      const key = `${projectId}:${connectionId}`;
+      const entry = presence.get(key);
+      if (!alive(entry) || entry.accountId !== accountId) return false;
+      if (typeof name === "string") entry.name = name.slice(0, 80);
+      if (cursor === null) entry.cursor = null;
+      else if (cursor && typeof cursor === "object") entry.cursor = cursor;
+      entry.expiresAt = Date.now() + ttlMs;
+      return true;
     },
     async leavePresence({ projectId, connectionId }) {
       presence.delete(`${projectId}:${connectionId}`);
     },
-    async presenceCount(projectId) {
-      const accounts = new Set();
-      let connections = 0;
+    async presenceState(projectId) {
+      const entries = [];
       for (const [key, entry] of presence) {
         if (!key.startsWith(`${projectId}:`)) continue;
         if (!alive(entry)) {
           presence.delete(key);
           continue;
         }
-        accounts.add(entry.accountId);
-        connections += 1;
+        entries.push({
+          connectionId: key.slice(projectId.length + 1),
+          accountId: entry.accountId,
+          name: entry.name || "",
+          cursor: entry.cursor || null,
+        });
       }
-      return { accounts: accounts.size, connections };
+      return entries;
+    },
+    async presenceCount(projectId) {
+      const entries = await this.presenceState(projectId);
+      return { accounts: new Set(entries.map((entry) => entry.accountId)).size, connections: entries.length };
     },
     async acquireLeader({ ttlMs = ttl.leader }) {
       if (alive(leader)) return null;
@@ -175,7 +202,7 @@ export async function createCoordination({ redisUrl, prefix = "khaoyu", logger, 
     async acquireLock({ projectId, key, accountId, ttlMs = limits.lock }) {
       const lockKey = `${prefix}:lock:${projectId}:${key}`;
       const token = randomToken();
-      const result = await client.set(lockKey, token, {
+      const result = await client.set(lockKey, JSON.stringify({ token, accountId }), {
         NX: true,
         PX: Math.max(1000, ttlMs),
       });
@@ -184,25 +211,81 @@ export async function createCoordination({ redisUrl, prefix = "khaoyu", logger, 
     },
     async heartbeatLock({ projectId, key, token, ttlMs = limits.lock }) {
       const lockKey = `${prefix}:lock:${projectId}:${key}`;
-      const script = `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end`;
+      const script = `local value = redis.call('get', KEYS[1]); if not value then return 0 end; local ok, data = pcall(cjson.decode, value); if not ok or data.token ~= ARGV[1] then return 0 end; return redis.call('pexpire', KEYS[1], ARGV[2])`;
       const result = await client.eval(script, { keys: [lockKey], arguments: [token, String(ttlMs)] });
       return Number(result) === 1;
     },
+    async lockOwner({ projectId, key }) {
+      const lockKey = `${prefix}:lock:${projectId}:${key}`;
+      const value = await client.get(lockKey);
+      if (!value) return null;
+      try {
+        const parsed = JSON.parse(value);
+        return parsed.accountId ? { accountId: parsed.accountId } : null;
+      } catch {
+        return null;
+      }
+    },
     async releaseLock({ projectId, key, token }) {
       const lockKey = `${prefix}:lock:${projectId}:${key}`;
-      const script = `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end`;
+      const script = `local value = redis.call('get', KEYS[1]); if not value then return 0 end; local ok, data = pcall(cjson.decode, value); if not ok or data.token ~= ARGV[1] then return 0 end; return redis.call('del', KEYS[1])`;
       const result = await client.eval(script, { keys: [lockKey], arguments: [token] });
       return Number(result) === 1;
     },
     async joinPresence({ projectId, accountId, connectionId, ttlMs = limits.presence }) {
       await client.set(
         `${prefix}:presence:${projectId}:${connectionId}`,
-        JSON.stringify({ accountId }),
+        JSON.stringify({ accountId, name: "", cursor: null }),
         { PX: Math.max(1000, ttlMs) }
       );
     },
+    async updatePresence({ projectId, accountId, connectionId, name, cursor, ttlMs = limits.presence }) {
+      const key = `${prefix}:presence:${projectId}:${connectionId}`;
+      const value = await client.get(key);
+      if (!value) return false;
+      let parsed;
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        return false;
+      }
+      if (parsed.accountId !== accountId) return false;
+      if (typeof name === "string") parsed.name = name.slice(0, 80);
+      if (cursor === null) parsed.cursor = null;
+      else if (cursor && typeof cursor === "object") parsed.cursor = cursor;
+      await client.set(key, JSON.stringify(parsed), { PX: Math.max(1000, ttlMs) });
+      return true;
+    },
     async leavePresence({ projectId, connectionId }) {
       await client.del(`${prefix}:presence:${projectId}:${connectionId}`);
+    },
+    async presenceState(projectId) {
+      const match = `${prefix}:presence:${projectId}:*`;
+      const entries = [];
+      let cursor = "0";
+      do {
+        const result = await client.scan(cursor, { MATCH: match, COUNT: 200 });
+        cursor = result.cursor;
+        if (!result.keys.length) continue;
+        const values = await client.mGet(result.keys);
+        result.keys.forEach((key, index) => {
+          const value = values[index];
+          if (!value) return;
+          try {
+            const parsed = JSON.parse(value);
+            if (!parsed?.accountId) return;
+            entries.push({
+              connectionId: key.slice(`${prefix}:presence:${projectId}:`.length),
+              accountId: parsed.accountId,
+              name: parsed.name || "",
+              cursor: parsed.cursor || null,
+            });
+          } catch {
+            /* skip malformed entry */
+          }
+        });
+      } while (cursor !== "0");
+      return entries;
     },
     async presenceCount(projectId) {
       return scanPresence(projectId);

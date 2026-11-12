@@ -184,11 +184,11 @@ existing objects first.
 ## Team backend
 
 The multi-user team profile uses PostgreSQL as the system of record and Redis for cross-instance SSE
-fanout, single-use SSE tickets, global presence, advisory edit locks, the operation log and the worker
+fanout, single-use SSE tickets, global presence with cursors, hard per-card edit locks, the operation log and the worker
 leader lock.
 PostgreSQL storage, backup/restore, operation log and CLI commands are in place. The desktop/web sync
 client writes `doc.replace` operations and listens to the ticket-authenticated SSE stream; cursor and
-selection presence are still to be implemented. The remaining phases are recorded in
+CRDT/OT text merging are still to be implemented. The remaining phases are recorded in
 [docs/backend-postgres-redis.md](../docs/backend-postgres-redis.md).
 
 - `single-user` keeps SQLite and needs no PostgreSQL or Redis.
@@ -308,8 +308,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects/:id/ops?after=` | Replay operations after a sequence, or return `resync_required` when pruned. |
 | `POST` | `/api/v1/projects/:id/realtime-ticket` | Issue a single-use 60 second SSE ticket. |
 | `GET` | `/api/v1/projects/:id/events?ticket=` | SSE room for snapshot, ops and global presence events (session auth is still accepted). |
-| `POST` | `/api/v1/projects/:id/locks` | Acquire an advisory lock, or heartbeat with a lock token. |
-| `DELETE` | `/api/v1/projects/:id/locks` | Release an advisory lock with its token. |
+| `POST` | `/api/v1/projects/:id/presence` | Publish the connection cursor/selection for live presence. |
+| `POST` | `/api/v1/projects/:id/locks` | Acquire a hard card lock, or heartbeat with a lock token. Card updates from other accounts return `423 card_locked`. |
+| `DELETE` | `/api/v1/projects/:id/locks` | Release a hard card lock with its token. |
 | `GET` | `/api/v1/account/presence` | Read presence opt-in state. |
 | `PATCH` | `/api/v1/account/presence` | Opt in or out of project presence. |
 | `GET` | `/api/v1/account/email-preferences` | Read the email notification preference. |
@@ -322,7 +323,6 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/projects/:id/assets/:assetId` | Download an asset as a project member. |
 | `GET` | `/api/v1/projects/:id/versions` | List recent project revisions. |
 | `POST` | `/api/v1/projects/:id/versions/:revision/restore` | Restore a revision as editor or owner. |
-| `GET` | `/api/v1/projects/:id/events` | SSE room for snapshot and presence events. |
 | `GET` | `/api/v1/admin/audit` | Operator audit export, latest 500. |
 | `GET` | `/api/v1/admin/abuse-reports` | Operator abuse report review. |
 | `GET` | `/api/v1/admin/stats` | Operator counts for accounts, projects, shares, reports and audit. |

@@ -346,6 +346,56 @@ function rememberBase(board, doc) {
   liveBases.set(board.id, base);
 }
 
+const editLocks = new Map();
+
+export function activeEditLock(boardId) {
+  return editLocks.get(boardId) || null;
+}
+
+export async function acquireEditLock(board, cardId) {
+  if (!syncEnabled(board) || !cardId) return null;
+  const current = editLocks.get(board.id);
+  if (current?.cardId === cardId) return current;
+  if (current) await releaseEditLock(board);
+  try {
+    const data = await api(`/api/v1/projects/${board.sync.projectId}/locks`, {
+      method: "POST",
+      body: { key: `card:${cardId}` },
+    });
+    const lock = {
+      cardId,
+      token: data.token,
+      timer: setInterval(() => {
+        api(`/api/v1/projects/${board.sync.projectId}/locks`, {
+          method: "POST",
+          body: { key: `card:${cardId}`, token: data.token },
+        }).catch(() => releaseEditLock(board));
+      }, 10_000),
+    };
+    editLocks.set(board.id, lock);
+    return lock;
+  } catch (error) {
+    if (error.code === "lock_conflict") return null;
+    throw error;
+  }
+}
+
+export async function releaseEditLock(board) {
+  if (!board) return;
+  const current = editLocks.get(board.id);
+  if (!current) return;
+  clearInterval(current.timer);
+  editLocks.delete(board.id);
+  try {
+    await api(`/api/v1/projects/${board.sync.projectId}/locks`, {
+      method: "DELETE",
+      body: { key: `card:${current.cardId}`, token: current.token },
+    });
+  } catch {
+    /* TTL cleanup handles a lost release */
+  }
+}
+
 export function forgetLiveBase(boardId) {
   liveBases.delete(boardId);
 }
@@ -692,9 +742,22 @@ export async function fetchOps(board, after = 0) {
   return api(`/api/v1/projects/${board.sync.projectId}/ops?after=${encodeURIComponent(String(after))}`);
 }
 
+export async function sendPresence(board, connectionId, cursor, name = "") {
+  if (!syncEnabled(board) || !connectionId) return false;
+  try {
+    await api(`/api/v1/projects/${board.sync.projectId}/presence`, {
+      method: "POST",
+      body: { connectionId, name, cursor },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Opens the single-use-ticket SSE stream for a synced board. The caller decides whether to adopt a
 // remote document; the stream itself only reports that a change is available.
-export async function openRealtime(board, { onUpdate, onStatus } = {}) {
+export async function openRealtime(board, { onUpdate, onStatus, onReady } = {}) {
   if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
   if (typeof EventSource === "undefined") return { close() {}, supported: false };
   const config = requireConfig();
@@ -704,6 +767,16 @@ export async function openRealtime(board, { onUpdate, onStatus } = {}) {
   const source = new EventSource(
     `${config.url}/api/v1/projects/${board.sync.projectId}/events?ticket=${encodeURIComponent(ticket.token)}`
   );
+  const handle = { supported: true, connectionId: null, close() { source.close(); } };
+  source.addEventListener("ready", (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handle.connectionId = data.connectionId;
+      onReady?.(data);
+    } catch {
+      /* ignore malformed ready event */
+    }
+  });
   for (const type of ["ops", "snapshot", "presence"]) {
     source.addEventListener(type, (event) => {
       try {
@@ -715,12 +788,7 @@ export async function openRealtime(board, { onUpdate, onStatus } = {}) {
   }
   source.onerror = () => onStatus?.("offline");
   source.onopen = () => onStatus?.("connected");
-  return {
-    supported: true,
-    close() {
-      source.close();
-    },
-  };
+  return handle;
 }
 
 export async function flushQueue() {

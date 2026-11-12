@@ -338,6 +338,18 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
     }
   }
 
+  async function broadcastPresence(projectId) {
+    const users = await collab.presenceState(projectId);
+    events.publish(projectId, {
+      type: "presence",
+      projectId,
+      accounts: new Set(users.map((entry) => entry.accountId)).size,
+      connections: users.length,
+      users,
+      global: true,
+    });
+  }
+
   async function emailRecipients(accountIds, payload) {
     await Promise.all(
       accountIds.map((accountId) =>
@@ -3049,31 +3061,70 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           presence: presenceEnabled,
         });
         const connectionId = crypto.randomUUID();
-        const publishGlobalPresence = async () => {
+        const presenceName = auth.account.display_name || auth.account.email || "";
+        const refreshPresence = async () => {
           if (!presenceEnabled) return;
-          await collab.joinPresence({ projectId, accountId: auth.account.id, connectionId });
-          const counts = await collab.presenceCount(projectId);
-          events.publish(projectId, { type: "presence", projectId, ...counts, global: true });
+          await collab.updatePresence({
+            projectId,
+            accountId: auth.account.id,
+            connectionId,
+            name: presenceName,
+          });
+          await broadcastPresence(projectId);
         };
         let presenceTimer = null;
         if (presenceEnabled) {
-          void publishGlobalPresence().catch((error) => logger.error("presence.join_failed", { message: error.message }));
+          await collab.joinPresence({ projectId, accountId: auth.account.id, connectionId });
+          response.write(`event: ready\ndata: ${JSON.stringify({ connectionId, accountId: auth.account.id })}\n\n`);
+          void refreshPresence().catch((error) => logger.error("presence.join_failed", { message: error.message }));
           presenceTimer = setInterval(() => {
-            void publishGlobalPresence().catch((error) => logger.error("presence.refresh_failed", { message: error.message }));
+            void refreshPresence().catch((error) => logger.error("presence.refresh_failed", { message: error.message }));
           }, 20_000);
           presenceTimer.unref?.();
+        } else {
+          response.write(`event: ready\ndata: ${JSON.stringify({ connectionId, accountId: auth.account.id })}\n\n`);
         }
         request.on("close", () => {
           events.unsubscribe(client);
           if (presenceTimer) clearInterval(presenceTimer);
           if (!presenceEnabled) return;
           void collab.leavePresence({ projectId, connectionId })
-            .then(async () => {
-              const counts = await collab.presenceCount(projectId);
-              events.publish(projectId, { type: "presence", projectId, ...counts, global: true });
-            })
+            .then(() => broadcastPresence(projectId))
             .catch((error) => logger.error("presence.leave_failed", { message: error.message }));
         });
+        return true;
+      }
+
+      const presenceMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/presence$/);
+      if (method === "POST" && presenceMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        const projectId = decodeURIComponent(presenceMatch[1]);
+        if (!(await projectRole(db, projectId, auth.account.id))) {
+          throw new HttpError(404, "project not found", "not_found");
+        }
+        const body = await readJson(request);
+        const connectionId = requireString(body.connectionId, "connectionId", 100);
+        const name = typeof body.name === "string" ? body.name.slice(0, 80) : "";
+        let cursor;
+        if (body.cursor === null) {
+          cursor = null;
+        } else if (body.cursor && typeof body.cursor === "object") {
+          const cardId = String(body.cursor.cardId || "").slice(0, 100);
+          const field = String(body.cursor.field || "").slice(0, 40);
+          const offset = Math.max(0, Math.min(1_000_000, Number(body.cursor.offset) || 0));
+          const length = Math.max(0, Math.min(1_000_000, Number(body.cursor.length) || 0));
+          if (cardId) cursor = { cardId, field, offset, length };
+        }
+        const updated = await collab.updatePresence({
+          projectId,
+          accountId: auth.account.id,
+          connectionId,
+          name,
+          cursor,
+        });
+        if (!updated) throw new HttpError(404, "presence connection expired", "presence_expired");
+        await broadcastPresence(projectId);
+        sendNoContent(response, 204, config);
         return true;
       }
 
@@ -3260,6 +3311,17 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const baseSeq = Number(body.baseSeq ?? 0);
         if (!Number.isInteger(baseSeq) || baseSeq < 0) {
           throw new HttpError(400, "baseSeq must be a non-negative integer", "op_invalid");
+        }
+        const lockedCards = [];
+        for (const operation of operations) {
+          if (!["card.update", "card.delete", "card.move"].includes(operation.type)) continue;
+          const cardId = String(operation.payload?.id || "");
+          if (!cardId) continue;
+          const owner = await collab.lockOwner({ projectId, key: `card:${cardId}` });
+          if (owner && owner.accountId !== auth.account.id) lockedCards.push(cardId);
+        }
+        if (lockedCards.length) {
+          throw new HttpError(423, "card is locked by another editor", "card_locked");
         }
         let result;
         try {

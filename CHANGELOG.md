@@ -80,6 +80,12 @@ project uses Semantic Versioning.
 - Deployment-readiness pass: PostgreSQL tests now reset the schema between suites so the full
   PostgreSQL/Redis service suite passes in one run; stale CI expectations for the enabled Share/Sync
   controls, Account Management, preview reservation and activity layout were updated.
+- Hard per-card edit locks are acquired while an editable field has focus; the server rejects a second
+  editor's card operations with `423 card_locked`. SSE connections emit a `ready` id, clients publish
+  debounced cursor/selection state, and remote carets/selections render with the editor name.
+- Added a synthetic concurrent operation load check (`npm run test:collab-load`): six clients,
+  360 operations, consistent log/card counts, p95 8 ms locally. Production-scale load testing remains
+  a release gate.
 - Live collaboration is now wired end to end: local board saves push granular card/title operations
   through the server-sequenced operation log, SSE ops events are replayed and applied to the other
   clients, and presence reflects connected accounts. Two browser clients merge distinct card edits
