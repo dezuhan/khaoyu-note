@@ -150,8 +150,8 @@ test("service admin dashboard API", async (t) => {
       assert.equal((await api.call(asset)).status, 200, asset);
     }
     const accountPage = await api.call("/account");
-    assert.equal(accountPage.status, 200);
-    assert.match(accountPage.body, /Two-factor authentication/);
+    assert.equal(accountPage.status, 302);
+    assert.equal(accountPage.response.headers.get("location"), "/admin#profile");
   });
 
   const registered = await api.register("admin@example.com");

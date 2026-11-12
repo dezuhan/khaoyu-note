@@ -1551,3 +1551,13 @@ body.admin-body {
 .admin-section > .ky-button {
   align-self: flex-start;
 }
+
+.admin-body[data-role="member"] [data-admin-only],
+.admin-nav-item[hidden],
+#admin-dashboard-menu-item[hidden] {
+  display: none !important;
+}
+
+.admin-body[data-role="member"] .admin-nav-sep {
+  margin-top: var(--ky-space-2);
+}

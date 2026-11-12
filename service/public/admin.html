@@ -60,7 +60,7 @@
         </button>
 
         <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
-          <button type="button" role="menuitem" data-action="dashboard">Admin dashboard</button>
+          <button type="button" role="menuitem" data-action="dashboard" id="admin-dashboard-menu-item">Admin dashboard</button>
           <button type="button" role="menuitem" data-action="account">Profile &amp; security</button>
           <button type="button" role="menuitem" data-action="help">Help</button>
           <div class="admin-menu-sep" role="separator"></div>
@@ -72,23 +72,23 @@
     <div class="admin-shell">
       <aside class="admin-rail">
         <nav class="admin-nav" aria-label="Admin sections">
-          <button type="button" class="admin-nav-item is-active" data-page="overview">
+          <button type="button" class="admin-nav-item is-active" data-page="overview" data-admin-only>
             <span class="admin-nav-icon" data-icon="grid" aria-hidden="true"></span>
             <span>Overview</span>
           </button>
-          <button type="button" class="admin-nav-item" data-page="accounts">
+          <button type="button" class="admin-nav-item" data-page="accounts" data-admin-only>
             <span class="admin-nav-icon" data-icon="users" aria-hidden="true"></span>
             <span>Accounts</span>
           </button>
-          <button type="button" class="admin-nav-item" data-page="boards">
+          <button type="button" class="admin-nav-item" data-page="boards" data-admin-only>
             <span class="admin-nav-icon" data-icon="board" aria-hidden="true"></span>
             <span>Boards</span>
           </button>
-          <button type="button" class="admin-nav-item" data-page="activity">
+          <button type="button" class="admin-nav-item" data-page="activity" data-admin-only>
             <span class="admin-nav-icon" data-icon="listBullet" aria-hidden="true"></span>
             <span>Activity</span>
           </button>
-          <button type="button" class="admin-nav-item" data-page="sharing">
+          <button type="button" class="admin-nav-item" data-page="sharing" data-admin-only>
             <span class="admin-nav-icon" data-icon="share" aria-hidden="true"></span>
             <span>Sharing</span>
           </button>

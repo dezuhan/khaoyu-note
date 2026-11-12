@@ -2132,6 +2132,62 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/account/profile") {
+        const auth = await requireSessionAuth(request, response, db, config);
+        const user = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS},
+                    (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS last_seen_at,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.account_id = a.id) AS project_count
+             FROM accounts a WHERE a.id = ? AND a.deleted_at IS NULL`, [auth.account.id]));
+        if (!user) throw new HttpError(404, "account not found", "not_found");
+        sendJson(response, 200, { user: adminAccount(user) }, config);
+        return true;
+      }
+
+      if (method === "PATCH" && url.pathname === "/api/v1/account/profile") {
+        const auth = await requireSessionAuth(request, response, db, config);
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
+        const current = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS} FROM accounts a WHERE a.id = ? AND a.deleted_at IS NULL`, [auth.account.id]));
+        if (!current) throw new HttpError(404, "account not found", "not_found");
+        const body = await readJson(request);
+        const displayName =
+          body.displayName === undefined
+            ? current.display_name
+            : requireString(body.displayName, "displayName", 120);
+        const firstName =
+          body.firstName === undefined ? current.first_name : String(body.firstName).trim().slice(0, 80);
+        const lastName =
+          body.lastName === undefined ? current.last_name : String(body.lastName).trim().slice(0, 80);
+        let avatarColor =
+          body.avatarColor === undefined ? current.avatar_color : String(body.avatarColor || "").trim();
+        if (avatarColor && !/^#[0-9a-f]{6}$/i.test(avatarColor)) {
+          throw new HttpError(400, "avatarColor must be a hex color", "invalid_avatar");
+        }
+        const avatarUrl =
+          body.avatarUrl === undefined ? current.avatar_url : validateAdminAvatar(body.avatarUrl);
+        (await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, avatar_color = ?,
+             avatar_url = ?, updated_at = ? WHERE id = ?`, [displayName,
+          firstName || null,
+          lastName || null,
+          avatarColor || null,
+          avatarUrl || null,
+          now(),
+          auth.account.id]));
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "account.profile_updated",
+          resourceType: "account",
+          resourceId: auth.account.id,
+          ip,
+          secret: config.secret,
+        });
+        const updated = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS},
+                    (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS last_seen_at,
+                    (SELECT COUNT(*) FROM project_members m WHERE m.account_id = a.id) AS project_count
+             FROM accounts a WHERE a.id = ?`, [auth.account.id]));
+        sendJson(response, 200, { user: adminAccount(updated) }, config);
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/account/password") {
         const auth = await requireSessionAuth(request, response, db, config);
         enforceRate(accountPasswordRate, accountKey(auth, ipHash));

@@ -77,6 +77,11 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
       return;
     }
     const sharePage = /^\/s\/[^/]+$/.test(url.pathname);
+    if (request.method === "GET" && url.pathname === "/account") {
+      response.writeHead(302, { Location: "/admin#profile" });
+      response.end();
+      return;
+    }
     // Sharing now lives inside the admin dashboard instead of a separate page.
     if (request.method === "GET" && url.pathname === "/shares") {
       response.writeHead(302, { Location: "/admin#sharing" });

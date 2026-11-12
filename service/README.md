@@ -292,6 +292,8 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/totp/setup` | Create a TOTP secret and `otpauth` URI. |
 | `POST` | `/api/v1/auth/totp/enable` | Confirm a TOTP code and enable it. |
 | `POST` | `/api/v1/auth/totp/disable` | Disable TOTP with password and code. |
+| `GET` | `/api/v1/account/profile` | Read the signed-in account's profile and metadata. |
+| `PATCH` | `/api/v1/account/profile` | Update display name, first/last name, avatar colour or picture. |
 | `GET` | `/api/v1/account/export` | Export the account, accessible projects and their snapshots. |
 | `GET` | `/api/v1/account/tokens` | List scoped API tokens. |
 | `POST` | `/api/v1/account/tokens` | Create a scoped API token; the raw token is returned once. |
@@ -390,11 +392,13 @@ passkey link. `/register` creates an account immediately; the first account beco
 `/reset` asks for email, current password and a new password, then revokes every session. It never sends
 an email reset token because this service has no email confirmation flow.
 
-Login and recovery responses carry the account role; admins are sent to `/admin` and members to
-`/account`, including when they visit the other page. `/account` is the account security page: TOTP setup with an inline QR code, TOTP enable/disable,
-passkey readiness, sessions, API tokens and sign out. The dashboard Account section links to it and
-keeps the admin profile/password controls. `/passkeys` handles passkey login and registration. All
-pages use the same cookie and CSRF rules as the API and are served with a strict self-only CSP.
+Login and recovery responses carry the account role; both admins and members land on `/admin`.
+Admins see Overview, Accounts, Boards, Activity and Sharing. Members see only the Account Management
+group: Profile, Security and Login sessions. Admin-only navigation is hidden for members and the
+backend admin APIs remain role-protected. `/account` redirects to `/admin#profile`; self-profile reads
+and updates use `/api/v1/account/profile`, which requires only a session. `/passkeys` handles passkey
+login and registration. All pages use the same cookie and CSRF rules as the API and are served with a
+strict self-only CSP.
 
 ## Passkeys
 

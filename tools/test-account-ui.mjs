@@ -67,12 +67,12 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  // /account is the member security page and remains directly reachable.
+  // /account is a legacy URL; member security now lives in the role-aware dashboard.
   const accountPage = await page.request.get(`${base}/account`, { maxRedirects: 0 });
   check(
-    "account URL serves the account security page",
-    accountPage.status() === 200 && (await accountPage.text()).includes("Two-factor authentication"),
-    `${accountPage.status()}`
+    "account URL redirects to dashboard profile",
+    accountPage.status() === 302 && String(accountPage.headers().location || "").endsWith("/admin#profile"),
+    `${accountPage.status()} ${accountPage.headers().location || ""}`
   );
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForURL(/\/login$/, { timeout: 15000 });
@@ -389,21 +389,33 @@ try {
   check("login with a backup code works without a password", (await page.locator("#admin-email").innerText()).includes(email));
 
   // Member login must land on /account, not loop between /login and /admin.
-  await page.goto(`${base}/account`, { waitUntil: "load" });
-  await page.waitForSelector("#logout");
-  await page.click("#logout");
+  await page.click('.admin-nav-item[data-page="sessions"]');
+  await page.waitForSelector('[data-role="logout-all"]');
+  await page.click('[data-role="logout-all"]');
   await page.waitForURL(/\/login\?signedout=1/, { timeout: 15000 });
   await page.fill("#email", manualEmail);
   await page.fill("#password", "manual-password-123");
   await page.click("#login-submit");
-  await page.waitForURL(/\/account$/, { timeout: 15000 });
-  check("member login lands on the account page", true);
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
+  await page.waitForSelector('[data-role="profile-form"]');
+  check(
+    "member login lands on the account dashboard profile",
+    (await page.locator(".admin-title").innerText()) === "Profile"
+  );
+  check(
+    "member navigation hides admin-only sections",
+    (await page.locator('.admin-nav-item[data-page="accounts"]').isHidden()) &&
+      (await page.locator('.admin-nav-item[data-page="boards"]').isHidden()) &&
+      (await page.locator('.admin-nav-item[data-page="security"]').isVisible()) &&
+      (await page.locator('.admin-nav-item[data-page="sessions"]').isVisible())
+  );
   await page.goto(`${base}/login`, { waitUntil: "load" });
-  await page.waitForURL(/\/account$/, { timeout: 15000 });
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
   check("signed-in member is redirected away from login", true);
-  await page.goto(`${base}/admin`, { waitUntil: "load" });
-  await page.waitForURL(/\/account$/, { timeout: 15000 });
-  check("member is redirected away from the admin dashboard", true);
+  await page.goto(`${base}/admin#accounts`, { waitUntil: "load" });
+  await page.reload({ waitUntil: "load" });
+  await page.waitForSelector('[data-role="profile-form"]');
+  check("member deep link to an admin page falls back to profile", (await page.locator(".admin-title").innerText()) === "Profile");
 
   check("no unexpected page errors", pageErrors.length === 0, pageErrors.join(" | "));
 } catch (error) {

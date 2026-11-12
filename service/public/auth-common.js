@@ -51,8 +51,8 @@ export async function api(path, { method = "GET", body } = {}) {
   return parsed;
 }
 
-export function landingFor(account) {
-  return account?.role === "admin" ? "/admin" : "/account";
+export function landingFor() {
+  return "/admin";
 }
 
 export async function hasSession() {

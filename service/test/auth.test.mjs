@@ -1744,6 +1744,24 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(withCode.status, 200);
   });
 
+  await t.test("members can read and update their own profile", async () => {
+    const user = await api.account(`profile-${crypto.randomUUID()}@example.com`);
+    const before = await api.call("/api/v1/account/profile", { jar: user.jar });
+    assert.equal(before.status, 200);
+    assert.equal(before.body.user.email, user.email);
+    const updated = await api.call("/api/v1/account/profile", {
+      method: "PATCH",
+      jar: user.jar,
+      body: { displayName: "Renamed Member", firstName: "Ren", avatarColor: "#123456" },
+    });
+    assert.equal(updated.status, 200, JSON.stringify(updated.body));
+    assert.equal(updated.body.user.displayName, "Renamed Member");
+    assert.equal(updated.body.user.firstName, "Ren");
+    const session = await api.call("/api/v1/auth/sessions", { jar: user.jar });
+    assert.equal(session.body.account.displayName, "Renamed Member");
+    assert.equal(session.body.account.role, "member");
+  });
+
   await t.test("account security mutations are rate limited", async () => {
     const user = await api.account(`account-limit-${crypto.randomUUID()}@example.com`);
     for (let attempt = 0; attempt < 5; attempt += 1) {

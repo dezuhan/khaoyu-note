@@ -18,6 +18,7 @@ const helpClose = document.getElementById("admin-help-close");
 
 const LEGACY_THEME_KEYS = SERVICE_LEGACY_KEYS;
 let page = "overview";
+let currentRole = "member";
 let dashboard = null;
 let activityOffset = 0;
 let activityFilter = { q: "", action: "" };
@@ -831,20 +832,24 @@ function avatarPerson(person) {
 async function renderProfile() {
   pane.innerHTML = `<div class="admin-loading">Loading profile...</div>`;
   let sessionData;
-  let dashboardData;
   let detail;
   try {
-    sessionData = await api("/api/v1/auth/sessions");
-    dashboardData = await api("/api/v1/admin/dashboard");
-    detail = await api(`/api/v1/admin/users/${encodeURIComponent(sessionData.account.id)}`);
+    [sessionData, detail] = await Promise.all([
+      api("/api/v1/auth/sessions"),
+      api("/api/v1/account/profile"),
+    ]);
   } catch (error) {
     if (error instanceof AuthError) return showAuth();
     pane.innerHTML = "";
     return showError(error);
   }
-  dashboard = dashboardData;
-  renderIdentity(dashboard.admin);
   const account = detail.user;
+  renderIdentity({
+    id: account.id,
+    email: account.email,
+    displayName: account.displayName,
+    avatarUrl: account.avatarUrl || "",
+  });
   const avatar = avatarPerson(account);
   let avatarData = avatar.avatarUrl;
   pane.innerHTML = `
@@ -909,7 +914,7 @@ async function renderProfile() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      await api(`/api/v1/admin/users/${encodeURIComponent(account.id)}`, {
+      const saved = await api("/api/v1/account/profile", {
         method: "PATCH",
         body: {
           displayName: form.displayName.value.trim(),
@@ -919,8 +924,12 @@ async function renderProfile() {
           avatarUrl: avatarData,
         },
       });
-      dashboard = await api("/api/v1/admin/dashboard");
-      renderIdentity(dashboard.admin);
+      renderIdentity({
+        id: saved.user.id,
+        email: saved.user.email,
+        displayName: saved.user.displayName,
+        avatarUrl: saved.user.avatarUrl || "",
+      });
       pageStatus("Profile saved.");
     } catch (error) {
       if (error instanceof AuthError) return showAuth();
@@ -1667,11 +1676,11 @@ async function renderSharing() {
 // ---------------------------------------------------------------- menus and commands
 
 const COMMANDS = [
-  { id: "overview", label: "Go to Overview", hint: "Dashboard", run: () => void go("overview") },
-  { id: "accounts", label: "Go to Accounts", hint: "Dashboard", run: () => void go("accounts") },
-  { id: "boards", label: "Go to Boards", hint: "Dashboard", run: () => void go("boards") },
-  { id: "activity", label: "Go to Activity", hint: "Dashboard", run: () => void go("activity") },
-  { id: "sharing", label: "Go to Sharing", hint: "Dashboard", run: () => void go("sharing") },
+  { id: "overview", adminOnly: true, label: "Go to Overview", hint: "Dashboard", run: () => void go("overview") },
+  { id: "accounts", adminOnly: true, label: "Go to Accounts", hint: "Dashboard", run: () => void go("accounts") },
+  { id: "boards", adminOnly: true, label: "Go to Boards", hint: "Dashboard", run: () => void go("boards") },
+  { id: "activity", adminOnly: true, label: "Go to Activity", hint: "Dashboard", run: () => void go("activity") },
+  { id: "sharing", adminOnly: true, label: "Go to Sharing", hint: "Dashboard", run: () => void go("sharing") },
   { id: "profile", label: "Open Profile", hint: "Account Management", run: () => void go("profile") },
   { id: "security", label: "Open Security", hint: "Account Management", run: () => void go("security") },
   { id: "sessions", label: "Open Login sessions", hint: "Account Management", run: () => void go("sessions") },
@@ -1735,7 +1744,7 @@ function setActiveCommand(index) {
 
 function renderCommands(query = "") {
   const search = query.trim().toLowerCase();
-  commandMatches = COMMANDS.filter((command) => command.label.toLowerCase().includes(search));
+  commandMatches = COMMANDS.filter((command) => (!command.adminOnly || currentRole === "admin") && command.label.toLowerCase().includes(search));
   commandIndex = 0;
   commandList.textContent = "";
   for (const command of commandMatches) {
@@ -1776,6 +1785,20 @@ function runCommand(id) {
   if (command) command.run();
 }
 
+function applyRole(role) {
+  currentRole = role === "admin" ? "admin" : "member";
+  document.body.dataset.role = currentRole;
+  for (const item of navItems) {
+    if (item.hasAttribute("data-admin-only")) item.hidden = currentRole !== "admin";
+  }
+  const dashboardItem = document.getElementById("admin-dashboard-menu-item");
+  if (dashboardItem) dashboardItem.hidden = currentRole !== "admin";
+  const brandSubtitle = document.querySelector(".admin-brand-copy span");
+  if (brandSubtitle) brandSubtitle.textContent = currentRole === "admin" ? "Service admin" : "Service account";
+}
+
+const ADMIN_PAGES = new Set(["overview", "accounts", "boards", "activity", "sharing"]);
+
 const PAGE_TITLES = {
   overview: "Overview",
   accounts: "Accounts",
@@ -1789,6 +1812,7 @@ const PAGE_TITLES = {
 
 async function go(next) {
   if (!PAGE_TITLES[next]) next = "overview";
+  if (currentRole !== "admin" && ADMIN_PAGES.has(next)) next = "profile";
   page = next;
   for (const item of navItems) item.classList.toggle("is-active", item.dataset.page === next);
   title.textContent = PAGE_TITLES[next];
@@ -1817,12 +1841,29 @@ async function go(next) {
   return renderActivity();
 }
 
-function init() {
+async function init() {
   initTheme();
   if (hostBadge) hostBadge.textContent = window.location.host;
+  let account;
+  try {
+    const sessionData = await api("/api/v1/auth/sessions");
+    account = sessionData.account;
+  } catch {
+    window.location.replace("/login");
+    return;
+  }
+  applyRole(account?.role === "admin" ? "admin" : "member");
+  renderIdentity({
+    id: account.id,
+    email: account.email,
+    displayName: account.displayName || account.email,
+    avatarUrl: "",
+  });
   for (const item of navItems) item.addEventListener("click", () => void go(item.dataset.page));
 
-  document.getElementById("admin-home").addEventListener("click", () => void go("overview"));
+  document.getElementById("admin-home").addEventListener("click", () =>
+    void go(currentRole === "admin" ? "overview" : "profile")
+  );
   document.querySelectorAll(".admin-nav-icon[data-icon]").forEach((element) => {
     element.innerHTML = icon(element.dataset.icon, 14);
   });
@@ -1881,7 +1922,9 @@ function init() {
   });
 
   const initial = window.location.hash.replace(/^#/, "");
-  void go(PAGE_TITLES[initial] ? initial : "overview");
+  const fallback = currentRole === "admin" ? "overview" : "profile";
+  const requested = PAGE_TITLES[initial] ? initial : fallback;
+  void go(currentRole !== "admin" && ADMIN_PAGES.has(requested) ? "profile" : requested);
 }
 
 init();
