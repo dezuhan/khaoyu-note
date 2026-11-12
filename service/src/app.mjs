@@ -27,6 +27,14 @@ const AUTH_PAGES = {
   "/share-view.js": ["share-view.js", "text/javascript; charset=utf-8"],
   "/ui.css": ["ui.css", "text/css; charset=utf-8"],
   "/ky.css": ["ky.css", "text/css; charset=utf-8"],
+  "/icons.js": ["icons.js", "text/javascript; charset=utf-8"],
+  "/khaoyu-note.svg": ["khaoyu-note.svg", "image/svg+xml"],
+  "/fonts.css": ["fonts.css", "text/css; charset=utf-8"],
+  "/fonts/DMSans-400.woff2": ["fonts/DMSans-400.woff2", "font/woff2"],
+  "/fonts/PlayfairDisplay-400.woff2": ["fonts/PlayfairDisplay-400.woff2", "font/woff2"],
+  "/fonts/PlusJakartaSans-400.woff2": ["fonts/PlusJakartaSans-400.woff2", "font/woff2"],
+  "/fonts/SpaceMono-400.woff2": ["fonts/SpaceMono-400.woff2", "font/woff2"],
+  "/fonts/SpaceMono-700.woff2": ["fonts/SpaceMono-700.woff2", "font/woff2"],
 };
 
 export async function assertSchemaCurrent(db, { dialect = db.dialect } = {}) {

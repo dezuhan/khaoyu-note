@@ -105,6 +105,17 @@ try {
   await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
   check("password login shows the signed-in account", (await page.locator("#admin-email").innerText()).includes(email));
+  check(
+    "admin chrome reuses the main UI logo, SVG icons and fonts",
+    (await page.locator(".admin-logo img[src=\"/khaoyu-note.svg\"]").count()) === 1 &&
+      (await page.locator("#admin-theme svg").count()) === 1 &&
+      (await page.locator(".admin-nav-item[data-page=\"overview\"] .admin-nav-icon svg").count()) === 1 &&
+      (await page.locator("#admin-identity.admin-account-trigger .admin-avatar").count()) === 1 &&
+      (await page.evaluate(async () => {
+        await document.fonts.ready;
+        return document.fonts.check('12px "Plus Jakarta Sans"');
+      }))
+  );
 
   // The account page inside the dashboard owns sessions, tokens and password changes. It is opened
   // from the profile button: the Account entry is temporarily out of the menu bar.

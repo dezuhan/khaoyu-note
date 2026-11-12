@@ -425,8 +425,9 @@ The service serves browser pages at `/login`, `/register`, `/reset`, `/passkeys`
 admin page uses the normal account session, requires the global admin role and calls
 `/api/v1/admin/dashboard`, `/users`, `/teams` and `/activity`; every mutation goes through the same
 CSRF check and writes `admin.*` audit rows. The page keeps the left navigation rail and adds a top
-menu bar (Dashboard, Account menu, command search, theme toggle) above the content pane, uses
-`ky.css` tokens for light and dark themes, and shows profile pictures or initials, role and status. The
+menu bar (Dashboard/Help, command search, theme toggle and a circular account menu) above the content
+pane, reuses the main app logo, SVG icon set and fonts, uses `ky.css` tokens for light and dark
+themes, and shows profile pictures or initials, role and status. The
 operator `KHAOYU_SERVICE_ADMIN_TOKEN` remains only for scripted access to the legacy JSON admin
 endpoints.
 

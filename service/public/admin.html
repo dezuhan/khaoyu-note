@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Khaoyu Note service admin</title>
+    <link rel="stylesheet" href="/fonts.css" />
     <link rel="stylesheet" href="/ky.css" />
     <link rel="stylesheet" href="/admin.css" />
   </head>
@@ -12,7 +13,7 @@
     <header class="admin-menubar">
       <div class="admin-menubar-left">
         <button class="admin-logo" id="admin-home" type="button" title="Admin dashboard" aria-label="Khaoyu Note service admin">
-          <span class="admin-brand-mark" aria-hidden="true">K</span>
+          <img class="admin-logo-mark" src="/khaoyu-note.svg" alt="" />
           <span class="admin-brand-copy">
             <strong>Khaoyu Note</strong>
             <span>Service admin</span>
@@ -20,19 +21,13 @@
         </button>
         <nav class="admin-menubar-menus" aria-label="Service menus">
           <button type="button" class="admin-menubar-btn" id="admin-menu-dashboard">Dashboard</button>
-          <button
-            type="button"
-            class="admin-menubar-btn"
-            id="admin-menu-account"
-            aria-haspopup="menu"
-            aria-expanded="false"
-          >Account</button>
+          <button type="button" class="admin-menubar-btn" id="admin-menu-help">Help</button>
         </nav>
       </div>
 
       <div class="admin-menubar-center">
         <button class="admin-search-btn" id="admin-search" type="button" title="Search commands (Ctrl+K)">
-          <span aria-hidden="true">⌕</span>
+          <span class="admin-search-icon" id="admin-search-icon" aria-hidden="true"></span>
           <span>Search commands</span>
           <kbd>Ctrl K</kbd>
         </button>
@@ -49,12 +44,13 @@
         ></button>
         <button
           type="button"
-          class="admin-admin"
+          class="admin-admin admin-account-trigger"
           id="admin-identity"
           hidden
           aria-haspopup="menu"
           aria-expanded="false"
           title="Account menu"
+          aria-label="Account menu"
         >
           <span class="admin-avatar" id="admin-avatar" data-tone="0"></span>
           <span class="admin-admin-copy">
@@ -77,23 +73,23 @@
       <aside class="admin-rail">
         <nav class="admin-nav" aria-label="Admin sections">
           <button type="button" class="admin-nav-item is-active" data-page="overview">
-            <span class="admin-nav-icon" aria-hidden="true">◧</span>
+            <span class="admin-nav-icon" data-icon="grid" aria-hidden="true"></span>
             <span>Overview</span>
           </button>
           <button type="button" class="admin-nav-item" data-page="accounts">
-            <span class="admin-nav-icon" aria-hidden="true">◎</span>
+            <span class="admin-nav-icon" data-icon="users" aria-hidden="true"></span>
             <span>Accounts</span>
           </button>
           <button type="button" class="admin-nav-item" data-page="teams">
-            <span class="admin-nav-icon" aria-hidden="true">▦</span>
+            <span class="admin-nav-icon" data-icon="board" aria-hidden="true"></span>
             <span>Teams</span>
           </button>
           <button type="button" class="admin-nav-item" data-page="activity">
-            <span class="admin-nav-icon" aria-hidden="true">≡</span>
+            <span class="admin-nav-icon" data-icon="listBullet" aria-hidden="true"></span>
             <span>Activity</span>
           </button>
           <button type="button" class="admin-nav-item" data-page="sharing">
-            <span class="admin-nav-icon" aria-hidden="true">⧉</span>
+            <span class="admin-nav-icon" data-icon="share" aria-hidden="true"></span>
             <span>Sharing</span>
           </button>
         </nav>

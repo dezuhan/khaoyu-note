@@ -64,8 +64,10 @@ with the global `admin` role. The first account created by `bootstrap`, or the f
 on a fresh database, becomes an admin; migration 13 also promotes the oldest existing account.
 
 The dashboard keeps the left rail (Overview, Accounts, Teams, Activity, Sharing) and adds a top menu
-bar above the content pane: Dashboard, an Account menu (Admin dashboard, Account settings, Help,
-Logout), a command search with Ctrl+K, the host badge and the light/dark toggle.
+bar above the content pane: Dashboard and Help, a command search with Ctrl+K, the host badge, the
+light/dark toggle and a circular account button next to it that opens the Account menu (Admin
+dashboard, Account settings, Help, Logout). The top bar and rail reuse the main app logo, SVG icon
+set, fonts and theme tokens.
 
 - Overview shows account, team, share-link and audit counts plus recent activity and signups.
 - Account settings (opened from the Account menu or profile button) holds the signed-in password

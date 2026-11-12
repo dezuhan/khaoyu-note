@@ -88,7 +88,7 @@ try {
     "sharing is rendered inside the admin dashboard with the rail and top bar",
     (await page.locator(".admin-menubar .admin-host").count()) === 1 &&
       (await page.locator(".admin-rail .admin-nav-item[data-page=\"sharing\"]").count()) === 1 &&
-      (await page.locator(".admin-menubar #admin-menu-account").count()) === 1
+      (await page.locator(".admin-menubar #admin-identity.admin-account-trigger").count()) === 1
   );
 
   const projectId = await page.evaluate(async () => {

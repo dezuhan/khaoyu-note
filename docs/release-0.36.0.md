@@ -13,10 +13,11 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
 - **Global light/dark theme**: the theme is now an app-wide preference. Boards no longer store or
   apply their own theme, so switching boards or reloading keeps the chosen mode.
 - **Service dashboard refresh**: the admin page keeps the left rail and adds a top menu bar in the
-  app's chrome style with Dashboard, an Account menu (Admin dashboard, Account settings, Help,
-  Logout), command search (Ctrl+K), host badge and a light/dark toggle. Sharing is a section of the
-  same dashboard (`/shares` redirects to `/admin#sharing`), the Teams pane fills the page, and the
-  password fields keep the compact control height.
+  app's chrome style with the same logo, SVG icon set and fonts, Dashboard/Help menus, command search
+  (Ctrl+K), host badge, light/dark toggle and a circular account button that opens the Account menu
+  (Admin dashboard, Account settings, Help, Logout). Sharing is a section of the same dashboard
+  (`/shares` redirects to `/admin#sharing`), the Teams pane fills the page, and the password fields
+  keep the compact control height.
 - **Documentation and verification**: the README, roadmap checkboxes and release docs now match the
   verified 0.36.0 state. The service suite runs against PostgreSQL and Redis, Rust tests and Clippy
   pass, the service image builds and its CRITICAL Trivy scan is clean.

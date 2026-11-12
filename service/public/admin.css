@@ -1127,3 +1127,79 @@ button.admin-admin:hover {
   text-decoration: none;
   cursor: pointer;
 }
+
+/* Shared app assets: the same logo, inline icon set and circular account trigger as the main UI. */
+.admin-logo-mark {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.admin-menubar svg {
+  display: block;
+}
+
+.admin-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-search-icon {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+}
+
+.admin-search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.admin-nav-icon {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0;
+}
+
+.admin-nav-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.admin-menubar .admin-admin-copy {
+  display: none;
+}
+
+.admin-menubar .admin-account-trigger {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 999px;
+  background: var(--ky-control);
+}
+
+.admin-menubar .admin-account-trigger:hover {
+  background: var(--ky-control-hover);
+}
+
+.admin-menubar .admin-account-trigger .admin-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+/* Same typography tokens as the main app. */
+.admin-body {
+  --ky-font: "Plus Jakarta Sans", Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --ky-font-body: "Plus Jakarta Sans", Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --ky-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ky-font-code: "Space Mono", ui-monospace, monospace;
+  font-family: var(--ky-font-body);
+}

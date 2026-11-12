@@ -1,3 +1,4 @@
+import { icon } from "./icons.js";
 // Self-hosted service admin dashboard. The page uses the account session and requires the admin role.
 
 const pane = document.getElementById("admin-pane");
@@ -6,7 +7,6 @@ const navItems = [...document.querySelectorAll(".admin-nav-item")];
 const identity = document.getElementById("admin-identity");
 const themeButton = document.getElementById("admin-theme");
 const hostBadge = document.getElementById("admin-host");
-const accountMenuButton = document.getElementById("admin-menu-account");
 const accountMenu = document.getElementById("admin-account-menu");
 const searchButton = document.getElementById("admin-search");
 const commandLayer = document.getElementById("admin-command-layer");
@@ -131,8 +131,11 @@ function renderIdentity(admin) {
     return;
   }
   identity.hidden = false;
-  document.getElementById("admin-name").textContent = admin.displayName || admin.email;
+  const label = admin.displayName || admin.email;
+  document.getElementById("admin-name").textContent = label;
   document.getElementById("admin-email").textContent = admin.email;
+  identity.title = `${label} — account menu`;
+  identity.setAttribute("aria-label", `${label} — account menu`);
   document.getElementById("admin-avatar").outerHTML = avatarHtml({
     displayName: admin.displayName,
     email: admin.email,
@@ -143,7 +146,7 @@ function renderIdentity(admin) {
 function setTheme(theme) {
   document.documentElement.dataset.kyTheme = theme;
   localStorage.setItem(THEME_KEY, theme);
-  themeButton.textContent = theme === "dark" ? "☀" : "☾";
+  themeButton.innerHTML = icon(theme === "dark" ? "sun" : "moon", 16);
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
   themeButton.title = label;
   themeButton.setAttribute("aria-label", label);
@@ -950,7 +953,6 @@ let commandIndex = 0;
 
 function setAccountMenu(open) {
   accountMenu.hidden = !open;
-  accountMenuButton.setAttribute("aria-expanded", String(open));
   identity.setAttribute("aria-expanded", String(open));
 }
 
@@ -1086,10 +1088,12 @@ function init() {
 
   document.getElementById("admin-home").addEventListener("click", () => void go("overview"));
   document.getElementById("admin-menu-dashboard").addEventListener("click", () => void go("overview"));
-  accountMenuButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    setAccountMenu(accountMenu.hidden);
+  document.getElementById("admin-menu-help").addEventListener("click", () => openHelp());
+  document.querySelectorAll(".admin-nav-icon[data-icon]").forEach((element) => {
+    element.innerHTML = icon(element.dataset.icon, 14);
   });
+  const searchIcon = document.getElementById("admin-search-icon");
+  if (searchIcon) searchIcon.innerHTML = icon("search", 14);
   identity.addEventListener("click", (event) => {
     event.stopPropagation();
     if (!identity.hidden) setAccountMenu(accountMenu.hidden);
@@ -1136,7 +1140,6 @@ function init() {
     if (
       !accountMenu.hidden &&
       !accountMenu.contains(event.target) &&
-      !accountMenuButton.contains(event.target) &&
       !identity.contains(event.target)
     ) {
       closeAccountMenu();
