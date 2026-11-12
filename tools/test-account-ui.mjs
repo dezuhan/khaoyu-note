@@ -118,7 +118,7 @@ try {
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("#login-submit");
-  await page.waitForURL(/\/workspace$/, { timeout: 15000 });
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
   check("password login shows the signed-in account", (await page.locator("#admin-email").innerText()).includes(email));
@@ -461,7 +461,7 @@ try {
   await page.fill("#email", email);
   await page.fill("#password", newPassword);
   await page.click("#login-submit");
-  await page.waitForURL(/\/workspace$/, { timeout: 15000 });
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
   check("login with the new password", (await page.locator("#admin-email").innerText()).includes(email));
@@ -474,7 +474,7 @@ try {
   await page.locator("summary", { hasText: "Use a backup code" }).click();
   await page.fill("#recovery-code", backupCode);
   await page.click("#login-submit");
-  await page.waitForURL(/\/workspace$/, { timeout: 15000 });
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
   check("login with a backup code works without a password", (await page.locator("#admin-email").innerText()).includes(email));
@@ -487,7 +487,7 @@ try {
   await page.fill("#email", manualEmail);
   await page.fill("#password", "manual-password-123");
   await page.click("#login-submit");
-  await page.waitForURL(/\/workspace$/, { timeout: 15000 });
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForSelector('[data-role="profile-form"]');
   check(
@@ -502,7 +502,7 @@ try {
       (await page.locator('.admin-nav-item[data-page="sessions"]').isVisible())
   );
   await page.goto(`${base}/login`, { waitUntil: "load" });
-  await page.waitForURL(/\/workspace$/, { timeout: 15000 });
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
   check("signed-in member is redirected away from login", true);
   await page.goto(`${base}/admin#accounts`, { waitUntil: "load" });
   await page.reload({ waitUntil: "load" });

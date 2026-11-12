@@ -128,9 +128,9 @@ project uses Semantic Versioning.
   menu with Local/Add Server, remote board lists, read-only share rendering via
   `/?share=<token>&server=<origin>`, and a `?workspace=1` entry point. The service `/workspace` and
   `/s` routes redirect to the configured main app; the backend keeps login/admin/share management.
-- `/workspace` is the default landing for the service: the root URL redirects there and all sign-ins
-  (admin and member) land on the shared workspace page on the admin port. The main frontend also has
-  its own workspace popover; the admin dashboard remains at `/admin`.
+- The service root and login return to the admin dashboard (`/admin`). `/workspace` remains available
+  as a direct service-side fallback; the main frontend keeps its own workspace popover. Public share
+  links continue to use the main frontend.
 - Added a team workspace model and `/workspace` web prototype: approved accounts automatically get
   viewer access to every server board (migration 18/6), with an admin able to promote per-board roles.
   The page lists local/remote servers, supports Add Server links, and opens read-only board previews.

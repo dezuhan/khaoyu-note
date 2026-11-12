@@ -36,9 +36,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   design-system modal, with menu layering and admin-nav polish fixed.
 - **Frontend/backend split**: workspace switching and share viewing moved to the main board
   frontend; the service backend now redirects those views and keeps only account/admin/share APIs.
-- **Workspace default**: `/` redirects to `/workspace`, and login lands on the local service
-  workspace page for admins and members; `/admin` remains the administration dashboard, while the
-  main frontend has the richer workspace popover.
+- **Admin default**: `/` and login return to `/admin`; `/workspace` remains a direct service fallback,
+  while the main frontend keeps the workspace popover.
 - **Team workspace prototype**: `/workspace` server/board switcher and automatic viewer access for
   approved accounts.
 - **Private registration default**: admin-controlled Private/Public registration access, account

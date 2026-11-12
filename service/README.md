@@ -64,16 +64,15 @@ every board on the server; an admin can promote a member to editor/commenter fro
 panel. This is the default `workspace_mode=shared` policy. Set
 `service_meta.workspace_mode = 'private'` only for deployments that want strict per-board membership.
 
-The service root redirects to the local workspace page:
+The service root redirects to the administration dashboard:
 
 ```text
-https://admin.example.com/           -> 302 /workspace
-https://admin.example.com/workspace   -> service workspace
+https://admin.example.com/           -> 302 /admin
+https://admin.example.com/workspace   -> optional service workspace page
 ```
 
-The main board frontend still owns the richer Workspace popover and public share rendering. The
-service workspace remains available on the admin port for account/admin-side access; the backend
-dashboard is at `/admin`.
+Login lands on `/admin` as well; the main board frontend owns the richer Workspace popover and public
+share rendering. `/workspace` remains available as a direct service-side fallback.
 
 
 - **Local storage** — the local board web host (default `http://127.0.0.1:1430`);

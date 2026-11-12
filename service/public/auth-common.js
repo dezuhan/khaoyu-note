@@ -52,7 +52,7 @@ export async function api(path, { method = "GET", body } = {}) {
 }
 
 export function landingFor() {
-  return "/workspace";
+  return "/admin";
 }
 
 export async function hasSession() {
