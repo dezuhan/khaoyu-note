@@ -1111,3 +1111,17 @@ button.admin-admin:hover {
     display: none;
   }
 }
+
+/* The signed-out admin card is a standalone action, not a dense table control. */
+.admin-auth .ky-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
