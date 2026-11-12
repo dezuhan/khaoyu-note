@@ -1994,6 +1994,17 @@ const noteToolBox2 = await page.locator('.mn-tool[data-tool="note"]').boundingBo
 await page.mouse.move(noteToolBox2.x + noteToolBox2.width / 2, noteToolBox2.y + noteToolBox2.height / 2);
 await page.mouse.down();
 await page.mouse.move(dropColumnBox.x + dropColumnBox.width / 2, dropColumnBox.y + 72, { steps: 12 });
+await page.waitForTimeout(350);
+const liveColumnPreview = await page.evaluate((columnId) => {
+  const placeholder = document.querySelector(`.mn-drop-reservation[data-column="${columnId}"]`);
+  const column = document.querySelector(`.mn-card[data-id="${columnId}"]`);
+  return { placeholder: Boolean(placeholder), height: Number.parseFloat(column?.style.height || "0") };
+}, dropColumnId);
+check(
+  "Hovering a column reserves space and previews the drop before mouseup",
+  liveColumnPreview.placeholder && liveColumnPreview.height > dropColumnMetricsBefore.height,
+  JSON.stringify({ ...liveColumnPreview, before: dropColumnMetricsBefore.height })
+);
 await page.mouse.up();
 await page.waitForTimeout(700);
 const placedInColumn = await page.evaluate(async ([cardId, columnId]) => {
@@ -2645,6 +2656,34 @@ if (await imageCard.count()) {
       (await imageCard.locator(".mn-image-crop img").isVisible())
   );
 }
+// Dragging an existing card into a column uses the same live reservation preview.
+const sourceCardId = await page.evaluate(async () => {
+  const actions = await import("/js/actions.js");
+  return actions.addCardAtCenter("note").id;
+});
+await page.waitForTimeout(350);
+const sourceCard = byId(sourceCardId);
+if (await sourceCard.count()) {
+  const sourceBox = await sourceCard.boundingBox();
+  const targetBox = await byId(dropColumnId).boundingBox();
+  await page.mouse.move(sourceBox.x + 20, sourceBox.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 140, { steps: 12 });
+  await page.waitForTimeout(300);
+  const cardHoverPreview = await page.evaluate(
+    (columnId) => Boolean(document.querySelector(`.mn-drop-reservation[data-column="${columnId}"]`)),
+    dropColumnId
+  );
+  check("Dragging an existing card shows the live drop reservation", cardHoverPreview);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  const movedCard = await page.evaluate(async ([columnId, cardId]) => {
+    const { state } = await import("/js/store.js");
+    return state.board.cards.find((card) => card.id === cardId)?.parentId === columnId;
+  }, [dropColumnId, await selectedId()]);
+  check("Existing card can be dropped into the previewed column", movedCard);
+}
+
 // Dropping into a row inserts by horizontal position too.
 await page.evaluate(async (columnId) => {
   const actions = await import("/js/actions.js");
@@ -2662,6 +2701,17 @@ const noteToolBox3 = await page.locator('.mn-tool[data-tool="note"]').boundingBo
 await page.mouse.move(noteToolBox3.x + noteToolBox3.width / 2, noteToolBox3.y + noteToolBox3.height / 2);
 await page.mouse.down();
 await page.mouse.move(rowDropBox.x + 20, rowDropBox.y + 100, { steps: 12 });
+await page.waitForTimeout(350);
+const liveRowPreview = await page.evaluate((columnId) => {
+  const placeholder = document.querySelector(`.mn-drop-reservation[data-column="${columnId}"]`);
+  const column = document.querySelector(`.mn-card[data-id="${columnId}"]`);
+  return { placeholder: Boolean(placeholder), width: Number.parseFloat(column?.style.width || "0") };
+}, dropColumnId);
+check(
+  "Hovering a row reserves space and previews the drop before mouseup",
+  liveRowPreview.placeholder && liveRowPreview.width > rowMetricsBefore.width,
+  JSON.stringify({ ...liveRowPreview, before: rowMetricsBefore.width })
+);
 await page.mouse.up();
 await page.waitForTimeout(700);
 const placedInRow = await page.evaluate(async ([cardId, columnId]) => {

@@ -59,6 +59,10 @@ project uses Semantic Versioning.
 - Rows now follow the width of their cards instead of stretching every card to fill the row. Columns
   keep auto height and rows auto width after drops, with a short width/height transition so the
   reflow is visible without delaying resize drags.
+- While a card or rail tool hovers a column or row, the target container now reserves the insertion
+  slot live: a dashed drop placeholder appears, the column grows or the row widens, and cards after
+  the slot shift before the pointer is released. Leaving the container restores the original layout.
+
 
 - Light/dark mode is now a global appearance preference. Opening or switching boards no longer
   applies a legacy theme stored in the board document or dirties the board, so the chosen theme

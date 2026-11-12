@@ -1268,6 +1268,49 @@ body.ky-scope {
   transition: none;
 }
 
+.mn-card.is-drop-preview-shifting {
+  transition:
+    top 140ms ease,
+    left 140ms ease;
+}
+
+.mn-drop-reservation {
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--ky-accent);
+  border-radius: var(--ky-radius-control);
+  background: color-mix(in srgb, var(--ky-accent) 10%, transparent);
+  color: var(--ky-accent);
+  animation: mn-drop-preview-pulse 900ms ease-in-out infinite alternate;
+}
+
+.mn-drop-reservation span {
+  padding: 2px 8px;
+  border-radius: var(--ky-radius-pill, 999px);
+  background: var(--ky-control);
+  color: var(--ky-text);
+  font-size: var(--ky-text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@keyframes mn-drop-preview-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-card.is-drop-preview-shifting,
+  .mn-drop-reservation {
+    transition: none;
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mn-card-column {
     transition: none;

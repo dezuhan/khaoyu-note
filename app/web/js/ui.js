@@ -66,6 +66,7 @@ import { createTemplateFromSelection, openTemplateLibrary } from "./templates.js
 import { icon } from "./icons.js";
 import { CARD_ASPECTS, columnChildren, createCard, getCard, layoutColumns, TYPE_LABELS } from "./model.js";
 import { cardElement, renderView } from "./render.js";
+import { clearDropPreview, previewDrop } from "./drop-preview.js";
 import {
   canRedo,
   canUndo,
@@ -539,6 +540,41 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
   }
 }
 
+function previewToolColumnDrop(tool, column, event) {
+  if (!column) return false;
+  if (["line", "draw", "upload"].includes(tool.key)) return false;
+  const type = tool.key === "image" ? "image" : tool.key === "board" ? "board" : tool.type;
+  if (!type || type === "column" || type === "section") return false;
+  const children = columnChildren(state.board, column.id);
+  const rowOfColumns =
+    column.direction === "row" &&
+    (Boolean(column.kanban) || (children.length > 0 && children.every((child) => child.type === "column")));
+  if (rowOfColumns) return false;
+  const viewport = document.getElementById("viewport");
+  const rect = viewport.getBoundingClientRect();
+  const point = {
+    x: (event.clientX - rect.left - state.view.x) / state.view.zoom,
+    y: (event.clientY - rect.top - state.view.y) / state.view.zoom,
+  };
+  const probe = createCard(type, 0, 0);
+  const aspect = probe.aspect || CARD_ASPECTS[type];
+  const innerW = Math.max(120, column.w - 28);
+  const width = column.direction === "row" ? Math.max(120, probe.w) : innerW;
+  const height =
+    column.direction === "row"
+      ? Math.max(56, column.h - 64 - 14)
+      : aspect
+        ? Math.max(70, Math.round(innerW / aspect))
+        : probe.h;
+  previewDrop(column, point, {
+    width,
+    height,
+    label: toolLabel(tool),
+    excludeIds: [],
+  });
+  return true;
+}
+
 function buildToolRail() {
   refs.toolrail.innerHTML = "";
   const hidden = new Set(getSettings().hiddenTools || []);
@@ -598,14 +634,22 @@ function buildToolRail() {
         document.querySelectorAll(".mn-card").forEach((el) => {
           el.classList.toggle("is-drop-target", el.dataset.id === current.targetColumnId);
         });
-        if (current.targetViewport) {
-          showToolDragPreview(current.tool.key, moveEvent);
-        } else if (toolDropPreviewEl) {
-          toolDropPreviewEl.hidden = true;
-        }
-        if (current.moved && !current.targetTool && !current.targetViewport) {
-          showToolDragPreview(current.tool.key, moveEvent);
-          if (toolDropPreviewEl) toolDropPreviewEl.hidden = true;
+        const previewingColumn = Boolean(
+          hoverColumn && !current.targetTool && previewToolColumnDrop(current.tool, hoverColumn, moveEvent)
+        );
+        if (previewingColumn) {
+          clearToolDragPreview();
+        } else {
+          clearDropPreview();
+          if (current.targetViewport) {
+            showToolDragPreview(current.tool.key, moveEvent);
+          } else if (toolDropPreviewEl) {
+            toolDropPreviewEl.hidden = true;
+          }
+          if (current.moved && !current.targetTool && !current.targetViewport) {
+            showToolDragPreview(current.tool.key, moveEvent);
+            if (toolDropPreviewEl) toolDropPreviewEl.hidden = true;
+          }
         }
       };
       const onUp = (upEvent) => {
@@ -623,6 +667,7 @@ function buildToolRail() {
           el.classList.remove("is-drop-target")
         );
         clearToolDragPreview();
+        clearDropPreview();
         if (current.targetTool && current.targetTool !== current.tool.key) {
           moveTool(current.tool.key, current.targetTool);
         } else if (current.targetColumnId) {

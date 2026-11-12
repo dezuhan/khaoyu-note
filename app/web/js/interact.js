@@ -15,6 +15,7 @@ import { openColorPicker } from "./color-picker.js";
 import { colorNameForHex } from "./color-names.js";
 import { isTemporarilyDisabledType } from "./limits.js";
 import { confirmAction, toast } from "./ui.js";
+import { clearDropPreview, previewDrop } from "./drop-preview.js";
 import {
   CARD_ASPECTS,
   cardHeightFor,
@@ -877,6 +878,7 @@ function onPointerUp(event) {
 }
 
 function finishDrag(current) {
+  clearDropPreview();
   const before = captureRects();
   const dragged = new Set(current.ids);
   const target = current.dropTarget;
@@ -1005,6 +1007,7 @@ function ensureDragUI() {
 }
 
 function clearDragIndicators() {
+  clearDropPreview();
   if (gesture) gesture.dropTarget = null;
   if (!dragUI) return;
   dragUI.layer.remove();
@@ -1038,6 +1041,7 @@ function updateDragIndicators(point) {
     ui.origin.hidden = !gesture.wasChild;
     if (gesture.wasChild) paintOriginGhost(ui, cards[0]);
     gesture.dropTarget = null;
+    clearDropPreview();
     document.querySelectorAll(".mn-card.is-drop-target").forEach((el) =>
       el.classList.remove("is-drop-target")
     );
@@ -1062,6 +1066,7 @@ function updateDragIndicators(point) {
       ui.line.hidden = true;
       ui.ghost.hidden = true;
       gesture.dropTarget = null;
+      clearDropPreview();
       return;
     }
     const innerX = column.x + COLUMN_PADDING;
@@ -1100,12 +1105,19 @@ function updateDragIndicators(point) {
       height: `${innerH}px`,
     });
     gesture.dropTarget = { columnId: column.id, index };
+    previewDrop(column, point, {
+      width: ghostW,
+      height: innerH,
+      label: "Drop",
+      excludeIds: dragged,
+    });
     return;
   }
   if (cards.every((card) => card.type === "column")) {
     ui.line.hidden = true;
     ui.ghost.hidden = true;
     gesture.dropTarget = null;
+    clearDropPreview();
     return;
   }
   ui.line.classList.remove("is-vertical");
@@ -1149,6 +1161,12 @@ function updateDragIndicators(point) {
   ui.origin.hidden = !gesture.wasChild;
   if (gesture.wasChild) paintOriginGhost(ui, cards[0]);
   gesture.dropTarget = { columnId: column.id, index };
+  previewDrop(column, point, {
+    width: innerW,
+    height: ghostHeight,
+    label: "Drop",
+    excludeIds: dragged,
+  });
 }
 
 function paintOriginGhost(ui, card) {

@@ -15,6 +15,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
 - **Sharing hardening**: optional share-view watermark and per-link download caps, server-side rich
   HTML sanitisation, exact remote-embed host allowlists, optional AES-256-GCM object encryption and
   a data-only PostgreSQL deployment script.
+- **Live drop preview**: hovering a column or row with a card or rail tool reserves the exact slot,
+  grows the container and shifts the following cards before the drop; leaving restores the layout.
 - **Auto-sized columns and rows**: rows follow their card widths instead of stretching cards; after a
   drop the column height or row width reflows with a short transition.
 - **Pointer-accurate tool drops**: dropping a rail tool into a column or row inserts it at the hovered
