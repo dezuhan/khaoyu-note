@@ -25,25 +25,26 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
   service adds accounts, sharing and sync.
 - [x] The MCP server runs locally over stdio and shares the same database.
 - [x] Boards, cards and columns are scoped to one local database.
-- [~] First-run database setup shell: single-user Local SQLite works; Turso and collaboration are
-  **not production ready**. Collaboration is disabled in the wizard until the admin dashboard and
-  role model in Milestone 10 land. See `docs/production-readiness.md`.
+- [~] First-run database setup shell: single-user Local SQLite works; the collaboration choice now
+  hands off to Server sync. Turso remains **not production ready**. Team onboarding still needs a
+  guided service connection in `docs/production-readiness.md`.
 
 ## Product goals
 
 - [x] 1. Keep the local-first desktop experience fully usable without a server.
-- [ ] 2. Offer an optional self-hosted server for teams that want accounts and sharing. (`service/`
-  implements this; production readiness is pending, see `docs/production-readiness.md`.)
-- [ ] 3. Support login and roles, but never make login mandatory for local boards. (Local-first guest
+- [~] 2. Offer an optional self-hosted server for teams that want accounts and sharing. (`service/`
+  implements this; production readiness is still pending OIDC, load tests, penetration testing and a
+  guided team onboarding, see `docs/production-readiness.md`.)
+- [x] 3. Support login and roles, but never make login mandatory for local boards. (Local-first guest
   mode does this; the service requires accounts only for synced projects.)
-- [ ] 4. Share a whole project, a single card, or a column without exposing the rest of the board.
-  (Implemented in `service/`; the local-first build hides the Share UI.)
-- [ ] 5. Treat security, privacy and data ownership as first-class requirements. (Ongoing; see the
-  security audit and release gates.)
+- [x] 4. Share a whole project, a single card, or a column without exposing the rest of the board.
+  (Implemented in `service/`; the local-first UI exposes share controls once a board is synced.)
+- [~] 5. Treat security, privacy and data ownership as first-class requirements. (Ongoing; account
+  security hardening exists, but external penetration testing and production load tests remain.)
 - [ ] 6. Add an optional AI assistant that can organise, research, browse and edit only with explicit user consent.
-- [ ] 7. Offer a first-run storage choice: local SQLite or Turso for single-user, PostgreSQL + Redis
-  for collaboration. (Local SQLite and the PostgreSQL/Redis team profile exist; the Turso adapter is
-  not implemented.)
+- [~] 7. Offer a first-run storage choice: local SQLite or Turso for single-user, PostgreSQL + Redis
+  for collaboration. (Local SQLite, the PostgreSQL/Redis team profile and the collaboration setup
+  handoff exist; the Turso adapter is not implemented.)
 
 ## Milestone 1: Self-hosted service foundation
 

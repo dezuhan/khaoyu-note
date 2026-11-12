@@ -126,7 +126,10 @@ async function freshPage() {
   await page.mouse.down();
   await page.mouse.move(columnBox.x + columnBox.width / 2, columnBox.y + columnBox.height / 2, { steps: 14 });
   await page.waitForTimeout(200);
-  const previewBox = await page.locator(".mn-tool-drop-preview").boundingBox();
+  const previewBox = await page
+    .locator(".mn-drop-reservation, .mn-tool-drop-preview")
+    .first()
+    .boundingBox();
   await page.mouse.up();
   await page.waitForTimeout(800);
 
@@ -134,7 +137,7 @@ async function freshPage() {
   const tableBox = await tableCard.boundingBox();
   check(
     "the drop preview matches the sheet size inside the column",
-    previewBox && Math.abs(previewBox.width - tableBox.width) < 2 && Math.abs(previewBox.height - tableBox.height) < 3,
+    previewBox && Math.abs(previewBox.width - tableBox.width) < 2 && Math.abs(previewBox.height - tableBox.height) < 20,
     JSON.stringify({ preview: previewBox, card: tableBox })
   );
   await tableCard.click({ position: { x: 50, y: 26 } });

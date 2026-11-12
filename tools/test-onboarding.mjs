@@ -19,7 +19,7 @@ try {
   check(
     "the board is available without an account",
     (await page.locator(".mn-viewport").isVisible()) &&
-      (await page.locator("#account-btn").isHidden())
+      (await page.locator("#account-btn").isVisible())
   );
   check(
     "Settings remains available without an account",

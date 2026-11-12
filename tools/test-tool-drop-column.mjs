@@ -25,6 +25,7 @@ const before = await page.evaluate(() => {
     id,
     columnId: column.id,
     children: doc.cards.filter((card) => card.parentId === column.id).length,
+    noteIds: doc.cards.filter((card) => card.parentId === column.id && card.type === "note").map((card) => card.id),
     total: doc.cards.length,
   };
 });
@@ -53,23 +54,23 @@ await page.evaluate(() => {
   );
 });
 await page.waitForTimeout(600);
-const after = await page.evaluate((boardId) => {
+const after = await page.evaluate(({ boardId, noteIds }) => {
   const doc = JSON.parse(localStorage.getItem("mn.board." + boardId));
   const column = doc.cards.find((card) => card.type === "column");
   const children = doc.cards.filter((card) => card.parentId === column.id);
   return {
     children: children.length,
     total: doc.cards.length,
-    last: children.sort((a, b) => (a.order || 0) - (b.order || 0)).at(-1),
+    newNote: children.find((card) => card.type === "note" && !noteIds.includes(card.id)),
   };
-}, before.id);
+}, { boardId: before.id, noteIds: before.noteIds });
 
 check("the tool is added as a column child", after.children === before.children + 1, `${before.children} -> ${after.children}`);
 check("the card count increases by one", after.total === before.total + 1, `${before.total} -> ${after.total}`);
 check(
   "the new child is a note with the column as parent",
-  after.last?.type === "note" && after.last?.parentId === before.columnId,
-  `${after.last?.type} / ${after.last?.parentId}`
+  after.newNote?.parentId === before.columnId,
+  `${after.newNote?.type} / ${after.newNote?.parentId}`
 );
 check("no runtime errors", errors.length === 0, errors.join(" | ").slice(0, 200));
 

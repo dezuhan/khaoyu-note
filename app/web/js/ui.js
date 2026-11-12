@@ -377,7 +377,7 @@ function insertToolCard(column, card, index) {
 function toolPreviewRect(probe, event) {
   const probeHeight =
     probe.type === "table"
-      ? Math.max(probe.h, (probe.cells?.length || 0) * 28 + 4)
+      ? Math.max(80, probe.h, (probe.cells?.length || 0) * 28 + 4)
       : probe.h;
   const viewport = document.getElementById("viewport");
   const rect = viewport.getBoundingClientRect();
@@ -565,7 +565,9 @@ function previewToolColumnDrop(tool, column, event) {
       ? Math.max(56, column.h - 64 - 14)
       : aspect
         ? Math.max(70, Math.round(innerW / aspect))
-        : probe.h;
+        : type === "table"
+          ? 80
+          : probe.h;
   previewDrop(column, point, {
     width,
     height,

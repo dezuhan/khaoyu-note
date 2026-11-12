@@ -13,6 +13,11 @@ import { migrate, rollback } from "../src/storage/migrations.mjs";
 import { createPostgresBackup, restorePostgresBackup } from "../src/storage/backup-postgres.mjs";
 import { ObjectStore } from "../src/objects.mjs";
 
+async function resetPostgresSchema(storage) {
+  await storage.exec("DROP SCHEMA IF EXISTS public CASCADE");
+  await storage.exec("CREATE SCHEMA public");
+}
+
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "khaoyu-pg-runtime-"));
 }
@@ -62,12 +67,7 @@ test(
     const mailer = createFileMailer(config, logger);
     let server = null;
     try {
-      const down = fs.readFileSync(
-        path.join(POSTGRES_MIGRATIONS_DIR, "001_baseline.down.sql"),
-        "utf8"
-      );
-      await db.exec(down);
-      await db.exec("DROP TABLE IF EXISTS schema_migrations");
+      await resetPostgresSchema(db);
       await migrate(db, { directory: POSTGRES_MIGRATIONS_DIR });
 
       server = createService({ config, db, logger, mailer });
@@ -154,10 +154,7 @@ test(
     const dataDir = tempDir();
     const config = configFor(dataDir);
     try {
-      await db.exec(
-        fs.readFileSync(path.join(POSTGRES_MIGRATIONS_DIR, "001_baseline.down.sql"), "utf8")
-      );
-      await db.exec("DROP TABLE IF EXISTS schema_migrations");
+      await resetPostgresSchema(db);
       await migrate(db, { directory: POSTGRES_MIGRATIONS_DIR });
 
       const now = Date.now();

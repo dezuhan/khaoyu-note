@@ -27,7 +27,7 @@ check("the connection hit area is tightened", hitWidth <= 10, String(hitWidth));
 const empty = await page.evaluate(() => {
   const viewport = document.getElementById("viewport").getBoundingClientRect();
   for (let y = viewport.top + 80; y < viewport.bottom - 40; y += 20) {
-    for (let x = viewport.left + 40; x < viewport.right - 40; x += 20) {
+    for (let x = viewport.left + 90; x < viewport.right - 40; x += 20) {
       if (!document.elementFromPoint(x, y)?.closest(".mn-card")) return { x, y };
     }
   }
@@ -63,7 +63,7 @@ check(
 const secondStart = await page.evaluate(() => {
   const viewport = document.getElementById("viewport").getBoundingClientRect();
   for (let y = viewport.top + 80; y < viewport.bottom - 40; y += 20) {
-    for (let x = viewport.left + 40; x < viewport.right - 40; x += 20) {
+    for (let x = viewport.left + 90; x < viewport.right - 40; x += 20) {
       const el = document.elementFromPoint(x, y);
       if (!el?.closest(".mn-card, .mn-connection-hit, .mn-line-handle")) return { x, y };
     }

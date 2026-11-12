@@ -30,9 +30,9 @@ Implemented in this repository:
 
 Not ready for a production team deployment:
 
-1. The desktop/web UI still exposes only the local-first path. The setup wizard’s Collaboration option
-   is disabled until the admin dashboard/role model (Roadmap Milestone 10) exists, and does not
-   connect to the service.
+1. The setup wizard’s Collaboration option now opens the Server sync flow, and the admin dashboard
+   covers accounts, boards, security and sessions. Team onboarding still needs a guided service
+   connection and role walkthrough before it is production-polished.
 2. OIDC is not implemented; the current SSO path is a trusted-proxy header mode. A real OIDC
    discovery/callback flow is still required for normal deployments.
 3. External penetration testing and production-scale load tests are outstanding.
@@ -82,7 +82,7 @@ Backup and the export action are preparation only, not a migration implementatio
 - [ ] backup and restore verified on Windows, Linux and macOS;
 - [ ] external penetration test completed;
 - [ ] production-scale load test for login, shares and uploads;
-- [ ] two-instance PostgreSQL + Redis validation;
+- [x] two-instance PostgreSQL + Redis validation;
 - [ ] OIDC implementation and test;
 - [ ] object storage plan for service assets;
 - [ ] Turso adapter, token storage and migration tests, or the option hidden;

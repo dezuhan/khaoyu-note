@@ -77,6 +77,9 @@ project uses Semantic Versioning.
   with an email on the login page as a passwordless fallback. Migration 016 adds `recovery_codes`.
 - The Activity table scrolls inside its rounded section card with a sticky header, so the card outline
   and Load more control remain visible while browsing a long audit trail.
+- Deployment-readiness pass: PostgreSQL tests now reset the schema between suites so the full
+  PostgreSQL/Redis service suite passes in one run; stale CI expectations for the enabled Share/Sync
+  controls, Account Management, preview reservation and activity layout were updated.
 - Sensitive account endpoints now have bounded rate limits: password change, TOTP setup/enable/
   disable, passkey registration, backup-code generation, export and account deletion. Added a
   self-hosted account-security readiness checklist documenting the remaining per-process limiter

@@ -117,8 +117,8 @@ async function registerPasskey() {
       method: "POST",
       body: { response: serializeCredential(credential, "create"), name: "This device" },
     });
-    setStatus("Passkey registered.");
-    await generateBackupCodes();
+    await generateBackupCodes({ quiet: true });
+    setStatus("Passkey registered. Backup codes generated below.");
     await loadPasskeys();
   } catch (error) {
     setStatus(error.message);
@@ -171,19 +171,19 @@ async function logout() {
 }
 
 document.getElementById("login").addEventListener("click", loginWithPassword);
-async function generateBackupCodes() {
+async function generateBackupCodes({ quiet = false } = {}) {
   const output = document.getElementById("backup-codes");
   try {
     const data = await api("/api/v1/auth/recovery-codes", { method: "POST", body: {} });
     output.textContent = data.codes.join("\n");
     output.hidden = false;
-    setStatus("Backup codes generated. Save them now; each code works once.");
+    if (!quiet) setStatus("Backup codes generated. Save them now; each code works once.");
   } catch (error) {
     setStatus(error.message);
   }
 }
 
-document.getElementById("backup-generate").addEventListener("click", generateBackupCodes);
+document.getElementById("backup-generate").addEventListener("click", () => generateBackupCodes());
 document.getElementById("passkey-register").addEventListener("click", registerPasskey);
 document.getElementById("passkey-login").addEventListener("click", loginWithPasskey);
 document.getElementById("logout").addEventListener("click", logout);

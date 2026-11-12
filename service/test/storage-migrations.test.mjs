@@ -18,6 +18,11 @@ import {
 } from "../src/storage/migrations.mjs";
 import { copySqliteToPostgres } from "../src/storage/migrate-data.mjs";
 
+async function resetPostgresSchema(storage) {
+  await storage.exec("DROP SCHEMA IF EXISTS public CASCADE");
+  await storage.exec("CREATE SCHEMA public");
+}
+
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "khaoyu-migrations-"));
 }
@@ -55,12 +60,7 @@ test(
     const sqliteDir = tempDir();
     const sqlite = openDatabase(path.join(sqliteDir, "parity.db"));
     try {
-      const downSql = fs.readFileSync(
-        path.join(POSTGRES_MIGRATIONS_DIR, "001_baseline.down.sql"),
-        "utf8"
-      );
-      await storage.exec(downSql);
-      await storage.exec("DROP TABLE IF EXISTS schema_migrations");
+      await resetPostgresSchema(storage);
       assert.deepEqual(await migrateStorage(storage, { directory: POSTGRES_MIGRATIONS_DIR }), [1, 2, 3, 4]);
       assert.equal(
         (await migrationStatus(storage, POSTGRES_MIGRATIONS_DIR))[0].applied,
@@ -198,10 +198,7 @@ test(
       sqlite.close();
       sqliteClosed = true;
 
-      await storage.exec(
-        fs.readFileSync(path.join(POSTGRES_MIGRATIONS_DIR, "001_baseline.down.sql"), "utf8")
-      );
-      await storage.exec("DROP TABLE IF EXISTS schema_migrations");
+      await resetPostgresSchema(storage);
       await migrateStorage(storage, { directory: POSTGRES_MIGRATIONS_DIR });
 
       const report = await copySqliteToPostgres({
