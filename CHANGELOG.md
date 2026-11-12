@@ -116,6 +116,10 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- The main board frontend now owns workspace switching and public board viewing. It adds a Workspace
+  menu with Local/Add Server, remote board lists, read-only share rendering via
+  `/?share=<token>&server=<origin>`, and a `?workspace=1` entry point. The service `/workspace` and
+  `/s` routes redirect to the configured main app; the backend keeps login/admin/share management.
 - `/workspace` is now the default landing for the service: the root URL redirects there and all
   sign-ins (admin and member) land on the shared workspace instead of the admin dashboard. The admin
   dashboard remains reachable from the workspace Admin link.

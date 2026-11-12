@@ -6,6 +6,7 @@ import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initLiveBoard } from "./live-board.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
+import { initWorkspaceLauncher, openShareFromQuery, openWorkspaceFromQuery } from "./workspace-mode.js";
 import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
 import {
@@ -80,6 +81,14 @@ function syncBoardUrl() {
 async function boot() {
   initTheme();
   initLanguage();
+  if (await openShareFromQuery()) {
+    document.getElementById("boot")?.remove();
+    return;
+  }
+  if (await openWorkspaceFromQuery()) {
+    document.getElementById("boot")?.remove();
+    return;
+  }
   // After a reset, choose the storage direction before any board or setting is read.
   await initSetupGate();
   await initAuth();
@@ -87,6 +96,7 @@ async function boot() {
   initRender(refs);
   initInteractions(refs);
   initUI(uiRefs);
+  initWorkspaceLauncher(uiRefs);
   initSyncUI(uiRefs);
   initLiveBoard();
   initShareUI(uiRefs);

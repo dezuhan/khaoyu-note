@@ -79,6 +79,19 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
       sendJson(response, 426, { error: "HTTPS required", code: "https_required" }, config);
       return;
     }
+    const sharePath = url.pathname.match(/^\/s\/([^/]+)$/);
+    if (request.method === "GET" && sharePath && config.mainAppUrl) {
+      response.writeHead(302, {
+        Location: `${config.mainAppUrl}/?share=${encodeURIComponent(decodeURIComponent(sharePath[1]))}&server=${encodeURIComponent(config.publicUrl)}`,
+      });
+      response.end();
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/workspace" && config.mainAppUrl) {
+      response.writeHead(302, { Location: `${config.mainAppUrl}/?workspace=1` });
+      response.end();
+      return;
+    }
     if (request.method === "GET" && url.pathname === "/") {
       response.writeHead(302, { Location: "/workspace" });
       response.end();

@@ -2586,7 +2586,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         sendJson(response, 201, {
           id: created.id,
           token: created.token,
-          url: `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(created.token)}`,
+          url: config.mainAppUrl
+            ? `${config.mainAppUrl}/?share=${encodeURIComponent(created.token)}&server=${encodeURIComponent(config.publicUrl)}`
+            : `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(created.token)}`,
           scope,
           permission,
           expiresAt,
@@ -2629,7 +2631,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         });
         sendJson(response, 200, {
           token,
-          url: `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(token)}`,
+          url: config.mainAppUrl
+            ? `${config.mainAppUrl}/?share=${encodeURIComponent(token)}&server=${encodeURIComponent(config.publicUrl)}`
+            : `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(token)}`,
         }, config);
         return true;
       }

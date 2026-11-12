@@ -140,8 +140,11 @@ test("service admin dashboard API", async (t) => {
     assert.equal(script.status, 200);
     const style = await api.call("/admin.css");
     assert.equal(style.status, 200);
+    const root = await api.call("/");
+    assert.equal(root.status, 302);
+    assert.equal(root.response.headers.get("location"), "/workspace");
     for (const [route, marker] of [
-      ["/", "login-form"],
+      ["/workspace", "Shared workspace"],
       ["/login", "login-form"],
       ["/register", "register-form"],
       ["/reset", "reset-form"],

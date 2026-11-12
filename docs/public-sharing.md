@@ -57,16 +57,16 @@ The team installer accepts two origins:
 - `KHAOYU_SERVICE_SHARE_PUBLIC_URL` — public share-view origin, for example
   `https://view.example.com`.
 
-Both URLs must include `http://` or `https://`; the installer normalizes a bare domain to HTTPS.
-Both Cloudflare hostnames must point at the same service frontend port `18080`:
+The backend/admin domain points at the service frontend `18080`; the public-view domain points at
+the **main board frontend** (the web host, default port `1430`):
 
 ```text
-note.example.com  -> http://127.0.0.1:18080   login, admin, API
-view.example.com  -> http://127.0.0.1:18080   /s/:token share links
+admin.example.com -> http://127.0.0.1:18080   login, admin, API
+note.example.com  -> http://127.0.0.1:1430    workspace, boards, public share
 ```
 
-Generated share links use the public-view origin. The board editor frontend is a separate web host
-and needs its own origin if it is exposed publicly.
+Set `KHAOYU_SERVICE_MAIN_APP_URL=https://note.example.com` on the service. Generated share links then
+open the main frontend as `/?share=<token>&server=<service-origin>` instead of the legacy `/s` page.
 
 ## Troubleshooting the public port
 

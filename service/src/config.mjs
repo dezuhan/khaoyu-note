@@ -44,6 +44,10 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
   if (!/^https?:\/\//.test(sharePublicUrl)) {
     throw new Error("KHAOYU_SERVICE_SHARE_PUBLIC_URL must be an http or https URL");
   }
+  const mainAppUrl = (env.KHAOYU_SERVICE_MAIN_APP_URL || "").replace(/\/+$/, "");
+  if (mainAppUrl && !/^https?:\/\//.test(mainAppUrl)) {
+    throw new Error("KHAOYU_SERVICE_MAIN_APP_URL must be an http or https URL");
+  }
 
   const adminToken = env.KHAOYU_SERVICE_ADMIN_TOKEN || "";
   if (adminToken) {
@@ -140,6 +144,7 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     port,
     publicUrl,
     sharePublicUrl,
+    mainAppUrl,
     dataDir,
     secret,
     databasePath: path.join(dataDir, "khaoyu-service.db"),

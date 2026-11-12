@@ -30,6 +30,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   and an explicit `--purge` path.
 - **Separate public-view domain**: the installer now captures backend and public-share origins and
   uses the latter for generated `/s/:token` links.
+- **Frontend/backend split**: workspace switching and share viewing moved to the main board
+  frontend; the service backend now redirects those views and keeps only account/admin/share APIs.
 - **Workspace default**: `/` redirects to `/workspace`, and login lands on the shared workspace for
   admins and members; `/admin` remains the administration dashboard.
 - **Team workspace prototype**: `/workspace` server/board switcher and automatic viewer access for

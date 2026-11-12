@@ -64,13 +64,15 @@ every board on the server; an admin can promote a member to editor/commenter fro
 panel. This is the default `workspace_mode=shared` policy. Set
 `service_meta.workspace_mode = 'private'` only for deployments that want strict per-board membership.
 
-`/workspace` is now the default route for all users. It shows every board the account can access and
-the server switcher. Open it directly or via the root URL:
+The main board frontend owns the workspace UI. When `KHAOYU_SERVICE_MAIN_APP_URL` is set, the
+service root and `/workspace` redirect there:
 
 ```text
-https://your-service/           -> 302 /workspace
-https://your-service/workspace
+https://admin.example.com/           -> 302 /workspace
+https://admin.example.com/workspace   -> 302 https://note.example.com/?workspace=1
 ```
+
+The backend dashboard remains at `/admin`.
 
 
 - **Local storage** — the local board web host (default `http://127.0.0.1:1430`);
