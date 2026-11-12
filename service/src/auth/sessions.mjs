@@ -14,6 +14,7 @@ export function publicAccount(account) {
     id: account.id,
     email: account.email,
     displayName: account.display_name,
+    role: account.role || "member",
     emailVerified: Boolean(account.email_verified_at),
     deletionPending: Boolean(account.deletion_requested_at),
   };

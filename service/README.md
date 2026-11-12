@@ -390,7 +390,8 @@ passkey link. `/register` creates an account immediately; the first account beco
 `/reset` asks for email, current password and a new password, then revokes every session. It never sends
 an email reset token because this service has no email confirmation flow.
 
-`/account` is the account security page: TOTP setup with an inline QR code, TOTP enable/disable,
+Login and recovery responses carry the account role; admins are sent to `/admin` and members to
+`/account`, including when they visit the other page. `/account` is the account security page: TOTP setup with an inline QR code, TOTP enable/disable,
 passkey readiness, sessions, API tokens and sign out. The dashboard Account section links to it and
 keeps the admin profile/password controls. `/passkeys` handles passkey login and registration. All
 pages use the same cookie and CSRF rules as the API and are served with a strict self-only CSP.

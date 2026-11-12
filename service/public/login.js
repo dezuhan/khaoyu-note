@@ -5,6 +5,7 @@ import {
   isEmail,
   queryMessage,
   redirectIfSignedIn,
+  landingFor,
   setBusy,
   setStatus,
 } from "./auth-common.js";
@@ -32,13 +33,14 @@ form.addEventListener("submit", async (event) => {
   setBusy(submit, true);
   setStatus("Signing in...");
   try {
+    let result;
     if (recovery) {
-      await api("/api/v1/auth/recovery-login", {
+      result = await api("/api/v1/auth/recovery-login", {
         method: "POST",
         body: { email, code: recovery },
       });
     } else {
-      await api("/api/v1/auth/login", {
+      result = await api("/api/v1/auth/login", {
         method: "POST",
         body: {
           email,
@@ -47,7 +49,7 @@ form.addEventListener("submit", async (event) => {
         },
       });
     }
-    window.location.replace("/admin");
+    window.location.replace(landingFor(result.account));
   } catch (error) {
     setStatus(error.message || "Could not sign in.", "error");
     setBusy(submit, false);

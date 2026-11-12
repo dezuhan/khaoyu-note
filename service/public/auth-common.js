@@ -51,18 +51,23 @@ export async function api(path, { method = "GET", body } = {}) {
   return parsed;
 }
 
+export function landingFor(account) {
+  return account?.role === "admin" ? "/admin" : "/account";
+}
+
 export async function hasSession() {
   try {
-    await api("/api/v1/auth/sessions");
-    return true;
+    const data = await api("/api/v1/auth/sessions");
+    return data.account || true;
   } catch {
     return false;
   }
 }
 
 export async function redirectIfSignedIn() {
-  if (await hasSession()) {
-    window.location.replace("/admin");
+  const account = await hasSession();
+  if (account) {
+    window.location.replace(landingFor(account));
     return true;
   }
   return false;

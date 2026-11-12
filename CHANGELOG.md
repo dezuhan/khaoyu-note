@@ -87,6 +87,9 @@ project uses Semantic Versioning.
 - Passkeys can be temporarily switched off with `KHAOYU_SERVICE_PASSKEYS_ENABLED=false`. The login
   link, account Security card, passkey page actions and public feature lookup all respect the switch;
   password, TOTP and backup-code sign-in remain available.
+- Login now lands by role: admins go to `/admin`, members go to `/account`. A signed-in member can no
+  longer bounce between `/login` and `/admin`; direct admin access redirects members to their security
+  page.
 - The admin dashboard now owns the viewport: the service sidebar and menubar stay fixed while the active
   page scrolls inside the content pane. Account security pages use the same fixed-viewport model, so
   long pages no longer scroll the whole document.

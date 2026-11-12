@@ -388,6 +388,23 @@ try {
   await page.waitForURL(/\/admin$/, { timeout: 15000 });
   check("login with a backup code works without a password", (await page.locator("#admin-email").innerText()).includes(email));
 
+  // Member login must land on /account, not loop between /login and /admin.
+  await page.goto(`${base}/account`, { waitUntil: "load" });
+  await page.waitForSelector("#logout");
+  await page.click("#logout");
+  await page.waitForURL(/\/login\?signedout=1/, { timeout: 15000 });
+  await page.fill("#email", manualEmail);
+  await page.fill("#password", "manual-password-123");
+  await page.click("#login-submit");
+  await page.waitForURL(/\/account$/, { timeout: 15000 });
+  check("member login lands on the account page", true);
+  await page.goto(`${base}/login`, { waitUntil: "load" });
+  await page.waitForURL(/\/account$/, { timeout: 15000 });
+  check("signed-in member is redirected away from login", true);
+  await page.goto(`${base}/admin`, { waitUntil: "load" });
+  await page.waitForURL(/\/account$/, { timeout: 15000 });
+  check("member is redirected away from the admin dashboard", true);
+
   check("no unexpected page errors", pageErrors.length === 0, pageErrors.join(" | "));
 } catch (error) {
   console.error("FAIL", error.message);

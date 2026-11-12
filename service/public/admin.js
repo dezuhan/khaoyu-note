@@ -105,9 +105,20 @@ async function api(path, { method = "GET", body } = {}) {
   return payload;
 }
 
-function showAuth() {
+async function showAuth() {
   identity.hidden = true;
-  // Redirect immediately: the dashboard is only meaningful with a signed-in admin session.
+  // A signed-in member is not allowed on /admin, but should not bounce between /login and /admin.
+  // Send admin sessions to the dashboard and everyone else to the member security page.
+  try {
+    const response = await fetch("/api/v1/auth/sessions", { credentials: "include" });
+    if (response.ok) {
+      const data = await response.json();
+      window.location.replace(data.account?.role === "admin" ? "/admin" : "/account");
+      return;
+    }
+  } catch {
+    /* fall through to login */
+  }
   window.location.replace("/login");
 }
 

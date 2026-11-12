@@ -205,6 +205,7 @@ test("service admin dashboard API", async (t) => {
     assert.equal(weak.body.code, "weak_password");
     const login = await api.login(email);
     assert.equal(login.status, 200, JSON.stringify(login.body));
+    assert.equal(login.body.account.role, "member");
     const activity = await api.call("/api/v1/admin/activity?limit=20", { jar: admin.jar });
     assert.ok(activity.body.entries.some((entry) => entry.action === "admin.user_created"));
   });

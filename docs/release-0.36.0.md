@@ -24,6 +24,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   keeping the card frame and Load more button visible.
 - **Passkey kill switch**: `KHAOYU_SERVICE_PASSKEYS_ENABLED=false` hides passkey UI and disables the
   passkey endpoints while leaving password, TOTP and backup-code login available.
+- **Role-aware login**: admins land on the dashboard and members land on account security, with no
+  redirect loop between `/login` and `/admin`.
 - **Fixed service chrome**: the admin sidebar remains visible while page content scrolls internally;
   account security pages keep the document fixed to the viewport too.
 - **Account Management dashboard**: Profile, Security (password, 2FA, passkeys and API tokens) and
