@@ -29,6 +29,10 @@ project uses Semantic Versioning.
 - The palette token layer was renamed from `--ph-*` to `--ky-palette-*`, so colour uses one `--ky-*`
   namespace in the app and the service. Service pages share the `khaoyu.theme` key and migrate the
   old admin/auth keys; the app keeps `mn.theme`.
+- Geometry is now a shared token scale (`--ky-space-*`, `--ky-text-*`, `--ky-radius-*`), and
+  `shared/theme/components.css` supplies the `.ky-card`, `.ky-section` and `.ky-table` used by the
+  service pages. Every padding, margin, gap, font size and radius in `admin.css`, `auth.css` and
+  `ui.css` uses those tokens; `test:theme-css` fails if literal px values return.
 
 ### Fixed
 

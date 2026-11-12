@@ -77,6 +77,47 @@
   --ky-radius-control: 7px;
   --ky-radius-card: 12px;
   --ky-control-height: 24px;
+
+  /* Shared geometry scale. Values are the pixel steps used by the app shell and the service pages,
+     so layout changes can be made once in the shared theme instead of in each page stylesheet. */
+  --ky-space-1: 1px;
+  --ky-space-2: 2px;
+  --ky-space-4: 4px;
+  --ky-space-5: 5px;
+  --ky-space-6: 6px;
+  --ky-space-8: 8px;
+  --ky-space-9: 9px;
+  --ky-space-10: 10px;
+  --ky-space-11: 11px;
+  --ky-space-12: 12px;
+  --ky-space-13: 13px;
+  --ky-space-14: 14px;
+  --ky-space-16: 16px;
+  --ky-space-18: 18px;
+  --ky-space-20: 20px;
+  --ky-space-22: 22px;
+  --ky-space-24: 24px;
+  --ky-space-26: 26px;
+  --ky-space-28: 28px;
+
+  --ky-text-2xs: 9px;
+  --ky-text-xs: 10px;
+  --ky-text-sm: 11px;
+  --ky-text-md: 12px;
+  --ky-text-lg: 13px;
+  --ky-text-xl: 14px;
+  --ky-text-2xl: 18px;
+  --ky-text-3xl: 20px;
+  --ky-text-4xl: 22px;
+
+  --ky-radius-2xs: 5px;
+  --ky-radius-xs: 6px;
+  --ky-radius-sm: 8px;
+  --ky-radius-md: 9px;
+  --ky-radius-lg: 10px;
+  --ky-radius-xl: 13px;
+  --ky-radius-2xl: 16px;
+  --ky-radius-pill: 999px;
   --ky-panel-padding: 12px;
   --ky-gap: 10px;
 

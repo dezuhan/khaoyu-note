@@ -30,6 +30,18 @@ Khaoyu Note uses one token vocabulary across the desktop app and the optional se
 every component. The table above resolves the dark fallback skin. There is no `--ky-surface-raised`,
 `--ky-accent-strong` or `--ky-font-code`; use `--ky-raise`, `--ky-accent-bright` and `--ky-mono`.
 
+## Geometry and shared components
+
+`shared/theme/ky.css` also defines the geometry scale: `--ky-space-*` (1 to 28 px steps),
+`--ky-text-*` (9 to 22 px type sizes), `--ky-radius-*` (5 px to pill), the existing
+`--ky-control-height` and `--ky-radius-control`. `shared/theme/components.css` layers the shared
+`.ky-card`, `.ky-section` and `.ky-table` components on those tokens; the service pages add the
+shared class to their admin markup and keep only page-specific layout in `admin.css`/`auth.css`.
+
+Service spacing, type sizes and radii must use `var(--ky-space-*)`, `var(--ky-text-*)` and
+`var(--ky-radius-*)`; `npm run test:theme-css` fails when a literal px value comes back (0, auto,
+percentages and var() are allowed). This keeps admin/auth geometry on the same scale as the app.
+
 ## Source of truth
 
 `shared/theme/` owns the design system: `ky.css` and `ky.js` (token vocabulary and vendored component runtime), `fonts.css` and

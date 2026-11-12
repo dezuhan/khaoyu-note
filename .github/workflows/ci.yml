@@ -48,6 +48,9 @@ jobs:
       - name: Shared theme runtime tests
         run: npm run test:theme-module
 
+      - name: Service theme CSS contract
+        run: npm run test:theme-css
+
       - name: Version consistency check
         run: node tools/test-version.mjs
 

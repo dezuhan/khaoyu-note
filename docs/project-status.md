@@ -260,6 +260,8 @@ Still blocked by the environment or missing credentials:
 - Account browser checks now include the shared service design tokens.
 - `shared/theme/` is the single source for tokens, fonts, icons, the brand mark and the theme runtime;
   generated app/service copies are checked in CI, and the palette layer uses `--ky-palette-*`.
+- Service spacing, type sizes and radii use the shared `--ky-space-*`/`--ky-text-*`/`--ky-radius-*`
+  scale and the shared `.ky-card`/`.ky-section`/`.ky-table` components; CI rejects literal px values.
 - Link header images and image cards support free crop with a Fit to image reset, applied from the context menu; the crop dialog fits the whole image on screen before editing.
 - Audio editing uses a clip-only upload button and Submit; uploading again while editing replaces the source before submit.
 - Audio playback supports MP3, WAV, M4A, AAC, OGG, Opus and FLAC MIME types in the web host and preview fallback, with a visible error toast for unsupported files.

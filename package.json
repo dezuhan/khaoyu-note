@@ -42,7 +42,8 @@
     "test:theme": "node tools/test-theme-global.mjs",
     "theme:sync": "node tools/sync-theme.mjs",
     "theme:check": "node tools/sync-theme.mjs --check",
-    "test:theme-module": "node --test tools/test-theme-module.test.mjs"
+    "test:theme-module": "node --test tools/test-theme-module.test.mjs",
+    "test:theme-css": "node tools/test-theme-css.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3"

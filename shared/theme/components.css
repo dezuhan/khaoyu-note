@@ -1,0 +1,56 @@
+/* Shared component geometry for the app and the server-rendered service pages.
+ * Spacing, radii, type sizes and card/table padding come from the ky.css token scale.
+ * Page stylesheets add only page-specific layout on top of these classes. */
+
+.ky-card {
+  padding: var(--ky-space-10) var(--ky-space-12);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-card);
+  background: var(--ky-surface);
+}
+
+.ky-section {
+  padding: var(--ky-space-12);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-card);
+  background: var(--ky-surface);
+}
+
+.ky-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ky-text-xs);
+}
+
+.ky-table th {
+  padding: var(--ky-space-6) var(--ky-space-8);
+  border-bottom: 1px solid var(--ky-stroke);
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+  font-weight: 600;
+  text-align: left;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ky-table td {
+  padding: var(--ky-space-8);
+  border-bottom: 1px solid var(--ky-stroke);
+  vertical-align: middle;
+}
+
+.ky-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.ky-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-space-16);
+}
+
+.ky-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ky-space-8);
+}

@@ -10,6 +10,7 @@ const check = process.argv.includes("--check");
 const files = [
   ["ky.css", ["app/web/vendor/ky.css", "service/public/ky.css"]],
   ["ky.js", ["app/web/vendor/ky.js"]],
+  ["components.css", ["app/web/vendor/components.css", "service/public/components.css"]],
   ["fonts.css", ["app/web/css/fonts.css", "service/public/fonts.css"]],
   ["icons.js", ["app/web/js/icons.js", "service/public/icons.js"]],
   ["theme.js", ["app/web/js/theme.js", "service/public/theme.js"]],

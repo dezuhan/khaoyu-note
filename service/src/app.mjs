@@ -27,6 +27,7 @@ const AUTH_PAGES = {
   "/share-view.js": ["share-view.js", "text/javascript; charset=utf-8"],
   "/ui.css": ["ui.css", "text/css; charset=utf-8"],
   "/ky.css": ["ky.css", "text/css; charset=utf-8"],
+  "/components.css": ["components.css", "text/css; charset=utf-8"],
   "/icons.js": ["icons.js", "text/javascript; charset=utf-8"],
   "/theme.js": ["theme.js", "text/javascript; charset=utf-8"],
   "/theme-init.js": ["theme-init.js", "text/javascript; charset=utf-8"],

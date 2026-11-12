@@ -515,7 +515,9 @@ font files, the SVG icon set, the brand mark and the `theme.js` runtime. `npm ru
 generates the app and service copies, and CI runs `npm run theme:check` so they cannot drift. That
 means 24 px controls, 7 px control radius, 12 px floating radius, 12/17 body text, custom select
 dropdowns, and four host skins (`light`, `softLight`, `softDark`, `dark`) driven by
-`--ky-palette-*` tokens.
+`--ky-palette-*` tokens. Geometry comes from `--ky-space-*`, `--ky-text-*` and `--ky-radius-*`;
+`shared/theme/components.css` provides the shared `.ky-card`, `.ky-section` and `.ky-table` used by
+the service pages, and `npm run test:theme-css` keeps literal px values out of their spacing rules.
 
 Colour is always a `--ky-*` / `--ky-palette-*` token or a `var()` fallback. One intentional content-level
 exception: the Heading card and column titles use a serif stack (Georgia, Times), because editorial

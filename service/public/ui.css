@@ -7,7 +7,7 @@ html[data-ky-theme] {
 body.ky-scope {
   min-height: 100vh;
   margin: 0;
-  padding: 28px 20px;
+  padding: var(--ky-space-28) var(--ky-space-20);
   display: grid;
   place-items: center;
   background: var(--ky-bg);
@@ -25,36 +25,36 @@ body.ky-scope {
   min-height: 0;
   max-height: calc(100vh - 56px);
   overflow-y: auto;
-  padding: 26px;
+  padding: var(--ky-space-26);
   background: var(--ky-surface);
-  border-radius: var(--ky-radius-card, 12px);
+  border-radius: var(--ky-radius-card, var(--ky-radius-card));
   box-shadow: var(--ky-hairline), var(--ky-shadow-popup);
 }
 
 .ky-auth-panel .ky-title {
   flex: 0 0 auto;
-  font-size: 20px;
+  font-size: var(--ky-text-3xl);
   font-weight: 650;
   letter-spacing: -0.02em;
-  margin: 0 0 6px;
+  margin: 0 0 var(--ky-space-6);
 }
 
 .ky-auth-panel > p {
   color: var(--ky-muted);
-  font-size: 12px;
+  font-size: var(--ky-text-md);
   line-height: 1.55;
-  margin: 0 0 14px;
+  margin: 0 0 var(--ky-space-14);
 }
 
 .ky-auth-section {
-  margin-top: 18px;
-  padding-top: 16px;
+  margin-top: var(--ky-space-18);
+  padding-top: var(--ky-space-16);
   border-top: 1px solid var(--ky-stroke);
 }
 
 .ky-auth-section h2 {
-  margin: 0 0 4px;
-  font-size: 13px;
+  margin: 0 0 var(--ky-space-4);
+  font-size: var(--ky-text-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ky-text);
@@ -63,8 +63,8 @@ body.ky-scope {
 .ky-auth-panel label,
 .ky-auth-panel .ky-label {
   display: block;
-  margin: 10px 0 4px;
-  font-size: 11px;
+  margin: var(--ky-space-10) 0 var(--ky-space-4);
+  font-size: var(--ky-text-sm);
   color: var(--ky-muted);
 }
 
@@ -73,23 +73,23 @@ body.ky-scope {
 }
 
 .ky-auth-panel .ky-button {
-  margin-top: 10px;
+  margin-top: var(--ky-space-10);
 }
 
 .ky-auth-panel .ky-button + .ky-button {
-  margin-left: 6px;
+  margin-left: var(--ky-space-6);
 }
 
 .tabs,
 .row {
   display: flex;
-  gap: 8px;
+  gap: var(--ky-space-8);
   flex-wrap: wrap;
   align-items: center;
 }
 
 .tabs {
-  margin: 0 0 14px;
+  margin: 0 0 var(--ky-space-14);
 }
 
 .tabs .ky-button,
@@ -99,14 +99,14 @@ body.ky-scope {
 
 #status {
   min-height: 18px;
-  margin-top: 12px;
-  font-size: 11px;
+  margin-top: var(--ky-space-12);
+  font-size: var(--ky-text-sm);
   color: var(--ky-muted);
 }
 
 .ky-auth-panel ul {
   list-style: none;
-  margin: 10px 0 0;
+  margin: var(--ky-space-10) 0 0;
   padding: 0;
 }
 
@@ -114,25 +114,25 @@ body.ky-scope {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-top: 6px;
-  padding: 8px 10px;
+  gap: var(--ky-space-10);
+  margin-top: var(--ky-space-6);
+  padding: var(--ky-space-8) var(--ky-space-10);
   border: 1px solid var(--ky-stroke);
   border-radius: var(--ky-radius-control);
   background: var(--ky-control);
-  font-size: 11px;
+  font-size: var(--ky-text-sm);
   color: var(--ky-text);
 }
 
 .ky-auth-panel li .ky-button {
   margin: 0;
-  padding: 4px 8px;
-  font-size: 10px;
+  padding: var(--ky-space-4) var(--ky-space-8);
+  font-size: var(--ky-text-xs);
 }
 
 .ky-auth-panel code {
   font-family: var(--ky-mono);
-  font-size: 10px;
+  font-size: var(--ky-text-xs);
   color: var(--ky-text);
   overflow-wrap: anywhere;
 }
@@ -153,7 +153,7 @@ body.ky-scope {
 .ky-auth-panel .ky-share-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--ky-space-8);
 }
 
 .ky-auth-panel select.ky-input {

@@ -161,7 +161,7 @@ function statCards(cards) {
   return `<div class="admin-grid">${cards
     .map(
       ([label, value]) =>
-        `<div class="admin-card"><span class="admin-card-label">${escapeHtml(label)}</span><span class="admin-card-value">${escapeHtml(value)}</span></div>`
+        `<div class="ky-card admin-card"><span class="admin-card-label">${escapeHtml(label)}</span><span class="admin-card-value">${escapeHtml(value)}</span></div>`
     )
     .join("")}</div>`;
 }
@@ -169,7 +169,7 @@ function statCards(cards) {
 function activityTable(entries, compact = false) {
   if (!entries.length) return `<div class="admin-empty">No activity yet.</div>`;
   return `
-    <table class="admin-table">
+    <table class="ky-table admin-table">
       <thead><tr><th>Actor</th><th>Action</th><th>Resource</th><th>Time</th></tr></thead>
       <tbody>
         ${entries
@@ -208,11 +208,11 @@ function renderOverview() {
       ["Teams", counts.teams],
       ["Activity entries", counts.auditEntries],
     ])}
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Recent activity</h2><p>Every recorded account, project and share change.</p></div></div>
       ${activityTable(recentActivity, true)}
     </div>
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Recent accounts</h2><p>Newest service members and their status.</p></div></div>
       <div class="admin-team-grid">
         ${recentAccounts
@@ -248,7 +248,7 @@ async function renderAccounts(query = "") {
   }
   const selfId = dashboard?.admin?.id;
   pane.innerHTML = `
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Accounts</h2><p>${data.total} service account${
         data.total === 1 ? "" : "s"
       }.</p></div></div>
@@ -258,7 +258,7 @@ async function renderAccounts(query = "") {
       </form>
       ${
         data.users.length
-          ? `<table class="admin-table">
+          ? `<table class="ky-table admin-table">
         <thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Teams</th><th>Last active</th><th>Updated</th></tr></thead>
         <tbody>
           ${data.users
@@ -326,7 +326,7 @@ async function renderTeams() {
     return showError(error);
   }
   pane.innerHTML = `
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Teams</h2><p>${data.total} project${
         data.total === 1 ? "" : "s"
       } owned by service accounts.</p></div></div>
@@ -389,7 +389,7 @@ async function renderTeams() {
         const members = await api(
           `/api/v1/admin/teams/${encodeURIComponent(button.dataset.team)}/members`
         );
-        box.innerHTML = `<table class="admin-table"><thead><tr><th>Member</th><th>Role</th><th>Status</th></tr></thead><tbody>${members.members
+        box.innerHTML = `<table class="ky-table admin-table"><thead><tr><th>Member</th><th>Role</th><th>Status</th></tr></thead><tbody>${members.members
           .map(
             (member) => `<tr><td><div class="admin-user">${avatarHtml(member)}<span class="admin-user-copy"><strong>${escapeHtml(
               displayName(member)
@@ -432,7 +432,7 @@ async function renderActivity({ append = false } = {}) {
   if (!append) {
     activityOffset = 0;
     pane.innerHTML = `
-      <div class="admin-section">
+      <div class="ky-section admin-section">
         <div class="admin-section-head"><div><h2>Activity</h2><p>All users, newest first.</p></div></div>
         <form class="admin-toolbar" data-role="activity-search">
           <input class="admin-search" name="q" value="${escapeHtml(activityFilter.q)}" placeholder="Search actor, action or resource" />
@@ -471,7 +471,7 @@ async function renderActivity({ append = false } = {}) {
         body.innerHTML = `<div class="admin-empty">No activity matches that filter.</div>`;
         return;
       }
-      body.innerHTML = `<table class="admin-table"><thead><tr><th>Actor</th><th>Action</th><th>Resource</th><th>Time</th></tr></thead><tbody data-role="activity-rows">${activityRows(
+      body.innerHTML = `<table class="ky-table admin-table"><thead><tr><th>Actor</th><th>Action</th><th>Resource</th><th>Time</th></tr></thead><tbody data-role="activity-rows">${activityRows(
         data.entries
       )}</tbody></table>`;
     } else {
@@ -513,7 +513,7 @@ async function renderAccount() {
   const sessions = (sessionData.sessions || []).filter((entry) => !entry.revoked);
   const tokens = (tokensData.tokens || []).filter((entry) => !entry.revoked);
   pane.innerHTML = `
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Profile</h2><p>The account used by this dashboard.</p></div></div>
       <div class="admin-user">
         ${avatarHtml({ displayName: admin.displayName || account.displayName, email: account.email, avatarUrl: admin.avatarUrl })}
@@ -521,7 +521,7 @@ async function renderAccount() {
       </div>
     </div>
 
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Password</h2><p>Changing it signs out every other session.</p></div></div>
       <form data-role="password-form" novalidate>
         <div class="admin-form-grid">
@@ -536,11 +536,11 @@ async function renderAccount() {
       </form>
     </div>
 
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Sessions</h2><p>${sessions.length} active session${sessions.length === 1 ? "" : "s"}.</p></div></div>
       ${
         sessions.length
-          ? `<table class="admin-table"><thead><tr><th>Device</th><th>Created</th><th>Last seen</th><th></th></tr></thead><tbody>${sessions
+          ? `<table class="ky-table admin-table"><thead><tr><th>Device</th><th>Created</th><th>Last seen</th><th></th></tr></thead><tbody>${sessions
               .map(
                 (session) => `<tr>
                   <td>${escapeHtml(session.device)}${session.current ? ' <span class="admin-badge is-active">Current</span>' : ""}</td>
@@ -556,7 +556,7 @@ async function renderAccount() {
       }
     </div>
 
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>API tokens</h2><p>Scoped tokens for desktop sync.</p></div></div>
       <form class="admin-toolbar" data-role="token-form">
         <input class="admin-search" name="name" value="Desktop sync" maxlength="80" />
@@ -565,7 +565,7 @@ async function renderAccount() {
       <p class="admin-note" data-role="token-result"></p>
       ${
         tokens.length
-          ? `<table class="admin-table"><thead><tr><th>Name</th><th>Scopes</th><th>Expires</th><th></th></tr></thead><tbody>${tokens
+          ? `<table class="ky-table admin-table"><thead><tr><th>Name</th><th>Scopes</th><th>Expires</th><th></th></tr></thead><tbody>${tokens
               .map(
                 (token) => `<tr>
                   <td>${escapeHtml(token.name)}</td>
@@ -581,7 +581,7 @@ async function renderAccount() {
       }
     </div>
 
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Sign out</h2><p>End this session or every session on the service.</p></div></div>
       <div class="admin-actions">
         <button class="ky-button" type="button" data-role="logout">Sign out</button>
@@ -774,7 +774,7 @@ async function renderSharing() {
     return showError(error);
   }
   pane.innerHTML = `
-    <div class="admin-section">
+    <div class="ky-section admin-section">
       <div class="admin-section-head">
         <div><h2>Sharing</h2><p>Share a whole project, one card, or a column. Public sharing is off by default and every link is scoped.</p></div>
         <button class="ky-button ky-button-quiet" id="refresh" type="button">Refresh</button>
@@ -783,7 +783,7 @@ async function renderSharing() {
     </div>
 
     <div id="sharing-content" hidden>
-      <div class="admin-section">
+      <div class="ky-section admin-section">
         <div class="admin-section-head"><div><h2>Public sharing</h2><p id="public-state" class="admin-note"></p></div></div>
         <div id="enable-box">
           <div class="admin-warning">
@@ -801,7 +801,7 @@ async function renderSharing() {
         </div>
       </div>
 
-      <div class="admin-section">
+      <div class="ky-section admin-section">
         <div class="admin-section-head"><div><h2>Create a link</h2><p>The raw token is shown once; copy it before leaving this page.</p></div></div>
         <div class="admin-share-form">
           <label class="admin-field"><span>Scope</span>
@@ -832,7 +832,7 @@ async function renderSharing() {
         <p id="token" class="admin-share-token"></p>
       </div>
 
-      <div class="admin-section">
+      <div class="ky-section admin-section">
         <div class="admin-section-head"><div><h2>Existing links</h2><p>Every link is scoped to the selected project or target.</p></div></div>
         <ul id="shares" class="admin-share-list"></ul>
       </div>
