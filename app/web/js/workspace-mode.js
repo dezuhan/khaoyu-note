@@ -122,7 +122,47 @@ function withTimeout(promise, ms = 6000) {
 function serverTitle(server) {
   return `<div class="mn-workspace-server-title">${icon("globe", 14)}<span><strong>${escapeText(
     server.name || new URL(server.url).host
-  )}</strong><small>${escapeText(server.email || new URL(server.url).host)}</small></span></div><div class="mn-workspace-popover-sep"></div>`;
+  )}</strong><small>${escapeText(server.email || new URL(server.url).host)}</small></span><button type="button" class="mn-icon-btn mn-workspace-server-menu-btn" data-server-menu="1" aria-label="Server options" title="Server options">${icon("more", 16)}</button></div><div class="mn-workspace-popover-sep"></div>`;
+}
+
+function closeServerMenu() {
+  popover?.querySelector(".mn-workspace-server-menu")?.remove();
+}
+
+function removeServer(server) {
+  const next = servers().filter((entry) => entry.url !== server.url);
+  saveServers(next);
+  try {
+    const cache = JSON.parse(localStorage.getItem(WORKSPACE_CACHE_KEY) || "{}");
+    delete cache[server.url];
+    localStorage.setItem(WORKSPACE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    /* cache is optional */
+  }
+  closePopover();
+  window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Server removed" } }));
+  void openWorkspacePopover(document.getElementById("template-btn"));
+}
+
+function openServerMenu(server, section, button) {
+  closeServerMenu();
+  const menu = document.createElement("div");
+  menu.className = "mn-workspace-server-menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML = `<button type="button" class="mn-workspace-server-menu-item is-danger" role="menuitem" data-remove-server="1">${icon("trash", 14)} Remove server</button>`;
+  button.parentElement.append(menu);
+  const close = () => {
+    closeServerMenu();
+    document.removeEventListener("pointerdown", outside, true);
+  };
+  const outside = (event) => {
+    if (!menu.contains(event.target) && event.target !== button && !button.contains(event.target)) close();
+  };
+  document.addEventListener("pointerdown", outside, true);
+  menu.querySelector("[data-remove-server]").addEventListener("click", () => {
+    close();
+    removeServer(server);
+  });
 }
 
 export async function openWorkspacePopover(anchor) {
@@ -155,6 +195,10 @@ export async function openWorkspacePopover(anchor) {
     section.className = "mn-workspace-server-section";
     section.innerHTML = `${serverTitle(server)}<div data-role="workspaces"><p class="mn-server-note" style="padding:8px">Loading workspaces...</p></div>`;
     sections.append(section);
+    section.querySelector("[data-server-menu]").addEventListener("click", (event) => {
+      event.stopPropagation();
+      openServerMenu(server, section, event.currentTarget);
+    });
     void loadServerWorkspaces(server, section, view);
   }
 }
