@@ -1079,8 +1079,6 @@ function init() {
   for (const item of navItems) item.addEventListener("click", () => void go(item.dataset.page));
 
   document.getElementById("admin-home").addEventListener("click", () => void go("overview"));
-  document.getElementById("admin-menu-dashboard").addEventListener("click", () => void go("overview"));
-  document.getElementById("admin-menu-help").addEventListener("click", () => openHelp());
   document.querySelectorAll(".admin-nav-icon[data-icon]").forEach((element) => {
     element.innerHTML = icon(element.dataset.icon, 14);
   });

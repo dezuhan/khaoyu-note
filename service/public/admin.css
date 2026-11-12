@@ -825,31 +825,6 @@ button.admin-admin:hover {
   font-size: var(--ky-text-2xs);
 }
 
-.admin-menubar-menus {
-  display: flex;
-  align-items: center;
-  gap: var(--ky-space-2);
-  margin-left: var(--ky-space-6);
-}
-
-.admin-menubar-btn {
-  height: 24px;
-  padding: 0 var(--ky-space-9);
-  border: 0;
-  border-radius: var(--ky-radius-control);
-  background: transparent;
-  color: var(--ky-muted);
-  font: inherit;
-  font-size: var(--ky-text-sm);
-  cursor: pointer;
-}
-
-.admin-menubar-btn:hover,
-.admin-menubar-btn[aria-expanded="true"] {
-  background: var(--ky-control);
-  color: var(--ky-text);
-}
-
 .admin-search-btn {
   display: flex;
   align-items: center;
@@ -884,7 +859,7 @@ button.admin-admin:hover {
 
 .admin-account-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--ky-space-20));
   right: 0;
   z-index: 60;
   display: flex;

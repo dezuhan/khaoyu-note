@@ -67,9 +67,13 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  // /account is now a redirect to the admin dashboard.
-  await page.goto(`${base}/account`, { waitUntil: "load" });
-  check("account URL redirects to the admin dashboard", page.url().endsWith("/admin"), page.url());
+  // /account is now a server-side redirect to the admin dashboard.
+  const accountRedirect = await page.request.get(`${base}/account`, { maxRedirects: 0 });
+  check(
+    "account URL redirects to the admin dashboard",
+    accountRedirect.status() === 302 && String(accountRedirect.headers().location || "").endsWith("/admin"),
+    `${accountRedirect.status()} ${accountRedirect.headers().location || ""}`
+  );
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForURL(/\/login$/, { timeout: 15000 });
   check("signed-out admin redirects straight to the login page", true);
@@ -122,6 +126,10 @@ try {
     JSON.stringify(themeState)
   );
   check(
+    "admin menubar omits the redundant Dashboard and Help buttons",
+    (await page.locator("#admin-menu-dashboard, #admin-menu-help").count()) === 0
+  );
+  check(
     "admin chrome reuses the main UI logo, SVG icons and fonts",
     (await page.locator(".admin-logo img[src=\"/khaoyu-note.svg\"]").count()) === 1 &&
       (await page.locator("#admin-theme svg").count()) === 1 &&
@@ -140,6 +148,13 @@ try {
     (await page.locator('.admin-nav-item[data-page="account"]').count()) === 0
   );
   await page.click("#admin-identity");
+  await page.waitForSelector("#admin-account-menu:not([hidden])");
+  const menuGap = await page.evaluate(() => {
+    const bar = document.querySelector(".admin-menubar").getBoundingClientRect();
+    const menu = document.querySelector("#admin-account-menu").getBoundingClientRect();
+    return Math.round(menu.top - bar.bottom);
+  });
+  check("account menu floats clear of the menubar", menuGap >= 8, `${menuGap}px`);
   await page.click('#admin-account-menu [data-action="account"]');
   await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("Sessions"));
   check("account page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
