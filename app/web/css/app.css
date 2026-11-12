@@ -5866,6 +5866,42 @@ html[data-performance="true"] *::after {
 .mn-sync-state[data-status="offline"] {
   color: var(--ky-danger);
 }
+.mn-presence {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding-left: 2px;
+}
+.mn-presence[hidden] {
+  display: none;
+}
+.mn-presence-avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--ky-surface);
+  background: var(--presence-color, var(--ky-accent));
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  flex: none;
+  user-select: none;
+}
+.mn-presence-avatar:first-child {
+  margin-left: 0;
+}
+.mn-presence-more {
+  color: var(--ky-soft);
+  font-size: 10px;
+  margin-left: 6px;
+  padding: 0 2px;
+  white-space: nowrap;
+}
 .mn-sync-overlay {
   position: fixed;
   inset: 0;

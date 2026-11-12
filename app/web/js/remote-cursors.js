@@ -1,5 +1,7 @@
 // Draw remote editing carets and a narrow selection overlay without mutating editable DOM.
 
+import { colorFor } from "./presence.js";
+
 function fieldFor(cardId, fieldName) {
   const card = document.querySelector(`.mn-card[data-id="${CSS.escape(cardId)}"]`);
   if (!card) return null;
@@ -27,13 +29,6 @@ function textOffsetRange(field, offset) {
   range.selectNodeContents(field);
   range.collapse(false);
   return range;
-}
-
-function colorFor(accountId) {
-  let hash = 0;
-  for (const char of String(accountId || "")) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  const hue = hash % 360;
-  return `hsl(${hue} 72% 52%)`;
 }
 
 export function renderRemoteCursors(users = [], ownConnectionId = null) {

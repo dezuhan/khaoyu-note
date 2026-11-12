@@ -41,6 +41,9 @@ project uses Semantic Versioning.
   adopting a remote document; rebase and live-merge are serialized per board.
 - The sync model documents the causal clocks, the three-way text merge and the remaining
   character-level CRDT prerequisites in `docs/sync-model.md`.
+- The top bar shows up to three avatars of other people currently viewing a synced board, with a +N
+  badge for the rest. Presence comes from the existing project SSE roster, excludes the current
+  account, dedupes multiple tabs per account and uses a deterministic avatar colour.
 - The colour picker no longer shows the "Drag the square or the hue bar, or type a HEX value." hint.
 - The workspace switcher remembers the last opened workspace per server and loads its board list as
   soon as the popover opens. On a fresh profile the seeded default workspace is not selected

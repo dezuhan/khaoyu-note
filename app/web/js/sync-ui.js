@@ -4,6 +4,7 @@ import * as bridge from "./bridge.js";
 import { adoptRemoteBoard, persistBoardSnapshot, state } from "./store.js";
 import * as sync from "./sync.js";
 import { clearRemoteCursors, renderRemoteCursors } from "./remote-cursors.js";
+import { renderPresenceBadges } from "./presence.js";
 
 let refs = null;
 let overlay = null;
@@ -14,6 +15,8 @@ let realtimeStarting = false;
 let lockTimer = 0;
 let cursorTimer = 0;
 let realtimeConnectionId = null;
+let realtimeAccountId = "";
+let presenceUsers = [];
 let lockCardId = null;
 let lockBoardId = null;
 let lockBoardRef = null;
@@ -110,7 +113,14 @@ function closeRealtime() {
   realtimeBoardId = null;
   realtimeStarting = false;
   realtimeConnectionId = null;
+  realtimeAccountId = "";
+  presenceUsers = [];
   clearRemoteCursors();
+  renderPresenceBadges(refs?.presence, [], "");
+}
+
+function renderPresence() {
+  renderPresenceBadges(refs?.presence, presenceUsers, realtimeAccountId);
 }
 
 function releaseActiveLock() {
@@ -174,8 +184,10 @@ function ensureRealtime() {
   realtimeStarting = true;
   sync
     .openRealtime(board, {
-      onReady: ({ connectionId }) => {
-        realtimeConnectionId = connectionId;
+      onReady: (data) => {
+        realtimeConnectionId = data.connectionId;
+        realtimeAccountId = String(data.accountId || "");
+        renderPresence();
         sendCursor();
       },
       onUpdate: async ({ type, data }) => {
@@ -187,7 +199,10 @@ function ensureRealtime() {
               `${data.accounts} user${data.accounts === 1 ? "" : "s"} in this project`
             );
           }
-          renderRemoteCursors(data?.users || [], realtimeConnectionId);
+          if (Array.isArray(data?.users)) presenceUsers = data.users;
+          else if (Number(data?.accounts) === 0) presenceUsers = [];
+          renderPresence();
+          renderRemoteCursors(presenceUsers, realtimeConnectionId);
           return;
         }
         if (type === "ops") {

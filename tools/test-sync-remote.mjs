@@ -140,6 +140,48 @@ try {
   }, { base, token, projectId, seedDoc });
   check("remote board opened from the server", opened);
 
+  // Top-bar presence stack: three avatars plus a +N badge, with deterministic avatar colors.
+  const presenceState = await page.evaluate(async () => {
+    const { renderPresenceBadges } = await import("/js/presence.js");
+    const container = document.getElementById("presence");
+    const summary = renderPresenceBadges(
+      container,
+      [
+        { accountId: "user-1", name: "Alice" },
+        { accountId: "user-2", name: "Bob" },
+        { accountId: "user-3", name: "Cara" },
+        { accountId: "user-4", name: "Dan" },
+        { accountId: "user-4", name: "Dan" },
+      ],
+      "self"
+    );
+    const avatars = [...container.querySelectorAll(".mn-presence-avatar")];
+    return {
+      summary,
+      avatars: avatars.length,
+      more: container.querySelector(".mn-presence-more")?.textContent || "",
+      hidden: container.hidden,
+      colors: avatars.map((avatar) => getComputedStyle(avatar).getPropertyValue("--presence-color").trim()),
+    };
+  });
+  check(
+    "three presence avatars fit and the rest collapse into +N",
+    presenceState.avatars === 3 &&
+      presenceState.more === "+1" &&
+      presenceState.hidden === false &&
+      presenceState.summary.total === 4,
+    JSON.stringify({ avatars: presenceState.avatars, more: presenceState.more, total: presenceState.summary.total })
+  );
+  check(
+    "presence avatars carry deterministic colors",
+    presenceState.colors.every(Boolean) && new Set(presenceState.colors).size === 3,
+    JSON.stringify(presenceState.colors)
+  );
+  await page.evaluate(async () => {
+    const { renderPresenceBadges } = await import("/js/presence.js");
+    renderPresenceBadges(document.getElementById("presence"), [], "");
+  });
+
   // Online edit: the capture runs on save and the operation reaches the service.
   await page.evaluate(async () => {
     const store = await import("/js/store.js");

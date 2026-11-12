@@ -412,6 +412,9 @@ node tools/test-save-retry.mjs
 # durable remote sync: service + preview server, includes an offline period and a reload
 node tools/test-sync-remote.mjs http://127.0.0.1:1430/
 
+# presence badge summary (dedupe, current-user exclusion, three-avatar cap)
+node tools/test-presence.mjs
+
 # workspace switcher: auto-load preference and New board inside a workspace
 node tools/test-workspace-ui.mjs http://127.0.0.1:1430/
 

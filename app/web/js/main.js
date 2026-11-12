@@ -41,6 +41,7 @@ const uiRefs = {
   saveState: document.getElementById("save-state"),
   syncButton: document.getElementById("sync-state"),
   syncState: document.getElementById("sync-state"),
+  presence: document.getElementById("presence"),
   shareButton: document.getElementById("share-btn"),
   accountBtn: document.getElementById("account-btn"),
   undoBtn: document.getElementById("undo-btn"),
