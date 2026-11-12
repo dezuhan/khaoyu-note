@@ -262,6 +262,39 @@ const columnTransition = await firstColumnCard.evaluate((el) => {
   const style = getComputedStyle(el);
   return `${style.transitionProperty} ${style.transitionDuration}`;
 });
+const rowResizeMetrics = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const { columnChildren } = await import("/js/model.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return {
+    width: column.w,
+    extraWidth: Number(column.extraWidth || 0),
+    childWidths: columnChildren(state.board, columnId).map((child) => child.w),
+  };
+}, firstColumnId);
+const rowResizeHandle = await firstColumnCard.locator(".mn-resize").boundingBox();
+await page.mouse.move(rowResizeHandle.x + 4, rowResizeHandle.y + 4);
+await page.mouse.down();
+await page.mouse.move(rowResizeHandle.x + 84, rowResizeHandle.y + 4, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(400);
+const rowResizedMetrics = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const { columnChildren } = await import("/js/model.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return {
+    width: column.w,
+    extraWidth: Number(column.extraWidth || 0),
+    childWidths: columnChildren(state.board, columnId).map((child) => child.w),
+  };
+}, firstColumnId);
+check(
+  "Auto-width rows can still be resized without changing child widths",
+  rowResizedMetrics.width > rowResizeMetrics.width + 60 &&
+    rowResizedMetrics.extraWidth > 0 &&
+    JSON.stringify(rowResizedMetrics.childWidths) === JSON.stringify(rowResizeMetrics.childWidths),
+  `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)} extra ${rowResizedMetrics.extraWidth}`
+);
 check(
   "Column auto-height and row auto-width changes animate",
   columnTransition.includes("width") &&

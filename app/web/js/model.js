@@ -241,6 +241,33 @@ export function columnSummary(board, column) {
 
 // Position column children and grow the column to fit them. A row is the same container with its
 // children laid out horizontally, so a column can be converted back and forth without losing cards.
+function columnContentChildren(board, column) {
+  return columnChildren(board, column.id).filter(
+    (card) => !isTemporarilyDisabledType(card.type)
+  );
+}
+
+// Natural row width/column height before a manual extra size is added. `extraWidth` and
+// `extraHeight` keep a resized container larger than its content while still allowing new items to
+// grow the auto-sized dimension.
+export function columnContentWidth(board, column) {
+  const children = columnContentChildren(board, column);
+  if (!children.length) return 0;
+  return 28 + children.reduce((sum, child) => sum + (Number(child.w) || 120), 0) + 10 * (children.length - 1);
+}
+
+export function columnContentHeight(board, column) {
+  const children = columnContentChildren(board, column);
+  if (!children.length) return Math.max(column.minHeight || 160, 160);
+  if (column.direction === "row") {
+    return Math.max(column.minHeight || 160, 64 + Math.max(...children.map((child) => Number(child.h) || 56)) + 14);
+  }
+  return Math.max(
+    column.minHeight || 160,
+    64 + children.reduce((sum, child) => sum + (Number(child.h) || 56), 0) + 10 * (children.length - 1) + 14
+  );
+}
+
 export function layoutColumn(board, column) {
   const padding = 14;
   const gap = 10;
@@ -271,8 +298,11 @@ export function layoutColumn(board, column) {
       maxH = Math.max(maxH, child.h);
     }
     if (children.length) {
-      column.w = Math.max(160, padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1));
-      column.h = Math.max(column.minHeight || 160, header + maxH + padding);
+      const contentWidth = padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1);
+      column.w = Math.max(160, contentWidth + Math.max(0, Number(column.extraWidth) || 0));
+      column.h =
+        Math.max(column.minHeight || 160, header + maxH + padding) +
+        Math.max(0, Number(column.extraHeight) || 0);
     }
     return;
   }
@@ -289,7 +319,9 @@ export function layoutColumn(board, column) {
     }
     y += child.h + gap;
   }
-  column.h = Math.max(column.minHeight || 160, y - column.y - gap + padding);
+  column.h =
+    Math.max(column.minHeight || 160, y - column.y - gap + padding) +
+    Math.max(0, Number(column.extraHeight) || 0);
 }
 
 export function layoutColumns(board) {

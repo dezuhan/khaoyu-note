@@ -20,6 +20,8 @@ import {
   CARD_ASPECTS,
   cardHeightFor,
   columnChildren,
+  columnContentHeight,
+  columnContentWidth,
   getCard,
   layoutColumns,
   MIN_SIZES,
@@ -667,6 +669,20 @@ function onPointerMove(event) {
       if (card.type === "column" || card.type === "section") {
         card.x = x;
         card.y = y;
+        if (card.type === "column") {
+          // Rows default to their content width; keep a manual extra only for the axes the resize
+          // handle actually changed, so new items still grow the auto dimension.
+          if (card.direction === "row" && (handle.includes("e") || handle.includes("w"))) {
+            const autoWidth = columnContentWidth(state.board, card);
+            card.extraWidth = Math.max(0, width - autoWidth);
+            width = autoWidth + card.extraWidth;
+          }
+          if (handle.includes("n") || handle.includes("s")) {
+            const autoHeight = columnContentHeight(state.board, card);
+            card.extraHeight = Math.max(0, height - autoHeight);
+            height = autoHeight + card.extraHeight;
+          }
+        }
         card.w = Math.max(gesture.minW, width);
         card.h = Math.max(gesture.minH, height);
         if (card.type === "column") layoutColumns(state.board);
