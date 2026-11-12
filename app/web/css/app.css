@@ -192,8 +192,8 @@ body.ky-scope {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 0 0 68px;
-  width: 68px;
+  flex: 0 0 62px;
+  width: 62px;
   padding: 8px 0 6px;
   gap: 1px;
   overflow-y: auto;
@@ -7483,7 +7483,7 @@ html[data-performance="true"] *::after {
   left: 12px;
   top: calc(var(--mn-menubar-height) + var(--mn-header-height) + 12px);
   bottom: 12px;
-  width: 68px;
+  width: 62px;
   flex: none;
   padding: 8px 0 6px;
   border: 1px solid var(--ky-stroke);
