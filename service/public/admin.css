@@ -1454,3 +1454,38 @@ button.admin-admin:hover {
   color: var(--ky-muted);
   font-size: var(--ky-text-2xs);
 }
+
+/* Keep the service chrome fixed and scroll only the active page. */
+html,
+body.admin-body {
+  height: 100%;
+}
+
+.admin-body {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-shell {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-rail {
+  height: 100%;
+}
+
+.admin-main {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

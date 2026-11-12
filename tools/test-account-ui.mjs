@@ -232,6 +232,35 @@ try {
   await page.locator(".admin-team h3", { hasText: "CRUD team renamed" }).waitFor({ state: "detached" });
   check("board can be deleted from the dashboard", true);
 
+  // The admin shell owns the viewport; the sidebar stays put while the page content scrolls.
+  const originalViewport = page.viewportSize();
+  await page.setViewportSize({ width: 1200, height: 480 });
+  await page.click('.admin-nav-item[data-page="activity"]');
+  await page.waitForSelector(".admin-table");
+  const shellLayout = await page.evaluate(() => {
+    const pane = document.getElementById("admin-pane");
+    pane.scrollTop = 600;
+    const sidebar = document.querySelector(".admin-rail").getBoundingClientRect();
+    return {
+      paneScroll: pane.scrollTop,
+      pageScroll: document.documentElement.scrollTop,
+      bodyOverflow: getComputedStyle(document.body).overflow,
+      sidebarTop: sidebar.top,
+      viewport: window.innerHeight,
+      documentHeight: document.documentElement.scrollHeight,
+    };
+  });
+  check(
+    "admin shell keeps the sidebar fixed while the page scrolls",
+    shellLayout.pageScroll === 0 &&
+      shellLayout.bodyOverflow === "hidden" &&
+      shellLayout.paneScroll > 0 &&
+      shellLayout.sidebarTop >= 0 &&
+      shellLayout.documentHeight <= shellLayout.viewport + 1,
+    JSON.stringify(shellLayout)
+  );
+  await page.setViewportSize(originalViewport);
+
   // Account Management is grouped below the service sections with three individual pages.
   check(
     "Account Management submenus are grouped below the service sections",

@@ -214,3 +214,20 @@ body.ky-scope {
   color: var(--ky-on-primary);
   text-decoration: none;
 }
+
+/* Account security pages keep the page fixed and scroll the panel itself. */
+html,
+body.account-security-page {
+  height: 100%;
+}
+
+body.account-security-page {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.account-security-page .ky-auth-panel {
+  max-height: 100%;
+  overscroll-behavior: contain;
+}
