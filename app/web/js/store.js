@@ -149,10 +149,10 @@ let retryDelay = 1000;
 let saveInFlight = false;
 let resetInProgress = false;
 
-// Autosave waits for the user to stop editing. Web/mobile viewers save sooner so another window
-// receives the SSE update quickly; desktop keeps the calmer five-second idle window.
-const IDLE_SAVE_MS = bridge.hasWeb ? 2000 : 5000;
-const REMOTE_SAVE_MS = 400;
+// Autosave is intentionally aggressive. Web/localStorage builds persist a board on a short throttle
+// even while the user keeps typing; desktop keeps a small idle window before its SQLite write.
+const IDLE_SAVE_MS = bridge.hasWeb ? 80 : 250;
+const REMOTE_SAVE_MS = 120;
 const MAX_RETRY_DELAY = 30000;
 
 export function markDirty(kind = "board") {
@@ -177,13 +177,13 @@ export function scheduleSave() {
     clearTimeout(remoteTempTimer);
     remoteTempTimer = setTimeout(() => {
       if (state.remote && state.board) writeRemoteTemp(state.board);
-    }, 100);
+    }, 30);
   }
   const pending = saveTimer;
   clearTimeout(saveTimer);
-  // Remote team boards save on a short throttle even while the user keeps typing. Keep an already
-  // scheduled save instead of resetting it on every keystroke.
-  if (state.remote && pending) return;
+  // Both remote team boards and browser-localStorage boards save on a short throttle even while the
+  // user keeps typing. Keep an already scheduled save instead of resetting it on every keystroke.
+  if ((state.remote || bridge.hasWeb) && pending) return;
   saveTimer = setTimeout(saveNow, state.remote ? REMOTE_SAVE_MS : IDLE_SAVE_MS);
 }
 

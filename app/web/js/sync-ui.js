@@ -287,7 +287,7 @@ function onBoardSaved(event) {
         );
       }
     }
-  }, state.remote ? 120 : 500);
+  }, state.remote ? 60 : 500);
 }
 
 export function openSyncDialog() {

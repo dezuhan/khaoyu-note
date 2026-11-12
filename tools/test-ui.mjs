@@ -1760,15 +1760,9 @@ await page.mouse.move(canvasBox.x + 280, canvasBox.y + 300, { steps: 10 });
 await page.mouse.up();
 await page.waitForTimeout(200);
 await page.locator('[data-role="save"]').click();
-await page.waitForTimeout(1500);
+await page.waitForTimeout(450);
 check(
-  "Autosave waits 5s after the last change",
-  (await page.locator("#save-state").innerText()).includes("Saving"),
-  await page.locator("#save-state").innerText()
-);
-await page.waitForTimeout(4300);
-check(
-  "Autosave saves after 5s idle",
+  "Autosave saves quickly after the last change",
   (await page.locator("#save-state").innerText()).includes("Saved"),
   await page.locator("#save-state").innerText()
 );

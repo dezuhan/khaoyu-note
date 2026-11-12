@@ -34,6 +34,7 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   frontend workspace popover.
 - **Workspace schema**: first-class workspaces, members, invitations, access policies and
   workspace-scoped boards, with viewer as the default member board role.
+- **Near-realtime autosave**: 80 ms localStorage throttle, 120 ms remote save and 60 ms push.
 - **Remote temp buffer**: durable localStorage buffer per remote board with background push on
   workspace switch and recovery on reopen.
 - **Realtime remote save**: remote editor saves are throttled at 400 ms and pushed to the service

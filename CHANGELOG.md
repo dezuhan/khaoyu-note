@@ -127,6 +127,9 @@ project uses Semantic Versioning.
   seeds a default team workspace with viewer as the member default board role; existing projects and
   approved accounts are backfilled. Workspace APIs list/create workspaces and list boards with
   effective roles, and the main frontend workspace popover now shows server → workspace → board.
+- Autosave is now near-realtime: web/localStorage boards persist on an 80 ms throttle while typing,
+  remote boards save at 120 ms with a 30 ms temporary-buffer write and a 60 ms service push. Desktop
+  SQLite saves use a 250 ms idle window. The autosave UI test now asserts the fast behavior.
 - Remote workspace editing now writes a durable temporary copy to `ky.remoteTemp.<boardId>` before
   the network push. Switching boards/workspaces flushes that copy, starts the service push in the
   background, and recovers pending edits when the board is opened again. Page hide/visibility changes
