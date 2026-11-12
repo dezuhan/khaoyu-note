@@ -13,7 +13,7 @@ Run before tagging a release.
 - [ ] Version is bumped in root, app, Tauri, Cargo, service, Compose and documentation.
 - [ ] CHANGELOG entry exists.
 - [ ] `git diff --check` and `git status` are clean.
-- [ ] Installers are rebuilt after the final web changes and `dist/` contains only the current version.
+- [x] Installers are rebuilt after the final web changes and `dist/` contains only the current version.
 
 ## Security
 

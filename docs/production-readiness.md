@@ -63,8 +63,9 @@ production-ready until items 1–7 are closed.
   `[1,2,3,4]`, `profile=team`, `/readyz` returned `{"status":"ready","realtime":"ok"}`, Redis
   responded `PONG`, PostgreSQL contained the bootstrapped account/project. The stack was cleaned
   after the check.
-- Linux `dist/linux` artifacts currently pass their checksums, but were built **before** the final
-  web live/refresh, viewport and share-viewer changes; rebuild them before tagging.
+- Linux `dist/linux` artifacts were rebuilt on 2026-11-12 after the final web live/refresh,
+  viewport and share-viewer changes, and their checksums pass. X11/Wayland launch verification is
+  still pending.
 
 ## Turso readiness
 
