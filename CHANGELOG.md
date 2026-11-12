@@ -116,6 +116,10 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- Workspace switching now opens as an Affine-style popover from the existing template/workspace
+  button instead of a full-screen page or a separate menubar button. The server-add flow uses the
+  design-system modal (no native browser prompt), floating menus sit above the tool rail, and admin
+  workspace links have no underline.
 - The main board frontend now owns workspace switching and public board viewing. It adds a Workspace
   menu with Local/Add Server, remote board lists, read-only share rendering via
   `/?share=<token>&server=<origin>`, and a `?workspace=1` entry point. The service `/workspace` and

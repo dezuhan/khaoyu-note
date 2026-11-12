@@ -64,6 +64,7 @@ import { initFileDrop } from "./file-drop.js";
 import { initNotifications } from "./notifications.js";
 import { createTemplateFromSelection, openTemplateLibrary } from "./templates.js";
 import { icon } from "./icons.js";
+import { openWorkspacePopover } from "./workspace-mode.js";
 import { CARD_ASPECTS, columnChildren, createCard, getCard, layoutColumns, TYPE_LABELS } from "./model.js";
 import { cardElement, renderView } from "./render.js";
 import { clearDropPreview, previewDrop } from "./drop-preview.js";
@@ -1164,7 +1165,7 @@ function refreshTopbarLanguage() {
   }
   if (refs.templateBtn) {
     const label = refs.templateBtn.querySelector("span:not(.mn-tool-icon)");
-    if (label) label.textContent = t("topbar.template");
+    if (label) label.textContent = "Workspace";
   }
   if (refs.commandSearchBtn) {
     const label = refs.commandSearchBtn.querySelector("span");
@@ -1193,8 +1194,9 @@ function wireTopbar() {
   if (el.languageBtn) el.languageBtn.innerHTML = icon("globe", 16);
   el.commentCount.innerHTML = `${icon("comment", 14)}<span>0</span>`;
   if (el.templateBtn) {
-    el.templateBtn.innerHTML = `${icon("grid", 14)}<span>${t("topbar.template")}</span>`;
-    el.templateBtn.addEventListener("click", () => openTemplateLibrary());
+    el.templateBtn.innerHTML = `${icon("grid", 14)}<span>Workspace</span>`;
+    el.templateBtn.title = "Workspace and servers";
+    el.templateBtn.addEventListener("click", () => openWorkspacePopover(el.templateBtn));
   }
   el.homeBtn.addEventListener("click", () => openTemplateLibrary());
   el.undoBtn.addEventListener("click", undo);

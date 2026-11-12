@@ -87,6 +87,7 @@ html[data-ky-theme="softLight"] {
   font: inherit;
   font-size: var(--ky-text-sm);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -1651,4 +1652,10 @@ body.admin-body {
   gap: var(--ky-space-8);
   padding: var(--ky-space-12) var(--ky-space-18);
   border-top: 1px solid var(--ky-stroke);
+}
+
+.admin-nav a.admin-nav-item,
+.admin-nav a.admin-nav-item:hover,
+.admin-nav a.admin-nav-item:focus {
+  text-decoration: none;
 }

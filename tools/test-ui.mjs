@@ -1942,10 +1942,10 @@ check(
   "Home gallery is disabled and the logo opens templates",
   (await page.locator("#home-page").isHidden())
 );
-await page.click("#template-btn");
+await page.click("#home-btn");
 await page.waitForTimeout(400);
 check(
-  "Template library opens from the header",
+  "Template library opens from the home button",
   (await page.locator(".mn-template-modal").isVisible()) &&
     (await page.locator(".mn-template-card").count()) >= 6
 );
@@ -1973,7 +1973,7 @@ check(
   (await page.locator(".mn-card-column").count()) >= 4 &&
     (await page.locator(".mn-crumb.is-current").innerText()).includes("Kanban board")
 );
-await page.click("#template-btn");
+await page.click("#home-btn");
 await page.waitForTimeout(400);
 await page.locator(".mn-template-card", { hasText: "Welcome board" }).click();
 await page.waitForTimeout(300);
@@ -2660,7 +2660,7 @@ const persisted = await page.evaluate(() => {
   return { boards: ids.length, total, max };
 });
 check("Board persists card edits", persisted.max >= 15, JSON.stringify(persisted));
-check("Single-file header keeps the template menu visible", await page.locator("#template-btn").isVisible());
+check("Single-file header keeps the workspace menu visible", await page.locator("#template-btn").isVisible());
 check("Sync and Share remain visible from the header", (await page.locator("#sync-state").isVisible()) && (await page.locator("#share-btn").isVisible()));
 await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
 await page.waitForTimeout(200);

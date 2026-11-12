@@ -1,8 +1,10 @@
-// Workspace and public-share views hosted by the main web UI. The service frontend only handles
-// accounts/admin; board data and share viewing belong here.
+// The main board frontend owns server/workspace switching and public share viewing. The service
+// frontend only owns accounts and administration.
 
 const SERVERS_KEY = "mn.servers";
-let overlay = null;
+let popover = null;
+let boardOverlay = null;
+let activeServer = null;
 
 function escapeText(value) {
   return String(value ?? "")
@@ -50,32 +52,172 @@ async function jsonFetch(url, options = {}, token = "") {
   return body;
 }
 
-function ensureOverlay() {
-  if (overlay) return overlay;
-  overlay = document.createElement("section");
-  overlay.className = "mn-server-view";
-  overlay.innerHTML = `
-    <header class="mn-server-bar">
-      <button type="button" class="mn-btn" data-role="back">Back</button>
-      <strong data-role="title">Workspace</strong>
-      <span class="mn-server-bar-spacer"></span>
-      <button type="button" class="mn-btn" data-role="refresh">Refresh</button>
-    </header>
-    <div class="mn-server-layout">
-      <aside class="mn-server-sidebar" data-role="sidebar"></aside>
-      <main class="mn-server-content" data-role="content"></main>
-    </div>`;
-  document.body.append(overlay);
-  overlay.querySelector('[data-role="back"]').addEventListener("click", closeServerView);
-  overlay.querySelector('[data-role="refresh"]').addEventListener("click", () => {
-    if (overlay?.dataset.mode === "workspace") void renderWorkspace();
-  });
-  return overlay;
+function closePopover() {
+  popover?.remove();
+  popover = null;
+  activeServer = null;
 }
 
-function closeServerView() {
-  overlay?.remove();
-  overlay = null;
+function ensurePopover(anchor) {
+  closePopover();
+  popover = document.createElement("section");
+  popover.className = "mn-workspace-popover";
+  popover.setAttribute("role", "menu");
+  popover.setAttribute("aria-label", "Workspace");
+  const rect = anchor?.getBoundingClientRect();
+  const left = Math.max(8, Math.min(window.innerWidth - 368, rect ? rect.left : 12));
+  const top = Math.min(window.innerHeight - 80, (rect ? rect.bottom : 40) + 6);
+  popover.style.left = `${left}px`;
+  popover.style.top = `${Math.max(8, top)}px`;
+  document.body.append(popover);
+  popover.addEventListener("click", (event) => {
+    if (event.target === popover) return;
+  });
+  const onKey = (event) => {
+    if (event.key === "Escape") {
+      closePopover();
+      document.removeEventListener("keydown", onKey, true);
+    }
+  };
+  document.addEventListener("keydown", onKey, true);
+  setTimeout(() => {
+    const outside = (event) => {
+      if (!popover || popover.contains(event.target) || anchor?.contains(event.target)) return;
+      closePopover();
+      document.removeEventListener("pointerdown", outside, true);
+    };
+    document.addEventListener("pointerdown", outside, true);
+  }, 0);
+  return popover;
+}
+
+function serverRow(server, active) {
+  return `<button type="button" class="mn-workspace-popover-row${active ? " is-active" : ""}" data-server="${escapeText(
+    server.url
+  )}"><span><strong>${escapeText(server.name || new URL(server.url).host)}</strong><small>${escapeText(
+    server.email || new URL(server.url).host
+  )}</small></span></button>`;
+}
+
+export async function openWorkspacePopover(anchor) {
+  const view = ensurePopover(anchor);
+  view.innerHTML = `
+    <div class="mn-workspace-popover-head"><span>Workspace</span><span>${escapeText(location.host)}</span></div>
+    <button type="button" class="mn-workspace-popover-row is-active" data-local="1"><span><strong>Local storage</strong><small>This browser’s boards</small></span></button>
+    <div class="mn-workspace-popover-sep"></div>
+    <div data-role="server-rows"></div>
+    <div data-role="server-boards"></div>
+    <button type="button" class="mn-workspace-popover-row" data-add-server="1"><span><strong>+ Add Server</strong><small>Connect a Khaoyu service</small></span></button>`;
+  const rows = view.querySelector('[data-role="server-rows"]');
+  const current = servers();
+  rows.innerHTML = current.length
+    ? current.map((server) => serverRow(server, activeServer?.url === server.url)).join("")
+    : `<p class="mn-server-note" style="padding:8px">No remote server connected.</p>`;
+  view.querySelector('[data-local]').addEventListener("click", closePopover);
+  view.querySelector('[data-add-server]').addEventListener("click", () => openAddServerDialog(anchor));
+  for (const button of rows.querySelectorAll("[data-server]")) {
+    const server = current.find((entry) => entry.url === button.dataset.server);
+    button.addEventListener("click", () => loadServerBoards(server, view));
+  }
+  if (current[0]) loadServerBoards(current[0], view);
+}
+
+async function loadServerBoards(server, view) {
+  if (!server || !view) return;
+  activeServer = server;
+  const rows = view.querySelector('[data-role="server-rows"]');
+  for (const button of rows.querySelectorAll("[data-server]")) {
+    button.classList.toggle("is-active", button.dataset.server === server.url);
+  }
+  const target = view.querySelector('[data-role="server-boards"]');
+  target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading ${escapeText(server.name)}...</p>`;
+  try {
+    const data = await jsonFetch(`${server.url}/api/v1/projects`, {}, server.token);
+    const projects = data.projects || [];
+    target.innerHTML = projects.length
+      ? `<div class="mn-workspace-popover-boards">${projects
+          .map(
+            (project) =>
+              `<button type="button" class="mn-workspace-popover-board" data-project="${escapeText(project.id)}"><strong>${escapeText(
+                project.name || "Untitled board"
+              )}</strong><span>${escapeText(project.role || "viewer")} · revision ${escapeText(project.revision ?? 1)}</span></button>`
+          )
+          .join("")}</div>`
+      : `<p class="mn-server-note" style="padding:8px">No boards shared with this account.</p>`;
+    for (const button of target.querySelectorAll("[data-project]")) {
+      const project = projects.find((entry) => entry.id === button.dataset.project);
+      button.addEventListener("click", () => {
+        closePopover();
+        void openBoard(server, project, server.token);
+      });
+    }
+  } catch (error) {
+    target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
+  }
+}
+
+function openAddServerDialog(anchor) {
+  closePopover();
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Add server">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Add Server</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+    <div class="mn-modal-body mn-workspace-form">
+      <label>Server URL<input class="ky-input" name="url" placeholder="https://admin.example.com" autocomplete="url" required /></label>
+      <label>Account email<input class="ky-input" name="email" type="email" autocomplete="email" required /></label>
+      <label>Password<input class="ky-input" name="password" type="password" autocomplete="current-password" required /></label>
+      <p class="mn-workspace-form-error" data-role="error" role="status"></p>
+    </div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Connect server</button></footer>
+  </form>`;
+  document.body.append(overlay);
+  const form = overlay.querySelector("form");
+  const errorEl = form.querySelector('[data-role="error"]');
+  const close = () => overlay.remove();
+  form.querySelector(".mn-modal-close").addEventListener("click", close);
+  form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  overlay.addEventListener("pointerdown", (event) => {
+    if (event.target === overlay) close();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const url = normalizeUrl(form.url.value);
+    if (!url) {
+      errorEl.textContent = "Enter a valid server URL.";
+      return;
+    }
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    errorEl.textContent = "Connecting...";
+    try {
+      const data = await jsonFetch(`${url}/api/v1/auth/sync-token`, {
+        method: "POST",
+        body: { email: form.email.value.trim(), password: form.password.value },
+      });
+      if (!data.token) throw new Error("The server did not return a sync token.");
+      const entries = servers().filter((entry) => entry.url !== url);
+      entries.unshift({ url, name: new URL(url).host, email: form.email.value.trim(), token: data.token });
+      saveServers(entries);
+      close();
+      await openWorkspacePopover(anchor);
+    } catch (error) {
+      errorEl.textContent = error.message || "Could not connect the server.";
+      submit.disabled = false;
+    }
+  });
+}
+
+function ensureBoardOverlay() {
+  if (boardOverlay) return boardOverlay;
+  boardOverlay = document.createElement("section");
+  boardOverlay.className = "mn-server-view";
+  boardOverlay.innerHTML = `<header class="mn-server-bar"><button type="button" class="mn-btn" data-role="back">Back</button><strong data-role="title">Board</strong><span class="mn-server-bar-spacer"></span></header><main class="mn-server-content" data-role="content"></main>`;
+  document.body.append(boardOverlay);
+  boardOverlay.querySelector('[data-role="back"]').addEventListener("click", () => {
+    boardOverlay.remove();
+    boardOverlay = null;
+  });
+  return boardOverlay;
 }
 
 function boardCard(card) {
@@ -93,7 +235,7 @@ function boardCard(card) {
       card.text || card.description || card.caption || card.url || type
     )}</p>`;
   }
-  return `<article class="mn-server-board-card" data-card="${escapeText(card.id)}" style="left:${Number(card.x) || 0}px;top:${Number(card.y) || 0}px;width:${Math.max(
+  return `<article class="mn-server-board-card" style="left:${Number(card.x) || 0}px;top:${Number(card.y) || 0}px;width:${Math.max(
     80,
     Number(card.w) || 220
   )}px;height:${Math.max(40, Number(card.h) || 90)}px;z-index:${Number(card.z) || 1}">${body}</article>`;
@@ -118,18 +260,15 @@ function renderBoard(container, doc) {
 }
 
 async function openBoard(server, project, token = "") {
-  const view = ensureOverlay();
-  view.dataset.mode = "board";
-  view.querySelector('[data-role="title"]').textContent = project.name || project.title || "Board";
-  view.querySelector('[data-role="sidebar"]').innerHTML = "";
+  const view = ensureBoardOverlay();
+  view.querySelector('[data-role="title"]').textContent = project.name || "Board";
   const content = view.querySelector('[data-role="content"]');
   content.innerHTML = `<p class="mn-server-empty">Loading board...</p>`;
   try {
     const data = await jsonFetch(`${server.url}/api/v1/projects/${encodeURIComponent(project.id)}`, {}, token);
-    const snapshot = data.snapshot || {};
     let doc = {};
     try {
-      doc = JSON.parse(snapshot.doc || "{}");
+      doc = JSON.parse(data.snapshot?.doc || "{}");
     } catch {
       doc = {};
     }
@@ -140,107 +279,10 @@ async function openBoard(server, project, token = "") {
   }
 }
 
-async function renderWorkspace() {
-  const view = ensureOverlay();
-  view.dataset.mode = "workspace";
-  view.querySelector('[data-role="title"]').textContent = "Workspace";
-  view.querySelector('[data-role="content"]').innerHTML = "";
-  const sidebar = view.querySelector('[data-role="sidebar"]');
-  const content = view.querySelector('[data-role="content"]');
-  const current = servers();
-  sidebar.innerHTML = `
-    <h2>Servers</h2>
-    <div data-role="server-list"></div>
-    <button type="button" class="mn-btn mn-server-add" data-role="add-server">+ Add Server</button>
-    <p class="mn-server-note">Local boards stay in this browser. Add a Khaoyu service URL to open its shared team workspace.</p>`;
-  const list = sidebar.querySelector('[data-role="server-list"]');
-  if (!current.length) {
-    list.innerHTML = `<p class="mn-server-note">No remote server connected.</p>`;
-  }
-  for (const server of current) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "mn-server-item";
-    button.textContent = server.name || server.url;
-    button.addEventListener("click", () => void loadServerProjects(server));
-    list.append(button);
-  }
-  sidebar.querySelector('[data-role="add-server"]').addEventListener("click", addServer);
-  if (current[0]) void loadServerProjects(current[0]);
-  else {
-    content.innerHTML = `<div class="mn-server-empty"><h2>Team workspace</h2><p>Connect a server to see boards shared with your account.</p></div>`;
-  }
-}
-
-async function loadServerProjects(server) {
-  const view = ensureOverlay();
-  const content = view.querySelector('[data-role="content"]');
-  content.innerHTML = `<p class="mn-server-empty">Loading ${escapeText(server.name || server.url)}...</p>`;
-  try {
-    const data = await jsonFetch(`${server.url}/api/v1/projects`, {}, server.token);
-    const projects = data.projects || [];
-    content.innerHTML = `<h2>${escapeText(server.name || new URL(server.url).host)}</h2><div class="mn-server-board-list">${
-      projects.length
-        ? projects
-            .map(
-              (project) =>
-                `<button type="button" class="mn-server-board-link" data-project="${escapeText(project.id)}"><strong>${escapeText(
-                  project.name || "Untitled board"
-                )}</strong><span>${escapeText(project.role || "viewer")} · revision ${escapeText(project.revision ?? 1)}</span></button>`
-            )
-            .join("")
-        : `<p class="mn-server-empty">No boards are shared with this account.</p>`
-    }</div>`;
-    for (const button of content.querySelectorAll("[data-project]")) {
-      const project = projects.find((entry) => entry.id === button.dataset.project);
-      button.addEventListener("click", () => void openBoard(server, project, server.token));
-    }
-  } catch (error) {
-    content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message)} <button type="button" class="mn-btn" data-role="retry">Retry</button></p>`;
-    content.querySelector('[data-role="retry"]')?.addEventListener("click", () => void loadServerProjects(server));
-  }
-}
-
-async function addServer() {
-  const url = normalizeUrl(window.prompt("Khaoyu service URL", "https://admin.example.com") || "");
-  if (!url) return;
-  const email = window.prompt("Account email") || "";
-  if (!email) return;
-  const password = window.prompt("Account password") || "";
-  if (!password) return;
-  try {
-    const data = await jsonFetch(`${url}/api/v1/auth/sync-token`, {
-      method: "POST",
-      body: { email, password },
-    });
-    if (!data.token) throw new Error("The server did not return a sync token.");
-    const entries = servers().filter((entry) => entry.url !== url);
-    entries.unshift({ url, name: new URL(url).host, email, token: data.token });
-    saveServers(entries);
-    await renderWorkspace();
-  } catch (error) {
-    window.alert(`Could not connect: ${error.message}`);
-  }
-}
-
-export function initWorkspaceLauncher(uiRefs) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "mn-btn mn-workspace-launcher";
-  button.textContent = "Workspace";
-  button.title = "Workspace and servers";
-  button.addEventListener("click", () => void renderWorkspace());
-  const left = document.querySelector(".mn-menubar-left");
-  if (left) left.append(button);
-  return button;
-}
-
 export async function openWorkspaceFromQuery() {
-  if (new URLSearchParams(location.search).get("workspace") === "1") {
-    await renderWorkspace();
-    return true;
-  }
-  return false;
+  if (new URLSearchParams(location.search).get("workspace") !== "1") return false;
+  openWorkspacePopover(document.getElementById("template-btn"));
+  return true;
 }
 
 export async function openShareFromQuery() {
@@ -248,24 +290,20 @@ export async function openShareFromQuery() {
   const token = params.get("share");
   if (!token) return false;
   const server = normalizeUrl(params.get("server") || "");
-  if (!server) {
-    ensureOverlay().querySelector('[data-role="content"]').innerHTML =
-      `<p class="mn-server-empty">This share link is missing its server URL.</p>`;
-    return true;
-  }
-  const view = ensureOverlay();
-  view.dataset.mode = "share";
-  view.querySelector('[data-role="sidebar"]').innerHTML = "";
+  const view = ensureBoardOverlay();
   view.querySelector('[data-role="title"]').textContent = "Shared board";
   const content = view.querySelector('[data-role="content"]');
+  if (!server) {
+    content.innerHTML = `<p class="mn-server-empty">This share link is missing its server URL.</p>`;
+    return true;
+  }
   content.innerHTML = `<p class="mn-server-empty">Opening shared board...</p>`;
   try {
     const data = await jsonFetch(`${server}/api/v1/share/${encodeURIComponent(token)}/access`, {
       method: "POST",
       body: {},
     });
-    const snapshot = data.doc || {};
-    renderBoard(content, snapshot);
+    renderBoard(content, data.doc || {});
     content.insertAdjacentHTML("afterbegin", `<p class="mn-server-note">Shared read-only view · do not forward this link to people who should not have access.</p>`);
   } catch (error) {
     content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message || "This share link is invalid or expired.")}</p>`;

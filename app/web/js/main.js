@@ -6,7 +6,7 @@ import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initLiveBoard } from "./live-board.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
-import { initWorkspaceLauncher, openShareFromQuery, openWorkspaceFromQuery } from "./workspace-mode.js";
+import { openShareFromQuery, openWorkspaceFromQuery } from "./workspace-mode.js";
 import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
 import {
@@ -96,7 +96,6 @@ async function boot() {
   initRender(refs);
   initInteractions(refs);
   initUI(uiRefs);
-  initWorkspaceLauncher(uiRefs);
   initSyncUI(uiRefs);
   initLiveBoard();
   initShareUI(uiRefs);

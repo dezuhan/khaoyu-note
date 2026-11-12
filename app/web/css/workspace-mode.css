@@ -150,3 +150,112 @@
     border-bottom: 1px solid var(--ky-stroke);
   }
 }
+
+/* Affine-style workspace popover. */
+.mn-workspace-popover {
+  position: fixed;
+  z-index: 1300;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(520px, calc(100dvh - 70px));
+  overflow: auto;
+  padding: var(--ky-space-6);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-card);
+  background: var(--ky-popup-bg, var(--ky-surface));
+  box-shadow: var(--ky-shadow-popup, 0 16px 40px rgba(0, 0, 0, 0.3));
+}
+
+.mn-workspace-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ky-space-8);
+  padding: var(--ky-space-6) var(--ky-space-8);
+  color: var(--ky-muted);
+  font-size: var(--ky-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mn-workspace-popover-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ky-space-8);
+  width: 100%;
+  padding: var(--ky-space-8);
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+  color: var(--ky-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-workspace-popover-row:hover,
+.mn-workspace-popover-row.is-active {
+  background: var(--ky-control);
+}
+
+.mn-workspace-popover-row small {
+  display: block;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+.mn-workspace-popover-sep {
+  height: 1px;
+  margin: var(--ky-space-6) 0;
+  background: var(--ky-stroke);
+}
+
+.mn-workspace-popover-boards {
+  display: grid;
+  gap: var(--ky-space-2);
+  padding: var(--ky-space-4) var(--ky-space-8) var(--ky-space-8);
+}
+
+.mn-workspace-popover-board {
+  display: block;
+  width: 100%;
+  padding: var(--ky-space-6) var(--ky-space-8);
+  border: 0;
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+  color: var(--ky-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mn-workspace-popover-board:hover {
+  background: var(--ky-control);
+}
+
+.mn-workspace-popover-board span {
+  display: block;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+.mn-workspace-form {
+  display: grid;
+  gap: var(--ky-space-10);
+}
+
+.mn-workspace-form label {
+  display: grid;
+  gap: var(--ky-space-4);
+  color: var(--ky-muted);
+  font-size: var(--ky-text-xs);
+}
+
+.mn-workspace-form .ky-input {
+  width: 100%;
+}
+
+.mn-workspace-form-error {
+  margin: 0;
+  color: var(--ky-danger, #d9534f);
+  font-size: var(--ky-text-xs);
+}

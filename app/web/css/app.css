@@ -7699,3 +7699,12 @@ html[data-performance="true"] *::after {
   background: color-mix(in srgb, var(--remote-color, var(--ky-accent)) 22%, transparent);
   pointer-events: none;
 }
+
+/* Floating menus must sit above the detached tool rail. */
+.mn-menu-layer {
+  z-index: 1200;
+}
+
+.mn-toolrail {
+  z-index: 1000;
+}
