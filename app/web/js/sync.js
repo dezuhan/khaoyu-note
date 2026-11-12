@@ -27,17 +27,21 @@ export function loadSyncConfig() {
       url: String(parsed.url || ""),
       email: String(parsed.email || ""),
       token: String(parsed.token || ""),
+      publicShareUrl: String(parsed.publicShareUrl || ""),
     };
   } catch {
-    return { url: "", email: "", token: "" };
+    return { url: "", email: "", token: "", publicShareUrl: "" };
   }
 }
 
 export function saveSyncConfig(config) {
-  const url = normalizeServerUrl(config.url);
+  const url = config.url ? normalizeServerUrl(config.url) : "";
   const email = String(config.email || "").trim();
   const token = String(config.token || "").trim();
-  storage().setItem(CONFIG_KEY, JSON.stringify({ url, email, token }));
+  const publicShareUrl = config.publicShareUrl
+    ? normalizeServerUrl(config.publicShareUrl)
+    : "";
+  storage().setItem(CONFIG_KEY, JSON.stringify({ url, email, token, publicShareUrl }));
   connectionStatus.state = "unknown";
   connectionStatus.message = "Not checked";
   connectionStatus.url = "";
@@ -187,6 +191,7 @@ export async function signIn({ url, email, password, timeoutMs = 10000 } = {}) {
       url: serverUrl,
       email: String(body.email || address),
       token: body.token,
+      publicShareUrl: loadSyncConfig().publicShareUrl || "",
     })
   );
   return loadSyncConfig();

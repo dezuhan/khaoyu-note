@@ -2226,6 +2226,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         sendJson(response, 201, {
           id: created.id,
           token: created.token,
+          url: `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(created.token)}`,
           scope,
           permission,
           expiresAt,
@@ -2266,7 +2267,10 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           ip,
           secret: config.secret,
         });
-        sendJson(response, 200, { token }, config);
+        sendJson(response, 200, {
+          token,
+          url: `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(token)}`,
+        }, config);
         return true;
       }
 

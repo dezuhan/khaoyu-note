@@ -114,8 +114,19 @@ assert.throws(() => sync.normalizeServerUrl("ftp://notes.example.com"), /http/);
 assert.throws(() => sync.normalizeServerUrl(""), /server URL/i);
 
 // The connection check proves readiness and the authenticated database round trip.
-sync.saveSyncConfig({ url: "localhost:8080", token: "token-value" });
+sync.saveSyncConfig({
+  url: "localhost:8080",
+  token: "token-value",
+  publicShareUrl: "https://notes.example.com",
+});
 assert.equal(sync.loadSyncConfig().url, "http://localhost:8080");
+assert.equal(sync.loadSyncConfig().publicShareUrl, "https://notes.example.com");
+assert.throws(
+  () => sync.saveSyncConfig({ url: "localhost:8080", publicShareUrl: "ftp://example.com" }),
+  /http/
+);
+sync.saveSyncConfig({ url: "localhost:8080", token: "token-value", publicShareUrl: "" });
+assert.equal(sync.loadSyncConfig().publicShareUrl, "");
 let connection = await sync.checkConnection();
 assert.equal(connection.state, "connected");
 assert.equal(connection.projectCount, 2);

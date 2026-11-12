@@ -87,9 +87,12 @@ async function boardShareUrl() {
   const info = await bridge.shareInfo();
   const origin = `${window.location.protocol}//${window.location.host}`;
   const candidates = [...(info?.urls || []), origin].filter(Boolean);
-  const base = isLoopbackUrl(origin)
-    ? candidates.find((candidate) => !isLoopbackUrl(candidate)) || origin
-    : origin;
+  const publicOrigin = loadSyncConfig().publicShareUrl;
+  const base = publicOrigin
+    ? publicOrigin
+    : isLoopbackUrl(origin)
+      ? candidates.find((candidate) => !isLoopbackUrl(candidate)) || origin
+      : origin;
   return `${String(base).replace(/\/+$/, "")}/?board=${encodeURIComponent(state.board.id)}`;
 }
 
@@ -298,7 +301,8 @@ async function renderPanel() {
           expiresInDays: expiry.value ? Number(expiry.value) : undefined,
           downloadAllowed: download.checked,
         });
-        const url = sharing.shareUrl(created.token);
+        const url =
+          loadSyncConfig().publicShareUrl || created.url || sharing.shareUrl(created.token);
         tokenOutput.textContent = url;
         tokenOutput.dataset.url = url;
         toast("Share link created. Copy it now.");

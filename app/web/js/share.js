@@ -34,7 +34,9 @@ async function api(pathname, { method = "GET", body } = {}) {
 }
 
 export function shareUrl(token) {
-  return `${config().base}/s/${encodeURIComponent(token)}`;
+  const sync = loadSyncConfig();
+  const base = (sync.publicShareUrl || config().base).replace(/\/+$/, "");
+  return `${base}/s/${encodeURIComponent(token)}`;
 }
 
 export async function readProject(projectId) {

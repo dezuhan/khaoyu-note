@@ -137,6 +137,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files, outbox, backups, logs and `runtime.json`. |
 | `KHAOYU_SERVICE_SECRET` | required | At least 32 characters and not a placeholder. |
 | `KHAOYU_SERVICE_PUBLIC_URL` | frontend URL | Public HTTPS origin behind a proxy. |
+| `KHAOYU_SERVICE_SHARE_PUBLIC_URL` | `PUBLIC_URL` | Optional origin used in generated share links when the API is local but links open through a public IP, tunnel or proxy. |
 | `KHAOYU_SERVICE_COOKIE_SECURE` | based on public URL | Force Secure cookies. Use `false` only on local HTTP. |
 | `KHAOYU_SERVICE_TRUST_PROXY` | `false` | Read the client IP from the first `X-Forwarded-For` value. |
 | `KHAOYU_SERVICE_PUBLIC_SHARING` | `true` | Operator kill switch for all public share links. |

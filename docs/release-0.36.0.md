@@ -18,6 +18,9 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
 - **Sharing hardening**: optional share-view watermark and per-link download caps, server-side rich
   HTML sanitisation, exact remote-embed host allowlists, optional AES-256-GCM object encryption and
   a data-only PostgreSQL deployment script.
+- **Public share links**: the Share dialog follows a configurable public origin, either from
+  `KHAOYU_SERVICE_SHARE_PUBLIC_URL` or the app's Public share links setting, so links can use a
+  public IP, domain or tunnel instead of localhost.
 - **Resizable auto-layout**: rows start auto-width from their cards; resizing a row switches its
   cards to fill the row (the old stretch behavior), and "Fit container to items" returns to auto.
 - **Live drop preview**: hovering a column or row with a card or rail tool reserves the exact slot,

@@ -778,6 +778,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       jar: owner.jar,
       body: { scope: "column", targetId: "col1", permission: "comment" },
     });
+    assert.equal(columnShare.body.url, `http://127.0.0.1/s/${columnShare.body.token}`);
     const comment = await api.call(`/api/v1/share/${columnShare.body.token}/comments`, {
       method: "POST",
       body: { cardId: "child1", text: "Scoped comment" },

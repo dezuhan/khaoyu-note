@@ -15,7 +15,7 @@ import { icon } from "./icons.js";
 import { LANGUAGES, getLanguage, setLanguage, t } from "./i18n.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
-import { checkConnection, describeConnection, loadSyncConfig, signOut } from "./sync.js";
+import { checkConnection, describeConnection, loadSyncConfig, saveSyncConfig, signOut } from "./sync.js";
 import { currentVersion, initCurrentVersion, releaseSummary } from "./update.js";
 import { openSyncDialog } from "./sync-ui.js";
 import {
@@ -1686,6 +1686,58 @@ function renderAccountSettingsTab(container) {
   container.append(page);
 }
 
+function renderPublicShareSetting(content, config) {
+  const box = document.createElement("div");
+  box.className = "mn-account-status mn-public-share";
+  const title = document.createElement("div");
+  title.className = "mn-account-server";
+  title.textContent = "Public share links";
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent =
+    "Optional public origin used in share links and board links (for example a domain, tunnel, or public IP). The host still needs port forwarding, a tunnel or a reverse proxy so the address reaches this service; HTTPS is recommended.";
+  const row = document.createElement("div");
+  row.className = "mn-share-copy-row";
+  const input = document.createElement("input");
+  input.className = "ky-input";
+  input.type = "url";
+  input.placeholder = "https://notes.example.com or http://203.0.113.10:8080";
+  input.value = config.publicShareUrl || "";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "mn-btn";
+  save.textContent = "Save public URL";
+  const savePublicUrl = () => {
+    const current = loadSyncConfig();
+    try {
+      const saved = saveSyncConfig({
+        url: current.url,
+        email: current.email,
+        token: current.token,
+        publicShareUrl: input.value.trim(),
+      });
+      input.value = saved.publicShareUrl;
+      setStatus(
+        saved.publicShareUrl
+          ? `Share links will use ${saved.publicShareUrl}`
+          : "Share links will use the sync server URL"
+      );
+    } catch (error) {
+      setStatus(error.message || "Enter a valid public URL");
+    }
+  };
+  save.addEventListener("click", savePublicUrl);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      savePublicUrl();
+    }
+  });
+  row.append(input, save);
+  box.append(title, note, row);
+  content.append(box);
+}
+
 function renderServerPage(content) {
   content.append(heading("Server"));
   const config = loadSyncConfig();
@@ -1695,6 +1747,7 @@ function renderServerPage(content) {
     "Connection details for this computer and the optional self-hosted service.";
   content.append(intro);
   renderServerRuntime(content);
+  renderPublicShareSetting(content, config);
   const status = document.createElement("div");
   status.className = "mn-account-status";
   const server = document.createElement("div");

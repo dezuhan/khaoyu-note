@@ -2120,6 +2120,11 @@ check(
     (await page.locator('[data-role="account-connection"]').innerText()).includes("Status:")
 );
 check(
+  "Settings > Server offers a public share URL field",
+  (await page.locator(".mn-public-share input").isVisible()) &&
+    (await page.locator(".mn-public-share input").getAttribute("placeholder")).includes("https://")
+);
+check(
   "Topbar language button is enabled",
   (await page.locator("#language-btn").isVisible()) && !(await page.locator("#language-btn").isDisabled())
 );

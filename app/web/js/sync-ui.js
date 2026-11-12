@@ -283,6 +283,7 @@ function renderDialog() {
       url: url.value,
       email: email.value,
       token: current.token,
+      publicShareUrl: current.publicShareUrl,
     });
     url.value = saved.url;
     return saved;

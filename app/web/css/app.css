@@ -7657,3 +7657,13 @@ html[data-performance="true"] *::after {
 .mn-toolrail::-webkit-scrollbar {
   display: none;
 }
+
+.mn-public-share {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mn-public-share .mn-prefs-note {
+  margin: 0;
+}

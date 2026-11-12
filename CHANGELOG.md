@@ -72,6 +72,11 @@ project uses Semantic Versioning.
 - The Share dialog is reorganized into clear Board link, Create a share link and Active links
   sections: the board URL and copy action share one row, the form fields align in two columns, and
   Create/Copy actions sit together without the previous empty vertical gaps.
+- Share links can use a public origin: `KHAOYU_SERVICE_SHARE_PUBLIC_URL` controls the absolute URL
+  returned by the service, and **Settings > Server > Public share links** stores a client-side
+  public origin for share links and browser board links. See `docs/public-sharing.md` for port
+  forwarding, reverse-proxy and tunnel setups.
+
 
 - Dragging a tool from the rail into a column or row inserts it at the pointer position, including
   before the first child; the drop preview line shows the target slot instead of always appending.
