@@ -128,6 +128,16 @@ try {
   check("account page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
   const passwordBox = await page.locator('[data-role="password-form"] input').first().boundingBox();
   check("password inputs stay compact", passwordBox !== null && passwordBox.height <= 30, String(passwordBox?.height));
+  const passwordRects = await page.locator('[data-role="password-form"] input').evaluateAll((inputs) =>
+    inputs.map((input) => {
+      const rect = input.getBoundingClientRect();
+      return { x: rect.x, width: rect.width };
+    })
+  );
+  check(
+    "password fields stay inside their grid columns",
+    passwordRects.every((rect, index) => index === 0 || rect.x >= passwordRects[index - 1].x + passwordRects[index - 1].width)
+  );
   check(
     "account page uses the shared design tokens",
     (await page.locator('link[href="/ky.css"]').count()) === 1 &&

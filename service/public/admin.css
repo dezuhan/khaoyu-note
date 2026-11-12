@@ -1203,3 +1203,11 @@ button.admin-admin:hover {
   --ky-font-code: "Space Mono", ui-monospace, monospace;
   font-family: var(--ky-font-body);
 }
+
+/* Form controls use border-box so 100%-width fields do not overflow their grid columns. */
+.admin-search,
+.admin-select,
+.admin-field input,
+.admin-field select {
+  box-sizing: border-box;
+}

@@ -32,6 +32,8 @@ project uses Semantic Versioning.
 - The signed-out admin card renders "Sign in to the service" as a real primary button with the app
   theme tokens (no underlined link) at a comfortable 32 px control height, so the label never looks
   clipped.
+- The Account password fields use border-box sizing, so the three inputs keep their own grid columns
+  instead of overlapping into one long control.
 - Visiting the admin dashboard without a session now redirects straight to `/login` instead of showing
   an inline sign-in card. The service login, registration and reset pages reuse the main app logo,
   Plus Jakarta Sans / Space Mono fonts and the shared sun/moon theme icon.
