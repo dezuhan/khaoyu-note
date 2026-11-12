@@ -45,8 +45,9 @@ disabled and its form is hidden. Password reset and invitation mail use SMTP whe
 
 The service always opens two listeners on different free ports in the 5-digit range 20000 to 59999:
 
-- **Frontend** serves `/login`, `/register`, `/reset`, `/account` (redirects to `/admin`),
-  `/passkeys`, `/s/:token`, `/admin` and the static assets. `/shares` redirects to
+- **Frontend** serves `/workspace` (the default landing), `/login`, `/register`, `/reset`,
+  `/account` (redirects to `/admin`), `/passkeys`, `/s/:token`, `/admin` and the static assets. The
+  root URL redirects to `/workspace`; authenticated sign-in lands there too. `/shares` redirects to
   `/admin#sharing`, because sharing is rendered inside the admin dashboard.
 - **Backend** serves `/api/v1/*`, `/healthz` and `/readyz`; it refuses page requests.
 
@@ -63,7 +64,14 @@ every board on the server; an admin can promote a member to editor/commenter fro
 panel. This is the default `workspace_mode=shared` policy. Set
 `service_meta.workspace_mode = 'private'` only for deployments that want strict per-board membership.
 
-Open `/workspace` for the web workspace switcher:
+`/workspace` is now the default route for all users. It shows every board the account can access and
+the server switcher. Open it directly or via the root URL:
+
+```text
+https://your-service/           -> 302 /workspace
+https://your-service/workspace
+```
+
 
 - **Local storage** — the local board web host (default `http://127.0.0.1:1430`);
 - the current server workspace;

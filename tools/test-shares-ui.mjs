@@ -81,7 +81,9 @@ try {
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("#login-submit");
-  await page.waitForURL(/\/admin$/);
+  await page.waitForURL(/\/workspace$/);
+  await page.goto(`${base}/admin#sharing`, { waitUntil: "load" });
+  await page.waitForSelector('.admin-nav-item[data-page="sharing"]');
   await page.click('.admin-nav-item[data-page="sharing"]');
   await page.waitForSelector("#project");
   check(

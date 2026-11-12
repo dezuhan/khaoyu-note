@@ -2000,6 +2000,9 @@ test("team workspace auto-grants approved members viewer access to admin boards"
   assert.equal(shared.role, "viewer");
   const snapshot = await api.call(`/api/v1/projects/${project.body.id}`, { jar: member.jar });
   assert.equal(snapshot.status, 200);
+  const root = await fetch(`${api.base}/`, { redirect: "manual" });
+  assert.equal(root.status, 302);
+  assert.equal(root.headers.get("location"), "/workspace");
   const workspacePage = await api.raw("/workspace");
   assert.equal(workspacePage.status, 200);
   assert.match(workspacePage.text, /Shared workspace/);

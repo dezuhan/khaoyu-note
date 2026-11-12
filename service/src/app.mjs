@@ -79,6 +79,11 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
       sendJson(response, 426, { error: "HTTPS required", code: "https_required" }, config);
       return;
     }
+    if (request.method === "GET" && url.pathname === "/") {
+      response.writeHead(302, { Location: "/workspace" });
+      response.end();
+      return;
+    }
     const sharePage = /^\/s\/[^/]+$/.test(url.pathname);
     if (request.method === "GET" && url.pathname === "/account") {
       response.writeHead(302, { Location: "/admin#profile" });

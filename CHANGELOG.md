@@ -116,6 +116,9 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- `/workspace` is now the default landing for the service: the root URL redirects there and all
+  sign-ins (admin and member) land on the shared workspace instead of the admin dashboard. The admin
+  dashboard remains reachable from the workspace Admin link.
 - Added a team workspace model and `/workspace` web prototype: approved accounts automatically get
   viewer access to every server board (migration 18/6), with an admin able to promote per-board roles.
   The page lists local/remote servers, supports Add Server links, and opens read-only board previews.
