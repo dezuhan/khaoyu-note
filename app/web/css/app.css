@@ -7469,3 +7469,37 @@ html[data-performance="true"] *::after {
   font-size: 10px;
   line-height: 1.35;
 }
+
+/* ==========================================================================
+   Floating tool rail.
+   The rail is detached from the window edges and floats above the canvas. It is
+   fixed at its position (no drag handle), keeps the app chrome margins on the
+   left, top and bottom, and sits above board items. Modal and menu layers keep
+   their larger z-index so dialogs still cover the rail.
+   ========================================================================== */
+
+.mn-toolrail {
+  position: fixed;
+  left: 12px;
+  top: calc(var(--mn-menubar-height) + var(--mn-header-height) + 12px);
+  bottom: 12px;
+  width: 68px;
+  flex: none;
+  padding: 8px 0 6px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 14px;
+  background: var(--ky-surface);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.24),
+    0 4px 12px rgba(0, 0, 0, 0.16);
+  z-index: 1000;
+}
+
+.mn-toolrail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Keep the canvas clear of the floating rail: the rail is detached, the canvas starts after it. */
+.mn-viewport {
+  margin-left: 92px;
+}

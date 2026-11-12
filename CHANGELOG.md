@@ -16,6 +16,9 @@ project uses Semantic Versioning.
 - The self-hosted service admin page is now a single dashboard with a top menu bar (Overview,
   Accounts, Teams, Activity, Sharing), a host badge, a light/dark toggle and a profile button for the
   account pane. Sharing is rendered inside the dashboard; `/shares` redirects to `/admin#sharing`.
+- The main editor tool rail is now a floating inset panel: fixed at 12 px from the left, top and
+  bottom edges, rounded and shadowed above the canvas. The canvas starts after the rail so tools
+  never cover cards, and the rail cannot be dragged.
 
 ### Fixed
 

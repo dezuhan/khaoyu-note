@@ -76,6 +76,36 @@ check(
   railToolKeys.join(",")
 );
 check("tool rail keeps the trash button", (await page.locator(".mn-tool.mn-trash").count()) === 1);
+const floatingRail = await page.evaluate(() => {
+  const rail = document.querySelector(".mn-toolrail");
+  const css = getComputedStyle(rail);
+  const railRect = rail.getBoundingClientRect();
+  const viewportRect = document.getElementById("viewport").getBoundingClientRect();
+  return {
+    position: css.position,
+    zIndex: Number(css.zIndex),
+    left: Math.round(railRect.left),
+    top: Math.round(railRect.top),
+    bottom: Math.round(window.innerHeight - railRect.bottom),
+    width: Math.round(railRect.width),
+    viewportLeft: Math.round(viewportRect.left),
+    borderRadius: css.borderRadius,
+  };
+});
+check(
+  "tool rail floats as a fixed inset panel",
+  floatingRail.position === "fixed" &&
+    floatingRail.left >= 8 &&
+    floatingRail.top >= 8 &&
+    floatingRail.bottom >= 8 &&
+    floatingRail.borderRadius !== "0px",
+  JSON.stringify(floatingRail)
+);
+check(
+  "tool rail sits above the canvas and clears it",
+  floatingRail.zIndex >= 1000 && floatingRail.viewportLeft > floatingRail.left + floatingRail.width,
+  JSON.stringify(floatingRail)
+);
 const welcomeTypes = await page.evaluate(() =>
   Array.from(new Set(Array.from(document.querySelectorAll(".mn-card")).map((card) => card.dataset.type)))
 );
