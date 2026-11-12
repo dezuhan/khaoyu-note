@@ -383,7 +383,8 @@ bind address, port, share URLs, database path and version, while `window.__TAURI
 to `/api/asset?path=...`. The existing frontend therefore runs unchanged, with the same save guard,
 conflict handling and asset flow.
 
-Routes: `/` and the static frontend, `/api/invoke` for the whitelisted board, settings and asset
+Routes: `/api/events` (session-authenticated SSE for cross-tab board refresh), `/` and the static
+frontend, `/api/invoke` for the whitelisted board, settings and asset
 commands, `/api/asset` and `/api/download` for validated files under `assets/`, `/api/share-info` for
 full board URLs, and `/status` for host, port, database, uptime, version and Node version. The command
 bridge, assets and downloads require a signed-in session. Set `KHAOYU_WEB_HOST=127.0.0.1` to keep the

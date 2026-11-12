@@ -86,6 +86,10 @@ project uses Semantic Versioning.
 - Added a synthetic concurrent operation load check (`npm run test:collab-load`): six clients,
   360 operations, consistent log/card counts, p95 8 ms locally. Production-scale load testing remains
   a release gate.
+- The localhost web host now has a session-authenticated SSE stream (`/api/events`) with a
+  1.2-second SQLite change watcher. Edits in one browser/phone/tunnel window reach other open web
+  windows without a reload; web autosave runs after two seconds idle, and the desktop app polls the
+  shared database. This is separate from service collaboration and does not require WebSocket.
 - Board viewport position and zoom are now stored per device instead of being written into the board
   row. Opening a board from a phone/tunnel can no longer conflict with a desktop window merely
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.

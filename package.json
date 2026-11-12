@@ -44,7 +44,8 @@
     "theme:check": "node tools/sync-theme.mjs --check",
     "test:theme-module": "node --test tools/test-theme-module.test.mjs",
     "test:theme-css": "node tools/test-theme-css.mjs",
-    "test:collab-load": "node tools/test-collab-load.mjs"
+    "test:collab-load": "node tools/test-collab-load.mjs",
+    "test:web-live": "node tools/test-web-live.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3"

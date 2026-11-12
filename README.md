@@ -478,6 +478,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/screenshot.ps1
 # localhost web host against the same SQLite database
 node server.mjs
 node tools/test-web-mode.mjs
+node tools/test-web-live.mjs
 
 # light/dark mode stays global across board switches and reloads
 node tools/test-theme-global.mjs

@@ -144,8 +144,9 @@ let retryTimer = 0;
 let retryDelay = 1000;
 let saveInFlight = false;
 
-// Autosave waits for the user to stop editing, then persists 5 seconds after the last change.
-const IDLE_SAVE_MS = 5000;
+// Autosave waits for the user to stop editing. Web/mobile viewers save sooner so another window
+// receives the SSE update quickly; desktop keeps the calmer five-second idle window.
+const IDLE_SAVE_MS = bridge.hasWeb ? 2000 : 5000;
 const MAX_RETRY_DELAY = 30000;
 
 export function markDirty(kind = "board") {

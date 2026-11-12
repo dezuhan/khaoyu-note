@@ -24,6 +24,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   keeping the card frame and Load more button visible.
 - **Passkey kill switch**: `KHAOYU_SERVICE_PASSKEYS_ENABLED=false` hides passkey UI and disables the
   passkey endpoints while leaving password, TOTP and backup-code login available.
+- **Live web-host refresh**: `/api/events` SSE plus a SQLite watcher and desktop polling remove the
+  manual reload between the phone/tunnel and laptop windows.
 - **Per-device viewport**: board pan/zoom is stored locally per device, avoiding false save
   conflicts when the same board is open through a phone/tunnel and the desktop at once.
 - **Share board preview**: `/s/:token` now shows a scaled spatial read-only board instead of a raw

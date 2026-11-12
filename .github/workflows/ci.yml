@@ -112,6 +112,9 @@ jobs:
       - name: Web mode suite
         run: node tools/test-web-mode.mjs
 
+      - name: Web host live updates
+        run: node tools/test-web-live.mjs
+
       - name: Global theme suite
         run: node tools/test-theme-global.mjs
 

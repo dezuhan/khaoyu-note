@@ -4,6 +4,7 @@ import { initAuth } from "./auth.js";
 import { initInteractions } from "./interact.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
+import { initLiveBoard } from "./live-board.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
 import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
@@ -87,6 +88,7 @@ async function boot() {
   initInteractions(refs);
   initUI(uiRefs);
   initSyncUI(uiRefs);
+  initLiveBoard();
   initShareUI(uiRefs);
   initContextMenu();
 

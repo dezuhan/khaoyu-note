@@ -1221,6 +1221,15 @@ function injectRuntime(html) {
   const script = `
 <script>
 window.__KHAOYU_WEB__ = ${JSON.stringify(webInfo)};
+window.__KHAOYU_TAB__ = (() => {
+  try {
+    const existing = sessionStorage.getItem("mn.webTab");
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    sessionStorage.setItem("mn.webTab", created);
+    return created;
+  } catch { return "tab-" + Math.random().toString(36).slice(2); }
+})();
 window.__TAURI__ = {
   core: {
     invoke: async (cmd, args = {}) => {
@@ -1243,7 +1252,7 @@ window.__TAURI__ = {
       }
       if (cmd === "restart_app") { location.reload(); return null; }
       const csrfMatch = document.cookie.match(/(?:^|;\s*)khaoyu_local_csrf=([^;]+)/);
-      const headers = { "content-type": "application/json" };
+      const headers = { "content-type": "application/json", "x-khaoyu-tab": window.__KHAOYU_TAB__ };
       if (csrfMatch) headers["x-khaoyu-csrf"] = csrfMatch[1];
       const response = await fetch("/api/invoke", {
         method: "POST",
@@ -1585,6 +1594,79 @@ async function handleAuth(request, response, url) {
   throw new RequestError("not found", 404);
 }
 
+const liveClients = new Set();
+const boardVersions = new Map();
+
+function writeLiveEvent(client, event, data) {
+  try {
+    client.response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    return true;
+  } catch {
+    liveClients.delete(client);
+    return false;
+  }
+}
+
+function broadcastBoard(data) {
+  if (data.removed) boardVersions.delete(data.boardId);
+  else if (Number.isFinite(Number(data.updatedAt))) boardVersions.set(data.boardId, Number(data.updatedAt));
+  for (const client of liveClients) {
+    if (data.tab && client.tab === data.tab) continue;
+    writeLiveEvent(client, "board", data);
+  }
+}
+
+function boardChangeFor(cmd, args, result) {
+  if (cmd === "save_board") {
+    return { boardId: String(args.id || ""), updatedAt: Number(result) || Date.now() };
+  }
+  if (cmd === "rename_board") {
+    const row = db.prepare("SELECT updated_at FROM boards WHERE id = ?").get(String(args.id || ""));
+    return row ? { boardId: String(args.id), updatedAt: Number(row.updated_at) } : null;
+  }
+  if (cmd === "delete_board") {
+    return { boardId: String(args.id || ""), removed: true };
+  }
+  return null;
+}
+
+function primeBoardVersions() {
+  for (const row of db.prepare("SELECT id, updated_at FROM boards").all()) {
+    boardVersions.set(row.id, Number(row.updated_at));
+  }
+}
+
+function watchBoards() {
+  const timer = setInterval(() => {
+    let rows;
+    try {
+      rows = db.prepare("SELECT id, updated_at FROM boards").all();
+    } catch {
+      return;
+    }
+    const seen = new Set();
+    for (const row of rows) {
+      const id = String(row.id);
+      const updatedAt = Number(row.updated_at);
+      seen.add(id);
+      if (boardVersions.get(id) === updatedAt) continue;
+      boardVersions.set(id, updatedAt);
+      for (const client of liveClients) {
+        writeLiveEvent(client, "board", { boardId: id, updatedAt, external: true });
+      }
+    }
+    for (const id of [...boardVersions.keys()]) {
+      if (seen.has(id)) continue;
+      boardVersions.delete(id);
+      for (const client of liveClients) {
+        writeLiveEvent(client, "board", { boardId: id, removed: true, external: true });
+      }
+    }
+  }, 1200);
+  timer.unref?.();
+  return timer;
+}
+
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, webInfo.url);
@@ -1658,11 +1740,44 @@ const server = http.createServer(async (request, response) => {
       });
       return;
     }
+    if (request.method === "GET" && url.pathname === "/api/events") {
+      const session = currentSession(request);
+      if (!session) {
+        response.writeHead(401, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        response.end(JSON.stringify({ error: "Sign in required" }));
+        return;
+      }
+      const tab = String(url.searchParams.get("tab") || "");
+      response.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+      response.write("retry: 1500\n\n");
+      const client = { response, tab };
+      liveClients.add(client);
+      writeLiveEvent(client, "ready", { tab });
+      const heartbeat = setInterval(() => {
+        try { response.write(": heartbeat\n\n"); } catch { liveClients.delete(client); }
+      }, 20_000);
+      heartbeat.unref?.();
+      request.on("close", () => {
+        clearInterval(heartbeat);
+        liveClients.delete(client);
+      });
+      return;
+    }
     if (request.method === "POST" && url.pathname === "/api/invoke") {
       const session = currentSession(request);
       const body = JSON.parse(await readBody(request));
+      const tab = String(request.headers["x-khaoyu-tab"] || "");
       try {
-        const result = await invoke(String(body.cmd || ""), body.args || {}, session ? session.user : null);
+        const cmd = String(body.cmd || "");
+        const args = body.args || {};
+        const result = await invoke(cmd, args, session ? session.user : null);
+        const change = boardChangeFor(cmd, args, result);
+        if (change) broadcastBoard({ ...change, tab });
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ result }));
       } catch (error) {
@@ -1691,6 +1806,9 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
+primeBoardVersions();
+const boardWatcher = watchBoards();
+
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Khaoyu Note web: ${LOCAL_URL}`);
   for (const url of SHARE_URLS) {
@@ -1702,6 +1820,10 @@ server.listen(PORT, BIND_HOST, () => {
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
+    clearInterval(boardWatcher);
+    for (const client of liveClients) {
+      try { client.response.end(); } catch { /* already closed */ }
+    }
     server.close(() => {
       db.close();
       process.exit(0);
