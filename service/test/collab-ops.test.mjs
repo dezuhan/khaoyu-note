@@ -37,6 +37,58 @@ test("card delete removes descendants and their connections", () => {
   assert.deepEqual(doc.connections.map((connection) => connection.id), []);
 });
 
+test("connections can be replaced without sending the whole document", () => {
+  const doc = {
+    id: "p1",
+    title: "Board",
+    cards: [{ id: "a", type: "note" }, { id: "b", type: "note" }],
+    connections: [{ id: "old", from: "a", to: "b" }],
+    trash: [],
+  };
+  applyOperation(doc, {
+    type: "connections.set",
+    payload: { connections: [{ id: "new", from: "b", to: "a" }] },
+  });
+  assert.deepEqual(doc.connections.map((connection) => connection.id), ["new"]);
+  assert.equal(doc.cards.length, 2);
+  assert.throws(
+    () => applyOperation(doc, { type: "connections.set", payload: { connections: "nope" } }),
+    /must be an array/
+  );
+  assert.doesNotThrow(() =>
+    validateOperations([{ opId: "c1", type: "connections.set", payload: { connections: [] } }])
+  );
+});
+
+test("bulk operations may be larger than a card patch", () => {
+  const largeTitle = "x".repeat(300 * 1024);
+  assert.doesNotThrow(() =>
+    validateOperations([
+      { opId: "bulk-1", type: "connections.set", payload: { connections: [] } },
+    ])
+  );
+  assert.doesNotThrow(() =>
+    validateOperations([
+      { opId: "bulk-2", type: "doc.replace", payload: { doc: { title: largeTitle, cards: [] } } },
+    ])
+  );
+  assert.throws(
+    () =>
+      validateOperations([
+        { opId: "bulk-3", type: "card.update", payload: { id: "n1", patch: { text: largeTitle } } },
+      ]),
+    /too large/
+  );
+  const oversized = "x".repeat(4 * 1024 * 1024 + 16);
+  assert.throws(
+    () =>
+      validateOperations([
+        { opId: "bulk-4", type: "doc.replace", payload: { doc: { title: oversized, cards: [] } } },
+      ]),
+    /too large/
+  );
+});
+
 test("invalid operations are rejected before applying", () => {
   assert.throws(() => validateOperations([]), OpError);
   assert.throws(

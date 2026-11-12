@@ -2,13 +2,11 @@
 
 import * as bridge from "./bridge.js";
 import { adoptRemoteBoard, persistBoardSnapshot, state } from "./store.js";
-import { clearRemoteTemp } from "./remote-temp.js";
 import * as sync from "./sync.js";
 import { clearRemoteCursors, renderRemoteCursors } from "./remote-cursors.js";
 
 let refs = null;
 let overlay = null;
-let autoTimer = 0;
 let running = false;
 let realtime = null;
 let realtimeBoardId = null;
@@ -28,10 +26,29 @@ export function initSyncUI(uiRefs) {
   refs = uiRefs;
   refs.syncButton?.addEventListener("click", openSyncDialog);
   window.addEventListener("mn:board-saved", onBoardSaved);
-  window.addEventListener("online", () => {
-    sync.flushQueue().finally(refresh);
+  window.addEventListener("mn:sync-status", () => {
+    refresh();
+    // Only the status line changes; re-rendering would wipe the credentials the user is typing.
+    if (overlay) renderStatus();
   });
-  window.addEventListener("beforeunload", closeRealtime);
+  window.addEventListener("online", () => {
+    sync
+      .flushQueue()
+      .catch(() => {})
+      .finally(refresh);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void sync
+        .flushQueue()
+        .catch(() => {})
+        .then(refresh);
+    }
+  });
+  window.addEventListener("beforeunload", () => {
+    if (state.remote && state.board) void sync.captureBoardChanges(state.board);
+    closeRealtime();
+  });
   document.addEventListener("selectionchange", scheduleCursorSend);
   document.addEventListener("focusin", scheduleCursorSend);
   document.addEventListener("focusout", () => {
@@ -79,9 +96,9 @@ export function refresh() {
     refs.syncState.dataset.status = "disabled";
     return;
   }
+  if (sync.syncEnabled(state.board)) void sync.primeBoard(state.board);
   const status = sync.syncStatusFor(state.board);
-  refs.syncState.textContent =
-    status.status === "synced" ? status.message : status.message || "Sync";
+  refs.syncState.textContent = status.message || "Sync";
   refs.syncState.dataset.status = status.status;
   if (overlay) renderStatus();
   ensureRealtime();
@@ -266,28 +283,18 @@ function onBoardSaved(event) {
   if (event.detail?.boardId !== state.board?.id) return;
   if (!sync.syncEnabled(state.board)) return;
   if (state.board.sync.conflict) return;
-  clearTimeout(autoTimer);
-  autoTimer = setTimeout(async () => {
-    try {
-      const result = await sync.pushLiveChanges(state.board);
-      if (result.status === "pushed" || result.status === "noop") {
-        clearRemoteTemp(event.detail.boardId);
-        await persistBoardSnapshot();
-        refresh();
-      } else if (result.status === "conflict") {
-        await runSync({ quiet: true });
-      }
-    } catch (error) {
-      if (error.offline) {
-        sync.enqueueForOffline(state.board);
-        refresh();
-      } else if (error.code === "card_locked") {
-        window.dispatchEvent(
-          new CustomEvent("mn:toast", { detail: { message: "A card is locked by another editor" } })
-        );
-      }
-    }
-  }, state.remote ? 60 : 500);
+  const board = state.board;
+  // Capture first so the durable queue holds the edit even if the network push never starts.
+  void sync
+    .captureBoardChanges(board)
+    .then((captured) => {
+      if (!captured.captured) return;
+      sync.scheduleFlush(board, state.remote ? 60 : 500);
+      refresh();
+    })
+    .catch(() => {
+      refresh();
+    });
 }
 
 export function openSyncDialog() {
@@ -415,9 +422,12 @@ function renderDialog() {
   body.append(connection);
 
   if (enabled) {
+    const queue = sync.pendingInfoFor(board);
     const info = document.createElement("div");
     info.className = "mn-sync-meta";
-    info.textContent = `Project ${board.sync.projectId} · revision ${board.sync.revision}`;
+    const stored = queue.storage === "indexeddb" ? "durable cache" : "local storage";
+    info.textContent = `Project ${board.sync.projectId} · revision ${board.sync.revision} · ${queue.pending} queued · ${stored}`;
+    info.dataset.role = "sync-queue";
     body.append(info);
   }
 
@@ -548,14 +558,66 @@ function renderDialog() {
       })
     );
   }
-  if (enabled) {
+  // A remote workspace board lives on the server; disabling sync locally would leave edits with
+  // nowhere durable to go, so the control is only offered for local boards.
+  if (enabled && !state.remote) {
     foot.append(
       button("Disable for this board", "mn-btn mn-btn-quiet", async () => {
+        const boardId = state.board.id;
         delete state.board.sync;
         await persistBoardSnapshot();
+        await sync.clearBoardState(boardId);
         refresh();
         renderDialog();
         toast("Sync disabled for this board; server data was not deleted");
+      })
+    );
+  }
+  if (status.fieldConflicts?.length) {
+    const section = document.createElement("div");
+    section.className = "mn-sync-conflicts";
+    section.dataset.role = "field-conflicts";
+    const title = document.createElement("p");
+    title.textContent = `${status.fieldConflicts.length} field conflict${
+      status.fieldConflicts.length === 1 ? "" : "s"
+    } kept your value (last writer wins per field):`;
+    const list = document.createElement("ul");
+    list.className = "mn-sync-conflict-list";
+    for (const conflict of status.fieldConflicts.slice(0, 8)) {
+      const item = document.createElement("li");
+      const server = JSON.stringify(conflict.remoteValue ?? null);
+      item.textContent = `${conflict.cardId} · ${conflict.field} · server: ${
+        server.length > 48 ? server.slice(0, 45) + "..." : server
+      }${conflict.remoteDeleted ? " (deleted)" : ""}`;
+      list.append(item);
+    }
+    const actions = document.createElement("div");
+    actions.className = "mn-sync-actions";
+    actions.append(
+      button("Use server values", "mn-btn", async () => {
+        const result = await sync.applyServerFieldValues(state.board);
+        refresh();
+        renderDialog();
+        toast(result.applied ? "Server values applied" : "Nothing to apply");
+      }),
+      button("Dismiss", "mn-btn mn-btn-quiet", async () => {
+        await sync.dismissFieldConflicts(state.board);
+        refresh();
+        renderDialog();
+      })
+    );
+    section.append(title, list, actions);
+    body.append(section);
+  }
+
+  if (status.status === "failed") {
+    foot.append(
+      button("Discard queued changes", "mn-btn mn-btn-quiet", async () => {
+        const result = await sync.discardQueuedChanges(state.board);
+        if (result?.doc) await adoptRemoteBoard(result.doc);
+        refresh();
+        renderDialog();
+        toast("Queued changes discarded; the server version is loaded");
       })
     );
   }
@@ -608,7 +670,7 @@ async function runSync({ quiet = false } = {}) {
     let result;
     if (!sync.syncEnabled(state.board)) result = await sync.enableBoardSync(state.board);
     else result = await sync.syncBoard(state.board);
-    if (result.status === "pulled") {
+    if ((result.status === "pulled" || result.status === "resync") && result.doc) {
       await adoptRemoteBoard(result.doc);
     } else if (result.status === "conflict") {
       state.board.sync.conflict = true;
@@ -616,14 +678,20 @@ async function runSync({ quiet = false } = {}) {
     } else {
       await persistBoardSnapshot();
     }
-    if (!quiet) toast(result.status === "conflict" ? "Sync conflict" : "Sync complete");
-  } catch (error) {
-    if (error.offline) {
-      sync.enqueueForOffline(state.board);
-      if (!quiet) toast("Offline: changes queued for sync");
-    } else if (!quiet) {
-      toast(error.message || "Sync failed");
+    if (!quiet) {
+      const messages = {
+        conflict: "Sync conflict",
+        pending: "Offline or retrying: changes queued",
+        blocked: "Waiting for a card lock",
+        failed: "Sync failed",
+        synced: "Sync complete",
+        pushed: "Sync complete",
+        current: "Sync complete",
+      };
+      toast(messages[result.status] || "Sync complete");
     }
+  } catch (error) {
+    if (!quiet) toast(error.message || "Sync failed");
   } finally {
     running = false;
     refresh();

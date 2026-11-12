@@ -1,11 +1,52 @@
 // Opt-in project sync between a local board and the self-hosted service.
 // The local board remains authoritative unless sync is enabled for it.
+//
+// Every change is captured as a granular operation, appended to a durable per-board queue
+// (sync-store.js) and flushed in the background. A remote workspace board therefore survives
+// reloads, offline periods and failed pushes without replacing the whole document.
 
-import * as bridge from "./bridge.js";
+import * as localStore from "./sync-store.js";
 
 const CONFIG_KEY = "ky.sync.config";
-const QUEUE_KEY = "ky.sync.queue";
-const MAX_QUEUE = 20;
+const MAX_BATCH_OPS = 200;
+const MAX_PENDING_OPS = 4000;
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 30000;
+const RETRY_LOCKED_MS = 10000;
+
+// `crypto.randomUUID` is only available in secure contexts, but the web host is documented to run
+// on a plain-HTTP LAN address. A local id keeps the queue working there too.
+function operationId() {
+  try {
+    if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  } catch {
+    /* fall through */
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Pending operations are stored per tab: two tabs on the same board would otherwise overwrite each
+// other's queue record whenever they persist it.
+function sessionTabId() {
+  const key = "ky.sync.tab";
+  try {
+    const storageArea = globalThis.sessionStorage;
+    if (!storageArea) return `tab-${operationId()}`;
+    const existing = storageArea.getItem(key);
+    if (existing) return existing;
+    const created = `tab-${operationId()}`;
+    storageArea.setItem(key, created);
+    return created;
+  } catch {
+    return `tab-${operationId()}`;
+  }
+}
+
+const TAB_ID = sessionTabId();
+
+function queueKeyFor(boardId) {
+  return localStore.queueKeyFor(boardId, TAB_ID);
+}
 
 export const syncState = {
   status: "disabled",
@@ -272,29 +313,58 @@ export function syncEnabled(board) {
   return Boolean(board && board.sync && board.sync.projectId);
 }
 
-export function syncStatusFor(board) {
-  if (!syncEnabled(board)) return { status: "disabled", message: "Sync is off" };
-  const queue = loadQueue();
-  if (queue.some((entry) => entry.boardId === board.id)) {
-    return { status: "offline", message: "Waiting to sync" };
-  }
-  if (board.sync.conflict) return { status: "conflict", message: "Sync conflict" };
-  return {
-    status: "synced",
-    message: board.sync.lastSyncedAt ? `Synced ${new Date(board.sync.lastSyncedAt).toLocaleTimeString()}` : "Not synced yet",
-  };
-}
-
 function requireConfig() {
   const config = loadSyncConfig();
   if (!config.token) {
-    throw new Error("Sign in to the sync server first");
+    const error = new Error("Sign in to the sync server first");
+    error.code = "not_signed_in";
+    throw error;
   }
   return { url: normalizeServerUrl(config.url), token: config.token };
 }
 
-async function api(pathname, { method = "GET", body } = {}) {
-  const config = requireConfig();
+function findServerToken(serverUrl) {
+  try {
+    const entries = JSON.parse(storage().getItem("ky.servers") || "[]");
+    if (!Array.isArray(entries)) return "";
+    const match = entries.find((entry) => {
+      if (!entry?.token || !entry?.url) return false;
+      try {
+        return normalizeServerUrl(entry.url) === serverUrl;
+      } catch {
+        return false;
+      }
+    });
+    return match?.token || "";
+  } catch {
+    return "";
+  }
+}
+
+// Each record remembers the server it belongs to. When several servers are saved this must win over
+// the last configured server, otherwise a queue could be posted to the wrong instance.
+function credentialsFor(serverUrl) {
+  const config = loadSyncConfig();
+  const target = serverUrl || (config.url ? normalizeServerUrl(config.url) : "");
+  if (!target) {
+    const error = new Error("Enter the server URL");
+    error.code = "not_signed_in";
+    throw error;
+  }
+  let token = config.token;
+  if (serverUrl && normalizeServerUrl(config.url || "") !== serverUrl) {
+    token = findServerToken(serverUrl);
+  }
+  if (!token) {
+    const error = new Error("Sign in to the sync server first");
+    error.code = "not_signed_in";
+    throw error;
+  }
+  return { url: target, token };
+}
+
+async function api(pathname, { method = "GET", body, serverUrl = "", timeoutMs = 20000 } = {}) {
+  const config = credentialsFor(serverUrl);
   let response;
   try {
     response = await fetch(config.url + pathname, {
@@ -304,8 +374,9 @@ async function api(pathname, { method = "GET", body } = {}) {
         ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     });
-  } catch (error) {
+  } catch {
     const offline = new Error("offline");
     offline.offline = true;
     throw offline;
@@ -327,7 +398,10 @@ async function api(pathname, { method = "GET", body } = {}) {
   return parsed;
 }
 
-const liveBases = new Map();
+// --- Durable queue and status -------------------------------------------------------------
+
+const runtime = new Map();
+const priming = new Set();
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -339,12 +413,846 @@ function documentFromBoard(board) {
   return copy;
 }
 
-function rememberBase(board, doc) {
-  if (!board || !doc) return;
-  const base = clone(doc);
-  delete base.sync;
-  liveBases.set(board.id, base);
+function serializedBoard(board) {
+  const copy = JSON.parse(JSON.stringify(board));
+  delete copy.sync;
+  return JSON.stringify(copy);
 }
+
+function boardPayload(record) {
+  return {
+    boardId: record.boardId,
+    projectId: record.projectId || "",
+    serverUrl: record.serverUrl || "",
+    doc: record.doc || null,
+    baseDoc: record.baseDoc || null,
+    revision: Number(record.revision || 0),
+    lastSeq: Number(record.lastSeq || 0),
+    fieldConflicts: Array.isArray(record.fieldConflicts) ? record.fieldConflicts : [],
+    lastSyncedAt: Number(record.lastSyncedAt || 0),
+    updatedAt: Date.now(),
+  };
+}
+
+function queuePayload(record) {
+  return {
+    queueKey: record.queueKey || queueKeyFor(record.boardId),
+    boardId: record.boardId,
+    tabId: record.tabId || TAB_ID,
+    projectId: record.projectId || "",
+    serverUrl: record.serverUrl || "",
+    pendingOps: Array.isArray(record.pendingOps) ? record.pendingOps : [],
+    attempts: Number(record.attempts || 0),
+    nextAttemptAt: Number(record.nextAttemptAt || 0),
+    lastError: String(record.lastError || ""),
+    failed: Boolean(record.failed),
+    conflict: Boolean(record.conflict),
+    updatedAt: Date.now(),
+  };
+}
+
+async function persistRecord(record) {
+  record.updatedAt = Date.now();
+  await localStore.saveRecord(boardPayload(record));
+  const queue = queuePayload(record);
+  if (queue.pendingOps.length || queue.failed || queue.conflict) {
+    await localStore.saveQueue(queue);
+  } else {
+    await localStore.deleteQueue(queue.queueKey);
+  }
+}
+
+function applyRecordToBoard(record) {
+  const board = record.boardRef;
+  if (!board || !board.sync) return;
+  board.sync = {
+    ...board.sync,
+    projectId: record.projectId,
+    revision: record.revision,
+    lastSeq: record.lastSeq,
+    lastSyncedAt: record.lastSyncedAt,
+    serverUrl: record.serverUrl || board.sync.serverUrl || "",
+  };
+  if (record.conflict) board.sync.conflict = true;
+  else delete board.sync.conflict;
+}
+
+function describeRecord(record, { ignoreFlight = false } = {}) {
+  const pending = record.pendingOps?.length || 0;
+  if (!ignoreFlight && record.inFlight) {
+    return {
+      status: "syncing",
+      message: `Syncing ${pending} change${pending === 1 ? "" : "s"}...`,
+      pending,
+    };
+  }
+  if (record.conflict) return { status: "conflict", message: "Sync conflict", pending };
+  if (record.failed) {
+    return {
+      status: "failed",
+      message: record.lastError ? `Sync failed: ${record.lastError}` : "Sync failed",
+      pending,
+    };
+  }
+  const fieldConflicts = record.fieldConflicts?.length || 0;
+  const conflictSuffix = fieldConflicts
+    ? ` · ${fieldConflicts} field conflict${fieldConflicts === 1 ? "" : "s"} kept local`
+    : "";
+  if (pending) {
+    const retryIn = Math.max(0, Math.ceil((Number(record.nextAttemptAt || 0) - Date.now()) / 1000));
+    if (record.lastError === "card_locked") {
+      return { status: "blocked", message: "Waiting for a card lock to clear", pending };
+    }
+    let detail = `${pending} change${pending === 1 ? "" : "s"} waiting`;
+    if (record.lastError === "offline") detail = `Offline · ${detail}`;
+    else if (record.lastError) detail = `${detail} · ${record.lastError}`;
+    if (retryIn > 0) detail += ` · retry in ${retryIn}s`;
+    return { status: "pending", message: detail, pending, fieldConflicts };
+  }
+  return {
+    status: "synced",
+    message: (record.lastSyncedAt
+      ? `Synced ${new Date(record.lastSyncedAt).toLocaleTimeString()}`
+      : "Not synced yet") + conflictSuffix,
+    pending: 0,
+    fieldConflicts,
+  };
+}
+
+export function syncStatusFor(board) {
+  if (!syncEnabled(board)) return { status: "disabled", message: "Sync is off" };
+  const record = runtime.get(board.id);
+  if (record) return describeRecord(record);
+  if (board.sync.conflict) return { status: "conflict", message: "Sync conflict" };
+  return {
+    status: "synced",
+    message: board.sync.lastSyncedAt
+      ? `Synced ${new Date(board.sync.lastSyncedAt).toLocaleTimeString()}`
+      : "Not synced yet",
+  };
+}
+
+export function pendingInfoFor(board) {
+  const record = board?.id ? runtime.get(board.id) : null;
+  if (!record) {
+    return {
+      pending: 0,
+      nextAttemptAt: 0,
+      lastError: "",
+      conflict: false,
+      fieldConflicts: [],
+      storage: localStore.storageKind(),
+    };
+  }
+  return {
+    pending: record.pendingOps.length,
+    nextAttemptAt: record.nextAttemptAt,
+    lastError: record.lastError,
+    conflict: Boolean(record.conflict),
+    fieldConflicts: Array.isArray(record.fieldConflicts) ? record.fieldConflicts : [],
+    storage: localStore.storageKind(),
+  };
+}
+
+function emitStatus(record) {
+  applyRecordToBoard(record);
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  window.dispatchEvent(
+    new CustomEvent("mn:sync-status", {
+      detail: { boardId: record.boardId, status: describeRecord(record) },
+    })
+  );
+}
+
+function fromPersisted(persisted, queue, board) {
+  const legacy = Array.isArray(persisted?.pendingOps) ? persisted.pendingOps : [];
+  const pendingOps = Array.isArray(queue?.pendingOps) && queue.pendingOps.length ? queue.pendingOps : legacy;
+  const record = {
+    ...(persisted || {}),
+    pendingOps,
+    fieldConflicts: Array.isArray(persisted?.fieldConflicts) ? persisted.fieldConflicts : [],
+    attempts: Number(queue?.attempts ?? persisted?.attempts ?? 0),
+    nextAttemptAt: Number(queue?.nextAttemptAt ?? persisted?.nextAttemptAt ?? 0),
+    lastError: String(queue?.lastError ?? persisted?.lastError ?? ""),
+    failed: Boolean(queue?.failed ?? persisted?.failed),
+    conflict: Boolean(queue?.conflict ?? persisted?.conflict),
+    tabId: TAB_ID,
+    queueKey: queue?.queueKey || queueKeyFor(persisted?.boardId || ""),
+    inFlight: null,
+    retryTimer: 0,
+    flushTimer: 0,
+    boardRef: board || null,
+  };
+  if (!record.doc && record.baseDoc) record.doc = applyBoardOperations(record.baseDoc, record.pendingOps);
+  if (!record.baseDoc && record.doc) record.baseDoc = clone(record.doc);
+  return record;
+}
+
+// Load a persisted record into memory once so the status pill reflects queued work right after a
+// reload, without waiting for the user to edit the board.
+export async function primeBoard(board) {
+  if (!syncEnabled(board) || runtime.has(board.id) || priming.has(board.id)) return null;
+  priming.add(board.id);
+  try {
+    const [persisted, queue] = await Promise.all([
+      localStore.loadRecord(board.id),
+      localStore.loadQueue(board.id, TAB_ID),
+    ]);
+    if (!persisted && !queue) return null;
+    if (runtime.has(board.id)) return describeRecord(runtime.get(board.id));
+    const record = fromPersisted(persisted, queue, board);
+    record.projectId = record.projectId || board.sync.projectId;
+    runtime.set(board.id, record);
+    emitStatus(record);
+    return describeRecord(record);
+  } finally {
+    priming.delete(board.id);
+  }
+}
+
+export async function readCachedBoard(boardId) {
+  const cached = runtime.get(boardId);
+  if (cached) return cached;
+  const [persisted, queue] = await Promise.all([
+    localStore.loadRecord(boardId),
+    localStore.loadQueue(boardId, TAB_ID),
+  ]);
+  return persisted || queue ? fromPersisted(persisted, queue, null) : null;
+}
+
+async function ensureAttached(board, info = {}) {
+  if (!board) throw new Error("No board is open");
+  if (!board.sync?.projectId && !info.projectId) {
+    throw new Error("Sync is not enabled for this board");
+  }
+  const existing = runtime.get(board.id);
+  if (existing) {
+    existing.boardRef = board;
+    if (info.projectId) existing.projectId = info.projectId;
+    if (info.serverUrl) existing.serverUrl = info.serverUrl;
+    return existing;
+  }
+  const [persisted, queue] = await Promise.all([
+    localStore.loadRecord(board.id),
+    localStore.loadQueue(board.id, TAB_ID),
+  ]);
+  const current = documentFromBoard(board);
+  let record;
+  if (persisted || queue) {
+    record = fromPersisted(persisted, queue, board);
+    record.doc = current;
+    if (info.projectId) record.projectId = info.projectId;
+    if (info.serverUrl) record.serverUrl = info.serverUrl;
+    if (!record.pendingOps.length) {
+      if (info.baseDoc) record.baseDoc = clone(info.baseDoc);
+      if (info.revision !== undefined) record.revision = Number(info.revision);
+      if (info.lastSeq !== undefined) record.lastSeq = Number(info.lastSeq);
+      if (info.lastSyncedAt) record.lastSyncedAt = Number(info.lastSyncedAt);
+    }
+  } else {
+    record = {
+      boardId: board.id,
+      projectId: info.projectId || board.sync.projectId,
+      serverUrl: info.serverUrl || "",
+      doc: current,
+      baseDoc: clone(info.baseDoc || current),
+      revision: Number(info.revision ?? board.sync.revision ?? 1),
+      lastSeq: Number(info.lastSeq ?? board.sync.lastSeq ?? 0),
+      pendingOps: [],
+      fieldConflicts: [],
+      attempts: 0,
+      nextAttemptAt: 0,
+      lastError: "",
+      failed: false,
+      conflict: false,
+      lastSyncedAt: Number(info.lastSyncedAt || Date.now()),
+      inFlight: null,
+      retryTimer: 0,
+      flushTimer: 0,
+      tabId: TAB_ID,
+      queueKey: queueKeyFor(board.id),
+      boardRef: board,
+    };
+  }
+  runtime.set(board.id, record);
+  await persistRecord(record);
+  emitStatus(record);
+  return record;
+}
+
+// Attach a freshly opened remote board to its durable mirror. When the cache still holds pending
+// operations they win over the server snapshot: the flush below replays the remote changes and then
+// resends the local patches, so neither side is dropped.
+export async function attachRemoteBoard(board, info = {}) {
+  const record = await ensureAttached(board, info);
+  const current = documentFromBoard(board);
+  record.doc = current;
+  record.boardRef = board;
+  if (info.projectId) record.projectId = info.projectId;
+  if (info.serverUrl) record.serverUrl = info.serverUrl;
+  if (!record.pendingOps.length) {
+    if (info.baseDoc) record.baseDoc = clone(info.baseDoc);
+    if (info.revision !== undefined) record.revision = Number(info.revision);
+    if (info.lastSeq !== undefined) record.lastSeq = Number(info.lastSeq);
+    if (info.lastSyncedAt) record.lastSyncedAt = Number(info.lastSyncedAt);
+  }
+  await persistRecord(record);
+  emitStatus(record);
+  return record;
+}
+
+// Capture local edits since the last capture as granular operations. This runs on every save, not
+// only after a failure, so the durable record is always the source of truth.
+export async function captureBoardChanges(board) {
+  if (!syncEnabled(board)) return { status: "disabled", captured: 0, pending: 0 };
+  const record = await ensureAttached(board);
+  const current = documentFromBoard(board);
+  const operations = diffBoardOperations(record.doc, current);
+  record.doc = current;
+  record.boardRef = board;
+  if (operations.length) {
+    for (const operation of operations) {
+      record.pendingOps.push({
+        opId: `op-${operationId()}`,
+        type: operation.type,
+        payload: operation.payload,
+        createdAt: Date.now(),
+      });
+    }
+    if (record.pendingOps.length > MAX_PENDING_OPS) {
+      record.pendingOps = [
+        {
+          opId: `op-${operationId()}`,
+          type: "doc.replace",
+          payload: { doc: clone(current) },
+          createdAt: Date.now(),
+        },
+      ];
+      record.lastError = "queue overflow";
+    }
+    record.failed = false;
+    if (!record.conflict) record.nextAttemptAt = 0;
+  }
+  await persistRecord(record);
+  emitStatus(record);
+  return {
+    status: operations.length ? "captured" : "unchanged",
+    captured: operations.length,
+    pending: record.pendingOps.length,
+  };
+}
+
+export function scheduleFlush(board, delayMs = 0) {
+  const record = board?.id ? runtime.get(board.id) : null;
+  if (!record) return false;
+  clearTimeout(record.flushTimer);
+  record.flushTimer = setTimeout(() => {
+    record.flushTimer = 0;
+    void flushRecord(record);
+  }, Math.max(0, Number(delayMs) || 0));
+  record.flushTimer.unref?.();
+  return true;
+}
+
+function backoffDelay(record) {
+  record.attempts = Number(record.attempts || 0) + 1;
+  return Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.min(record.attempts - 1, 5));
+}
+
+function scheduleRetry(record, delay) {
+  record.nextAttemptAt = Date.now() + delay;
+  clearTimeout(record.retryTimer);
+  record.retryTimer = setTimeout(() => {
+    record.retryTimer = 0;
+    void flushRecord(record);
+  }, delay);
+  record.retryTimer.unref?.();
+  void persistRecord(record).then(() => emitStatus(record));
+}
+
+async function markFailed(record, message) {
+  record.failed = true;
+  record.lastError = String(message || "Sync failed");
+  record.nextAttemptAt = 0;
+  clearTimeout(record.retryTimer);
+  record.retryTimer = 0;
+  await persistRecord(record);
+  emitStatus(record);
+}
+
+async function postOperations(record, batch) {
+  return api(`/api/v1/projects/${record.projectId}/ops`, {
+    serverUrl: record.serverUrl,
+    timeoutMs: 30000,
+    method: "POST",
+    body: {
+      baseSeq: Number(record.lastSeq || 0),
+      ops: batch.map((operation) => ({
+        opId: operation.opId,
+        type: operation.type,
+        payload: operation.payload,
+      })),
+    },
+  });
+}
+
+async function replayRecordOperations(record, after) {
+  let cursor = Number(after || 0);
+  const applied = [];
+  for (let page = 0; page < 10; page += 1) {
+    const data = await api(
+      `/api/v1/projects/${record.projectId}/ops?after=${encodeURIComponent(String(cursor))}&limit=500`,
+      { serverUrl: record.serverUrl }
+    );
+    applied.push(...(data.ops || []));
+    cursor = Number(data.lastSeq);
+    if (!data.hasMore) return { ops: applied, lastSeq: cursor, revision: data.revision };
+  }
+  return { ops: applied, lastSeq: cursor, revision: undefined };
+}
+
+// A rebase merges remote operations into the local base. The open editor must adopt the merged
+// document as well: otherwise the next save would diff against the merged base and emit inverse
+// operations (deleting the cards the server just added, reverting its edits).
+async function adoptRecordDocument(record) {
+  const board = record.boardRef;
+  if (!board || !record.doc) return;
+  const merged = clone(record.doc);
+  merged.id = board.id;
+  merged.sync = {
+    ...(board.sync || {}),
+    projectId: record.projectId,
+    revision: record.revision,
+    lastSeq: record.lastSeq,
+    lastSyncedAt: record.lastSyncedAt || Date.now(),
+    serverUrl: record.serverUrl || board.sync?.serverUrl || "",
+  };
+  for (const key of ["view", "grid", "showGrid", "theme"]) {
+    if (board[key] !== undefined) merged[key] = clone(board[key]);
+  }
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    try {
+      const store = await import("./store.js");
+      if (store.state?.board?.id === board.id) {
+        await store.adoptRemoteBoard(merged);
+        record.boardRef = store.state.board;
+        return;
+      }
+    } catch {
+      /* fall through to the in-place update used by the Node tests */
+    }
+  }
+  for (const key of ["title", "cards", "connections", "trash"]) {
+    board[key] = clone(merged[key]);
+  }
+  board.updatedAt = Date.now();
+  board.sync = merged.sync;
+}
+
+// Per-field view of the operations that touch card fields, keyed by `cardId|field`. A `*` field
+// means the whole card was added, replaced or deleted remotely.
+function fieldsOfOperations(operations) {
+  const fields = new Map();
+  for (const operation of operations || []) {
+    const payload = operation.payload || {};
+    const seq = Number(operation.seq || 0);
+    if (operation.type === "card.update" && payload.id && payload.patch) {
+      for (const [field, value] of Object.entries(payload.patch)) {
+        fields.set(`${payload.id}|${field}`, { cardId: payload.id, field, value, seq });
+      }
+    } else if (operation.type === "card.add" && payload.card?.id) {
+      for (const [field, value] of Object.entries(payload.card)) {
+        fields.set(`${payload.card.id}|${field}`, { cardId: payload.card.id, field, value, seq });
+      }
+    } else if (operation.type === "card.delete" && payload.id) {
+      fields.set(`${payload.id}|*`, { cardId: payload.id, field: "*", value: null, seq, deleted: true });
+    } else if (operation.type === "doc.replace" && Array.isArray(payload.doc?.cards)) {
+      for (const card of payload.doc.cards) {
+        if (card?.id) fields.set(`${card.id}|*`, { cardId: card.id, field: "*", value: null, seq });
+      }
+    }
+  }
+  return fields;
+}
+
+// Called before a rebase resends the local patches: the server order makes the local value win, so
+// this only records the overlap for the conflict notice and the "use server values" action.
+function detectFieldConflicts(record, remoteOperations) {
+  const remote = fieldsOfOperations(remoteOperations);
+  if (!remote.size) return [];
+  const pending = fieldsOfOperations(record.pendingOps);
+  const conflicts = [];
+  const seen = new Set();
+  for (const [key, local] of pending) {
+    let hit = remote.get(key);
+    if (!hit && local.field !== "*") hit = remote.get(`${local.cardId}|*`);
+    if (!hit && local.field === "*") {
+      for (const [remoteKey, value] of remote) {
+        if (!remoteKey.startsWith(`${local.cardId}|`)) continue;
+        hit = value;
+        break;
+      }
+    }
+    if (!hit) continue;
+    const id = `${local.cardId}|${local.field}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    conflicts.push({
+      cardId: local.cardId,
+      field: local.field,
+      remoteValue: hit.value === undefined ? null : hit.value,
+      remoteDeleted: Boolean(hit.deleted),
+      remoteSeq: Number(hit.seq || 0),
+    });
+    if (conflicts.length >= 50) break;
+  }
+  return conflicts;
+}
+
+async function rebaseFromRemote(record) {
+  const replay = await replayRecordOperations(record, record.lastSeq);
+  const conflicts = detectFieldConflicts(record, replay.ops);
+  if (conflicts.length) record.fieldConflicts = conflicts;
+  if (replay.ops.length) {
+    record.baseDoc = applyBoardOperations(record.baseDoc, replay.ops);
+  }
+  // Rebuild the local document from the merged server base plus the still-pending local operations.
+  // Applying the remote operations to the old local document instead would lose remote additions the
+  // local document never saw (for example a card added by another client).
+  record.doc = applyBoardOperations(record.baseDoc, record.pendingOps);
+  record.lastSeq = Number(replay.lastSeq);
+  if (replay.revision !== undefined) record.revision = Number(replay.revision);
+  await persistRecord(record);
+  applyRecordToBoard(record);
+  await adoptRecordDocument(record);
+}
+
+async function resyncFromSnapshot(record) {
+  const remote = await api(`/api/v1/projects/${record.projectId}`, { serverUrl: record.serverUrl });
+  let doc = {};
+  try {
+    doc = JSON.parse(remote.snapshot?.doc || "{}");
+  } catch {
+    doc = {};
+  }
+  doc.id = record.boardId;
+  record.baseDoc = doc;
+  record.lastSeq = Number(remote.project.lastSeq || 0);
+  record.revision = Number(remote.project.revision || 0);
+  record.doc = applyBoardOperations(doc, record.pendingOps);
+  await persistRecord(record);
+  applyRecordToBoard(record);
+  await adoptRecordDocument(record);
+}
+
+async function handleFlushFailure(record, error, replays) {
+  if (error?.offline) {
+    record.lastError = "offline";
+    scheduleRetry(record, backoffDelay(record));
+    return describeRecord(record, { ignoreFlight: true });
+  }
+  if (error?.code === "not_signed_in") {
+    await markFailed(record, error.message);
+    return describeRecord(record, { ignoreFlight: true });
+  }
+  if (error?.code === "seq_conflict") {
+    if (replays >= 3) {
+      await markFailed(record, "Could not resolve a sequence conflict");
+      return describeRecord(record, { ignoreFlight: true });
+    }
+    try {
+      await rebaseFromRemote(record);
+    } catch (replayError) {
+      if (replayError?.offline) {
+        record.lastError = "offline";
+        scheduleRetry(record, backoffDelay(record));
+        return describeRecord(record, { ignoreFlight: true });
+      }
+      await markFailed(record, replayError?.message || "Could not replay remote changes");
+      return describeRecord(record, { ignoreFlight: true });
+    }
+    if (record.pendingOps.some((operation) => operation.type === "doc.replace")) {
+      record.conflict = true;
+      record.lastError = "Both this board and the server changed";
+      await persistRecord(record);
+      emitStatus(record);
+      return describeRecord(record, { ignoreFlight: true });
+    }
+    return "retry";
+  }
+  if (error?.code === "card_locked") {
+    record.lastError = "card_locked";
+    scheduleRetry(record, RETRY_LOCKED_MS);
+    return describeRecord(record, { ignoreFlight: true });
+  }
+  if (error?.code === "resync_required") {
+    if (replays >= 3) {
+      await markFailed(record, "The operation log was pruned");
+      return describeRecord(record, { ignoreFlight: true });
+    }
+    try {
+      await resyncFromSnapshot(record);
+    } catch (resyncError) {
+      await markFailed(record, resyncError?.message || "Could not reload the server snapshot");
+      return describeRecord(record, { ignoreFlight: true });
+    }
+    if (record.pendingOps.some((operation) => operation.type === "doc.replace")) {
+      record.conflict = true;
+      record.lastError = "Both this board and the server changed";
+      await persistRecord(record);
+      emitStatus(record);
+      return describeRecord(record, { ignoreFlight: true });
+    }
+    return "retry";
+  }
+  const status = Number(error?.status || 0);
+  if (status === 400 || status === 413 || status === 422) {
+    if (replays < 1) {
+      try {
+        // A stale operation (for example an update for a card another client deleted) is retried once
+        // against a fresh snapshot; a normal edit then applies, an obsolete one fails visibly.
+        await resyncFromSnapshot(record);
+      } catch (resyncError) {
+        await markFailed(record, resyncError?.message || "Could not reload the server snapshot");
+        return describeRecord(record, { ignoreFlight: true });
+      }
+      return "retry";
+    }
+    await markFailed(record, error?.body?.error || error?.message || "The server rejected the change");
+    return describeRecord(record, { ignoreFlight: true });
+  }
+  if (!status || status >= 500) {
+    record.lastError = error?.message || "Network error";
+    scheduleRetry(record, backoffDelay(record));
+    return describeRecord(record, { ignoreFlight: true });
+  }
+  if (status === 401 || status === 403) {
+    await markFailed(record, error?.message || "The sync token was rejected");
+    return describeRecord(record, { ignoreFlight: true });
+  }
+  await markFailed(record, error?.message || "Sync failed");
+  return describeRecord(record, { ignoreFlight: true });
+}
+
+function flushRecord(record) {
+  if (record.inFlight) return record.inFlight;
+  clearTimeout(record.flushTimer);
+  record.flushTimer = 0;
+  clearTimeout(record.retryTimer);
+  record.retryTimer = 0;
+  const run = (async () => {
+    try {
+      if (record.conflict) return describeRecord(record, { ignoreFlight: true });
+      if (!record.pendingOps.length) {
+        return { status: "noop", pending: 0, lastSeq: record.lastSeq, revision: record.revision };
+      }
+      let replays = 0;
+      while (record.pendingOps.length) {
+        const batch = record.pendingOps.slice(0, MAX_BATCH_OPS);
+        let result;
+        try {
+          result = await postOperations(record, batch);
+        } catch (error) {
+          const outcome = await handleFlushFailure(record, error, replays);
+          if (outcome === "retry") {
+            replays += 1;
+            if (replays > 3) {
+              await markFailed(record, "Could not resolve a sequence conflict");
+              return describeRecord(record, { ignoreFlight: true });
+            }
+            continue;
+          }
+          return outcome;
+        }
+        record.baseDoc = applyBoardOperations(record.baseDoc, batch);
+        record.lastSeq = Number(result.lastSeq ?? record.lastSeq);
+        record.revision = Number(result.revision ?? record.revision);
+        record.pendingOps = record.pendingOps.slice(batch.length);
+        record.attempts = 0;
+        record.nextAttemptAt = 0;
+        record.lastError = "";
+        record.failed = false;
+        record.conflict = false;
+        record.lastSyncedAt = Date.now();
+        await persistRecord(record);
+        emitStatus(record);
+      }
+      return {
+        status: "pushed",
+        pending: 0,
+        lastSeq: record.lastSeq,
+        revision: record.revision,
+      };
+    } finally {
+      record.inFlight = null;
+      emitStatus(record);
+    }
+  })();
+  record.inFlight = run;
+  emitStatus(record);
+  return run;
+}
+
+export async function flushBoardNow(board) {
+  if (!syncEnabled(board)) return { status: "disabled" };
+  const record = await ensureAttached(board);
+  record.boardRef = board;
+  return flushRecord(record);
+}
+
+// Capture every local change and push immediately. Used when leaving a remote board or during an
+// explicit Sync now, where waiting for the debounce would lose work.
+export async function pushLiveChanges(board) {
+  if (!syncEnabled(board)) return { status: "disabled" };
+  await captureBoardChanges(board);
+  return flushBoardNow(board);
+}
+
+// Flush every board with queued work. The service may be reached again after a reload or after the
+// browser comes back online, so this is deliberately independent of the currently open board. Queues
+// left behind by another tab (or by a tab that was closed) are drained here as well.
+export async function flushQueue() {
+  const [records, queues] = await Promise.all([
+    localStore.listRecords().catch(() => []),
+    localStore.listQueues().catch(() => []),
+  ]);
+  const recordsById = new Map(records.map((entry) => [entry.boardId, entry]));
+  const ids = new Set([...recordsById.keys(), ...runtime.keys(), ...queues.map((queue) => queue.boardId)]);
+  let flushed = 0;
+  let remaining = 0;
+  for (const boardId of ids) {
+    let record = runtime.get(boardId);
+    if (!record) {
+      const persisted = recordsById.get(boardId);
+      const ownQueue = queues.find((queue) => queue.boardId === boardId && queue.tabId === TAB_ID) || null;
+      if (!persisted && !ownQueue) continue;
+      record = fromPersisted(persisted, ownQueue, null);
+      runtime.set(boardId, record);
+    }
+    if (record.conflict) {
+      remaining += 1;
+    } else if (record.pendingOps.length) {
+      const result = await flushRecord(record);
+      if (result.status === "pushed") flushed += 1;
+      else if (Number(result.pending || 0) > 0 || result.status === "conflict") remaining += 1;
+    }
+    for (const queue of queues) {
+      if (queue.boardId !== boardId || queue.tabId === TAB_ID) continue;
+      if (!Array.isArray(queue.pendingOps) || !queue.pendingOps.length) continue;
+      const temp = {
+        ...record,
+        tabId: queue.tabId,
+        queueKey: queue.queueKey,
+        pendingOps: queue.pendingOps,
+        attempts: Number(queue.attempts || 0),
+        lastError: String(queue.lastError || ""),
+        failed: Boolean(queue.failed),
+        conflict: Boolean(queue.conflict),
+        inFlight: null,
+        retryTimer: 0,
+        flushTimer: 0,
+        boardRef: null,
+      };
+      const result = await flushRecord(temp);
+      if (result.status === "pushed") {
+        flushed += 1;
+        await localStore.deleteQueue(queue.queueKey);
+      } else if (Number(result.pending || 0) > 0 || result.status === "conflict") {
+        remaining += 1;
+      }
+    }
+  }
+  return { flushed, remaining };
+}
+
+// Import a document that predates the durable mirror (legacy remote-temp) as operations: the diff is
+// taken against the last server document so the local edits are queued instead of silently dropped.
+export async function importLocalDocument(board, fromDocument = null) {
+  if (!syncEnabled(board)) return { status: "disabled", captured: 0, pending: 0 };
+  const record = await ensureAttached(board);
+  if (record.pendingOps.length) {
+    return { status: "unchanged", captured: 0, pending: record.pendingOps.length };
+  }
+  record.doc = clone(fromDocument || record.baseDoc || documentFromBoard(board));
+  await persistRecord(record);
+  return captureBoardChanges(board);
+}
+
+// Replace the locally kept values with the server values recorded during the conflict, then drop the
+// notice. The server already holds these values, so no further push is required.
+export async function applyServerFieldValues(board) {
+  if (!syncEnabled(board)) return { status: "disabled", applied: 0 };
+  const record = await ensureAttached(board);
+  const conflicts = Array.isArray(record.fieldConflicts) ? record.fieldConflicts : [];
+  let applied = 0;
+  for (const conflict of conflicts) {
+    if (conflict.remoteDeleted || conflict.field === "*") continue;
+    const card = (board.cards || []).find((entry) => entry.id === conflict.cardId);
+    if (!card) continue;
+    if (conflict.remoteValue === null) delete card[conflict.field];
+    else card[conflict.field] = clone(conflict.remoteValue);
+    applied += 1;
+  }
+  record.fieldConflicts = [];
+  await persistRecord(record);
+  emitStatus(record);
+  if (applied) board.updatedAt = Date.now();
+  // The server currently holds the value that won the rebase (our local one). Push the applied server
+  // values as a normal edit so both sides converge on the user's choice.
+  if (applied) {
+    await captureBoardChanges(board);
+    const result = await flushBoardNow(board);
+    return { status: result.status, applied };
+  }
+  return { status: "applied", applied };
+}
+
+export async function dismissFieldConflicts(board) {
+  if (!syncEnabled(board)) return { status: "disabled" };
+  const record = await ensureAttached(board);
+  record.fieldConflicts = [];
+  await persistRecord(record);
+  emitStatus(record);
+  return { status: "dismissed" };
+}
+
+// Escape hatch for a queue the server keeps rejecting (for example an edit for a card that no longer
+// exists, or an oversized doc.replace). Remote boards reload the server snapshot; local boards keep
+// their content but stop pushing the queued operations.
+export async function discardQueuedChanges(board) {
+  if (!syncEnabled(board)) return { status: "disabled" };
+  const record = await ensureAttached(board);
+  clearTimeout(record.retryTimer);
+  record.retryTimer = 0;
+  record.pendingOps = [];
+  record.fieldConflicts = [];
+  record.failed = false;
+  record.conflict = false;
+  record.lastError = "";
+  record.attempts = 0;
+  record.nextAttemptAt = 0;
+  record.doc = documentFromBoard(board);
+  await persistRecord(record);
+  await localStore.deleteBoardQueues(board.id);
+  emitStatus(record);
+  if (record.serverUrl) return pullBoard(board, { force: true });
+  return { status: "cleared", revision: record.revision };
+}
+
+export async function clearBoardState(boardId) {
+  const record = runtime.get(boardId);
+  if (record) {
+    clearTimeout(record.retryTimer);
+    clearTimeout(record.flushTimer);
+    record.retryTimer = 0;
+    record.flushTimer = 0;
+  }
+  runtime.delete(boardId);
+  await localStore.deleteRecord(boardId);
+  await localStore.deleteBoardQueues(boardId);
+}
+
+// --- Edit locks ---------------------------------------------------------------------------
 
 const editLocks = new Map();
 
@@ -359,6 +1267,7 @@ export async function acquireEditLock(board, cardId) {
   if (current) await releaseEditLock(board);
   try {
     const data = await api(`/api/v1/projects/${board.sync.projectId}/locks`, {
+      serverUrl: board.sync.serverUrl || "",
       method: "POST",
       body: { key: `card:${cardId}` },
     });
@@ -367,11 +1276,13 @@ export async function acquireEditLock(board, cardId) {
       token: data.token,
       timer: setInterval(() => {
         api(`/api/v1/projects/${board.sync.projectId}/locks`, {
+          serverUrl: board.sync.serverUrl || "",
           method: "POST",
           body: { key: `card:${cardId}`, token: data.token },
         }).catch(() => releaseEditLock(board));
       }, 10_000),
     };
+    lock.timer.unref?.();
     editLocks.set(board.id, lock);
     return lock;
   } catch (error) {
@@ -388,6 +1299,7 @@ export async function releaseEditLock(board) {
   editLocks.delete(board.id);
   try {
     await api(`/api/v1/projects/${board.sync.projectId}/locks`, {
+      serverUrl: board.sync.serverUrl || "",
       method: "DELETE",
       body: { key: `card:${current.cardId}`, token: current.token },
     });
@@ -396,9 +1308,7 @@ export async function releaseEditLock(board) {
   }
 }
 
-export function forgetLiveBase(boardId) {
-  liveBases.delete(boardId);
-}
+// --- Operation diff and apply -------------------------------------------------------------
 
 export function diffBoardOperations(from, to) {
   if (!from || !to) return [{ type: "doc.replace", payload: { doc: clone(to) } }];
@@ -424,13 +1334,24 @@ export function diffBoardOperations(from, to) {
       if (["id", "type"].includes(key)) continue;
       if (JSON.stringify(previous[key]) !== JSON.stringify(value)) patch[key] = clone(value);
     }
+    // A field that was removed locally (for example `delete card.headerImage`) has no key in the new
+    // card, so it must be sent as an explicit null tombstone or the server keeps the old value.
+    for (const key of Object.keys(previous)) {
+      if (["id", "type"].includes(key)) continue;
+      if (!(key in card)) patch[key] = null;
+    }
     if (Object.keys(patch).length) operations.push({ type: "card.update", payload: { id, patch } });
   }
   const connectionsChanged = JSON.stringify(from.connections || []) !== JSON.stringify(to.connections || []);
+  if (connectionsChanged) {
+    operations.push({ type: "connections.set", payload: { connections: clone(to.connections || []) } });
+  }
   const trashChanged = JSON.stringify(from.trash || []) !== JSON.stringify(to.trash || []);
   const otherKeys = ["parentId", "archivedAt"];
   const otherChanged = otherKeys.some((key) => JSON.stringify(from[key]) !== JSON.stringify(to[key]));
-  if (connectionsChanged || trashChanged || otherChanged) {
+  // Trash entries can contain whole card trees, so they still travel with the document. Connections
+  // have their own operation above, which keeps a connection edit from replacing unrelated cards.
+  if (trashChanged || otherChanged) {
     return [{ type: "doc.replace", payload: { doc: clone(to) } }];
   }
   if (!operations.length) return [];
@@ -455,6 +1376,8 @@ function applyOperationsToDocument(document, operations) {
       doc.cards = Array.isArray(payload.doc.cards) ? payload.doc.cards : [];
       doc.connections = Array.isArray(payload.doc.connections) ? payload.doc.connections : [];
       doc.trash = Array.isArray(payload.doc.trash) ? payload.doc.trash : [];
+    } else if (operation.type === "connections.set" && Array.isArray(payload.connections)) {
+      doc.connections = clone(payload.connections);
     } else if (operation.type === "doc.title") {
       doc.title = String(payload.title || "").slice(0, 200);
     } else if (operation.type === "card.add" && payload.card?.id) {
@@ -491,90 +1414,45 @@ function applyOperationsToDocument(document, operations) {
   return doc;
 }
 
-async function replayOperations(board, after) {
-  let cursor = after;
-  const applied = [];
-  for (let page = 0; page < 10; page += 1) {
-    const data = await api(
-      `/api/v1/projects/${board.sync.projectId}/ops?after=${encodeURIComponent(String(cursor))}&limit=500`
-    );
-    applied.push(...(data.ops || []));
-    cursor = Number(data.lastSeq);
-    if (!data.hasMore) return { ops: applied, lastSeq: cursor, revision: data.revision };
-  }
-  return { ops: applied, lastSeq: cursor, revision: undefined };
-}
-
-export async function pushLiveChanges(board) {
-  if (!syncEnabled(board)) return { status: "disabled" };
-  let base = liveBases.get(board.id);
-  if (!base) {
-    const remote = await api(`/api/v1/projects/${board.sync.projectId}`);
-    if (remote.snapshot?.doc) {
-      base = JSON.parse(remote.snapshot.doc);
-      base.id = board.id;
-      rememberBase(board, base);
-      board.sync.revision = Number(remote.project.revision);
-      board.sync.lastSeq = Number(remote.project.lastSeq || 0);
-    }
-  }
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const current = documentFromBoard(board);
-    const operations = diffBoardOperations(base, current);
-    if (!operations.length) {
-      return { status: "noop", lastSeq: Number(board.sync.lastSeq || 0) };
-    }
-    try {
-      const result = await api(`/api/v1/projects/${board.sync.projectId}/ops`, {
-        method: "POST",
-        body: {
-          baseSeq: Number(board.sync.lastSeq || 0),
-          ops: operations.map((operation) => ({
-            opId: `live-${crypto.randomUUID()}`,
-            ...operation,
-          })),
-        },
-      });
-      board.sync.revision = result.revision;
-      board.sync.lastSeq = result.lastSeq;
-      board.sync.lastSyncedAt = Date.now();
-      board.sync.conflict = null;
-      rememberBase(board, current);
-      clearQueue(board.id);
-      return { status: "pushed", ops: operations.length, lastSeq: result.lastSeq };
-    } catch (error) {
-      if (error.code !== "seq_conflict" || attempt >= 2) throw error;
-      const replay = await replayOperations(board, Number(board.sync.lastSeq || 0));
-      base = applyOperationsToDocument(base || {}, replay.ops);
-      rememberBase(board, base);
-      board.sync.lastSeq = replay.lastSeq;
-      if (replay.revision !== undefined) board.sync.revision = replay.revision;
-    }
-  }
-  return { status: "conflict", lastSeq: Number(board.sync.lastSeq || 0) };
-}
+// --- Remote operations, realtime and presence ---------------------------------------------
 
 export async function consumeRemoteOperations(board) {
   if (!syncEnabled(board)) return { status: "disabled" };
+  const record = await ensureAttached(board);
   try {
-    const replay = await replayOperations(board, Number(board.sync.lastSeq || 0));
-    if (!replay.ops.length) return { status: "current", lastSeq: replay.lastSeq };
-    const currentBase = liveBases.get(board.id) || documentFromBoard(board);
-    const nextBase = applyOperationsToDocument(currentBase, replay.ops);
-    rememberBase(board, nextBase);
-    board.sync.lastSeq = replay.lastSeq;
-    if (replay.revision !== undefined) board.sync.revision = replay.revision;
-    board.sync.lastSyncedAt = Date.now();
-    board.sync.conflict = null;
-    const doc = applyOperationsToDocument(documentFromBoard(board), replay.ops);
+    const replay = await replayRecordOperations(record, record.lastSeq);
+    if (!replay.ops.length) return { status: "current", lastSeq: record.lastSeq };
+    const conflicts = detectFieldConflicts(record, replay.ops);
+    if (conflicts.length) record.fieldConflicts = conflicts;
+    record.baseDoc = applyBoardOperations(record.baseDoc, replay.ops);
+    record.doc = applyBoardOperations(record.baseDoc, record.pendingOps);
+    record.lastSeq = Number(replay.lastSeq);
+    if (replay.revision !== undefined) record.revision = Number(replay.revision);
+    record.lastSyncedAt = Date.now();
+    record.conflict = false;
+    await persistRecord(record);
+    emitStatus(record);
+    const doc = applyBoardOperations(documentFromBoard(board), replay.ops);
     // Viewport/theme are per-device preferences, not shared board content.
     for (const key of ["view", "grid", "showGrid", "theme"]) {
       if (board[key] !== undefined) doc[key] = clone(board[key]);
     }
     doc.sync = { ...board.sync };
-    return { status: "applied", doc, lastSeq: replay.lastSeq };
+    return { status: "applied", doc, lastSeq: record.lastSeq };
   } catch (error) {
     if (error.code === "resync_required") {
+      if (record.pendingOps.length) {
+        // Keep the queued local edits: reload the snapshot and replay them on top instead of
+        // pulling (which would silently drop the queue).
+        await resyncFromSnapshot(record);
+        const doc = clone(record.doc);
+        doc.id = board.id;
+        for (const key of ["view", "grid", "showGrid", "theme"]) {
+          if (board[key] !== undefined) doc[key] = clone(board[key]);
+        }
+        doc.sync = { ...board.sync };
+        return { status: "resync", doc, lastSeq: record.lastSeq };
+      }
       const pulled = await pullBoard(board);
       return { status: "resync", doc: pulled.doc };
     }
@@ -582,170 +1460,11 @@ export async function consumeRemoteOperations(board) {
   }
 }
 
-function serializedBoard(board) {
-  const copy = JSON.parse(JSON.stringify(board));
-  delete copy.sync;
-  return JSON.stringify(copy);
-}
-
-function loadQueue() {
-  try {
-    return JSON.parse(storage().getItem(QUEUE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveQueue(queue) {
-  storage().setItem(QUEUE_KEY, JSON.stringify(queue.slice(-MAX_QUEUE)));
-}
-
-function enqueue(board) {
-  if (!syncEnabled(board)) return;
-  const queue = loadQueue().filter((entry) => entry.boardId !== board.id);
-  queue.push({
-    boardId: board.id,
-    projectId: board.sync.projectId,
-    baseRevision: board.sync.revision,
-    baseSeq: Number(board.sync.lastSeq || 0),
-    doc: serializedBoard(board),
-    queuedAt: Date.now(),
-  });
-  saveQueue(queue);
-}
-
-export function clearQueue(boardId) {
-  saveQueue(loadQueue().filter((entry) => entry.boardId !== boardId));
-}
-
-export async function enableBoardSync(board) {
-  if (!board) throw new Error("No board is open");
-  const config = requireConfig();
-  void config;
-  if (!board.sync?.projectId) {
-    let parentProjectId = null;
-    if (board.parentId) {
-      try {
-        const parentRaw = await bridge.loadBoard(board.parentId);
-        const parent = parentRaw ? JSON.parse(parentRaw) : null;
-        parentProjectId = parent?.sync?.projectId || null;
-      } catch {
-        parentProjectId = null;
-      }
-    }
-    const created = await api("/api/v1/projects", {
-      method: "POST",
-      body: { title: board.title || "Untitled board", parentProjectId },
-    });
-    board.sync = {
-      projectId: created.id,
-      revision: created.revision || 1,
-      lastSeq: 0,
-      lastSyncedAt: 0,
-    };
-  }
-  return pushBoard(board);
-}
-
-export async function pushBoard(board) {
-  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
-  const baseSeq = Number(board.sync.lastSeq || 0);
-  const result = await api(`/api/v1/projects/${board.sync.projectId}/ops`, {
-    method: "POST",
-    body: {
-      baseSeq,
-      ops: [
-        {
-          opId: `client-${crypto.randomUUID()}`,
-          type: "doc.replace",
-          payload: { doc: JSON.parse(serializedBoard(board)) },
-        },
-      ],
-    },
-  });
-  board.sync.revision = result.revision;
-  board.sync.lastSeq = result.lastSeq;
-  board.sync.lastSyncedAt = Date.now();
-  board.sync.conflict = null;
-  rememberBase(board, board);
-  clearQueue(board.id);
-  return { status: "pushed", revision: result.revision, lastSeq: result.lastSeq };
-}
-
-export async function pullBoard(board) {
-  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
-  const remote = await api(`/api/v1/projects/${board.sync.projectId}`);
-  if (!remote.snapshot || !remote.snapshot.doc) return { status: "empty" };
-  const revision = Number(remote.project.revision);
-  if (revision <= board.sync.revision) return { status: "current", revision };
-  const doc = JSON.parse(remote.snapshot.doc);
-  doc.id = board.id;
-  doc.sync = {
-    ...board.sync,
-    revision,
-    lastSeq: Number(remote.project.lastSeq ?? board.sync.lastSeq ?? 0),
-    lastSyncedAt: Date.now(),
-    conflict: null,
-  };
-  rememberBase(board, doc);
-  return { status: "pulled", revision, doc };
-}
-
-async function forcePushAtCurrentRevision(board) {
-  const remote = await api(`/api/v1/projects/${board.sync.projectId}`);
-  board.sync.revision = Number(remote.project.revision);
-  return pushBoard(board);
-}
-
-export async function resolveSyncConflict(board, choice) {
-  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
-  if (choice === "server") return pullBoard(board);
-  if (choice === "local") return forcePushAtCurrentRevision(board);
-  throw new Error("Unknown conflict choice");
-}
-
-export async function syncBoard(board) {
-  if (!board) return { status: "disabled" };
-  if (!syncEnabled(board)) return { status: "disabled" };
-  const remote = await api(`/api/v1/projects/${board.sync.projectId}`);
-  const remoteRevision = Number(remote.project.revision);
-  const baseRevision = Number(board.sync.revision || 0);
-  const localChanged = Number(board.updatedAt || 0) > Number(board.sync.lastSyncedAt || 0);
-  if (remoteRevision <= baseRevision) {
-    if (localChanged) {
-      try {
-        return await pushBoard(board);
-      } catch (error) {
-        if (error.code !== "seq_conflict") throw error;
-        const latest = await api(`/api/v1/projects/${board.sync.projectId}`);
-        return {
-          status: "conflict",
-          remoteRevision: Number(latest.project.revision),
-          baseRevision,
-          remoteDoc: latest.snapshot?.doc ? JSON.parse(latest.snapshot.doc) : null,
-        };
-      }
-    }
-    return { status: "current", revision: baseRevision };
-  }
-  if (!localChanged) return pullBoard(board);
-  return {
-    status: "conflict",
-    remoteRevision,
-    baseRevision,
-    remoteDoc: remote.snapshot?.doc ? JSON.parse(remote.snapshot.doc) : null,
-  };
-}
-
-export async function fetchOps(board, after = 0) {
-  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
-  return api(`/api/v1/projects/${board.sync.projectId}/ops?after=${encodeURIComponent(String(after))}`);
-}
-
 export async function sendPresence(board, connectionId, cursor, name = "") {
   if (!syncEnabled(board) || !connectionId) return false;
   try {
     await api(`/api/v1/projects/${board.sync.projectId}/presence`, {
+      serverUrl: board.sync.serverUrl || "",
       method: "POST",
       body: { connectionId, name, cursor },
     });
@@ -760,8 +1479,9 @@ export async function sendPresence(board, connectionId, cursor, name = "") {
 export async function openRealtime(board, { onUpdate, onStatus, onReady } = {}) {
   if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
   if (typeof EventSource === "undefined") return { close() {}, supported: false };
-  const config = requireConfig();
+  const config = credentialsFor(board.sync.serverUrl || "");
   const ticket = await api(`/api/v1/projects/${board.sync.projectId}/realtime-ticket`, {
+    serverUrl: board.sync.serverUrl || "",
     method: "POST",
   });
   const source = new EventSource(
@@ -791,36 +1511,189 @@ export async function openRealtime(board, { onUpdate, onStatus, onReady } = {}) 
   return handle;
 }
 
-export async function flushQueue() {
-  const queue = loadQueue();
-  if (!queue.length) return { flushed: 0 };
-  const remaining = [];
-  let flushed = 0;
-  for (const entry of queue) {
-    try {
-      const result = await api(`/api/v1/projects/${entry.projectId}/ops`, {
-        method: "POST",
-        body: {
-          baseSeq: Number(entry.baseSeq || 0),
-          ops: [
-            {
-              opId: `offline-${crypto.randomUUID()}`,
-              type: "doc.replace",
-              payload: { doc: JSON.parse(entry.doc) },
-            },
-          ],
-        },
-      });
-      void result;
-      flushed += 1;
-    } catch {
-      remaining.push(entry);
-    }
-  }
-  saveQueue(remaining);
-  return { flushed, remaining: remaining.length };
+// --- Manual sync and conflicts -------------------------------------------------------------
+
+export async function fetchOps(board, after = 0) {
+  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
+  return api(`/api/v1/projects/${board.sync.projectId}/ops?after=${encodeURIComponent(String(after))}`);
 }
 
-export function enqueueForOffline(board) {
-  enqueue(board);
+export async function enableBoardSync(board) {
+  if (!board) throw new Error("No board is open");
+  requireConfig();
+  if (!board.sync?.projectId) {
+    let parentProjectId = null;
+    if (board.parentId) {
+      try {
+        const parentRaw = await bridgeLoadBoard(board.parentId);
+        const parent = parentRaw ? JSON.parse(parentRaw) : null;
+        parentProjectId = parent?.sync?.projectId || null;
+      } catch {
+        parentProjectId = null;
+      }
+    }
+    const created = await api("/api/v1/projects", {
+      method: "POST",
+      body: { title: board.title || "Untitled board", parentProjectId },
+    });
+    board.sync = {
+      projectId: created.id,
+      revision: created.revision || 1,
+      lastSeq: 0,
+      lastSyncedAt: 0,
+    };
+  }
+  await attachRemoteBoard(board, {
+    projectId: board.sync.projectId,
+    revision: board.sync.revision,
+    lastSeq: board.sync.lastSeq,
+    baseDoc: documentFromBoard(board),
+  });
+  return pushBoard(board);
+}
+
+async function bridgeLoadBoard(boardId) {
+  const bridge = await import("./bridge.js");
+  return bridge.loadBoard(boardId);
+}
+
+export async function pushBoard(board) {
+  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
+  const record = await ensureAttached(board);
+  const baseSeq = Number(record.lastSeq || 0);
+  const doc = JSON.parse(serializedBoard(board));
+  const pendingBefore = record.pendingOps.length;
+  const result = await api(`/api/v1/projects/${record.projectId}/ops`, {
+    serverUrl: record.serverUrl,
+    timeoutMs: 30000,
+    method: "POST",
+    body: {
+      baseSeq,
+      ops: [
+        {
+          opId: `client-${operationId()}`,
+          type: "doc.replace",
+          payload: { doc },
+        },
+      ],
+    },
+  });
+  // Operations captured while the request was in flight are newer than the pushed document and
+  // must stay queued.
+  record.pendingOps = record.pendingOps.slice(pendingBefore);
+  record.doc = documentFromBoard(board);
+  record.baseDoc = clone(doc);
+  record.revision = Number(result.revision ?? record.revision);
+  record.lastSeq = Number(result.lastSeq ?? record.lastSeq);
+  record.lastSyncedAt = Date.now();
+  record.conflict = false;
+  record.failed = false;
+  record.lastError = "";
+  record.fieldConflicts = [];
+  record.attempts = 0;
+  record.nextAttemptAt = 0;
+  await persistRecord(record);
+  emitStatus(record);
+  if (record.pendingOps.length) scheduleFlush(board, 100);
+  return { status: "pushed", revision: record.revision, lastSeq: record.lastSeq };
+}
+
+export async function pullBoard(board, { force = false } = {}) {
+  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
+  const record = await ensureAttached(board);
+  const remote = await api(`/api/v1/projects/${record.projectId}`, { serverUrl: record.serverUrl });
+  if (!remote.snapshot || !remote.snapshot.doc) return { status: "empty" };
+  const revision = Number(remote.project.revision);
+  if (!force && revision <= record.revision) return { status: "current", revision };
+  const doc = JSON.parse(remote.snapshot.doc);
+  doc.id = board.id;
+  const document = documentFromBoard(doc);
+  record.doc = clone(document);
+  record.baseDoc = clone(document);
+  record.pendingOps = [];
+  record.revision = revision;
+  record.lastSeq = Number(remote.project.lastSeq ?? record.lastSeq ?? 0);
+  record.lastSyncedAt = Date.now();
+  record.conflict = false;
+  record.failed = false;
+  record.lastError = "";
+  record.fieldConflicts = [];
+  await persistRecord(record);
+  emitStatus(record);
+  doc.sync = {
+    ...board.sync,
+    revision,
+    lastSeq: record.lastSeq,
+    lastSyncedAt: record.lastSyncedAt,
+    conflict: null,
+  };
+  return { status: "pulled", revision, doc };
+}
+
+export async function syncBoard(board) {
+  if (!board || !syncEnabled(board)) return { status: "disabled" };
+  const record = await ensureAttached(board);
+  record.boardRef = board;
+  // Capture unsaved-but-not-yet-queued edits so a manual sync also merges per operation.
+  if (!record.conflict) await captureBoardChanges(board);
+  if (record.pendingOps.length) return flushRecord(record);
+  const remote = await api(`/api/v1/projects/${record.projectId}`, { serverUrl: record.serverUrl });
+  const remoteRevision = Number(remote.project.revision);
+  const baseRevision = Number(record.revision || board.sync.revision || 0);
+  const localChanged = Number(board.updatedAt || 0) > Number(record.lastSyncedAt || 0);
+  if (remoteRevision <= baseRevision) {
+    if (localChanged) {
+      try {
+        return await pushBoard(board);
+      } catch (error) {
+        if (error.code !== "seq_conflict") throw error;
+        const latest = await api(`/api/v1/projects/${record.projectId}`, { serverUrl: record.serverUrl });
+        record.conflict = true;
+        await persistRecord(record);
+        emitStatus(record);
+        return {
+          status: "conflict",
+          remoteRevision: Number(latest.project.revision),
+          baseRevision,
+          remoteDoc: latest.snapshot?.doc ? JSON.parse(latest.snapshot.doc) : null,
+        };
+      }
+    }
+    return { status: "current", revision: baseRevision };
+  }
+  if (!localChanged) return pullBoard(board);
+  record.conflict = true;
+  await persistRecord(record);
+  emitStatus(record);
+  return {
+    status: "conflict",
+    remoteRevision,
+    baseRevision,
+    remoteDoc: remote.snapshot?.doc ? JSON.parse(remote.snapshot.doc) : null,
+  };
+}
+
+async function forcePushAtCurrentRevision(board) {
+  const record = await ensureAttached(board);
+  record.conflict = false;
+  await rebaseFromRemote(record);
+  return pushBoard(board);
+}
+
+export async function resolveSyncConflict(board, choice) {
+  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
+  if (choice === "server") return pullBoard(board, { force: true });
+  if (choice === "local") return forcePushAtCurrentRevision(board);
+  throw new Error("Unknown conflict choice");
+}
+
+// Test-only hook: drop in-memory state (timers included) without touching persisted records, so a
+// suite can exercise a reload.
+export function _resetRuntimeForTests() {
+  for (const record of runtime.values()) {
+    clearTimeout(record.retryTimer);
+    clearTimeout(record.flushTimer);
+  }
+  runtime.clear();
+  priming.clear();
 }

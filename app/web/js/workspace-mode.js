@@ -282,43 +282,85 @@ function renderWorkspaceRows(server, workspaces, target, view) {
   }
 }
 
+const PROJECTS_CACHE_KEY = "ky.workspaceProjects";
+
+function projectCacheKey(serverUrl, workspaceId) {
+  return `${serverUrl}|${workspaceId}`;
+}
+
+function readProjectCache(serverUrl, workspaceId) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROJECTS_CACHE_KEY) || "{}");
+    const entry = all[projectCacheKey(serverUrl, workspaceId)];
+    return Array.isArray(entry?.projects) ? entry.projects : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProjectCache(serverUrl, workspaceId, projects) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROJECTS_CACHE_KEY) || "{}");
+    all[projectCacheKey(serverUrl, workspaceId)] = { projects, at: Date.now() };
+    localStorage.setItem(PROJECTS_CACHE_KEY, JSON.stringify(all));
+  } catch {
+    /* cache is optional */
+  }
+}
+
+function renderProjectRows(target, server, workspace, projects, root, view, { stale = false } = {}) {
+  target.innerHTML = `<div class="mn-workspace-popover-actions"><button type="button" class="mn-btn" data-role="workspace-members">Members</button><button type="button" class="mn-btn" data-role="workspace-invite">Invite</button></div>${
+    stale ? `<p class="mn-workspace-form-error" style="padding:8px 8px 0">Server unreachable. Showing the last known boards.</p>` : ""
+  }<div class="mn-workspace-popover-boards">${
+    projects.length
+      ? projects
+          .map(
+            (project) =>
+              `<button type="button" class="mn-workspace-popover-board" data-project="${escapeText(
+                project.id
+              )}"><strong>${escapeText(project.name || "Untitled board")}</strong><span>${escapeText(
+                project.role || "viewer"
+              )} · revision ${escapeText(project.revision ?? 1)}</span></button>`
+          )
+          .join("")
+      : `<p class="mn-server-note" style="padding:8px">No boards in this workspace.</p>`
+  }</div>`;
+  target
+    .querySelector('[data-role="workspace-members"]')
+    ?.addEventListener("click", () => void openWorkspaceMembers(server, workspace));
+  target
+    .querySelector('[data-role="workspace-invite"]')
+    ?.addEventListener("click", () => void openWorkspaceInvite(server, workspace, root));
+  for (const button of target.querySelectorAll("[data-project]")) {
+    const project = projects.find((entry) => entry.id === button.dataset.project);
+    button.addEventListener("click", () => {
+      if (["owner", "editor"].includes(String(project.role || ""))) {
+        void openEditableBoard(server, project, server.token);
+      } else {
+        closePopover();
+        void openBoard(server, project, server.token);
+      }
+    });
+  }
+}
+
 async function loadWorkspaceBoards(server, workspace, root, view) {
   const target = root.querySelector('[data-role="workspace-detail"]');
   if (!target) return;
-  target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading boards...</p>`;
+  const cached = readProjectCache(server.url, workspace.id);
+  if (cached) renderProjectRows(target, server, workspace, cached, root, view, { stale: true });
+  else target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading boards...</p>`;
   try {
     const data = await withTimeout(
       jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/boards`, {}, server.token)
     );
     const projects = data.projects || [];
-    target.innerHTML = `<div class="mn-workspace-popover-actions"><button type="button" class="mn-btn" data-role="workspace-members">Members</button><button type="button" class="mn-btn" data-role="workspace-invite">Invite</button></div><div class="mn-workspace-popover-boards">${
-      projects.length
-        ? projects
-            .map(
-              (project) =>
-                `<button type="button" class="mn-workspace-popover-board" data-project="${escapeText(
-                  project.id
-                )}"><strong>${escapeText(project.name || "Untitled board")}</strong><span>${escapeText(
-                  project.role || "viewer"
-                )} · revision ${escapeText(project.revision ?? 1)}</span></button>`
-            )
-            .join("")
-        : `<p class="mn-server-note" style="padding:8px">No boards in this workspace.</p>`
-    }</div>`;
-    target.querySelector('[data-role="workspace-members"]')?.addEventListener("click", () => void openWorkspaceMembers(server, workspace));
-    target.querySelector('[data-role="workspace-invite"]')?.addEventListener("click", () => void openWorkspaceInvite(server, workspace, root));
-    for (const button of target.querySelectorAll("[data-project]")) {
-      const project = projects.find((entry) => entry.id === button.dataset.project);
-      button.addEventListener("click", () => {
-        if (["owner", "editor"].includes(String(project.role || ""))) void openEditableBoard(server, project, server.token);
-        else {
-          closePopover();
-          void openBoard(server, project, server.token);
-        }
-      });
-    }
+    writeProjectCache(server.url, workspace.id, projects);
+    renderProjectRows(target, server, workspace, projects, root, view);
   } catch (error) {
-    target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
+    if (!cached) {
+      target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
+    }
   }
 }
 
@@ -483,40 +525,148 @@ function renderBoard(container, doc) {
     .join("")}</div>`;
 }
 
+function parseSnapshotDoc(data, projectId) {
+  let doc = {};
+  try {
+    doc = JSON.parse(data.snapshot?.doc || "{}");
+  } catch {
+    doc = {};
+  }
+  doc.id = projectId;
+  return doc;
+}
+
+async function loadProjectDocument(server, project, token) {
+  const data = await jsonFetch(`${server.url}/api/v1/projects/${encodeURIComponent(project.id)}`, {}, token);
+  return {
+    doc: parseSnapshotDoc(data, project.id),
+    revision: Number(data.project?.revision ?? project.revision) || 1,
+    lastSeq: Number(data.project?.lastSeq ?? project.lastSeq ?? 0),
+    serverUrl: server.url,
+  };
+}
+
 async function openEditableBoard(server, project, token) {
   closePopover();
   const view = ensureBoardOverlay();
   view.querySelector('[data-role="title"]').textContent = project.name || "Board";
   const content = view.querySelector('[data-role="content"]');
   content.innerHTML = `<p class="mn-server-empty">Opening editable board...</p>`;
+  const [store, sync, syncUi, remoteTemp, syncStore] = await Promise.all([
+    import("./store.js"),
+    import("./sync.js"),
+    import("./sync-ui.js"),
+    import("./remote-temp.js"),
+    import("./sync-store.js"),
+  ]);
+  let cached = null;
   try {
-    const data = await jsonFetch(`${server.url}/api/v1/projects/${encodeURIComponent(project.id)}`, {}, token);
-    let doc = JSON.parse(data.snapshot?.doc || "{}");
-    doc.id = project.id;
-    const [store, sync, syncUi, remoteTemp] = await Promise.all([
-      import("./store.js"),
-      import("./sync.js"),
-      import("./sync-ui.js"),
-      import("./remote-temp.js"),
-    ]);
-    const pending = remoteTemp.readRemoteTemp(project.id);
-    if (pending?.board?.id === project.id) doc = pending.board;
+    cached = await syncStore.loadRecord(project.id);
+  } catch {
+    cached = null;
+  }
+  let doc;
+  let revision;
+  let lastSeq;
+  let baseDoc;
+  let offline = false;
+  try {
+    // A dead tunnel must not hang boot or the workspace popover; the cache is the fallback.
+    const remote = await withTimeout(loadProjectDocument(server, project, token), 10000);
+    baseDoc = remote.doc;
+    revision = remote.revision;
+    lastSeq = remote.lastSeq;
+    // Pending local operations win over the server snapshot; the flush replays the server changes
+    // first and then resends the local patches.
+    doc = cached?.pendingOps?.length && cached.doc ? cached.doc : remote.doc;
+  } catch (error) {
+    if (!cached?.doc) {
+      content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message)}</p>`;
+      return;
+    }
+    doc = cached.doc;
+    revision = Number(cached.revision) || 1;
+    lastSeq = Number(cached.lastSeq) || 0;
+    baseDoc = cached.baseDoc;
+    offline = true;
+  }
+  const pending = remoteTemp.readRemoteTemp(project.id);
+  const legacyDocument = pending?.board?.id === project.id ? pending.board : null;
+  if (legacyDocument) doc = legacyDocument;
+  try {
     await store.openRemoteBoard(doc, {
       projectId: project.id,
-      revision: Number(project.revision) || 1,
-      lastSeq: Number(data.project?.lastSeq || project.lastSeq || 0),
-      lastSyncedAt: Date.now(),
+      revision,
+      lastSeq,
+      lastSyncedAt: Number(cached?.lastSyncedAt) || Date.now(),
     });
     sync.saveSyncConfig({ url: server.url, email: server.email || "", token });
-    const pushed = await sync.pushLiveChanges(store.state.board);
+    await sync.attachRemoteBoard(store.state.board, {
+      projectId: project.id,
+      revision,
+      lastSeq,
+      baseDoc,
+      serverUrl: server.url,
+    });
+    localStorage.setItem("ky.lastBoard", project.id);
+    if (legacyDocument) {
+      // A temporary copy from an older build is diffed into operations against the server document.
+      try {
+        await sync.importLocalDocument(store.state.board, baseDoc || cached?.baseDoc || doc);
+      } catch {
+        /* the normal capture below still runs */
+      }
+    }
+    let pushed = { status: "pending" };
+    try {
+      pushed = await sync.flushBoardNow(store.state.board);
+    } catch {
+      pushed = { status: "pending" };
+    }
     if (pushed.status === "pushed" || pushed.status === "noop") remoteTemp.clearRemoteTemp(project.id);
     view.remove();
     boardOverlay = null;
     syncUi.refresh();
-    window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Opened team board" } }));
+    const message = offline
+      ? "Opened the cached board (offline); changes will sync later"
+      : pushed.status === "pushed" || pushed.status === "noop"
+        ? "Opened team board"
+        : "Opened team board; changes are queued";
+    window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message } }));
   } catch (error) {
     content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message)}</p>`;
   }
+}
+
+// Reopen the last remote workspace board after a reload, using the durable local mirror offline.
+export async function openCachedBoard(boardId) {
+  if (!boardId) return false;
+  let syncStore;
+  try {
+    syncStore = await import("./sync-store.js");
+  } catch {
+    return false;
+  }
+  const record = await syncStore.loadRecord(boardId).catch(() => null);
+  if (!record?.doc || !record.projectId) return false;
+  const sync = await import("./sync.js");
+  const config = sync.loadSyncConfig();
+  const serverUrl = normalizeUrl(record.serverUrl || config.url);
+  const token =
+    servers().find((entry) => normalizeUrl(entry.url) === serverUrl)?.token || config.token || "";
+  if (!serverUrl || !token) return false;
+  const server = {
+    url: serverUrl,
+    token,
+    email: config.email || "",
+    name: new URL(serverUrl).host,
+  };
+  await openEditableBoard(
+    server,
+    { id: record.projectId, name: record.doc.title || "Board", revision: record.revision },
+    token
+  );
+  return true;
 }
 
 async function openBoard(server, project, token = "") {

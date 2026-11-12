@@ -2,7 +2,19 @@
 // applied to the JSON document inside the same transaction that allocates their sequence numbers.
 export const MAX_OPS_PER_BATCH = 200;
 export const MAX_OP_BYTES = 256 * 1024;
-export const OP_TYPES = new Set(["doc.replace", "doc.title", "card.add", "card.update", "card.delete", "card.move"]);
+// A whole-document replacement or the connection list can legitimately be larger than one card
+// patch; the request body already caps the batch at 8 MB.
+export const MAX_BULK_OP_BYTES = 4 * 1024 * 1024;
+const BULK_OP_TYPES = new Set(["doc.replace", "connections.set"]);
+export const OP_TYPES = new Set([
+  "doc.replace",
+  "doc.title",
+  "card.add",
+  "card.update",
+  "card.delete",
+  "card.move",
+  "connections.set",
+]);
 
 export class OpError extends Error {
   constructor(message, code = "op_invalid") {
@@ -56,6 +68,15 @@ export function applyOperation(doc, operation) {
       doc.cards = next.cards;
       doc.connections = Array.isArray(next.connections) ? next.connections : [];
       doc.trash = Array.isArray(next.trash) ? next.trash : [];
+      break;
+    }
+    case "connections.set": {
+      if (!Array.isArray(payload.connections)) throw new OpError("payload.connections must be an array");
+      if (payload.connections.length > 5000) throw new OpError("too many connections", "op_too_large");
+      doc.connections = payload.connections.map((connection) => {
+        if (!connection || typeof connection !== "object") throw new OpError("connection must be an object");
+        return connection;
+      });
       break;
     }
     case "doc.title": {
@@ -132,7 +153,8 @@ export function validateOperations(ops) {
     const type = String(op.type || "");
     if (!OP_TYPES.has(type)) throw new OpError(`unsupported operation type ${type}`, "op_invalid");
     assertObject(op.payload, "payload");
-    if (Buffer.byteLength(JSON.stringify(op.payload), "utf8") > MAX_OP_BYTES) {
+    const limit = BULK_OP_TYPES.has(type) ? MAX_BULK_OP_BYTES : MAX_OP_BYTES;
+    if (Buffer.byteLength(JSON.stringify(op.payload), "utf8") > limit) {
       throw new OpError("operation payload is too large", "op_too_large");
     }
   }

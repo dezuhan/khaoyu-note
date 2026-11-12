@@ -126,6 +126,13 @@ async function boot() {
     if (next) await openBoard(next.id);
     else await createBoard("Home", { withWelcome: true });
   }
+  // A remote workspace board has no SQLite row, so reopen it from the durable local mirror. This
+  // also works offline; queued changes stay in the sync queue until the server is reachable.
+  const preferredRemote = requested || last;
+  if (preferredRemote && !state.boards.some((board) => board.id === preferredRemote)) {
+    const { openCachedBoard } = await import("./workspace-mode.js");
+    await openCachedBoard(preferredRemote);
+  }
   syncBoardUrl();
   render("board");
   renderView();

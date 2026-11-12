@@ -28,6 +28,7 @@
     "service:restore": "node service/src/cli.mjs restore",
     "test:service": "node --test --test-concurrency=1 service/test/service.test.mjs service/test/auth.test.mjs service/test/admin.test.mjs service/test/storage.test.mjs service/test/storage-migrations.test.mjs service/test/postgres-runtime.test.mjs service/test/redis-bus.test.mjs service/test/config.test.mjs service/test/sanitize.test.mjs service/test/object-encryption.test.mjs service/test/worker.test.mjs service/test/collab-ops.test.mjs service/test/coordination.test.mjs",
     "test:sync": "node --no-warnings tools/test-sync.mjs",
+    "test:sync-remote": "node --no-warnings tools/test-sync-remote.mjs http://127.0.0.1:1430/",
     "test:update": "node --no-warnings tools/test-update.mjs",
     "test:auto-backup": "node --no-warnings tools/test-auto-backup.mjs",
     "test:disabled-cards": "node --no-warnings tools/test-disabled-cards.mjs",

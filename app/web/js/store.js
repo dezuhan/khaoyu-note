@@ -142,7 +142,6 @@ export function clearSelection() {
 // ------------------------------------------------------------------ saving
 
 let saveTimer = 0;
-let remoteTempTimer = 0;
 let remoteFlushPromise = null;
 let retryTimer = 0;
 let retryDelay = 1000;
@@ -173,12 +172,6 @@ export function scheduleSave() {
   }
   state.saveState = "saving";
   notify("save");
-  if (state.remote) {
-    clearTimeout(remoteTempTimer);
-    remoteTempTimer = setTimeout(() => {
-      if (state.remote && state.board) writeRemoteTemp(state.board);
-    }, 30);
-  }
   const pending = saveTimer;
   clearTimeout(saveTimer);
   // Both remote team boards and browser-localStorage boards save on a short throttle even while the
@@ -267,10 +260,10 @@ export async function saveNow() {
   state.dirty = false;
   state.viewDirty = false;
   if (state.remote) {
-    // Remote workspace boards are not mirrored into the local SQLite database. Write the durable
-    // temporary copy first, then let the sync listener push the operation diff in the background.
-    clearTimeout(remoteTempTimer);
-    writeRemoteTemp(state.board);
+    // Remote workspace boards are not mirrored into the local SQLite database. The sync listener
+    // captures the edit into the durable per-operation queue (IndexedDB) before it pushes.
+    // Release the in-flight flag before returning: later edits must be able to schedule a save.
+    saveInFlight = false;
     state.saveState = "saved";
     window.dispatchEvent(
       new CustomEvent("mn:board-saved", { detail: { boardId: state.board.id, board: state.board } })
@@ -565,19 +558,18 @@ export async function exportCurrentBoard() {
 /// Workspace switches call this before changing `state.board` so pending edits are never dropped.
 export async function flushRemoteBoard() {
   if (!state.remote || !state.board) return { status: "noop" };
-  clearTimeout(remoteTempTimer);
   const board = state.board;
-  writeRemoteTemp(board);
   if (remoteFlushPromise) return remoteFlushPromise;
   remoteFlushPromise = (async () => {
     try {
       const sync = await import("./sync.js");
       if (!sync.syncEnabled(board)) return { status: "temp" };
       const result = await sync.pushLiveChanges(board);
+      // Legacy temporary copies are cleared once the durable queue has accepted the changes.
       if (result.status === "pushed" || result.status === "noop") clearRemoteTemp(board.id);
       return result;
     } catch (error) {
-      // Keep the temporary copy; opening the board again will retry from it.
+      // The durable record keeps the edits; the next open or online event retries them.
       return { status: "pending", error };
     }
   })().finally(() => {
@@ -661,8 +653,17 @@ export async function persistBoardSnapshot() {
 
 function persistRemoteOnExit() {
   if (!state.remote || !state.board) return;
-  clearTimeout(remoteTempTimer);
-  writeRemoteTemp(state.board);
+  // IndexedDB writes started during unload are usually aborted, so keep the synchronous localStorage
+  // copy as a fallback; opening the board again imports it into the durable queue.
+  const board = state.board;
+  try {
+    writeRemoteTemp(board);
+  } catch {
+    /* storage may be unavailable */
+  }
+  void import("./sync.js")
+    .then((sync) => sync.captureBoardChanges(board))
+    .catch(() => {});
 }
 
 if (typeof window !== "undefined") {

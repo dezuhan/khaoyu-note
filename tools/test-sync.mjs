@@ -18,16 +18,67 @@ class MemoryStorage {
 
 globalThis.localStorage = new MemoryStorage();
 const calls = [];
-let remote = { revision: 0, doc: null, lastSeq: 0 };
+let remote = { revision: 0, lastSeq: 0, doc: null };
+let remoteOps = [];
+const appliedOpIds = new Set();
 let offline = false;
 let readyStatus = 200;
 let projectsStatus = 200;
 let readyFails = false;
 let syncLoginStatus = 201;
+let failNextOps = null;
 const id = "project-sync-test";
 
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function applyMockOperation(document, operation) {
+  const doc = clone(document);
+  if (!Array.isArray(doc.cards)) doc.cards = [];
+  const payload = operation.payload || {};
+  if (operation.type === "doc.replace") return clone(payload.doc);
+  if (operation.type === "doc.title") {
+    doc.title = payload.title;
+    return doc;
+  }
+  if (operation.type === "card.add") {
+    doc.cards.push(clone(payload.card));
+    return doc;
+  }
+  if (operation.type === "card.update") {
+    const card = doc.cards.find((entry) => entry.id === payload.id);
+    if (card) Object.assign(card, clone(payload.patch));
+    return doc;
+  }
+  if (operation.type === "card.delete") {
+    doc.cards = doc.cards.filter((card) => card.id !== payload.id);
+    return doc;
+  }
+  if (operation.type === "connections.set") {
+    doc.connections = clone(payload.connections || []);
+    return doc;
+  }
+  if (operation.type === "card.move") {
+    const card = doc.cards.find((entry) => entry.id === payload.id);
+    if (card) {
+      for (const key of ["x", "y", "order"]) if (payload[key] !== undefined) card[key] = payload[key];
+      if (payload.parentId !== undefined) card.parentId = payload.parentId;
+    }
+    return doc;
+  }
+  throw new Error(`mock does not support ${operation.type}`);
+}
+
+function applyRemoteOperation(operation) {
+  remote.doc = JSON.stringify(applyMockOperation(JSON.parse(remote.doc || "{}"), operation));
+  remote.lastSeq += 1;
+  remote.revision += 1;
+  remoteOps.push({ seq: remote.lastSeq, opId: `remote-${remote.lastSeq}`, ...operation });
+}
+
 globalThis.fetch = async (url, options = {}) => {
-  calls.push({ url, method: options.method || "GET" });
+  calls.push({ url, method: options.method || "GET", body: options.body });
   if (offline) throw new Error("network down");
   const path = new URL(url).pathname;
   const method = options.method || "GET";
@@ -67,6 +118,8 @@ globalThis.fetch = async (url, options = {}) => {
   }
   if (method === "POST" && path === "/api/v1/projects") {
     remote = { revision: 1, doc: null, lastSeq: 0 };
+    remoteOps = [];
+    appliedOpIds.clear();
     return reply(201, { id, title: "Board", revision: 1, lastSeq: 0, role: "owner" });
   }
   if (method === "GET" && path === `/api/v1/projects/${id}`) {
@@ -75,31 +128,64 @@ globalThis.fetch = async (url, options = {}) => {
       snapshot: remote.doc ? { revision: remote.revision, doc: remote.doc } : null,
     });
   }
+  if (method === "GET" && path === `/api/v1/projects/${id}/ops`) {
+    const after = Number(new URL(url).searchParams.get("after") || 0);
+    const ops = remoteOps.filter((entry) => entry.seq > after);
+    return reply(200, {
+      ops,
+      lastSeq: remote.lastSeq,
+      revision: remote.revision,
+      hasMore: false,
+    });
+  }
   if (method === "POST" && path === `/api/v1/projects/${id}/ops`) {
+    if (failNextOps) {
+      const failure = failNextOps;
+      if (failure.remaining === undefined) {
+        failNextOps = null;
+      } else {
+        failure.remaining -= 1;
+        if (failure.remaining <= 0) failNextOps = null;
+      }
+      return reply(failure.status, { error: failure.message || "injected", code: failure.code });
+    }
     const body = JSON.parse(options.body);
+    const operations = body.ops || [];
+    if (operations.some((operation) => appliedOpIds.has(operation.opId))) {
+      return reply(200, { idempotent: true, lastSeq: remote.lastSeq, revision: remote.revision, ops: [] });
+    }
     if (Number(body.baseSeq) !== Number(remote.lastSeq)) {
       return reply(409, { error: "sequence conflict", code: "seq_conflict" });
     }
-    const doc = body.ops?.[0]?.payload?.doc;
-    remote = {
-      revision: remote.revision + 1,
-      doc: doc ? JSON.stringify(doc) : remote.doc,
-      lastSeq: remote.lastSeq + 1,
-    };
-    return reply(200, { lastSeq: remote.lastSeq, revision: remote.revision, idempotent: false });
+    let doc = JSON.parse(remote.doc || "{}");
+    for (const operation of operations) {
+      doc = applyMockOperation(doc, operation);
+      appliedOpIds.add(operation.opId);
+      remote.lastSeq += 1;
+      remoteOps.push({ seq: remote.lastSeq, opId: operation.opId, type: operation.type, payload: operation.payload });
+    }
+    remote.doc = JSON.stringify(doc);
+    remote.revision += 1;
+    return reply(200, {
+      lastSeq: remote.lastSeq,
+      revision: remote.revision,
+      idempotent: false,
+      ops: operations.map((operation, index) => ({ seq: remote.lastSeq - operations.length + 1 + index, opId: operation.opId, type: operation.type })),
+    });
   }
   if (method === "PUT" && path === `/api/v1/projects/${id}/snapshot`) {
     const body = JSON.parse(options.body);
     if (body.revision !== remote.revision) {
       return reply(409, { error: "revision conflict", code: "revision_conflict" });
     }
-    remote = { revision: remote.revision + 1, doc: body.doc };
+    remote = { ...remote, revision: remote.revision + 1, doc: body.doc };
     return reply(200, { revision: remote.revision });
   }
   return reply(404, { error: "not found" });
 };
 
 const sync = await import("../app/web/js/sync.js");
+const syncStore = await import("../app/web/js/sync-store.js");
 
 // A local service is addressed without a scheme, and it must not be forced onto a domain.
 assert.equal(sync.normalizeServerUrl("localhost:8080"), "http://localhost:8080");
@@ -203,7 +289,9 @@ sync.saveSyncConfig({ url: "http://service.test", token: "token-value" });
 const board = {
   id: "b1",
   title: "Sync board",
-  cards: [{ id: "c1", type: "note", text: "hello" }],
+  cards: [{ id: "c1", type: "note", text: "hello", x: 0, y: 0 }],
+  connections: [],
+  trash: [],
   updatedAt: 1000,
 };
 
@@ -212,54 +300,334 @@ assert.equal(enabled.status, "pushed");
 assert.equal(board.sync.projectId, id);
 assert.equal(board.sync.revision, 2);
 assert.equal(JSON.parse(remote.doc).sync, undefined);
+assert.equal(sync.syncStatusFor(board).status, "synced");
 
+// Every save is captured as granular operations before the network push is attempted.
+board.cards[0].text = "hello edited";
+board.updatedAt = Date.now();
+const captured = await sync.captureBoardChanges(board);
+assert.equal(captured.captured, 1);
+assert.equal(captured.pending, 1);
+assert.equal(sync.syncStatusFor(board).status, "pending");
+assert.equal(sync.pendingInfoFor(board).pending, 1);
+assert.equal(sync.pendingInfoFor(board).storage, "localstorage");
+const pushed = await sync.flushBoardNow(board);
+assert.equal(pushed.status, "pushed");
+assert.equal(sync.syncStatusFor(board).status, "synced");
+assert.equal(JSON.parse(remote.doc).cards[0].text, "hello edited");
+assert.equal((await sync.readCachedBoard(board.id)).pendingOps.length, 0);
+
+// Offline edits stay in the durable queue across a reload and flush when the network returns.
+offline = true;
+board.cards[0].text = "written offline";
+board.updatedAt = Date.now();
+await sync.captureBoardChanges(board);
+const failedFlush = await sync.flushBoardNow(board);
+assert.equal(failedFlush.status, "pending");
+assert.match(sync.syncStatusFor(board).message, /Offline/);
+assert.equal(sync.syncStatusFor(board).status, "pending");
+sync._resetRuntimeForTests();
+const reloaded = await sync.readCachedBoard(board.id);
+assert.ok(reloaded, "the durable record survives a reload");
+assert.equal(reloaded.pendingOps.length, 1);
+assert.equal(reloaded.doc.cards[0].text, "written offline");
+assert.equal(reloaded.attempts >= 1, true);
+assert.equal(reloaded.nextAttemptAt > Date.now(), true);
+
+offline = false;
+const flushedAll = await sync.flushQueue();
+assert.equal(flushedAll.flushed, 1);
+assert.equal(JSON.parse(remote.doc).cards[0].text, "written offline");
+assert.equal((await sync.readCachedBoard(board.id)).pendingOps.length, 0);
+
+// A sequence conflict replays the remote operations and merges the local patches instead of
+// replacing the document.
+sync._resetRuntimeForTests();
+const mergeBoard = board;
+remote.doc = JSON.stringify({
+  id: "b1",
+  title: "Sync board",
+  cards: [
+    { id: "c1", type: "note", text: "written offline", x: 0, y: 0 },
+    { id: "c2", type: "note", text: "from server", x: 10, y: 10 },
+  ],
+  connections: [],
+  trash: [],
+});
+mergeBoard.updatedAt = Date.now();
+await sync.attachRemoteBoard(mergeBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+mergeBoard.cards[0].text = "local wins";
+await sync.captureBoardChanges(mergeBoard);
+// Another client advances the server after our capture, so the first POST gets a seq_conflict.
+applyRemoteOperation({ type: "card.update", payload: { id: "c2", patch: { text: "remote edit" } } });
+const merged = await sync.flushBoardNow(mergeBoard);
+assert.equal(merged.status, "pushed");
+const mergedDoc = JSON.parse(remote.doc);
+assert.equal(mergedDoc.cards.find((card) => card.id === "c1").text, "local wins");
+assert.equal(mergedDoc.cards.find((card) => card.id === "c2").text, "remote edit");
+// The rebase must also update the open board. Otherwise the next save would emit inverse operations
+// (deleting c2 or reverting its text) against the merged base.
+const remoteAfterMerge = remote.doc;
+const recaptured = await sync.captureBoardChanges(mergeBoard);
+assert.equal(recaptured.captured, 0);
+assert.equal(remote.doc, remoteAfterMerge);
+assert.equal(mergeBoard.cards.find((card) => card.id === "c2").text, "remote edit");
+
+// A card locked by another editor blocks the queue and retries later.
+sync._resetRuntimeForTests();
+await sync.attachRemoteBoard(mergeBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+mergeBoard.cards[0].text = "locked edit";
+await sync.captureBoardChanges(mergeBoard);
+failNextOps = { status: 423, code: "card_locked" };
+const locked = await sync.flushBoardNow(mergeBoard);
+assert.equal(locked.status, "blocked");
+assert.equal(sync.syncStatusFor(mergeBoard).status, "blocked");
+assert.equal((await sync.readCachedBoard(mergeBoard.id)).pendingOps.length, 1);
+const retried = await sync.flushBoardNow(mergeBoard);
+assert.equal(retried.status, "pushed");
+assert.equal(JSON.parse(remote.doc).cards[0].text, "locked edit");
+
+// A whole-document replacement that races a remote change is surfaced as a conflict, not forced.
+sync._resetRuntimeForTests();
+await sync.attachRemoteBoard(mergeBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+mergeBoard.connections.push({
+  id: "conn_1",
+  from: "c1",
+  to: "c2",
+  fromPoint: null,
+  toPoint: null,
+  curve: null,
+});
+await sync.captureBoardChanges(mergeBoard);
+applyRemoteOperation({ type: "doc.title", payload: { title: "Remote title" } });
+// Connections now travel as their own operation, so the title change and the new connection merge.
+const mergedConnection = await sync.flushBoardNow(mergeBoard);
+assert.equal(mergedConnection.status, "pushed");
+const afterConnection = JSON.parse(remote.doc);
+assert.equal(afterConnection.title, "Remote title");
+assert.equal(afterConnection.connections.length, 1);
+assert.equal(afterConnection.cards.some((card) => card.id === "c2"), true);
+
+// The whole-document fallback (trash contents) still surfaces a conflict instead of overwriting.
+mergeBoard.trash.push({ id: "trash-1", cards: [{ id: "trashed", type: "note", text: "gone" }] });
+await sync.captureBoardChanges(mergeBoard);
+applyRemoteOperation({ type: "doc.title", payload: { title: "Remote title 2" } });
+const conflicted = await sync.flushBoardNow(mergeBoard);
+assert.equal(conflicted.status, "conflict");
+assert.equal(sync.syncStatusFor(mergeBoard).status, "conflict");
+const serverChoice = await sync.resolveSyncConflict(mergeBoard, "server");
+assert.equal(serverChoice.status, "pulled");
+assert.equal(serverChoice.doc.title, "Remote title 2");
+assert.equal(sync.syncStatusFor(mergeBoard).conflict, undefined);
+
+// A rejected token fails the queue visibly while keeping the operations.
+sync._resetRuntimeForTests();
+await sync.attachRemoteBoard(mergeBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+mergeBoard.cards[0].text = "after reauth";
+await sync.captureBoardChanges(mergeBoard);
+failNextOps = { status: 401, message: "token rejected" };
+const rejected = await sync.flushBoardNow(mergeBoard);
+assert.equal(rejected.status, "failed");
+assert.equal(sync.syncStatusFor(mergeBoard).status, "failed");
+assert.equal((await sync.readCachedBoard(mergeBoard.id)).pendingOps.length, 1);
+const recovered = await sync.flushBoardNow(mergeBoard);
+assert.equal(recovered.status, "pushed");
+
+// A change the server keeps rejecting fails visibly and offers a discard path instead of wedging.
+sync._resetRuntimeForTests();
+await sync.attachRemoteBoard(mergeBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+mergeBoard.cards[0].text = "obsolete edit";
+await sync.captureBoardChanges(mergeBoard);
+failNextOps = { status: 400, code: "op_invalid", message: "card not found", remaining: 2 };
+const rejectedOperation = await sync.flushBoardNow(mergeBoard);
+assert.equal(rejectedOperation.status, "failed");
+assert.equal(sync.syncStatusFor(mergeBoard).status, "failed");
+assert.equal((await sync.readCachedBoard(mergeBoard.id)).pendingOps.length > 0, true);
+const discarded = await sync.discardQueuedChanges(mergeBoard);
+assert.equal(discarded.status, "cleared");
+assert.equal((await sync.readCachedBoard(mergeBoard.id)).pendingOps.length, 0);
+assert.equal(sync.syncStatusFor(mergeBoard).status, "synced");
+
+// A legacy temporary document is imported as operations instead of being shown as already synced.
+sync._resetRuntimeForTests();
+remote.doc = JSON.stringify({
+  id: "b1",
+  title: "Server",
+  cards: [{ id: "legacy", type: "note", text: "server value" }],
+  connections: [],
+  trash: [],
+});
+board.cards = [{ id: "legacy", type: "note", text: "legacy local" }];
+board.connections = [];
+board.trash = [];
+board.title = "Server";
+await sync.attachRemoteBoard(board, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+const imported = await sync.importLocalDocument(board, JSON.parse(remote.doc));
+assert.equal(imported.captured > 0, true);
+const importedPush = await sync.flushBoardNow(board);
+assert.equal(importedPush.status, "pushed");
+assert.equal(JSON.parse(remote.doc).cards.find((card) => card.id === "legacy").text, "legacy local");
+
+// A concurrent edit of the same card field keeps the local value (server order wins) but records the
+// conflict, and the server value can be applied afterwards.
+sync._resetRuntimeForTests();
+remote.doc = JSON.stringify({
+  id: "b1",
+  title: "Conflict board",
+  cards: [{ id: "cf", type: "note", text: "base" }],
+  connections: [],
+  trash: [],
+});
+remote.lastSeq = 0;
+remote.revision = 1;
+remoteOps = [];
+appliedOpIds.clear();
+const conflictBoard = {
+  id: "b1",
+  title: "Conflict board",
+  cards: [{ id: "cf", type: "note", text: "base" }],
+  connections: [],
+  trash: [],
+  sync: { projectId: id, revision: 1, lastSeq: 0 },
+};
+await sync.attachRemoteBoard(conflictBoard, {
+  projectId: id,
+  revision: 1,
+  lastSeq: 0,
+  baseDoc: JSON.parse(remote.doc),
+});
+conflictBoard.cards[0].text = "local edit";
+await sync.captureBoardChanges(conflictBoard);
+applyRemoteOperation({ type: "card.update", payload: { id: "cf", patch: { text: "remote edit" } } });
+const conflictPush = await sync.flushBoardNow(conflictBoard);
+assert.equal(conflictPush.status, "pushed");
+assert.equal(JSON.parse(remote.doc).cards[0].text, "local edit");
+const conflictCache = await sync.readCachedBoard("b1");
+assert.equal(conflictCache.fieldConflicts.length, 1);
+assert.equal(conflictCache.fieldConflicts[0].field, "text");
+assert.equal(conflictCache.fieldConflicts[0].remoteValue, "remote edit");
+assert.match(sync.syncStatusFor(conflictBoard).message, /field conflict/);
+const appliedServerValues = await sync.applyServerFieldValues(conflictBoard);
+assert.equal(appliedServerValues.applied, 1);
+assert.equal(conflictBoard.cards[0].text, "remote edit");
+assert.equal((await sync.readCachedBoard("b1")).fieldConflicts.length, 0);
+
+// Queues are per tab: a queue left by another tab is drained instead of being overwritten.
+sync._resetRuntimeForTests();
+remote.doc = JSON.stringify({
+  id: "b1",
+  title: "Multi tab",
+  cards: [{ id: "mt", type: "note", text: "base" }],
+  connections: [],
+  trash: [],
+});
+remote.lastSeq = 0;
+remote.revision = 1;
+remoteOps = [];
+appliedOpIds.clear();
+const multiBoard = {
+  id: "b1",
+  title: "Multi tab",
+  cards: [{ id: "mt", type: "note", text: "base" }],
+  connections: [],
+  trash: [],
+  sync: { projectId: id, revision: 1, lastSeq: 0 },
+};
+await sync.attachRemoteBoard(multiBoard, {
+  projectId: id,
+  revision: 1,
+  lastSeq: 0,
+  baseDoc: JSON.parse(remote.doc),
+});
+await syncStore.saveQueue({
+  queueKey: "b1|other-tab",
+  boardId: "b1",
+  tabId: "other-tab",
+  projectId: id,
+  serverUrl: "",
+  pendingOps: [
+    {
+      opId: "other-tab-op-1",
+      type: "card.update",
+      payload: { id: "mt", patch: { text: "other tab" } },
+      createdAt: Date.now(),
+    },
+  ],
+  attempts: 0,
+  nextAttemptAt: 0,
+  lastError: "",
+  failed: false,
+  conflict: false,
+  updatedAt: Date.now(),
+});
+const otherTabFlush = await sync.flushQueue();
+assert.equal(otherTabFlush.flushed >= 1, true);
+assert.equal(JSON.parse(remote.doc).cards[0].text, "other tab");
+assert.equal(await syncStore.loadQueue("b1", "other-tab"), null);
+
+// Manual sync still pushes when only the local board changed, pulls when only the server changed,
+// and reports a conflict when both changed.
 board.updatedAt = board.sync.lastSyncedAt + 1000;
 assert.equal((await sync.syncBoard(board)).status, "pushed");
-assert.equal(board.sync.revision, 3);
-assert.equal(JSON.parse(remote.doc).cards[0].text, "hello");
+const afterPush = board.sync.revision;
+assert.equal(afterPush, remote.revision);
 
 remote = {
-  revision: 4,
-  lastSeq: 2,
+  revision: afterPush + 1,
+  lastSeq: remote.lastSeq,
   doc: JSON.stringify({ id: "server-board", title: "Server", cards: [], updatedAt: 3000 }),
 };
 board.updatedAt = board.sync.lastSyncedAt - 1;
-const pulled = await sync.syncBoard(board);
-assert.equal(pulled.status, "pulled");
-assert.equal(pulled.doc.id, board.id);
-assert.equal(pulled.doc.sync.revision, 4);
-board.sync = pulled.doc.sync;
+const pulledBoard = await sync.syncBoard(board);
+assert.equal(pulledBoard.status, "pulled");
+assert.equal(pulledBoard.doc.id, board.id);
+assert.equal(pulledBoard.doc.sync.revision, afterPush + 1);
+// Mimic the UI adopting the pulled document before the next edit.
+board.sync = pulledBoard.doc.sync;
+board.title = pulledBoard.doc.title;
+board.cards = pulledBoard.doc.cards;
+board.connections = pulledBoard.doc.connections;
+board.trash = pulledBoard.doc.trash;
 
 remote = {
-  revision: 5,
-  lastSeq: 2,
+  revision: afterPush + 2,
+  lastSeq: remote.lastSeq,
   doc: JSON.stringify({ id: "server-board", title: "Remote change", cards: [], updatedAt: 4000 }),
 };
 board.updatedAt = board.sync.lastSyncedAt + 1000;
 const conflict = await sync.syncBoard(board);
 assert.equal(conflict.status, "conflict");
-assert.equal(conflict.remoteRevision, 5);
-
-const serverChoice = await sync.resolveSyncConflict(board, "server");
-assert.equal(serverChoice.status, "pulled");
-assert.equal(serverChoice.doc.sync.revision, 5);
-board.sync = serverChoice.doc.sync;
-
-board.updatedAt = 6000;
-offline = true;
-await assert.rejects(() => sync.syncBoard(board), (error) => error.offline === true);
-sync.enqueueForOffline(board);
-assert.equal(sync.syncStatusFor(board).status, "offline");
-const queued = JSON.parse(localStorage.getItem("ky.sync.queue"));
-assert.equal(queued.length, 1);
-assert.equal(queued[0].projectId, id);
-
-offline = false;
-const flushed = await sync.flushQueue();
-assert.equal(flushed.flushed, 1);
-assert.equal(sync.loadSyncConfig().token, "token-value");
-const writes = calls.filter((call) => call.method === "DELETE");
-assert.equal(writes.length, 0);
+assert.equal(conflict.remoteRevision, afterPush + 2);
 
 // Granular live operations: different cards can be merged without replacing the whole document.
 const liveBefore = {
@@ -290,6 +658,15 @@ assert.equal(appliedLive.title, "Live board");
 assert.equal(appliedLive.cards.find((card) => card.id === "a").text, "one edited");
 assert.equal(appliedLive.cards.some((card) => card.id === "c"), true);
 assert.deepEqual(sync.diffBoardOperations(liveBefore, { ...liveBefore, view: { x: 1 } }), []);
+// A field removed on the card is sent as an explicit null tombstone.
+const tombstoneOps = sync.diffBoardOperations(
+  { cards: [{ id: "a", type: "note", headerImage: "hero.png" }], connections: [], trash: [] },
+  { cards: [{ id: "a", type: "note" }], connections: [], trash: [] }
+);
+assert.equal(tombstoneOps.length, 1);
+assert.equal(tombstoneOps[0].payload.patch.headerImage, null);
 
-console.log("PASS  sync url, connection status, create, push, pull, conflict, offline queue and no delete");
+sync._resetRuntimeForTests();
+
+console.log("PASS  sync config, sign-in, durable per-op queue, offline reload, merge, lock, conflict and failure states");
 console.log(`${calls.length} fake service calls`);

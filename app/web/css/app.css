@@ -5853,7 +5853,14 @@ html[data-performance="true"] *::after {
 .mn-sync-state[data-status="synced"] {
   color: var(--ky-accent);
 }
-.mn-sync-state[data-status="conflict"] {
+.mn-sync-state[data-status="syncing"],
+.mn-sync-state[data-status="pending"] {
+  color: var(--ky-accent);
+  opacity: 0.8;
+}
+.mn-sync-state[data-status="conflict"],
+.mn-sync-state[data-status="failed"],
+.mn-sync-state[data-status="blocked"] {
   color: var(--ky-danger);
 }
 .mn-sync-state[data-status="offline"] {
@@ -5892,7 +5899,14 @@ html[data-performance="true"] *::after {
 .mn-sync-status[data-status="synced"] {
   color: var(--ky-accent);
 }
-.mn-sync-status[data-status="conflict"] {
+.mn-sync-status[data-status="syncing"],
+.mn-sync-status[data-status="pending"] {
+  color: var(--ky-accent);
+  opacity: 0.85;
+}
+.mn-sync-status[data-status="conflict"],
+.mn-sync-status[data-status="failed"],
+.mn-sync-status[data-status="blocked"] {
   color: var(--ky-danger);
 }
 .mn-sync-connection {
@@ -5920,6 +5934,27 @@ html[data-performance="true"] *::after {
   font-size: 10px;
   color: var(--ky-soft);
   overflow-wrap: anywhere;
+}
+.mn-sync-conflicts {
+  border: 1px solid var(--ky-line-soft);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  color: var(--ky-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mn-sync-conflicts p {
+  margin: 0;
+}
+.mn-sync-conflict-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--ky-font-mono, monospace);
 }
 .mn-sync-conflict {
   border: 1px solid var(--ky-border);
