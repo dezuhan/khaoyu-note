@@ -85,10 +85,6 @@ async function boot() {
     document.getElementById("boot")?.remove();
     return;
   }
-  if (await openWorkspaceFromQuery()) {
-    document.getElementById("boot")?.remove();
-    return;
-  }
   // After a reset, choose the storage direction before any board or setting is read.
   await initSetupGate();
   await initAuth();
@@ -133,6 +129,9 @@ async function boot() {
   render("board");
   renderView();
   refreshSync();
+  if (await openWorkspaceFromQuery()) {
+    // The local editor is still the main UI; the workspace picker is only a popover.
+  }
   initUpdateUI();
   initAutoBackup();
   document.getElementById("boot")?.remove();

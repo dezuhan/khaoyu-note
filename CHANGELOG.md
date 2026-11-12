@@ -116,6 +116,10 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- Remote workspace boards now open in the real main board editor for owner/editor roles instead of
+  the read-only preview. Remote boards use a non-persisted in-memory mode so their operation diff is
+  pushed to the service rather than mirrored into the local SQLite card table; viewer accounts still
+  get the read-only preview. The template button opens the workspace popover after normal app boot.
 - Workspace switching now opens as an Affine-style popover from the existing template/workspace
   button instead of a full-screen page or a separate menubar button. The server-add flow uses the
   design-system modal (no native browser prompt), floating menus sit above the tool rail, and admin

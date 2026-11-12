@@ -19,6 +19,7 @@ export const state = {
   conflict: null,
   baseUpdatedAt: null,
   loaded: false,
+  remote: false,
 };
 
 function viewStorageKey(boardId) {
@@ -250,6 +251,16 @@ export async function saveNow() {
   const hadContentChanges = state.dirty;
   state.dirty = false;
   state.viewDirty = false;
+  if (state.remote) {
+    // Remote workspace boards are not mirrored into the local SQLite database. The sync listener
+    // consumes this event and pushes the operation diff to the server.
+    state.saveState = "saved";
+    window.dispatchEvent(
+      new CustomEvent("mn:board-saved", { detail: { boardId: state.board.id, board: state.board } })
+    );
+    notify("save");
+    return;
+  }
   const snapshot = JSON.stringify(state.board);
   const boardId = state.board.id;
   const base = Number.isFinite(state.baseUpdatedAt) ? state.baseUpdatedAt : null;
@@ -411,6 +422,7 @@ export async function openBoard(id, { flush = true } = {}) {
     doc.updatedAt = Date.now();
   }
   state.board = doc;
+  state.remote = false;
   // Legacy builds stored a theme per board. Ignore it: the global preference above wins, so a
   // board saved in the past cannot flip the theme when it is opened.
   layoutColumns(doc);
@@ -456,6 +468,7 @@ export async function createBoard(title = "Untitled board", { withWelcome = fals
   }
   await bridge.saveBoard(doc.id, JSON.stringify(doc), null);
   state.board = doc;
+  state.remote = false;
   state.selection = new Set();
   state.editing = null;
   layoutColumns(doc);
@@ -526,9 +539,47 @@ export async function exportCurrentBoard() {
   return bridge.exportBoard(json);
 }
 
+/// Open a board hosted by a remote workspace without mirroring it into the local database.
+export async function openRemoteBoard(doc, syncInfo) {
+  if (!doc || !doc.id) throw new Error("Remote board document is missing");
+  state.board = doc;
+  state.board.sync = { ...syncInfo };
+  layoutColumns(doc);
+  state.view = readStoredView(doc.id) || doc.view || { x: 0, y: 0, zoom: 1 };
+  state.selection = new Set();
+  state.editing = null;
+  state.loaded = true;
+  state.remote = true;
+  state.dirty = false;
+  state.viewDirty = false;
+  state.conflict = null;
+  state.saveState = "saved";
+  state.baseUpdatedAt = null;
+  clearRetry();
+  clearTimeout(saveTimer);
+  notify("board");
+  notify("view");
+  notify("history");
+  state.viewDirty = false;
+  return doc;
+}
+
 /// Adopt a server document after an explicit pull or conflict choice.
 export async function adoptRemoteBoard(doc) {
   if (!doc || !state.board || doc.id !== state.board.id) return;
+  if (state.remote) {
+    state.board = doc;
+    layoutColumns(doc);
+    state.selection = new Set();
+    state.editing = null;
+    state.conflict = null;
+    state.dirty = false;
+    state.saveState = "saved";
+    notify("board");
+    notify("view");
+    notify("history");
+    return;
+  }
   const previousBase = state.baseUpdatedAt;
   state.board = doc;
   layoutColumns(doc);
@@ -546,6 +597,7 @@ export async function adoptRemoteBoard(doc) {
 
 /// Persist sync metadata without marking the document dirty.
 export async function persistBoardSnapshot() {
+  if (state.remote) return true;
   if (!state.board) return false;
   const snapshot = JSON.stringify(state.board);
   try {

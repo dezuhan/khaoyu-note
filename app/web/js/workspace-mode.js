@@ -147,8 +147,12 @@ async function loadServerBoards(server, view) {
     for (const button of target.querySelectorAll("[data-project]")) {
       const project = projects.find((entry) => entry.id === button.dataset.project);
       button.addEventListener("click", () => {
-        closePopover();
-        void openBoard(server, project, server.token);
+        if (["owner", "editor"].includes(String(project.role || ""))) {
+          void openEditableBoard(server, project, server.token);
+        } else {
+          closePopover();
+          void openBoard(server, project, server.token);
+        }
       });
     }
   } catch (error) {
@@ -257,6 +261,38 @@ function renderBoard(container, doc) {
   )}px;height:${Math.max(420, maxY - minY + 64)}px">${cards
     .map((card) => boardCard({ ...card, x: (Number(card.x) || 0) - minX + 32, y: (Number(card.y) || 0) - minY + 32 }))
     .join("")}</div>`;
+}
+
+async function openEditableBoard(server, project, token) {
+  closePopover();
+  const view = ensureBoardOverlay();
+  view.querySelector('[data-role="title"]').textContent = project.name || "Board";
+  const content = view.querySelector('[data-role="content"]');
+  content.innerHTML = `<p class="mn-server-empty">Opening editable board...</p>`;
+  try {
+    const data = await jsonFetch(`${server.url}/api/v1/projects/${encodeURIComponent(project.id)}`, {}, token);
+    const doc = JSON.parse(data.snapshot?.doc || "{}");
+    doc.id = project.id;
+    const [store, sync, syncUi] = await Promise.all([
+      import("./store.js"),
+      import("./sync.js"),
+      import("./sync-ui.js"),
+    ]);
+    await store.openRemoteBoard(doc, {
+      projectId: project.id,
+      revision: Number(project.revision) || 1,
+      lastSeq: Number(data.project?.lastSeq || project.lastSeq || 0),
+      lastSyncedAt: Date.now(),
+    });
+    sync.saveSyncConfig({ url: server.url, email: server.email || "", token });
+    await sync.pushLiveChanges(store.state.board);
+    view.remove();
+    boardOverlay = null;
+    syncUi.refresh();
+    window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Opened team board" } }));
+  } catch (error) {
+    content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message)}</p>`;
+  }
 }
 
 async function openBoard(server, project, token = "") {
