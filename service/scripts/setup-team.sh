@@ -28,8 +28,8 @@ random_hex() { openssl rand -hex "${1:-24}"; }
 CREATED_ENV=0
 if [[ ! -f "$ENV_FILE" ]]; then
   CREATED_ENV=1
-  read -r -p "Public service URL [https://notes.example.com]: " PUBLIC_URL
-  PUBLIC_URL="${PUBLIC_URL:-https://notes.example.com}"
+  read -r -p "Public service URL [http://127.0.0.1:18080]: " PUBLIC_URL
+  PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:18080}"
   read -r -p "Initial owner email [owner@localhost]: " BOOTSTRAP_EMAIL
   BOOTSTRAP_EMAIL="${BOOTSTRAP_EMAIL:-owner@localhost}"
   read -r -p "Cloudflare tunnel token (optional, press Enter to skip): " TUNNEL_TOKEN

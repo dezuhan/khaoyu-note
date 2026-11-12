@@ -132,7 +132,8 @@ cd service
 
 The installer asks only for:
 
-1. public service URL (for example `https://notes.example.com`),
+1. public service URL (default `http://127.0.0.1:18080`; use the HTTPS tunnel/proxy origin for
+   public access),
 2. first owner email,
 3. optional Cloudflare Tunnel token.
 
