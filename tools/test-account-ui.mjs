@@ -82,6 +82,12 @@ try {
   }));
   check("auth pages use the shared design tokens", design.css && design.token.length > 0, JSON.stringify(design));
   check(
+    "auth pages declare the shared favicons",
+    (await page.locator('link[rel="icon"][href="/khaoyu-note.svg"]').count()) === 1 &&
+      (await page.locator('link[rel="icon"][href="/favicon-32.png"]').count()) === 1 &&
+      (await page.locator('link[rel="apple-touch-icon"][href="/favicon-180.png"]').count()) === 1
+  );
+  check(
     "auth pages use the main app logo asset",
     (await page.locator('.auth-brand img[src="/khaoyu-note.svg"]').count()) === 1
   );

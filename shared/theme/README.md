@@ -12,6 +12,7 @@ app and the self-hosted service pages display comes from here:
 | `theme.js` | shared runtime: read/apply/store/init theme | `app/web/js/theme.js`, `service/public/theme.js` |
 | `theme-init.js` | applies the saved theme on service pages without a toggle | `service/public/theme-init.js` |
 | `khaoyu-note.svg` | brand mark | `app/web/assets/khaoyu-note.svg`, `service/public/khaoyu-note.svg` |
+| `favicon-32.png`, `favicon-180.png` | browser tab and touch icons rendered from the brand mark | `app/web/assets/`, `service/public/` |
 
 ## Rules
 

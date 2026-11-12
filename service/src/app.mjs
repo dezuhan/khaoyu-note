@@ -31,6 +31,8 @@ const AUTH_PAGES = {
   "/theme.js": ["theme.js", "text/javascript; charset=utf-8"],
   "/theme-init.js": ["theme-init.js", "text/javascript; charset=utf-8"],
   "/khaoyu-note.svg": ["khaoyu-note.svg", "image/svg+xml"],
+  "/favicon-32.png": ["favicon-32.png", "image/png"],
+  "/favicon-180.png": ["favicon-180.png", "image/png"],
   "/fonts.css": ["fonts.css", "text/css; charset=utf-8"],
   "/fonts/DMSans-400.woff2": ["fonts/DMSans-400.woff2", "font/woff2"],
   "/fonts/PlayfairDisplay-400.woff2": ["fonts/PlayfairDisplay-400.woff2", "font/woff2"],

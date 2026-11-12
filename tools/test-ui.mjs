@@ -126,6 +126,12 @@ check(
   floatingRail.zIndex >= 1000 && floatingRail.viewportLeft <= floatingRail.left,
   JSON.stringify(floatingRail)
 );
+check(
+  "Web app declares the shared Khaoyu favicon",
+  (await page.locator('link[rel="icon"][href="./assets/khaoyu-note.svg"]').count()) === 1 &&
+    (await page.locator('link[rel="icon"][href="./assets/favicon-32.png"]').count()) === 1 &&
+    (await page.locator('link[rel="apple-touch-icon"]').count()) === 1
+);
 const welcomeTypes = await page.evaluate(() =>
   Array.from(new Set(Array.from(document.querySelectorAll(".mn-card")).map((card) => card.dataset.type)))
 );

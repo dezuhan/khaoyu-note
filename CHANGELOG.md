@@ -21,6 +21,8 @@ project uses Semantic Versioning.
 - The main editor tool rail is now a floating inset panel: fixed at 12 px from the left, top and
   bottom edges, rounded and shadowed above the canvas. The canvas runs beneath it (no reserved
   gutter), and the rail cannot be dragged.
+- The web app and every service page declare SVG and PNG favicons rendered from the shared brand
+  mark, so browser tabs and touch shortcuts show the Khaoyu icon.
 - `shared/theme/` is now the single source for the token stylesheet, fonts, SVG icon set, brand mark
   and theme runtime. `npm run theme:sync` generates the app and service copies, and CI runs
   `npm run theme:check` to fail on drift.

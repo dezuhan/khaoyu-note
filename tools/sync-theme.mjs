@@ -15,6 +15,8 @@ const files = [
   ["theme.js", ["app/web/js/theme.js", "service/public/theme.js"]],
   ["theme-init.js", ["service/public/theme-init.js"]],
   ["khaoyu-note.svg", ["app/web/assets/khaoyu-note.svg", "service/public/khaoyu-note.svg"]],
+  ["favicon-32.png", ["app/web/assets/favicon-32.png", "service/public/favicon-32.png"]],
+  ["favicon-180.png", ["app/web/assets/favicon-180.png", "service/public/favicon-180.png"]],
   [
     "fonts/DMSans-400.woff2",
     ["app/web/fonts/DMSans-400.woff2", "service/public/fonts/DMSans-400.woff2"],
