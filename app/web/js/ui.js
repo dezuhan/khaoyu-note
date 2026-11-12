@@ -343,7 +343,7 @@ function columnDropIndex(column, point) {
   return index;
 }
 
-function columnDropSlot(column, point, height) {
+function columnDropSlot(column, point, height, width = null) {
   const children = columnDropChildren(column);
   const index = columnDropIndex(column, point);
   const gap = 10;
@@ -351,8 +351,8 @@ function columnDropSlot(column, point, height) {
   if (column.direction === "row") {
     let x = column.x + 14;
     for (let i = 0; i < index; i += 1) x += children[i].w + gap;
-    const width = Math.max(120, Math.floor((innerW - gap * children.length) / (children.length + 1)));
-    return { x, y: column.y + 64, w: width, h: height, index };
+    const slotWidth = Math.max(120, Number(width) || children[index]?.w || 160);
+    return { x, y: column.y + 64, w: slotWidth, h: height, index };
   }
   let y = column.y + 64;
   for (let i = 0; i < index; i += 1) y += children[i].h + gap;
@@ -387,7 +387,7 @@ function toolPreviewRect(probe, event) {
   const column = columnAtPoint(event.clientX, event.clientY);
   if (column) {
     const aspect = probe.aspect || CARD_ASPECTS[probe.type];
-    const slot = columnDropSlot(column, point, probeHeight);
+    const slot = columnDropSlot(column, point, probeHeight, probe.w);
     return {
       x: slot.x,
       y: slot.y,

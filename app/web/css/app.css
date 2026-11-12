@@ -1257,6 +1257,21 @@ body.ky-scope {
   background: var(--ky-palette-black-6, #fdfdfd);
   box-shadow: inset 0 0 0 1px var(--ky-stroke);
   overflow: visible;
+  /* Auto-height columns and auto-width rows reflow smoothly after a card is dropped in/out. */
+  transition:
+    width 180ms ease,
+    height 180ms ease;
+}
+
+.mn-card-column.is-dragging,
+.mn-viewport.is-resizing .mn-card-column {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-card-column {
+    transition: none;
+  }
 }
 
 .mn-card-section {

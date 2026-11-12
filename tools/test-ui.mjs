@@ -245,6 +245,30 @@ check(
     rowChildren[0].y === rowChildren[1].y &&
     rowChildren[0].x !== rowChildren[1].x
 );
+const rowAutoMetrics = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const { columnChildren } = await import("/js/model.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  const children = columnChildren(state.board, columnId);
+  const expected = 28 + children.reduce((sum, child) => sum + child.w, 0) + 10 * (children.length - 1);
+  return { width: column.w, expected, count: children.length };
+}, firstColumnId);
+check(
+  "Row width follows its cards instead of stretching them",
+  rowAutoMetrics.count === 2 && Math.abs(rowAutoMetrics.width - rowAutoMetrics.expected) <= 2,
+  `${rowAutoMetrics.width} vs ${rowAutoMetrics.expected}`
+);
+const columnTransition = await firstColumnCard.evaluate((el) => {
+  const style = getComputedStyle(el);
+  return `${style.transitionProperty} ${style.transitionDuration}`;
+});
+check(
+  "Column auto-height and row auto-width changes animate",
+  columnTransition.includes("width") &&
+    columnTransition.includes("height") &&
+    !columnTransition.includes("0s"),
+  columnTransition
+);
 await openColumnContextMenu();
 await page.locator(".mn-menu-item", { hasText: "Convert to column" }).click();
 await page.waitForTimeout(450);
@@ -1960,10 +1984,12 @@ const dropColumnId = await page.evaluate(async () => {
 });
 const dropColumn = byId(dropColumnId);
 const dropColumnBox = await dropColumn.boundingBox();
-const dropColumnChildrenBefore = await page.evaluate(async (columnId) => {
+const dropColumnMetricsBefore = await page.evaluate(async (columnId) => {
   const { state } = await import("/js/store.js");
-  return state.board.cards.filter((card) => card.parentId === columnId).length;
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return { height: column.h, count: state.board.cards.filter((card) => card.parentId === columnId).length };
 }, dropColumnId);
+const dropColumnChildrenBefore = dropColumnMetricsBefore.count;
 const noteToolBox2 = await page.locator('.mn-tool[data-tool="note"]').boundingBox();
 await page.mouse.move(noteToolBox2.x + noteToolBox2.width / 2, noteToolBox2.y + noteToolBox2.height / 2);
 await page.mouse.down();
@@ -1976,14 +2002,21 @@ const placedInColumn = await page.evaluate(async ([cardId, columnId]) => {
   const siblings = state.board.cards
     .filter((entry) => entry.parentId === columnId)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
-  return { parentId: card?.parentId, order: card?.order, firstId: siblings[0]?.id, count: siblings.length };
+  return {
+    parentId: card?.parentId,
+    order: card?.order,
+    firstId: siblings[0]?.id,
+    count: siblings.length,
+    columnHeight: state.board.cards.find((entry) => entry.id === columnId)?.h,
+  };
 }, [await selectedId(), dropColumnId]);
 check(
   "Tool dropped near the top of a column becomes its first child",
   placedInColumn.parentId === dropColumnId &&
     placedInColumn.firstId === (await selectedId()) &&
-    placedInColumn.count === dropColumnChildrenBefore + 1,
-  JSON.stringify(placedInColumn)
+    placedInColumn.count === dropColumnChildrenBefore + 1 &&
+    placedInColumn.columnHeight > dropColumnMetricsBefore.height,
+  JSON.stringify({ ...placedInColumn, before: dropColumnMetricsBefore.height })
 );
 
 // ---------------------------------------------------------------- duplicate and copy a column tree
@@ -2619,10 +2652,12 @@ await page.evaluate(async (columnId) => {
 }, dropColumnId);
 await page.waitForTimeout(500);
 const rowDropBox = await byId(dropColumnId).boundingBox();
-const rowChildrenBefore = await page.evaluate(async (columnId) => {
+const rowMetricsBefore = await page.evaluate(async (columnId) => {
   const { state } = await import("/js/store.js");
-  return state.board.cards.filter((card) => card.parentId === columnId).length;
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return { width: column.w, count: state.board.cards.filter((card) => card.parentId === columnId).length };
 }, dropColumnId);
+const rowChildrenBefore = rowMetricsBefore.count;
 const noteToolBox3 = await page.locator('.mn-tool[data-tool="note"]').boundingBox();
 await page.mouse.move(noteToolBox3.x + noteToolBox3.width / 2, noteToolBox3.y + noteToolBox3.height / 2);
 await page.mouse.down();
@@ -2635,14 +2670,20 @@ const placedInRow = await page.evaluate(async ([cardId, columnId]) => {
   const siblings = state.board.cards
     .filter((entry) => entry.parentId === columnId)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
-  return { parentId: card?.parentId, firstId: siblings[0]?.id, count: siblings.length };
+  return {
+    parentId: card?.parentId,
+    firstId: siblings[0]?.id,
+    count: siblings.length,
+    rowWidth: state.board.cards.find((entry) => entry.id === columnId)?.w,
+  };
 }, [await selectedId(), dropColumnId]);
 check(
   "Tool dropped at the left of a row becomes its first child",
   placedInRow.parentId === dropColumnId &&
     placedInRow.firstId === (await selectedId()) &&
-    placedInRow.count === rowChildrenBefore + 1,
-  JSON.stringify(placedInRow)
+    placedInRow.count === rowChildrenBefore + 1 &&
+    placedInRow.rowWidth > rowMetricsBefore.width,
+  JSON.stringify({ ...placedInRow, before: rowMetricsBefore.width })
 );
 await page.evaluate(async (columnId) => {
   const actions = await import("/js/actions.js");

@@ -1066,7 +1066,6 @@ function updateDragIndicators(point) {
     }
     const innerX = column.x + COLUMN_PADDING;
     const innerY = column.y + COLUMN_HEADER;
-    const innerW = column.w - COLUMN_PADDING * 2;
     const innerH = Math.max(80, column.h - COLUMN_HEADER - COLUMN_PADDING);
     let slotX = innerX;
     let index = 0;
@@ -1078,10 +1077,10 @@ function updateDragIndicators(point) {
         break;
       }
     }
-    const total = children.length + moving.length;
-    const childW = Math.max(
+    const ghostW = Math.max(
       120,
-      Math.floor((innerW - COLUMN_GAP * Math.max(0, total - 1)) / Math.max(1, total))
+      moving.reduce((sum, card) => sum + (Number(card.w) || 120), 0) +
+        COLUMN_GAP * Math.max(0, moving.length - 1)
     );
     ui.line.classList.add("is-vertical");
     ui.line.hidden = false;
@@ -1097,7 +1096,7 @@ function updateDragIndicators(point) {
     Object.assign(ui.ghost.style, {
       left: `${slotX}px`,
       top: `${innerY}px`,
-      width: `${childW}px`,
+      width: `${ghostW}px`,
       height: `${innerH}px`,
     });
     gesture.dropTarget = { columnId: column.id, index };

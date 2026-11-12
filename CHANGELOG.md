@@ -56,6 +56,10 @@ project uses Semantic Versioning.
   ring (it was hidden by the child hairline), and keyboard focus shows a 2 px accent outline.
 - Dragging a tool from the rail into a column or row inserts it at the pointer position, including
   before the first child; the drop preview line shows the target slot instead of always appending.
+- Rows now follow the width of their cards instead of stretching every card to fill the row. Columns
+  keep auto height and rows auto width after drops, with a short width/height transition so the
+  reflow is visible without delaying resize drags.
+
 - Light/dark mode is now a global appearance preference. Opening or switching boards no longer
   applies a legacy theme stored in the board document or dirties the board, so the chosen theme
   stays the same everywhere and after a reload.

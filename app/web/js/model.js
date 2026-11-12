@@ -253,25 +253,27 @@ export function layoutColumn(board, column) {
     (card) => !isTemporarilyDisabledType(card.type)
   );
   if (column.direction === "row") {
-    const count = Math.max(1, children.length);
-    const available = Math.max(160, column.w - padding * 2 - gap * (count - 1));
-    const childW = Math.max(120, Math.floor(available / count));
+    // Rows follow their children instead of stretching children to fill the row: each card keeps
+    // its own width and the row grows to fit, so a new item widens the row by exactly its width.
     let x = column.x + padding;
     let maxH = 0;
     for (const child of children) {
       child.x = x;
       child.y = column.y + header;
-      child.w = childW;
+      child.w = Math.max(120, Number(child.w) || 120);
       if (child.type === "column") {
         layoutColumn(board, child);
       } else {
         const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
         if (child.h < minimum) child.h = minimum;
       }
-      x += childW + gap;
+      x += child.w + gap;
       maxH = Math.max(maxH, child.h);
     }
-    column.h = Math.max(column.minHeight || 160, header + maxH + padding);
+    if (children.length) {
+      column.w = Math.max(160, padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1));
+      column.h = Math.max(column.minHeight || 160, header + maxH + padding);
+    }
     return;
   }
   let y = column.y + header;
