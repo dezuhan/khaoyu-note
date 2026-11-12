@@ -28,8 +28,9 @@ project uses Semantic Versioning.
   stays the same everywhere and after a reload.
 - The Teams pane uses a responsive full-width layout and a compact creation form, and the password
   fields keep the 24 px control height instead of stretching to the form row.
-- The signed-out admin card uses a full 32 px primary action for "Sign in to the service" instead of
-  the compact dashboard control height, so the label never looks clipped.
+- The signed-out admin card renders "Sign in to the service" as a real primary button with the app
+  theme tokens (no underlined link) at a comfortable 32 px control height, so the label never looks
+  clipped.
 
 ### Security
 

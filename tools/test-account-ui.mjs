@@ -69,6 +69,14 @@ try {
   // /account is now a redirect to the admin dashboard.
   await page.goto(`${base}/account`, { waitUntil: "load" });
   check("account URL redirects to the admin dashboard", page.url().endsWith("/admin"), page.url());
+  await page.goto(`${base}/admin`, { waitUntil: "load" });
+  const signin = page.locator("#admin-signin");
+  check(
+    "signed-out admin offers a primary button, not an underlined link",
+    (await signin.count()) === 1 &&
+      (await signin.evaluate((el) => el.tagName)) === "BUTTON" &&
+      (await signin.evaluate((el) => getComputedStyle(el).textDecorationLine)) === "none"
+  );
 
   // Registration creates an immediately usable verified account and sends the user to /login.
   await page.goto(`${base}/register`, { waitUntil: "load" });

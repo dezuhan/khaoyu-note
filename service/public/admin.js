@@ -110,9 +110,12 @@ function showAuth(message) {
     <div class="admin-auth">
       <h2>Admin sign in</h2>
       <p>${escapeHtml(message || "Sign in with an account that has the admin role.")}</p>
-      <a class="ky-button ky-button-primary" href="/login">Sign in to the service</a>
+      <button class="ky-button ky-button-primary admin-signin" id="admin-signin" type="button">Sign in to the service</button>
       <p class="admin-note">The dashboard reads the service account session and never asks for the operator token.</p>
     </div>`;
+  pane.querySelector("#admin-signin")?.addEventListener("click", () => {
+    window.location.assign("/login");
+  });
 }
 
 function showError(error) {
