@@ -7,7 +7,7 @@ Snapshot: **0.36.0**, 2026-11-12. This is an engineering audit, not a release ap
 | Area | Status | Production ready? |
 | --- | --- | --- |
 | Single-user local SQLite | Stable local data path, backup/restore and export implemented | **Yes for local-first use**, with the release gates below |
-| Collaboration (PostgreSQL + Redis) | Backend foundation and realtime plumbing implemented in `service/` | **No** — operator/UI hardening and validation remain |
+| Collaboration (PostgreSQL + Redis) | Team Docker stack, realtime plumbing and client integration implemented | **Beta** — external production gates remain |
 | Turso/libSQL | UI placeholder and export preparation only | **No** — no adapter, migration or token integration exists |
 | Web host single-user | Same SQLite and assets; export ZIP implemented | **Beta** — no web import/restore flow yet |
 
@@ -51,6 +51,21 @@ Not ready for a production team deployment:
 Conclusion: the collaboration backend is a serious beta foundation, but it must not be advertised as
 production-ready until items 1–7 are closed.
 
+## Latest verification — 2026-11-12
+
+- Full local service suite: **94 pass, 0 fail, 7 skipped** (the skips are the PostgreSQL/Redis
+  suites when `TEST_DATABASE_URL`/`TEST_REDIS_URL` are absent).
+- Main UI suite: **288/288**; web mode **10/10**; web live refresh **4/4**; web auth **44/44**;
+  share viewer **8/8**; shares UI and account UI pass; passkeys **7/7**; sync engine passes.
+- Static modules **42/42**, theme copies pass, i18n **190/190 keys in 10 languages**, dependency
+  audit for root and service: **0 vulnerabilities**.
+- Full team Docker stack was run on PostgreSQL 17 + Redis 7 on alternate ports: migrations
+  `[1,2,3,4]`, `profile=team`, `/readyz` returned `{"status":"ready","realtime":"ok"}`, Redis
+  responded `PONG`, PostgreSQL contained the bootstrapped account/project. The stack was cleaned
+  after the check.
+- Linux `dist/linux` artifacts currently pass their checksums, but were built **before** the final
+  web live/refresh, viewport and share-viewer changes; rebuild them before tagging.
+
 ## Turso readiness
 
 Current state:
@@ -84,6 +99,7 @@ Backup and the export action are preparation only, not a migration implementatio
 - [ ] external penetration test completed;
 - [ ] production-scale load test for login, shares and uploads;
 - [x] two-instance PostgreSQL + Redis validation;
+- [x] one-command team Docker stack and exhaustive local test pass (2026-11-12);
 - [ ] OIDC implementation and test;
 - [ ] object storage plan for service assets;
 - [ ] Turso adapter, token storage and migration tests, or the option hidden;
