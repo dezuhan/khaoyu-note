@@ -124,6 +124,16 @@ try {
     document.getElementById("public-state")?.textContent.includes("disabled")
   );
 
+  const sectionGaps = await page.evaluate(() => {
+    const sections = [...document.querySelectorAll("#sharing-content > .admin-section")];
+    return sections.slice(1).map((section, index) => Math.round(section.getBoundingClientRect().top - sections[index].getBoundingClientRect().bottom));
+  });
+  check(
+    "sharing sections keep the shared vertical gap",
+    sectionGaps.length >= 2 && sectionGaps.every((gap) => gap >= 8),
+    sectionGaps.join(",")
+  );
+
   await page.click("#enable-sharing");
   await page.waitForFunction(() => document.getElementById("status").textContent.includes("Tick the acknowledgement"));
   check("sharing requires the explicit acknowledgement", true);

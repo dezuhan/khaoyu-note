@@ -529,7 +529,7 @@ async function renderAccount() {
           <label class="admin-field"><span>New password</span><input class="admin-search" name="newPassword" type="password" autocomplete="new-password" /></label>
           <label class="admin-field"><span>Confirm new password</span><input class="admin-search" name="confirmPassword" type="password" autocomplete="new-password" /></label>
         </div>
-        <div class="admin-actions" style="margin-top: 8px">
+        <div class="admin-actions admin-actions-spaced">
           <button class="ky-button ky-button-primary" type="submit">Update password</button>
           <span class="admin-time" data-role="password-status" role="status"></span>
         </div>
@@ -826,7 +826,7 @@ async function renderSharing() {
           <label class="admin-field"><span>Passphrase</span><input class="admin-search" id="password" type="password" autocomplete="new-password" /></label>
           <label class="admin-field"><span>Downloads</span><label class="admin-check"><input id="download" type="checkbox" /> Allow asset downloads</label></label>
         </div>
-        <div class="admin-actions" style="margin-top: 8px">
+        <div class="admin-actions admin-actions-spaced">
           <button class="ky-button ky-button-primary" id="create" type="button">Create share link</button>
         </div>
         <p id="token" class="admin-share-token"></p>

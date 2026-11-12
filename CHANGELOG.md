@@ -43,6 +43,8 @@ project uses Semantic Versioning.
   fields keep the 24 px control height instead of stretching to the form row.
 - The admin top bar no longer repeats Dashboard and Help buttons; the logo, command palette and
   Account menu cover both actions. The Account dropdown opens with a clear gap below the bar.
+- The Sharing pane stacks Public sharing, Create a link and Existing links with the same 14 px gap as
+  the rest of the admin dashboard; inline margin styles were replaced with geometry tokens.
 - The signed-out admin card renders "Sign in to the service" as a real primary button with the app
   theme tokens (no underlined link) at a comfortable 32 px control height, so the label never looks
   clipped.

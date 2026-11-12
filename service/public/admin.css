@@ -206,6 +206,20 @@ html[data-ky-theme="softLight"] {
   gap: var(--ky-space-14);
 }
 
+#sharing-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ky-space-14);
+}
+
+#sharing-content[hidden] {
+  display: none;
+}
+
+.admin-actions-spaced {
+  margin-top: var(--ky-space-8);
+}
+
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
