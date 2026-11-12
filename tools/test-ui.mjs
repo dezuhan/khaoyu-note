@@ -2666,15 +2666,26 @@ const sourceCard = byId(sourceCardId);
 if (await sourceCard.count()) {
   const sourceBox = await sourceCard.boundingBox();
   const targetBox = await byId(dropColumnId).boundingBox();
+  const sourceHeight = await page.evaluate(async (cardId) => {
+    const { state } = await import("/js/store.js");
+    return state.board.cards.find((card) => card.id === cardId)?.h;
+  }, sourceCardId);
   await page.mouse.move(sourceBox.x + 20, sourceBox.y + 20);
   await page.mouse.down();
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + 140, { steps: 12 });
   await page.waitForTimeout(300);
   const cardHoverPreview = await page.evaluate(
-    (columnId) => Boolean(document.querySelector(`.mn-drop-reservation[data-column="${columnId}"]`)),
+    (columnId) => {
+      const placeholder = document.querySelector(`.mn-drop-reservation[data-column="${columnId}"]`);
+      return { present: Boolean(placeholder), height: Number.parseFloat(placeholder?.style.height || "0") };
+    },
     dropColumnId
   );
-  check("Dragging an existing card shows the live drop reservation", cardHoverPreview);
+  check(
+    "Dragging an existing card shows the live drop reservation with its measured height",
+    cardHoverPreview.present && Math.abs(cardHoverPreview.height - sourceHeight) <= 2,
+    `${cardHoverPreview.height} vs ${sourceHeight}`
+  );
   await page.mouse.up();
   await page.waitForTimeout(500);
   const movedCard = await page.evaluate(async ([columnId, cardId]) => {
@@ -2682,6 +2693,25 @@ if (await sourceCard.count()) {
     return state.board.cards.find((card) => card.id === cardId)?.parentId === columnId;
   }, [dropColumnId, await selectedId()]);
   check("Existing card can be dropped into the previewed column", movedCard);
+
+  // Dragging the child above the column must detach it from the column, not snap it back.
+  const childBox = await byId(sourceCardId).boundingBox();
+  const viewportForDrop = await page.locator("#viewport").boundingBox();
+  await page.mouse.move(childBox.x + 20, childBox.y + 20);
+  await page.mouse.down();
+  // Drop on an empty canvas area that is outside every column/row.
+  await page.mouse.move(
+    viewportForDrop.x + 640,
+    viewportForDrop.y + viewportForDrop.height - 90,
+    { steps: 12 }
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(450);
+  const detached = await page.evaluate(async (cardId) => {
+    const { state } = await import("/js/store.js");
+    return state.board.cards.find((card) => card.id === cardId)?.parentId === null;
+  }, sourceCardId);
+  check("Dragging a child outside its column releases it from the column", detached);
 }
 
 // Dropping into a row inserts by horizontal position too.

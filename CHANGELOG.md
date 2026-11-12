@@ -62,6 +62,9 @@ project uses Semantic Versioning.
 - While a card or rail tool hovers a column or row, the target container now reserves the insertion
   slot live: a dashed drop placeholder appears, the column grows or the row widens, and cards after
   the slot shift before the pointer is released. Leaving the container restores the original layout.
+- Existing cards dragged from outside a column/row now preview with their measured height and width,
+  and dropping a child outside both axes releases it from the container instead of snapping back.
+
 
 
 - Light/dark mode is now a global appearance preference. Opening or switching boards no longer

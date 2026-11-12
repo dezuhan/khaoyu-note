@@ -926,9 +926,11 @@ function finishDrag(current) {
         continue;
       }
       const center = { x: card.x + card.w / 2, y: card.y + card.h / 2 };
-      const stillInside =
-        center.x >= parent.x - 24 && center.x <= parent.x + parent.w + 24;
-      if (!stillInside) {
+      const insideX = center.x >= parent.x - 24 && center.x <= parent.x + parent.w + 24;
+      const insideY = center.y >= parent.y - 24 && center.y <= parent.y + parent.h + 24;
+      // Leaving the column vertically must release the child as well as leaving it horizontally;
+      // the old X-only check snapped a card back into the column when it was dropped above/below.
+      if (!insideX || !insideY) {
         card.parentId = null;
         card.order = 0;
       }
@@ -1107,7 +1109,7 @@ function updateDragIndicators(point) {
     gesture.dropTarget = { columnId: column.id, index };
     previewDrop(column, point, {
       width: ghostW,
-      height: innerH,
+      height: Math.max(56, ...moving.map((card) => Number(card.h) || 56)),
       label: "Drop",
       excludeIds: dragged,
     });
@@ -1137,12 +1139,10 @@ function updateDragIndicators(point) {
       break;
     }
   }
+  // Existing cards keep their measured height when previewed inside a column, so the reservation
+  // matches the card that will actually be dropped instead of a fitted media aspect estimate.
   const ghostHeight =
-    cards.reduce((total, card) => {
-      const aspect = card.aspect || CARD_ASPECTS[card.type];
-      const fitted = aspect ? Math.max(70, Math.round(innerW / aspect)) : card.h;
-      return total + fitted;
-    }, 0) +
+    cards.reduce((total, card) => total + Math.max(56, Number(card.h) || 56), 0) +
     Math.max(0, cards.length - 1) * COLUMN_GAP;
   Object.assign(ui.line.style, {
     left: `${innerX}px`,
