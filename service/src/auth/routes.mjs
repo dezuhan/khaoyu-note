@@ -3357,7 +3357,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const projectId = decodeURIComponent(opsMatch[1]);
         const role = await projectRole(db, projectId, auth.account.id);
         if (!role) throw new HttpError(404, "project not found", "not_found");
-        const project = (await db.get("SELECT last_seq FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+        const project = (await db.get("SELECT last_seq, revision FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
         if (!project) throw new HttpError(404, "project not found", "not_found");
         const after = Math.max(0, Number(url.searchParams.get("after")) || 0);
         const limit = Math.max(1, Math.min(500, Number(url.searchParams.get("limit")) || 200));
@@ -3390,6 +3390,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         sendJson(response, 200, {
           projectId,
           lastSeq: Number(project.last_seq),
+          revision: Number(project.revision),
           after,
           ops,
           hasMore: ops.length > 0 && ops[ops.length - 1].seq < Number(project.last_seq),

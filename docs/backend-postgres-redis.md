@@ -4,8 +4,9 @@ Status: backend protocol implemented, client integration pending. The async SQLi
 storage adapter, PostgreSQL migrations, backup/restore, operation log, single-use SSE tickets,
 advisory edit locks, global Redis presence, worker leader lock and realtime readiness state are
 implemented. `team` starts with PostgreSQL and Redis and fails closed if either is unavailable. The
-desktop/web sync client now writes `doc.replace` operations and listens to the ticket-authenticated SSE
-stream; cursor/selection presence and granular per-card diff operations remain to be implemented.
+desktop/web sync client now diffs local saves into granular card operations, consumes ticket-authenticated
+SSE ops events and applies them live. Same-field concurrent text edits are last-writer-wins;
+cursor/selection presence and a CRDT/OT text layer remain to be implemented.
 
 ## Decision
 
@@ -141,7 +142,7 @@ compaction is still limited to the existing version history rather than an op-co
    worker leadership.
 3. [done] Two-instance validation with PostgreSQL 18 + Redis: tickets, global presence, ops propagation,
    lock conflict and readiness passed.
-4. [done] Desktop/web client writes operations and refreshes from the realtime stream.
+4. [done] Desktop/web client writes granular operations and applies remote ops from the realtime stream.
 5. [pending] Cursor/selection presence, granular per-card diffs and OIDC onboarding/hardening.
 
 ## Verification note (2026-11-12)

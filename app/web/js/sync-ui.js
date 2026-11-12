@@ -75,10 +75,27 @@ function ensureRealtime() {
         if (type === "presence") {
           if (Number.isFinite(Number(data?.accounts))) {
             refs?.syncState?.setAttribute("data-presence", String(data.accounts));
+            refs?.syncState?.setAttribute(
+              "title",
+              `${data.accounts} user${data.accounts === 1 ? "" : "s"} in this project`
+            );
           }
           return;
         }
-        if (type !== "ops" && type !== "snapshot") return;
+        if (type === "ops") {
+          try {
+            const result = await sync.consumeRemoteOperations(state.board);
+            if (result.doc) {
+              await adoptRemoteBoard(result.doc);
+              await persistBoardSnapshot();
+            }
+            refresh();
+          } catch {
+            /* the normal sync pass will surface errors */
+          }
+          return;
+        }
+        if (type !== "snapshot") return;
         if (state.dirty) {
           if (state.board) state.board.sync.conflict = true;
           refresh();
@@ -118,7 +135,22 @@ function onBoardSaved(event) {
   if (!sync.syncEnabled(state.board)) return;
   if (state.board.sync.conflict) return;
   clearTimeout(autoTimer);
-  autoTimer = setTimeout(() => runSync({ quiet: true }), 1200);
+  autoTimer = setTimeout(async () => {
+    try {
+      const result = await sync.pushLiveChanges(state.board);
+      if (result.status === "pushed") {
+        await persistBoardSnapshot();
+        refresh();
+      } else if (result.status === "conflict") {
+        await runSync({ quiet: true });
+      }
+    } catch (error) {
+      if (error.offline) {
+        sync.enqueueForOffline(state.board);
+        refresh();
+      }
+    }
+  }, 500);
 }
 
 export function openSyncDialog() {

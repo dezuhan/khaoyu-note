@@ -80,6 +80,11 @@ project uses Semantic Versioning.
 - Deployment-readiness pass: PostgreSQL tests now reset the schema between suites so the full
   PostgreSQL/Redis service suite passes in one run; stale CI expectations for the enabled Share/Sync
   controls, Account Management, preview reservation and activity layout were updated.
+- Live collaboration is now wired end to end: local board saves push granular card/title operations
+  through the server-sequenced operation log, SSE ops events are replayed and applied to the other
+  clients, and presence reflects connected accounts. Two browser clients merge distinct card edits
+  live over SSE/Redis. Same-field concurrent text edits are last-writer-wins; character-level
+  CRDT/OT and cursor presence remain future work.
 - Sensitive account endpoints now have bounded rate limits: password change, TOTP setup/enable/
   disable, passkey registration, backup-code generation, export and account deletion. Added a
   self-hosted account-security readiness checklist documenting the remaining per-process limiter

@@ -224,8 +224,9 @@ record what exists and what is still partial.
   - Distributed lock management for board/column operations and real-time conflict avoidance.
   - Redis-backed rate limiting and session caching for collaborative endpoints.
 - [~] **Live collaboration protocol** (idempotent operation batches, per-project operation log, SSE
-  tickets, advisory edit locks, client operation writes/realtime refresh and snapshot fallback are
-  implemented; granular per-card diffs, offline merge and cursor/selection awareness are pending):
+  tickets, advisory edit locks, granular client operation writes, live remote op application and
+  snapshot fallback are implemented; same-field CRDT/OT text merging, offline merge and
+  cursor/selection awareness are pending):
   - Operational sync protocol for low-latency broadcast of card movements, edits, and column reordering.
   - Heartbeat-driven presence rooms with graceful disconnect handling and state reconciliation.
   - Offline sync merge: replay offline queue from local SQLite into the PostgreSQL project upon reconnection.

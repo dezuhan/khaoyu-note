@@ -261,5 +261,35 @@ assert.equal(sync.loadSyncConfig().token, "token-value");
 const writes = calls.filter((call) => call.method === "DELETE");
 assert.equal(writes.length, 0);
 
+// Granular live operations: different cards can be merged without replacing the whole document.
+const liveBefore = {
+  id: "b1",
+  title: "Board",
+  cards: [
+    { id: "a", type: "note", text: "one", x: 0, y: 0 },
+    { id: "b", type: "note", text: "two", x: 10, y: 10 },
+  ],
+  connections: [],
+  trash: [],
+};
+const liveAfter = {
+  ...liveBefore,
+  title: "Live board",
+  cards: [
+    { id: "a", type: "note", text: "one edited", x: 0, y: 0 },
+    { id: "b", type: "note", text: "two", x: 10, y: 10 },
+    { id: "c", type: "note", text: "three", x: 20, y: 20 },
+  ],
+};
+const liveOps = sync.diffBoardOperations(liveBefore, liveAfter);
+assert.equal(liveOps.some((op) => op.type === "doc.title"), true);
+assert.equal(liveOps.some((op) => op.type === "card.update" && op.payload.id === "a"), true);
+assert.equal(liveOps.some((op) => op.type === "card.add" && op.payload.card.id === "c"), true);
+const appliedLive = sync.applyBoardOperations(liveBefore, liveOps);
+assert.equal(appliedLive.title, "Live board");
+assert.equal(appliedLive.cards.find((card) => card.id === "a").text, "one edited");
+assert.equal(appliedLive.cards.some((card) => card.id === "c"), true);
+assert.deepEqual(sync.diffBoardOperations(liveBefore, { ...liveBefore, view: { x: 1 } }), []);
+
 console.log("PASS  sync url, connection status, create, push, pull, conflict, offline queue and no delete");
 console.log(`${calls.length} fake service calls`);
