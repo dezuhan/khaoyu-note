@@ -1,7 +1,10 @@
 // The main board frontend owns server/workspace switching and public share viewing. The service
 // frontend only owns accounts and administration.
 
+import { icon } from "./icons.js";
+
 const SERVERS_KEY = "mn.servers";
+const WORKSPACE_CACHE_KEY = "mn.workspaceCache";
 let popover = null;
 let boardOverlay = null;
 let activeServer = null;
@@ -91,142 +94,146 @@ function ensurePopover(anchor) {
   return popover;
 }
 
-function serverRow(server, active) {
-  return `<button type="button" class="mn-workspace-popover-row${active ? " is-active" : ""}" data-server="${escapeText(
-    server.url
-  )}"><span><strong>${escapeText(server.name || new URL(server.url).host)}</strong><small>${escapeText(
-    server.email || new URL(server.url).host
-  )}</small></span></button>`;
+function readWorkspaceCache(serverUrl) {
+  try {
+    return JSON.parse(localStorage.getItem(WORKSPACE_CACHE_KEY) || "{}")[serverUrl] || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkspaceCache(serverUrl, workspaces) {
+  try {
+    const all = JSON.parse(localStorage.getItem(WORKSPACE_CACHE_KEY) || "{}");
+    all[serverUrl] = workspaces;
+    localStorage.setItem(WORKSPACE_CACHE_KEY, JSON.stringify(all));
+  } catch {
+    /* cache is optional */
+  }
+}
+
+function withTimeout(promise, ms = 6000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Server did not respond. Check the URL and tunnel.")), ms)),
+  ]);
+}
+
+function serverTitle(server) {
+  return `<div class="mn-workspace-server-title">${icon("globe", 14)}<span><strong>${escapeText(
+    server.name || new URL(server.url).host
+  )}</strong><small>${escapeText(server.email || new URL(server.url).host)}</small></span></div><div class="mn-workspace-popover-sep"></div>`;
 }
 
 export async function openWorkspacePopover(anchor) {
   const view = ensurePopover(anchor);
+  const current = servers();
   view.innerHTML = `
     <div class="mn-workspace-popover-head"><span>Workspace</span><span>${escapeText(location.host)}</span></div>
-    <button type="button" class="mn-workspace-popover-row is-active" data-local="1"><span><strong>Local storage</strong><small>This browser’s boards</small></span></button>
+    <button type="button" class="mn-workspace-popover-row is-active" data-local="1">${icon("database", 16)}<span><strong>Local storage</strong><small>This browser’s boards</small></span></button>
     <div class="mn-workspace-popover-sep"></div>
-    <div data-role="server-rows"></div>
-    <div data-role="server-boards"></div>
-    <button type="button" class="mn-workspace-popover-row" data-add-server="1"><span><strong>+ Add Server</strong><small>Connect a Khaoyu service</small></span></button>`;
-  const rows = view.querySelector('[data-role="server-rows"]');
-  const current = servers();
-  rows.innerHTML = current.length
-    ? current.map((server) => serverRow(server, activeServer?.url === server.url)).join("")
-    : `<p class="mn-server-note" style="padding:8px">No remote server connected.</p>`;
+    <div data-role="server-sections"></div>
+    <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>
+    <div class="mn-workspace-popover-sep"></div>
+    <button type="button" class="mn-workspace-popover-row is-muted" data-role="import-workspace">${icon("download", 16)}<span><strong>Import workspace</strong><small>Coming soon</small></span></button>
+    <button type="button" class="mn-workspace-popover-row" data-role="create-workspace">${icon("plus", 16)}<span><strong>Create workspace</strong><small>On the connected server</small></span></button>`;
   view.querySelector('[data-local]').addEventListener("click", closePopover);
   view.querySelector('[data-add-server]').addEventListener("click", () => openAddServerDialog(anchor));
-  for (const button of rows.querySelectorAll("[data-server]")) {
-    const server = current.find((entry) => entry.url === button.dataset.server);
-    button.addEventListener("click", () => loadServerBoards(server, view));
-  }
-  if (current[0]) loadServerBoards(current[0], view);
-}
-
-async function loadServerBoards(server, view) {
-  if (!server || !view) return;
-  activeServer = server;
-  const rows = view.querySelector('[data-role="server-rows"]');
-  for (const button of rows.querySelectorAll("[data-server]")) {
-    button.classList.toggle("is-active", button.dataset.server === server.url);
-  }
-  const target = view.querySelector('[data-role="server-boards"]');
-  target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading ${escapeText(server.name)}...</p>`;
-  try {
-    const data = await jsonFetch(`${server.url}/api/v1/workspaces`, {}, server.token);
-    const workspaces = data.workspaces || [];
-    if (!workspaces.length) {
-      target.innerHTML = `<p class="mn-server-note" style="padding:8px">No workspace is shared with this account.</p>`;
+  view.querySelector('[data-role="import-workspace"]').addEventListener("click", () => {
+    window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Workspace import is coming soon" } }));
+  });
+  view.querySelector('[data-role="create-workspace"]').addEventListener("click", () => {
+    if (!current[0]) {
+      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Connect a server first" } }));
       return;
     }
-    const pending = await jsonFetch(`${server.url}/api/v1/workspace-invitations`, {}, server.token).catch(() => ({ invitations: [] }));
-    const inviteRows = (pending.invitations || []).length
-      ? `<div class="mn-workspace-popover-head"><span>Invitations</span></div>${(pending.invitations || [])
-          .map(
-            (invite) =>
-              `<div class="mn-workspace-popover-row"><span><strong>Workspace invitation</strong><small>${escapeText(
-                invite.requested_role
-              )} · ${escapeText(invite.workspace_id)}</small></span><button type="button" class="mn-btn" data-invite-accept="${escapeText(
-                invite.id
-              )}">Accept</button><button type="button" class="mn-btn" data-invite-decline="${escapeText(
-                invite.id
-              )}">Decline</button></div>`
-          )
-          .join("")}`
-      : "";
-    target.innerHTML = inviteRows + `<div class="mn-workspace-popover-head"><span>Workspaces</span></div><div data-role="workspace-rows">${workspaces
-      .map(
-        (workspace) =>
-          `<button type="button" class="mn-workspace-popover-row" data-workspace="${escapeText(workspace.id)}"><span><strong>${escapeText(
-            workspace.name || "Workspace"
-          )}</strong><small>${escapeText(workspace.role || "member")} · default ${escapeText(
-            workspace.memberDefaultBoardRole || "viewer"
-          )}</small></span></button>`
-      )
-      .join("")}</div><div class="mn-workspace-popover-actions"><button type="button" class="mn-btn" data-role="workspace-members">Members</button><button type="button" class="mn-btn" data-role="workspace-invite">Invite</button></div><div data-role="workspace-boards"></div>`;
-    for (const button of target.querySelectorAll("[data-invite-accept], [data-invite-decline]")) {
-      button.addEventListener("click", async () => {
-        const accept = button.dataset.inviteAccept;
-        try {
-          await jsonFetch(
-            `${server.url}/api/v1/workspace-invitations/${encodeURIComponent(accept || button.dataset.inviteDecline)}/${accept ? "accept" : "decline"}`,
-            { method: "POST", body: {} },
-            server.token
-          );
-          await loadServerBoards(server, view);
-        } catch (error) {
-          window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: error.message } }));
-        }
-      });
-    }
-    const workspaceRows = target.querySelector('[data-role="workspace-rows"]');
-    for (const button of workspaceRows.querySelectorAll("[data-workspace]")) {
-      const workspace = workspaces.find((entry) => entry.id === button.dataset.workspace);
-      button.addEventListener("click", () => loadWorkspaceBoards(server, workspace, target));
-    }
-    target.querySelector('[data-role="workspace-members"]')?.addEventListener("click", () => {
-      const workspace = workspaces.find((entry) => entry.id === buttonWorkspaceId(workspaceRows)) || workspaces[0];
-      if (workspace) void openWorkspaceMembers(server, workspace, workspaces[0]);
-    });
-    target.querySelector('[data-role="workspace-invite"]')?.addEventListener("click", () => {
-      const workspace = workspaces.find((entry) => entry.id === buttonWorkspaceId(workspaceRows)) || workspaces[0];
-      if (workspace) void openWorkspaceInvite(server, workspace, workspaces[0], target);
-    });
-    await loadWorkspaceBoards(server, workspaces[0], target);
-  } catch (error) {
-    target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
+    openCreateWorkspaceDialog(current[0], anchor);
+  });
+  const sections = view.querySelector('[data-role="server-sections"]');
+  if (!current.length) {
+    sections.innerHTML = `<p class="mn-server-note" style="padding:8px">No remote server connected.</p>`;
+    return;
+  }
+  for (const server of current) {
+    const section = document.createElement("section");
+    section.className = "mn-workspace-server-section";
+    section.innerHTML = `${serverTitle(server)}<div data-role="workspaces"><p class="mn-server-note" style="padding:8px">Loading workspaces...</p></div>`;
+    sections.append(section);
+    void loadServerWorkspaces(server, section, view);
   }
 }
 
-async function loadWorkspaceBoards(server, workspace, root) {
-  if (!server || !workspace || !root) return;
-  for (const button of root.querySelectorAll("[data-workspace]")) {
-    button.classList.toggle("is-active", button.dataset.workspace === workspace.id);
+async function loadServerWorkspaces(server, section, view) {
+  const target = section.querySelector('[data-role="workspaces"]');
+  const cached = readWorkspaceCache(server.url);
+  if (cached?.length) renderWorkspaceRows(server, cached, target, view);
+  try {
+    const data = await withTimeout(jsonFetch(`${server.url}/api/v1/workspaces`, {}, server.token));
+    const workspaces = data.workspaces || [];
+    writeWorkspaceCache(server.url, workspaces);
+    renderWorkspaceRows(server, workspaces, target, view);
+  } catch (error) {
+    if (!cached?.length) {
+      target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)} <button type="button" class="mn-btn" data-role="retry">Retry</button></p>`;
+      target.querySelector('[data-role="retry"]')?.addEventListener("click", () => void loadServerWorkspaces(server, section, view));
+    }
   }
-  const target = root.querySelector('[data-role="workspace-boards"]');
+}
+
+function renderWorkspaceRows(server, workspaces, target, view) {
+  if (!workspaces.length) {
+    target.innerHTML = `<p class="mn-server-note" style="padding:8px">No workspace is shared with this account.</p>`;
+    return;
+  }
+  target.innerHTML = `<div class="mn-workspace-popover-boards">${workspaces
+    .map(
+      (workspace) =>
+        `<button type="button" class="mn-workspace-popover-board" data-workspace="${escapeText(
+          workspace.id
+        )}"><strong>${escapeText(workspace.name || "Workspace")}</strong><span>${escapeText(
+          workspace.role || "member"
+        )} · default ${escapeText(workspace.memberDefaultBoardRole || "viewer")}</span></button>`
+    )
+    .join("")}</div><div data-role="workspace-detail"></div>`;
+  for (const button of target.querySelectorAll("[data-workspace]")) {
+    const workspace = workspaces.find((entry) => entry.id === button.dataset.workspace);
+    button.addEventListener("click", () => {
+      target.querySelectorAll("[data-workspace]").forEach((entry) => entry.classList.toggle("is-active", entry === button));
+      void loadWorkspaceBoards(server, workspace, target, view);
+    });
+  }
+}
+
+async function loadWorkspaceBoards(server, workspace, root, view) {
+  const target = root.querySelector('[data-role="workspace-detail"]');
+  if (!target) return;
   target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading boards...</p>`;
   try {
-    const data = await jsonFetch(
-      `${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/boards`,
-      {},
-      server.token
+    const data = await withTimeout(
+      jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/boards`, {}, server.token)
     );
     const projects = data.projects || [];
-    target.innerHTML = projects.length
-      ? `<div class="mn-workspace-popover-boards">${projects
-          .map(
-            (project) =>
-              `<button type="button" class="mn-workspace-popover-board" data-project="${escapeText(project.id)}"><strong>${escapeText(
-                project.name || "Untitled board"
-              )}</strong><span>${escapeText(project.role || "viewer")} · revision ${escapeText(project.revision ?? 1)}</span></button>`
-          )
-          .join("")}</div>`
-      : `<p class="mn-server-note" style="padding:8px">No boards in this workspace.</p>`;
+    target.innerHTML = `<div class="mn-workspace-popover-actions"><button type="button" class="mn-btn" data-role="workspace-members">Members</button><button type="button" class="mn-btn" data-role="workspace-invite">Invite</button></div><div class="mn-workspace-popover-boards">${
+      projects.length
+        ? projects
+            .map(
+              (project) =>
+                `<button type="button" class="mn-workspace-popover-board" data-project="${escapeText(
+                  project.id
+                )}"><strong>${escapeText(project.name || "Untitled board")}</strong><span>${escapeText(
+                  project.role || "viewer"
+                )} · revision ${escapeText(project.revision ?? 1)}</span></button>`
+            )
+            .join("")
+        : `<p class="mn-server-note" style="padding:8px">No boards in this workspace.</p>`
+    }</div>`;
+    target.querySelector('[data-role="workspace-members"]')?.addEventListener("click", () => void openWorkspaceMembers(server, workspace));
+    target.querySelector('[data-role="workspace-invite"]')?.addEventListener("click", () => void openWorkspaceInvite(server, workspace, root));
     for (const button of target.querySelectorAll("[data-project]")) {
       const project = projects.find((entry) => entry.id === button.dataset.project);
       button.addEventListener("click", () => {
-        if (["owner", "editor"].includes(String(project.role || ""))) {
-          void openEditableBoard(server, project, server.token);
-        } else {
+        if (["owner", "editor"].includes(String(project.role || ""))) void openEditableBoard(server, project, server.token);
+        else {
           closePopover();
           void openBoard(server, project, server.token);
         }
@@ -237,8 +244,33 @@ async function loadWorkspaceBoards(server, workspace, root) {
   }
 }
 
-function buttonWorkspaceId(rows) {
-  return rows.querySelector("[data-workspace].is-active")?.dataset.workspace || rows.querySelector("[data-workspace]")?.dataset.workspace || "";
+function openCreateWorkspaceDialog(server, anchor) {
+  closePopover();
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Create workspace">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Create workspace</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+    <div class="mn-modal-body mn-workspace-form"><label>Workspace name<input class="ky-input" name="name" placeholder="Team workspace" required /></label><p class="mn-workspace-form-error" data-role="error" role="status"></p></div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Create</button></footer></form>`;
+  document.body.append(overlay);
+  const form = overlay.querySelector("form");
+  const close = () => overlay.remove();
+  form.querySelector(".mn-modal-close").addEventListener("click", close);
+  form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const error = form.querySelector('[data-role="error"]');
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      await jsonFetch(`${server.url}/api/v1/workspaces`, { method: "POST", body: { name: form.name.value.trim() } }, server.token);
+      close();
+      await openWorkspacePopover(anchor);
+    } catch (err) {
+      error.textContent = err.message;
+      submit.disabled = false;
+    }
+  });
 }
 
 async function openWorkspaceMembers(server, workspace, fallbackWorkspace) {
@@ -274,7 +306,7 @@ async function openWorkspaceMembers(server, workspace, fallbackWorkspace) {
   }
 }
 
-async function openWorkspaceInvite(server, workspace, fallbackWorkspace, root) {
+async function openWorkspaceInvite(server, workspace, root) {
   const overlay = document.createElement("div");
   overlay.className = "mn-overlay";
   overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Invite to workspace">

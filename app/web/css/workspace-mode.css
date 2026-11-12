@@ -285,3 +285,33 @@
   width: auto;
   min-width: 90px;
 }
+
+.mn-workspace-server-section {
+  padding-bottom: var(--ky-space-4);
+}
+
+.mn-workspace-server-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ky-space-8);
+  padding: var(--ky-space-8);
+  color: var(--ky-muted);
+}
+
+.mn-workspace-server-title span {
+  display: grid;
+}
+
+.mn-workspace-server-title strong {
+  color: var(--ky-text);
+  font-size: var(--ky-text-sm);
+}
+
+.mn-workspace-server-title small {
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+.mn-workspace-popover-row.is-muted {
+  opacity: 0.6;
+}
