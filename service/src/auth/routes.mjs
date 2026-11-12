@@ -3119,6 +3119,21 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         requireScope(auth, "projects:write");
         const body = await readJson(request);
         const title = requireString(body.title, "title", 120);
+        const workspaceId =
+          body.workspaceId === undefined || body.workspaceId === null
+            ? "workspace_default"
+            : requireString(body.workspaceId, "workspaceId", 200);
+        if (workspaceId !== "workspace_default") {
+          // A board can be created inside a workspace only by its owner or an admin.
+          const member = await db.get(
+            "SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'",
+            [workspaceId, auth.account.id]
+          );
+          if (!member) throw new HttpError(404, "workspace not found", "not_found");
+          if (!["owner", "admin"].includes(member.role)) {
+            throw new HttpError(403, "workspace admin required", "workspace_admin_required");
+          }
+        }
         let parentProjectId = null;
         if (body.parentProjectId !== undefined && body.parentProjectId !== null) {
           parentProjectId = requireString(body.parentProjectId, "parentProjectId", 200);
@@ -3131,7 +3146,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         await db.transaction(async (tx) => {
           await tx.run(
             "INSERT INTO projects (id, owner_account_id, name, parent_project_id, workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [projectId, auth.account.id, title, parentProjectId, "workspace_default", now(), now()]
+            [projectId, auth.account.id, title, parentProjectId, workspaceId, now(), now()]
           );
           await tx.run(
             "INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'owner', ?)",
@@ -3159,7 +3174,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         sendJson(
           response,
           201,
-          { id: projectId, title, revision: 1, role: "owner", parentProjectId },
+          { id: projectId, title, revision: 1, role: "owner", parentProjectId, workspaceId },
           config
         );
         return true;

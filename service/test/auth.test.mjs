@@ -506,6 +506,41 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.deepEqual(JSON.parse(version.clock), { A: 1, B: 2 });
   });
 
+  await t.test("a board can be created inside a workspace", async () => {
+    const owner = await api.account(`ws-${crypto.randomUUID()}@example.com`);
+    const workspace = await api.call("/api/v1/workspaces", {
+      method: "POST",
+      jar: owner.jar,
+      body: { name: "Client workspace" },
+    });
+    assert.equal(workspace.status, 201, JSON.stringify(workspace.body));
+    const created = await api.call("/api/v1/projects", {
+      method: "POST",
+      jar: owner.jar,
+      body: { title: "Scoped board", workspaceId: workspace.body.id },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.workspaceId, workspace.body.id);
+    const boards = await api.call(`/api/v1/workspaces/${workspace.body.id}/boards`, { jar: owner.jar });
+    assert.equal(boards.status, 200, JSON.stringify(boards.body));
+    assert.equal(boards.body.projects.some((project) => project.id === created.body.id), true);
+    const outsider = await api.account(`ws-out-${crypto.randomUUID()}@example.com`);
+    const denied = await api.call("/api/v1/projects", {
+      method: "POST",
+      jar: outsider.jar,
+      body: { title: "Nope", workspaceId: workspace.body.id },
+    });
+    assert.equal(denied.status, 404);
+    // Omitting workspaceId keeps the previous default-workspace behaviour.
+    const legacy = await api.call("/api/v1/projects", {
+      method: "POST",
+      jar: owner.jar,
+      body: { title: "Default board" },
+    });
+    assert.equal(legacy.status, 201);
+    assert.equal(legacy.body.workspaceId, "workspace_default");
+  });
+
   await t.test("registration does not require email verification before login", async () => {
     const email = `verify-${crypto.randomUUID()}@example.com`;
     await api.register(email);
