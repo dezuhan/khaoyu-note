@@ -239,22 +239,28 @@ try {
   await page.waitForSelector(".admin-table");
   const shellLayout = await page.evaluate(() => {
     const pane = document.getElementById("admin-pane");
-    pane.scrollTop = 600;
+    const scroller = document.querySelector('[data-role="activity-scroll"]');
+    scroller.scrollTop = 600;
     const sidebar = document.querySelector(".admin-rail").getBoundingClientRect();
+    const card = document.querySelector(".admin-activity").getBoundingClientRect();
     return {
-      paneScroll: pane.scrollTop,
+      tableScroll: scroller.scrollTop,
       pageScroll: document.documentElement.scrollTop,
+      paneScroll: pane.scrollTop,
       bodyOverflow: getComputedStyle(document.body).overflow,
       sidebarTop: sidebar.top,
+      cardBottom: card.bottom,
       viewport: window.innerHeight,
       documentHeight: document.documentElement.scrollHeight,
     };
   });
   check(
-    "admin shell keeps the sidebar fixed while the page scrolls",
+    "activity scrolls inside its rounded card while the sidebar stays fixed",
     shellLayout.pageScroll === 0 &&
+      shellLayout.paneScroll === 0 &&
       shellLayout.bodyOverflow === "hidden" &&
-      shellLayout.paneScroll > 0 &&
+      shellLayout.tableScroll > 0 &&
+      shellLayout.cardBottom <= shellLayout.viewport + 1 &&
       shellLayout.sidebarTop >= 0 &&
       shellLayout.documentHeight <= shellLayout.viewport + 1,
     JSON.stringify(shellLayout)

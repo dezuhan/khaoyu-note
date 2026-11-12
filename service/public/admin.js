@@ -715,7 +715,7 @@ async function renderActivity({ append = false } = {}) {
   if (!append) {
     activityOffset = 0;
     pane.innerHTML = `
-      <div class="ky-section admin-section">
+      <div class="ky-section admin-section admin-activity">
         <div class="admin-section-head"><div><h2>Activity</h2><p>All users, newest first.</p></div></div>
         <form class="admin-toolbar" data-role="activity-search">
           <input class="admin-search" name="q" value="${escapeHtml(activityFilter.q)}" placeholder="Search actor, action or resource" />
@@ -731,7 +731,9 @@ async function renderActivity({ append = false } = {}) {
           </select>
           <button class="ky-button ky-button-primary" type="submit">Filter</button>
         </form>
-        <div data-role="activity-body"><div class="admin-loading">Loading activity...</div></div>
+        <div class="admin-activity-scroll" data-role="activity-scroll">
+          <div data-role="activity-body"><div class="admin-loading">Loading activity...</div></div>
+        </div>
         <div class="admin-actions" data-role="activity-more"></div>
       </div>`;
     pane.querySelector('[data-role="activity-search"]').addEventListener("submit", (event) => {

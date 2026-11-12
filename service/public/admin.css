@@ -1512,3 +1512,31 @@ body.admin-body {
   font-size: var(--ky-text-sm);
   letter-spacing: 0.04em;
 }
+
+/* Activity stays inside its rounded card; the table region scrolls independently. */
+.admin-activity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-activity-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-activity-scroll .ky-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ky-surface);
+}
+
+.admin-activity .admin-actions {
+  flex: 0 0 auto;
+  margin-top: var(--ky-space-8);
+}

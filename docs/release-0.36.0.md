@@ -20,6 +20,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   a data-only PostgreSQL deployment script.
 - **Passkey backup codes**: creating a passkey issues ten one-time recovery codes, and the login page
   accepts a backup code with the account email when the passkey device is unavailable.
+- **Activity card**: the audit table scrolls inside its rounded, outlined section with a sticky header,
+  keeping the card frame and Load more button visible.
 - **Fixed service chrome**: the admin sidebar remains visible while page content scrolls internally;
   account security pages keep the document fixed to the viewport too.
 - **Account Management dashboard**: Profile, Security (password, 2FA, passkeys and API tokens) and

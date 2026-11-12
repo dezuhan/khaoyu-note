@@ -75,6 +75,8 @@ project uses Semantic Versioning.
 - Passkey registration now issues ten one-time **backup codes** (both in the admin Security page and
   on `/passkeys`). Codes are hashed at rest, shown once, invalidated on regeneration, and can be used
   with an email on the login page as a passwordless fallback. Migration 016 adds `recovery_codes`.
+- The Activity table scrolls inside its rounded section card with a sticky header, so the card outline
+  and Load more control remain visible while browsing a long audit trail.
 - The admin dashboard now owns the viewport: the service sidebar and menubar stay fixed while the active
   page scrolls inside the content pane. Account security pages use the same fixed-viewport model, so
   long pages no longer scroll the whole document.
