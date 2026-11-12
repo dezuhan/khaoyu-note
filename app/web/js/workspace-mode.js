@@ -143,11 +143,7 @@ export async function openWorkspacePopover(anchor) {
     window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Workspace import is coming soon" } }));
   });
   view.querySelector('[data-role="create-workspace"]').addEventListener("click", () => {
-    if (!current[0]) {
-      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Connect a server first" } }));
-      return;
-    }
-    openCreateWorkspaceDialog(current[0], anchor);
+    openCreateWorkspaceDialog(current, anchor);
   });
   const sections = view.querySelector('[data-role="server-sections"]');
   if (!current.length) {
@@ -244,90 +240,60 @@ async function loadWorkspaceBoards(server, workspace, root, view) {
   }
 }
 
-function openCreateWorkspaceDialog(server, anchor) {
+function openCreateWorkspaceDialog(serversList, anchor) {
   closePopover();
+  const serverOptions = (serversList || [])
+    .map(
+      (server) =>
+        `<option value="${escapeText(server.url)}">${escapeText(server.name || new URL(server.url).host)}</option>`
+    )
+    .join("");
   const overlay = document.createElement("div");
   overlay.className = "mn-overlay";
-  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Create workspace">
-    <header class="mn-modal-head"><h2 class="mn-modal-title">Create workspace</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
-    <div class="mn-modal-body mn-workspace-form"><label>Workspace name<input class="ky-input" name="name" placeholder="Team workspace" required /></label><p class="mn-workspace-form-error" data-role="error" role="status"></p></div>
+  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Name your workspace">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Name your workspace</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+    <div class="mn-modal-body mn-workspace-form">
+      <p class="mn-workspace-form-note">A workspace is your virtual space to capture, create and plan as just one person or together as a team.</p>
+      <label>Workspace name<input class="ky-input" name="name" placeholder="Set a workspace name" autocomplete="off" required /></label>
+      <label>Workspace type<select class="ky-input" name="type"><option value="local">Local storage</option>${serverOptions}</select></label>
+      <p class="mn-workspace-form-error" data-role="error" role="status"></p>
+    </div>
     <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Create</button></footer></form>`;
   document.body.append(overlay);
   const form = overlay.querySelector("form");
+  const error = form.querySelector('[data-role="error"]');
   const close = () => overlay.remove();
   form.querySelector(".mn-modal-close").addEventListener("click", close);
   form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  overlay.addEventListener("pointerdown", (event) => { if (event.target === overlay) close(); });
+  form.querySelector('[name="type"]').addEventListener("change", () => { error.textContent = ""; });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const error = form.querySelector('[data-role="error"]');
+    const name = form.elements.namedItem("name").value.trim();
+    if (!name) { error.textContent = "Enter a workspace name."; return; }
+    const type = form.elements.namedItem("type").value;
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
     try {
-      await jsonFetch(`${server.url}/api/v1/workspaces`, { method: "POST", body: { name: form.name.value.trim() } }, server.token);
+      if (type === "local") {
+        const store = await import("./store.js");
+        await store.createBoard(name);
+        close();
+        window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Local workspace created" } }));
+        return;
+      }
+      const server = serversList.find((entry) => entry.url === type);
+      if (!server) throw new Error("The selected server is no longer connected.");
+      await withTimeout(
+        jsonFetch(`${server.url}/api/v1/workspaces`, { method: "POST", body: { name } }, server.token)
+      );
       close();
       await openWorkspacePopover(anchor);
+      window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Workspace created" } }));
     } catch (err) {
       error.textContent = err.message;
       submit.disabled = false;
     }
-  });
-}
-
-async function openWorkspaceMembers(server, workspace, fallbackWorkspace) {
-  try {
-    const data = await jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/members`, {}, server.token);
-    const members = data.members || [];
-    const overlay = document.createElement("div");
-    overlay.className = "mn-overlay";
-    overlay.innerHTML = `<section class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Workspace members">
-      <header class="mn-modal-head"><h2 class="mn-modal-title">${escapeText(workspace.name)} members</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
-      <div class="mn-modal-body mn-workspace-form"><div data-role="member-list"></div><p class="mn-workspace-form-error" data-role="error"></p></div>
-      <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="close">Close</button></footer></section>`;
-    document.body.append(overlay);
-    const list = overlay.querySelector('[data-role="member-list"]');
-    const close = () => overlay.remove();
-    overlay.querySelector(".mn-modal-close").addEventListener("click", close);
-    overlay.querySelector('[data-role="close"]').addEventListener("click", close);
-    overlay.addEventListener("pointerdown", (event) => { if (event.target === overlay) close(); });
-    const renderList = () => {
-      list.innerHTML = members.map((member) => `<div class="mn-workspace-member" data-member="${escapeText(member.id)}"><span><strong>${escapeText(member.display_name || member.email)}</strong><small>${escapeText(member.email)}</small></span><select class="ky-input" data-role="member-role">${["owner","admin","member"].map((role)=>`<option value="${role}"${member.role===role?" selected":""}>${role}</option>`).join("")}</select></div>`).join("");
-      for (const select of list.querySelectorAll('[data-role="member-role"]')) {
-        select.addEventListener("change", async () => {
-          const row = select.closest("[data-member]");
-          try {
-            await jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/members/${encodeURIComponent(row.dataset.member)}`, { method: "PATCH", body: { role: select.value } }, server.token);
-          } catch (error) { overlay.querySelector('[data-role="error"]').textContent = error.message; }
-        });
-      }
-    };
-    renderList();
-  } catch (error) {
-    window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: error.message } }));
-  }
-}
-
-async function openWorkspaceInvite(server, workspace, root) {
-  const overlay = document.createElement("div");
-  overlay.className = "mn-overlay";
-  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Invite to workspace">
-    <header class="mn-modal-head"><h2 class="mn-modal-title">Invite to ${escapeText(workspace.name)}</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
-    <div class="mn-modal-body mn-workspace-form"><label>Email<input class="ky-input" name="email" type="email" required /></label><label>Role<select class="ky-input" name="role"><option value="member">Member</option><option value="admin">Admin</option></select></label><p class="mn-workspace-form-error" data-role="error" role="status"></p></div>
-    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Send invitation</button></footer></form>`;
-  document.body.append(overlay);
-  const form = overlay.querySelector("form");
-  const close = () => overlay.remove();
-  form.querySelector(".mn-modal-close").addEventListener("click", close);
-  form.querySelector('[data-role="cancel"]').addEventListener("click", close);
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const error = form.querySelector('[data-role="error"]');
-    const submit = form.querySelector('button[type="submit"]');
-    submit.disabled = true;
-    try {
-      await jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/invitations`, { method: "POST", body: { email: form.email.value.trim(), role: form.role.value } }, server.token);
-      close();
-      await loadWorkspaceBoards(server, workspace, root);
-    } catch (err) { error.textContent = err.message; submit.disabled = false; }
   });
 }
 

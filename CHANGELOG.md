@@ -132,6 +132,9 @@ project uses Semantic Versioning.
   the read-only preview. Remote boards use a non-persisted in-memory mode so their operation diff is
   pushed to the service rather than mirrored into the local SQLite card table; viewer accounts still
   get the read-only preview. The template button opens the workspace popover after normal app boot.
+- Create workspace now matches the Affine flow inside the app toolbar: “Name your workspace”,
+  workspace description, workspace name, and a workspace type selector for Local storage or any
+  connected server. Local workspaces create a local board; server workspaces use the workspace API.
 - Workspace switching now opens as an Affine-style popover from the existing template/workspace
   button instead of a full-screen page or a separate menubar button. The server-add flow uses the
   design-system modal (no native browser prompt), floating menus sit above the tool rail, and admin

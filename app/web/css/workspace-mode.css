@@ -315,3 +315,14 @@
 .mn-workspace-popover-row.is-muted {
   opacity: 0.6;
 }
+
+.mn-workspace-form-note {
+  margin: 0;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-sm);
+  line-height: 1.5;
+}
+
+.mn-workspace-form select.ky-input {
+  width: 100%;
+}
