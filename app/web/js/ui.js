@@ -319,30 +319,83 @@ function columnAtPoint(clientX, clientY) {
   return columns[0] || null;
 }
 
+function columnDropChildren(column) {
+  return columnChildren(state.board, column.id).filter(
+    (card) => !isTemporarilyDisabledType(card.type)
+  );
+}
+
+function columnDropIndex(column, point) {
+  const children = columnDropChildren(column);
+  if (column.direction === "row") {
+    let index = 0;
+    for (const child of children) {
+      if (point.x > child.x + child.w / 2) index += 1;
+      else break;
+    }
+    return index;
+  }
+  let index = 0;
+  for (const child of children) {
+    if (point.y > child.y + child.h / 2) index += 1;
+    else break;
+  }
+  return index;
+}
+
+function columnDropSlot(column, point, height) {
+  const children = columnDropChildren(column);
+  const index = columnDropIndex(column, point);
+  const gap = 10;
+  const innerW = column.w - 28;
+  if (column.direction === "row") {
+    let x = column.x + 14;
+    for (let i = 0; i < index; i += 1) x += children[i].w + gap;
+    const width = Math.max(120, Math.floor((innerW - gap * children.length) / (children.length + 1)));
+    return { x, y: column.y + 64, w: width, h: height, index };
+  }
+  let y = column.y + 64;
+  for (let i = 0; i < index; i += 1) y += children[i].h + gap;
+  return { x: column.x + 14, y, w: innerW, h: height, index };
+}
+
+function insertToolCard(column, card, index) {
+  const rest = columnChildren(state.board, column.id).filter(
+    (child) => child.id !== card.id && !isTemporarilyDisabledType(child.type)
+  );
+  const ordered = [...rest];
+  ordered.splice(Math.max(0, Math.min(index, ordered.length)), 0, card);
+  ordered.forEach((child, order) => {
+    child.parentId = column.id;
+    child.order = order;
+  });
+  layoutColumns(state.board);
+  markDirty("board");
+}
+
 function toolPreviewRect(probe, event) {
   const probeHeight =
     probe.type === "table"
       ? Math.max(probe.h, (probe.cells?.length || 0) * 28 + 4)
       : probe.h;
-  const column = columnAtPoint(event.clientX, event.clientY);
-  if (column) {
-    const children = column.collapsed ? [] : columnChildren(state.board, column.id);
-    let bottom = column.y + 64;
-    for (const child of children) bottom = Math.max(bottom, child.y + child.h);
-    const aspect = probe.aspect || CARD_ASPECTS[probe.type];
-    const width = column.w - 28;
-    return {
-      x: column.x + 14,
-      y: bottom + 10,
-      w: width,
-      h: aspect ? Math.max(70, Math.round(width / aspect)) : probeHeight,
-    };
-  }
   const viewport = document.getElementById("viewport");
   const rect = viewport.getBoundingClientRect();
-  const worldX = (event.clientX - rect.left - state.view.x) / state.view.zoom;
-  const worldY = (event.clientY - rect.top - state.view.y) / state.view.zoom;
-  return { x: worldX - probe.w / 2, y: worldY - probeHeight / 2, w: probe.w, h: probeHeight };
+  const point = {
+    x: (event.clientX - rect.left - state.view.x) / state.view.zoom,
+    y: (event.clientY - rect.top - state.view.y) / state.view.zoom,
+  };
+  const column = columnAtPoint(event.clientX, event.clientY);
+  if (column) {
+    const aspect = probe.aspect || CARD_ASPECTS[probe.type];
+    const slot = columnDropSlot(column, point, probeHeight);
+    return {
+      x: slot.x,
+      y: slot.y,
+      w: slot.w,
+      h: aspect ? Math.max(70, Math.round(slot.w / aspect)) : probeHeight,
+    };
+  }
+  return { x: point.x - probe.w / 2, y: point.y - probeHeight / 2, w: probe.w, h: probeHeight };
 }
 
 function showToolDragPreview(key, event) {
@@ -426,8 +479,8 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
     }
   }
   if (parentColumn) parentColumn.collapsed = false;
-  const order = parentColumn ? columnChildren(state.board, parentColumn.id).length : 0;
-  const parentFields = parentColumn ? { parentId: parentColumn.id, order } : {};
+  const dropIndex = parentColumn ? columnDropIndex(parentColumn, point) : 0;
+  const parentFields = parentColumn ? { parentId: parentColumn.id, order: dropIndex } : {};
 
   if (key === "line") {
     toast("Line tool: drag from one card or canvas point to another. Endpoints snap to cards.");
@@ -445,10 +498,7 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
     createNestedBoardCard({ x: point.x - 130, y: point.y - 60 })
       .then((card) => {
         if (!card || !parentColumn) return;
-        card.parentId = parentColumn.id;
-        card.order = order;
-        layoutColumns(state.board);
-        markDirty("board");
+        insertToolCard(parentColumn, card, dropIndex);
       })
       .catch((error) => toast("Could not create board: " + error));
     return;
@@ -473,6 +523,7 @@ function createToolFromDrop(key, clientX, clientY, columnId = null) {
     extra
   );
   if (!card) return;
+  if (parentColumn) insertToolCard(parentColumn, card, dropIndex);
   if (key === "image") {
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent("mn:pick-image", { detail: { cardId: card.id } }));
@@ -1666,7 +1717,8 @@ async function onDrop(event) {
   if (toolKey) {
     clearToolDragPreview();
     draggingToolKey = null;
-    createToolFromDrop(toolKey, event.clientX, event.clientY);
+    const column = columnAtPoint(event.clientX, event.clientY);
+    createToolFromDrop(toolKey, event.clientX, event.clientY, column?.id || null);
     return;
   }
   const files = [...(event.dataTransfer?.files || [])];

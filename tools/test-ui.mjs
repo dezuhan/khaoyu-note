@@ -1934,6 +1934,42 @@ check(
   `${notesBeforeDrop} -> ${notesAfterDrop} at ${Math.round(droppedBox.x)},${Math.round(droppedBox.y)}`
 );
 
+// ---------------------------------------------------------------- tool drop placement inside a column
+const dropColumnId = await page.evaluate(async () => {
+  const { state } = await import("/js/store.js");
+  const column = state.board.cards.find(
+    (card) => card.type === "column" && state.board.cards.some((child) => child.parentId === card.id)
+  );
+  return column?.id || null;
+});
+const dropColumn = byId(dropColumnId);
+const dropColumnBox = await dropColumn.boundingBox();
+const dropColumnChildrenBefore = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  return state.board.cards.filter((card) => card.parentId === columnId).length;
+}, dropColumnId);
+const noteToolBox2 = await page.locator('.mn-tool[data-tool="note"]').boundingBox();
+await page.mouse.move(noteToolBox2.x + noteToolBox2.width / 2, noteToolBox2.y + noteToolBox2.height / 2);
+await page.mouse.down();
+await page.mouse.move(dropColumnBox.x + dropColumnBox.width / 2, dropColumnBox.y + 72, { steps: 12 });
+await page.mouse.up();
+await page.waitForTimeout(700);
+const placedInColumn = await page.evaluate(async ([cardId, columnId]) => {
+  const { state } = await import("/js/store.js");
+  const card = state.board.cards.find((entry) => entry.id === cardId);
+  const siblings = state.board.cards
+    .filter((entry) => entry.parentId === columnId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  return { parentId: card?.parentId, order: card?.order, firstId: siblings[0]?.id, count: siblings.length };
+}, [await selectedId(), dropColumnId]);
+check(
+  "Tool dropped near the top of a column becomes its first child",
+  placedInColumn.parentId === dropColumnId &&
+    placedInColumn.firstId === (await selectedId()) &&
+    placedInColumn.count === dropColumnChildrenBefore + 1,
+  JSON.stringify(placedInColumn)
+);
+
 // ---------------------------------------------------------------- duplicate and copy a column tree
 await page.reload({ waitUntil: "load" });
 await page.waitForTimeout(1300);
@@ -2560,6 +2596,44 @@ if (await imageCard.count()) {
       (await imageCard.locator(".mn-image-crop img").isVisible())
   );
 }
+// Dropping into a row inserts by horizontal position too.
+await page.evaluate(async (columnId) => {
+  const actions = await import("/js/actions.js");
+  actions.setColumnDirection(columnId, "row");
+}, dropColumnId);
+await page.waitForTimeout(500);
+const rowDropBox = await byId(dropColumnId).boundingBox();
+const rowChildrenBefore = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  return state.board.cards.filter((card) => card.parentId === columnId).length;
+}, dropColumnId);
+const noteToolBox3 = await page.locator('.mn-tool[data-tool="note"]').boundingBox();
+await page.mouse.move(noteToolBox3.x + noteToolBox3.width / 2, noteToolBox3.y + noteToolBox3.height / 2);
+await page.mouse.down();
+await page.mouse.move(rowDropBox.x + 20, rowDropBox.y + 100, { steps: 12 });
+await page.mouse.up();
+await page.waitForTimeout(700);
+const placedInRow = await page.evaluate(async ([cardId, columnId]) => {
+  const { state } = await import("/js/store.js");
+  const card = state.board.cards.find((entry) => entry.id === cardId);
+  const siblings = state.board.cards
+    .filter((entry) => entry.parentId === columnId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  return { parentId: card?.parentId, firstId: siblings[0]?.id, count: siblings.length };
+}, [await selectedId(), dropColumnId]);
+check(
+  "Tool dropped at the left of a row becomes its first child",
+  placedInRow.parentId === dropColumnId &&
+    placedInRow.firstId === (await selectedId()) &&
+    placedInRow.count === rowChildrenBefore + 1,
+  JSON.stringify(placedInRow)
+);
+await page.evaluate(async (columnId) => {
+  const actions = await import("/js/actions.js");
+  actions.setColumnDirection(columnId, "column");
+}, dropColumnId);
+await page.waitForTimeout(500);
+
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
 const failed = results.filter((entry) => !entry.ok);

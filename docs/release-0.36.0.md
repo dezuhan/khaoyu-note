@@ -12,6 +12,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   is rate limited to 20 requests per 15-minute window per owner and IP.
 - **Global light/dark theme**: the theme is now an app-wide preference. Boards no longer store or
   apply their own theme, so switching boards or reloading keeps the chosen mode.
+- **Pointer-accurate tool drops**: dropping a rail tool into a column or row inserts it at the hovered
+  slot (not always at the end), and the preview line follows that slot.
 - **Shared component geometry**: spacing, type sizes and radii moved into the `--ky-space-*`,
   `--ky-text-*` and `--ky-radius-*` scale, with `.ky-card`, `.ky-section` and `.ky-table` shared by
   the service pages. `npm run test:theme-css` keeps literal px values out of service spacing.
