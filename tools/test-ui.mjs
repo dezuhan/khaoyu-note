@@ -194,6 +194,20 @@ check(
   columnStacking.childZ.every((z) => z > columnStacking.columnZ),
   `${columnStacking.columnZ} / ${columnStacking.childZ.join(",")}`
 );
+const childForOutline = page.locator(".mn-card.is-child").first();
+const childOutlineBefore = await childForOutline.evaluate((el) => getComputedStyle(el).boxShadow);
+const childOutlineBox = await childForOutline.boundingBox();
+await page.mouse.click(childOutlineBox.x + 18, childOutlineBox.y + 18);
+await page.waitForTimeout(250);
+const childOutlineAfter = await childForOutline.evaluate((el) => ({
+  selected: el.classList.contains("is-selected"),
+  shadow: getComputedStyle(el).boxShadow,
+}));
+check(
+  "Clicking a column child shows a selection outline",
+  childOutlineAfter.selected && childOutlineAfter.shadow !== childOutlineBefore,
+  childOutlineAfter.shadow === childOutlineBefore ? "unchanged" : "outline"
+);
 check(
   "Column child cards hide their resize grip",
   (await page

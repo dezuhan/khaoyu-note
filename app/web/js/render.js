@@ -775,6 +775,12 @@ export function buildCard(card) {
   }${card.type === "section" && card.positionLocked ? " is-position-locked" : ""}`;
   el.dataset.id = card.id;
   el.dataset.type = card.type;
+  // Cards are focusable so keyboard users get a visible focus ring; tabindex 0 keeps them in the
+  // normal tab order while the inner editor fields remain independently focusable.
+  el.tabIndex = 0;
+  el.setAttribute("role", "group");
+  const label = String(card.title || card.text || card.type).replace(/\s+/g, " ").trim();
+  el.setAttribute("aria-label", `${card.type}${label ? `: ${label.slice(0, 60)}` : ""}`);
   if (card.type === "section") {
     const sectionColor = card.sectionColor || "#F8D7DA";
     el.style.setProperty("--section-color", sectionColor);

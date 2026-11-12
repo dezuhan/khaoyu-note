@@ -408,6 +408,15 @@ body.ky-scope {
     0 0 0 3px color-mix(in srgb, var(--ky-accent) 16%, transparent);
 }
 
+.mn-card:focus {
+  outline: none;
+}
+
+.mn-card:focus-visible {
+  outline: 2px solid var(--ky-accent);
+  outline-offset: 3px;
+}
+
 .mn-card.is-editing {
   cursor: text;
 }
@@ -417,6 +426,12 @@ body.ky-scope {
   /* Nested radius: column radius (7) minus column padding (14) clamps to 0, lifted to 4 so the
      inner sheet corners stay soft instead of sharp. */
   border-radius: max(4px, calc(var(--ky-radius-control) - 14px));
+}
+
+.mn-card.is-child.is-selected {
+  /* `.is-child` owns the inset hairline, so restate a stronger accent ring when a column child is
+     the selected item; otherwise child cards lose the selection outline. */
+  box-shadow: inset 0 0 0 2px var(--ky-accent);
 }
 
 .mn-resize {

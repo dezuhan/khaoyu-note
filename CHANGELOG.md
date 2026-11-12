@@ -36,6 +36,8 @@ project uses Semantic Versioning.
 
 ### Fixed
 
+- Board cards are focusable groups: selecting a card inside a column now shows the accent selection
+  ring (it was hidden by the child hairline), and keyboard focus shows a 2 px accent outline.
 - Light/dark mode is now a global appearance preference. Opening or switching boards no longer
   applies a legacy theme stored in the board document or dirties the board, so the chosen theme
   stays the same everywhere and after a reload.
