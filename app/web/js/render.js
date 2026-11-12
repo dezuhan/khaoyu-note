@@ -594,9 +594,13 @@ function mapEmbedUrl(query) {
 function videoEmbedInfo(url, { autoplay = false, loop = false } = {}) {
   try {
     const u = new URL(url);
-    if (/youtube\.com$|youtu\.be$/.test(u.hostname)) {
+    if (!/^https?:$/.test(u.protocol)) return null;
+    const host = u.hostname.toLowerCase();
+    const youtubeHosts = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+    const vimeoHosts = new Set(["vimeo.com", "www.vimeo.com", "player.vimeo.com"]);
+    if (youtubeHosts.has(host)) {
       let id = "";
-      if (u.hostname === "youtu.be") {
+      if (host === "youtu.be") {
         id = u.pathname.slice(1).split("/")[0];
       } else if (u.pathname.startsWith("/shorts/")) {
         id = u.pathname.split("/")[2];
@@ -617,7 +621,7 @@ function videoEmbedInfo(url, { autoplay = false, loop = false } = {}) {
         poster: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
       };
     }
-    if (/vimeo\.com$/.test(u.hostname)) {
+    if (vimeoHosts.has(host)) {
       const id = u.pathname.split("/").filter(Boolean)[0];
       if (!id) return null;
       return {

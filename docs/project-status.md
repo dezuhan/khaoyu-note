@@ -243,6 +243,9 @@ Still blocked by the environment or missing credentials:
 - Operator admin endpoints expose audit export, abuse reports and service counts behind a separate rate-limited token.
 - Service admins can rename and delete teams and manage team membership (add by email, change role,
   remove); deletion cascades to child boards and revokes share links/invitations.
+- Public shares support an optional view watermark and per-link download cap; shared rich text is
+  sanitised server-side and remote video embeds use exact host allowlists. Optional AES-256-GCM
+  object encryption and a least-privilege PostgreSQL deployment script are documented.
 - Threat model, disclosure policy, incident response, release checklist and data residency docs are in the repository.
 - Backups can be encrypted with a scrypt-derived AES-256-GCM key, and login blocks can post a structured alert to an operator webhook.
 - Optional trusted-proxy SSO signs the proxy email with HMAC, can auto-create verified accounts and audits SSO sessions.

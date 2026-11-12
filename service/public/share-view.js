@@ -116,6 +116,18 @@ function render(data) {
     appendText(contentEl, "p", `This link expires ${new Date(data.expiresAt).toLocaleString()}.`, "muted");
   }
   appendText(contentEl, "p", "Shared read-only view. Do not forward this link to people who should not have access.", "muted");
+  if (data.watermark) {
+    const watermark = document.createElement("div");
+    watermark.className = "share-watermark";
+    watermark.setAttribute("aria-hidden", "true");
+    const label = data.project?.name || "Khaoyu Note · shared link";
+    for (let index = 0; index < 8; index += 1) {
+      const span = document.createElement("span");
+      span.textContent = label;
+      watermark.append(span);
+    }
+    document.body.append(watermark);
+  }
   unlockEl.hidden = true;
 }
 

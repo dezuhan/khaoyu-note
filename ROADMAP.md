@@ -54,12 +54,12 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
   database port; the service opens two loopback listeners (frontend proxy and backend API).
 - [x] Relational database for accounts, projects, memberships and audit data.
 - [x] Object storage for uploaded assets, addressed by opaque ids, never by user-supplied paths.
-- [ ] Background worker for email invitations, thumbnails, backups and cleanup jobs (partial: scheduled backups, temp cleanup, audit pruning, email retry queue and session/OTP cleanup implemented; thumbnail jobs pending).
+- [~] Background worker for email invitations, thumbnails, backups and cleanup jobs (scheduled backups, temp cleanup, audit pruning, email retry queue, session/OTP cleanup and expired share/invitation revocation implemented; worker status meta present; thumbnail jobs pending).
 - [x] Health endpoint that does not leak version, database or configuration details.
 
 ### Deployment
 
-- [ ] Supported deployment profiles: single-user, small team, reverse proxy behind HTTPS (partial: single-user and proxy deployment documented; team profiles wait for accounts in Milestone 2).
+- [x] Supported deployment profiles: single-user, team (PostgreSQL + Redis) and reverse proxy behind HTTPS; a least-privilege PostgreSQL role script is documented.
 - [x] Configuration through environment variables or a secrets file, never committed to the repo.
 - [x] Startup fails closed when required secrets are missing or weak.
 - [x] Database migrations run explicitly and are reversible where practical.
@@ -145,7 +145,7 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
 - [x] Public sharing is off by default and requires an explicit warning.
 - [x] Public links show only the selected scope.
 - [x] Search engines excluded with `noindex` and no sitemap exposure.
-- [ ] Optional watermark and download restrictions for shared assets (partial: download flag enforced and audited; watermarking pending).
+- [~] Optional watermark and download restrictions for shared assets (view watermark and per-link download cap implemented and audited; file-level watermarking and signed download URLs remain pending).
 - [x] Abuse reporting and a kill switch for operators.
 
 ## Security architecture requirements
@@ -165,18 +165,17 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
 - [~] Server-side validation for every request body, parameter and upload (implemented across the
   service routes; per-endpoint completeness is tracked in `docs/security-audit.md`).
 - [x] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks.
-- [ ] Markdown and rich text sanitised on the server before rendering. (The service returns JSON and
-  does not render card HTML; required only if a server-rendered share page is added.)
+- [x] Markdown and rich text sanitised on the server before rendering. Shared `html`/`markdown` fields pass an allowlist sanitizer before leaving the API.
 - [~] Stored XSS prevention through context-aware escaping and a strict CSP (CSP is enforced on every
   server-rendered response; a dedicated XSS test pass is still open).
 - [x] Parameterised database queries only.
-- [ ] Explicit allowlists for redirects and remote embed hosts (partial: media hosts are matched in the frontend; redirects are not implemented yet).
+- [~] Explicit allowlists for redirects and remote embed hosts (remote video embeds use exact YouTube/Vimeo host checks; there is no user-controlled redirect endpoint yet).
 - [x] Rate limits and payload limits on all public endpoints.
 
 ### Secrets and operations
 
 - [x] Secrets supplied by the environment or a secret manager, never baked into images.
-- [ ] Separate database credentials per service and least-privilege database roles (not applicable to the current single-file SQLite deployment).
+- [x] Separate database credentials per service and least-privilege database roles: `service/deploy/postgres-least-privilege.sql` creates a data-only application role; SQLite deployments use the OS file permissions/volume.
 - [x] No secret material in client bundles, crash reports or analytics.
 - [x] Structured audit logs for login, permission changes, share changes and destructive actions.
 - [x] Audit retention and export policy defined per deployment (retention and admin export are implemented; see `docs/data-residency.md`).

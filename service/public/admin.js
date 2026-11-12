@@ -881,9 +881,14 @@ function renderSharingLinks(shares) {
     item.className = "admin-share-row";
     const label = document.createElement("span");
     const expiry = share.expiresAt ? new Date(share.expiresAt).toLocaleDateString() : "no expiry";
+    const flags = [share.downloadAllowed ? "downloads" : "no downloads"];
+    if (share.watermark) flags.push("watermark");
+    if (share.downloadLimit !== null && share.downloadLimit !== undefined) {
+      flags.push(`downloads ${share.downloadCount || 0}/${share.downloadLimit}`);
+    }
     label.textContent = `${share.scope}${share.targetId ? " · " + share.targetId : ""} · ${
       share.permission
-    } · ${expiry}`;
+    } · ${expiry} · ${flags.join(" · ")}`;
     const revoke = document.createElement("button");
     revoke.type = "button";
     revoke.className = "ky-button ky-button-danger";
@@ -983,6 +988,8 @@ async function renderSharing() {
           <label class="admin-field"><span>Expiry days</span><input class="admin-search" id="expiry" type="number" min="1" max="365" placeholder="Never" /></label>
           <label class="admin-field"><span>Passphrase</span><input class="admin-search" id="password" type="password" autocomplete="new-password" /></label>
           <label class="admin-field"><span>Downloads</span><label class="admin-check"><input id="download" type="checkbox" /> Allow asset downloads</label></label>
+          <label class="admin-field"><span>Max downloads</span><input class="admin-search" id="download-limit" type="number" min="1" max="10000" placeholder="Unlimited" /></label>
+          <label class="admin-field"><span>Watermark</span><label class="admin-check"><input id="watermark" type="checkbox" /> Overlay a watermark on the shared view</label></label>
         </div>
         <div class="admin-actions admin-actions-spaced">
           <button class="ky-button ky-button-primary" id="create" type="button">Create share link</button>
@@ -1051,11 +1058,19 @@ async function renderSharing() {
   document.getElementById("create").addEventListener("click", async () => {
     try {
       const scope = document.getElementById("scope").value;
+      const downloadAllowed = document.getElementById("download").checked;
+      const limitValue = document.getElementById("download-limit").value;
+      if (limitValue && !downloadAllowed) {
+        sharingStatus("Enable asset downloads before setting a download limit.");
+        return;
+      }
       const body = {
         scope,
         permission: document.getElementById("permission").value,
-        downloadAllowed: document.getElementById("download").checked,
+        downloadAllowed,
+        watermark: document.getElementById("watermark").checked,
       };
+      if (limitValue) body.downloadLimit = Number(limitValue);
       if (scope !== "project") body.targetId = document.getElementById("target").value;
       if (document.getElementById("expiry").value) {
         body.expiresInDays = Number(document.getElementById("expiry").value);

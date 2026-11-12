@@ -56,6 +56,16 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     throw new Error("KHAOYU_SERVICE_BACKUP_PASSPHRASE must be at least 12 characters");
   }
 
+  const objectEncryptionKey = env.KHAOYU_SERVICE_OBJECT_KEY || "";
+  if (objectEncryptionKey) {
+    if (Buffer.byteLength(objectEncryptionKey, "utf8") < 32) {
+      throw new Error("KHAOYU_SERVICE_OBJECT_KEY must be at least 32 characters");
+    }
+    if (/^(change|replace|secret|password|example|test)/i.test(objectEncryptionKey)) {
+      throw new Error("KHAOYU_SERVICE_OBJECT_KEY still uses a placeholder value");
+    }
+  }
+
   const requireHttps = boolean(env.KHAOYU_SERVICE_REQUIRE_HTTPS, false);
   if (requireHttps && !publicUrl.startsWith("https://")) {
     throw new Error("KHAOYU_SERVICE_PUBLIC_URL must use https when HTTPS is required");
@@ -150,6 +160,7 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     instanceId,
     adminToken,
     backupPassphrase,
+    objectEncryptionKey,
     requireHttps,
     uploadScanCommand: env.KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND || "",
     alertWebhook,

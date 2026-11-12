@@ -2,10 +2,41 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+const ENCRYPTION_MAGIC = Buffer.from("KHOBJ1", "utf8");
+const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+
+function objectKey(value) {
+  return value ? crypto.createHash("sha256").update(String(value)).digest() : null;
+}
+
+function encryptObject(buffer, key) {
+  const nonce = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, nonce);
+  const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
+  return Buffer.concat([ENCRYPTION_MAGIC, nonce, cipher.getAuthTag(), encrypted]);
+}
+
+function decryptObject(buffer, key) {
+  if (buffer.length < ENCRYPTION_MAGIC.length + 28) {
+    throw new Error("encrypted object is truncated");
+  }
+  const nonce = buffer.subarray(ENCRYPTION_MAGIC.length, ENCRYPTION_MAGIC.length + 12);
+  const tag = buffer.subarray(ENCRYPTION_MAGIC.length + 12, ENCRYPTION_MAGIC.length + 28);
+  const data = buffer.subarray(ENCRYPTION_MAGIC.length + 28);
+  const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, nonce);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(data), decipher.final()]);
+}
+
+function isEncryptedObject(buffer) {
+  return buffer.length >= ENCRYPTION_MAGIC.length && buffer.subarray(0, ENCRYPTION_MAGIC.length).equals(ENCRYPTION_MAGIC);
+}
+
 export class ObjectStore {
-  constructor(db, objectsDir) {
+  constructor(db, objectsDir, encryptionKey = "") {
     this.db = db;
     this.objectsDir = path.resolve(objectsDir);
+    this.key = objectKey(encryptionKey);
     fs.mkdirSync(this.objectsDir, { recursive: true });
   }
 
@@ -28,7 +59,7 @@ export class ObjectStore {
     const target = this.resolveKey(storageKey);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     const temp = path.join(path.dirname(target), `.tmp-${id}`);
-    fs.writeFileSync(temp, buffer, { mode: 0o600 });
+    fs.writeFileSync(temp, this.key ? encryptObject(buffer, this.key) : buffer, { mode: 0o600 });
     fs.renameSync(temp, target);
     await this.db.run(
       "INSERT INTO objects (id, sha256, bytes, content_type, storage_key, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -43,7 +74,11 @@ export class ObjectStore {
       [id]
     );
     if (!row) return null;
-    const body = fs.readFileSync(this.resolveKey(row.storage_key));
+    let body = fs.readFileSync(this.resolveKey(row.storage_key));
+    if (isEncryptedObject(body)) {
+      if (!this.key) throw new Error("object is encrypted but KHAOYU_SERVICE_OBJECT_KEY is not set");
+      body = decryptObject(body, this.key);
+    }
     return { ...row, body };
   }
 

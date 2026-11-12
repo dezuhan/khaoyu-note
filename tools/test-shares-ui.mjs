@@ -145,10 +145,19 @@ try {
   await page.selectOption("#scope", "item");
   await page.selectOption("#target", "share-note");
   await page.fill("#password", "share-passphrase-123");
+  await page.check("#download");
+  await page.fill("#download-limit", "3");
+  await page.check("#watermark");
   await page.click("#create");
   await page.waitForFunction(() => document.getElementById("token").textContent.includes("khn_"));
   check("scoped link can be created and shown once", true);
   check("created link appears in the list", (await page.locator("#shares li").count()) === 1);
+  const shareLabel = await page.locator("#shares li").first().innerText();
+  check(
+    "share link stores the watermark and download limit",
+    shareLabel.includes("watermark") && shareLabel.includes("downloads 0/3"),
+    shareLabel
+  );
 
   await page.locator("#shares li button").click();
   await page.waitForFunction(() => document.getElementById("shares").textContent.includes("No share links"));

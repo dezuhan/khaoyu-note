@@ -83,7 +83,9 @@ set, fonts and theme tokens.
 - Activity reads every audit row with actor, action, resource and time, filterable by text and action
   prefix, with Load more pagination.
 - Sharing lists accessible projects, enables or disables public sharing with an acknowledgement and
-  creates project/item/column links with permission, expiry, passphrase and download controls.
+  creates project/item/column links with permission, expiry, passphrase, optional view watermark,
+  optional download cap and download controls. Rich card HTML is sanitised with a server-side
+  allowlist before it leaves the API.
 
 Disabled accounts cannot sign in with a password, email OTP or SSO, cannot rotate a refresh token and
 cannot use scoped API tokens. Admin mutations use the normal CSRF cookie and `x-csrf-token` header and
@@ -120,6 +122,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_DATABASE_URL` | empty | PostgreSQL connection string for team mode. |
 | `KHAOYU_SERVICE_DATABASE_SSL` | `false` | Require TLS for the PostgreSQL connection. |
 | `KHAOYU_SERVICE_DATABASE_POOL_MAX` | `10` | PostgreSQL connection pool size. |
+| `KHAOYU_SERVICE_OBJECT_KEY` | empty | Optional at-rest AES-256-GCM key for uploaded objects. At least 32 characters; existing plaintext objects stay readable, new objects are encrypted. |
 | `KHAOYU_SERVICE_REDIS_URL` | empty | Redis connection string for team mode. |
 | `KHAOYU_SERVICE_REDIS_PREFIX` | `khaoyu` | Namespace for Redis keys. |
 | `KHAOYU_SERVICE_INSTANCE_ID` | hostname plus PID | Instance identity used by the worker leader lock. |
@@ -166,7 +169,9 @@ a migration is pending.
 | `KHAOYU_SERVICE_TEMP_MAX_AGE_HOURS` | `24` | Temp upload cleanup age. |
 
 Startup fails closed when the secret is missing, shorter than 32 characters, too repetitive or still
-looks like a placeholder.
+looks like a placeholder. `KHAOYU_SERVICE_OBJECT_KEY` is optional but required to read objects after
+it has been enabled; keep it in the secret store and never rotate it without decrypting/migrating
+existing objects first.
 
 ## Team backend
 
@@ -179,6 +184,16 @@ being implemented. The remaining phases are recorded in
 - `single-user` keeps SQLite and needs no PostgreSQL or Redis.
 - `team` requires `KHAOYU_SERVICE_DATABASE_URL` and `KHAOYU_SERVICE_REDIS_URL`; `openStorage` fails
   closed if either is missing.
+- For production, run migrations with the database owner and give the service a separate
+  data-only PostgreSQL role: [deploy/postgres-least-privilege.sql](deploy/postgres-least-privilege.sql).
+  The role has no `CREATE`, `ALTER`, `DROP` or role-management privileges.
+- At-rest protection: set `KHAOYU_SERVICE_OBJECT_KEY` to encrypt uploaded objects with
+  AES-256-GCM, set `KHAOYU_SERVICE_BACKUP_PASSPHRASE` to encrypt backups, and use the platform's
+  encrypted database volume/disk for SQLite or PostgreSQL. `KHAOYU_SERVICE_DATABASE_SSL=true`
+  covers PostgreSQL connections in transit.
+- The worker records `last_worker_at` and `last_worker_summary` in `service_meta` after each run and
+  revokes expired invitations and share links in addition to backups, temp cleanup, token pruning and
+  email retry.
 - Docker Compose exposes opt-in `postgres` and `redis` services:
   `docker compose --profile team up -d postgres redis`.
 - PostgreSQL baseline and data migration commands:

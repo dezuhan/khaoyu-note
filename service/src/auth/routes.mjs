@@ -286,7 +286,7 @@ async function verifyShareForWrite(db, config, { token, body, ip, minimum }) {
 }
 
 export function createApiRouter({ db, config, logger, mailer, events: providedEvents }) {
-  const objects = new ObjectStore(db, config.objectsDir);
+  const objects = new ObjectStore(db, config.objectsDir, config.objectEncryptionKey);
   const events = providedEvents || createEventHub();
   const adminRate = new Map();
   const blockedExtensions = new Set([
@@ -977,6 +977,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             ...payload,
             expiresAt: share.expires_at,
             downloadAllowed: Boolean(share.download_allowed),
+            watermark: Boolean(share.watermark),
+            downloadLimit: share.download_limit,
+            downloadCount: share.download_count,
           },
           config,
           { "X-Robots-Tag": "noindex, nofollow" }
@@ -1196,13 +1199,24 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         const object = await objects.get(asset.object_id);
         if (!object) throw new HttpError(404, "not found", "not_found");
+        if (share.download_limit !== null) {
+          const claimed = await db.run(
+            "UPDATE share_links SET download_count = download_count + 1 WHERE id = ? AND download_count < ?",
+            [share.id, share.download_limit]
+          );
+          if (!claimed.changes) {
+            throw new HttpError(403, "download limit reached", "download_limit_reached");
+          }
+        } else {
+          await db.run("UPDATE share_links SET download_count = download_count + 1 WHERE id = ?", [share.id]);
+        }
         await recordShareAttempt(db, { shareId: share.id, ip, success: true, config });
         (await db.run("UPDATE share_links SET last_accessed_at = ? WHERE id = ?", [now(), share.id]));
         await writeAudit(db, {
           action: "share.asset_downloaded",
           resourceType: "share_link",
           resourceId: share.id,
-          metadata: { assetId },
+          metadata: { assetId, downloadLimit: share.download_limit },
           ip,
           secret: config.secret,
         });
@@ -2078,13 +2092,16 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (!role) throw new HttpError(404, "project not found", "not_found");
         if (!hasRole(role, "editor")) throw new HttpError(403, "editor role required", "forbidden");
         if (method === "GET") {
-          const links = (await db.all("SELECT id, scope, target_id, permission, download_allowed, created_at, expires_at, revoked_at, last_accessed_at FROM share_links WHERE project_id = ? ORDER BY created_at DESC", [projectId]))
+          const links = (await db.all("SELECT id, scope, target_id, permission, download_allowed, watermark, download_limit, download_count, created_at, expires_at, revoked_at, last_accessed_at FROM share_links WHERE project_id = ? ORDER BY created_at DESC", [projectId]))
             .map((link) => ({
               id: link.id,
               scope: link.scope,
               targetId: link.target_id,
               permission: link.permission,
               downloadAllowed: Boolean(link.download_allowed),
+              watermark: Boolean(link.watermark),
+              downloadLimit: link.download_limit,
+              downloadCount: link.download_count,
               createdAt: link.created_at,
               expiresAt: link.expires_at,
               revoked: Boolean(link.revoked_at),
@@ -2123,6 +2140,19 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           body.expiresInDays === undefined || body.expiresInDays === null
             ? null
             : now() + integerDays(body.expiresInDays) * 86_400_000;
+        const downloadAllowed = Boolean(body.downloadAllowed);
+        const watermark = body.watermark === true || body.watermark === 1 || body.watermark === "1";
+        let downloadLimit = null;
+        if (body.downloadLimit !== undefined && body.downloadLimit !== null && body.downloadLimit !== "") {
+          const parsed = Number(body.downloadLimit);
+          if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10000) {
+            throw new HttpError(400, "downloadLimit must be 1 to 10000", "invalid_download_limit");
+          }
+          if (!downloadAllowed) {
+            throw new HttpError(400, "downloadLimit requires downloads to be enabled", "downloads_disabled");
+          }
+          downloadLimit = parsed;
+        }
         const created = await createShareLink(db, {
           projectId,
           scope,
@@ -2130,7 +2160,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           permission,
           passwordHash,
           expiresAt,
-          downloadAllowed: Boolean(body.downloadAllowed),
+          downloadAllowed,
+          watermark,
+          downloadLimit,
           createdBy: auth.account.id,
         });
         await writeAudit(db, {
@@ -2142,7 +2174,16 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           ip,
           secret: config.secret,
         });
-        sendJson(response, 201, { id: created.id, token: created.token, scope, permission, expiresAt }, config);
+        sendJson(response, 201, {
+          id: created.id,
+          token: created.token,
+          scope,
+          permission,
+          expiresAt,
+          downloadAllowed,
+          watermark,
+          downloadLimit,
+        }, config);
         return true;
       }
 

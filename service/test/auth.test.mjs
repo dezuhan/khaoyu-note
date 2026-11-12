@@ -949,6 +949,62 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(columnAccess.body.cards.some((card) => card.id === "secret1"), false);
   });
 
+  await t.test("share links carry watermarks, sanitize rich HTML and enforce a download limit", async () => {
+    const owner = await api.account(`share-hardening-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Hardened sharing");
+    await api.call(`/api/v1/projects/${projectId}/public-sharing`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { enabled: true, acknowledge: true },
+    });
+    await putSnapshot(owner, projectId, {
+      id: projectId,
+      title: "Hardened sharing",
+      cards: [
+        {
+          id: "doc1",
+          type: "document",
+          x: 0,
+          y: 0,
+          w: 200,
+          h: 120,
+          z: 1,
+          text: "Body",
+          html: '<p onclick="alert(1)">Body</p><script>alert(2)</script>',
+        },
+      ],
+      connections: [],
+      trash: [],
+    });
+    const created = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view", downloadAllowed: true, watermark: true, downloadLimit: 2 },
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.watermark, true);
+    assert.equal(created.body.downloadLimit, 2);
+    const access = await api.call(`/api/v1/share/${created.body.token}/access`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(access.status, 200);
+    assert.equal(access.body.watermark, true);
+    assert.equal(access.body.downloadLimit, 2);
+    assert.equal(access.body.downloadCount, 0);
+    const document = access.body.doc.cards.find((card) => card.id === "doc1");
+    assert.equal(document.html, "<p>Body</p>alert(2)");
+    assert.doesNotMatch(document.html, /script|onclick/i);
+
+    const invalid = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view", downloadLimit: 2 },
+    });
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.code, "downloads_disabled");
+  });
+
   await t.test("share passwords, expiry, rotation and revocation are enforced", async () => {
     const owner = await api.account(`share-life-${crypto.randomUUID()}@example.com`);
     const projectId = await createProject(owner, "Share lifecycle");
@@ -1325,6 +1381,25 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     });
     assert.equal(allowedDownload.status, 200);
     assert.equal(allowedDownload.buffer.toString(), body.toString());
+
+    const limited = await api.call(`/api/v1/projects/${projectId}/shares`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { scope: "project", permission: "view", downloadAllowed: true, downloadLimit: 1 },
+    });
+    const firstDownload = await api.raw(`/api/v1/share/${limited.body.token}/assets/${assetId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(firstDownload.status, 200);
+    const overLimit = await api.raw(`/api/v1/share/${limited.body.token}/assets/${assetId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(overLimit.status, 403);
+    assert.equal(JSON.parse(overLimit.text).code, "download_limit_reached");
 
     const denied = await api.call(`/api/v1/projects/${projectId}/shares`, {
       method: "POST",

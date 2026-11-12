@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { hashIp, writeAudit } from "./audit.mjs";
 import { hashToken, randomToken } from "./auth/tokens.mjs";
+import { sanitizeRichFields } from "./sanitize.mjs";
 
 const ROLE_RANK = { viewer: 1, commenter: 2, editor: 3, owner: 4 };
 
@@ -54,7 +55,7 @@ function stripLocalAssetPaths(card) {
 }
 
 function sanitizedCards(cards) {
-  return (cards || []).map(stripLocalAssetPaths);
+  return (cards || []).map((card) => sanitizeRichFields(stripLocalAssetPaths(card)));
 }
 
 function sanitizedDoc(doc) {
@@ -124,7 +125,11 @@ export async function sharedPayload(db, share) {
   if (share.scope === "item") {
     const card = (doc.cards || []).find((entry) => entry.id === share.target_id);
     if (!card) return null;
-    return { scope: "item", permission: share.permission, card: stripLocalAssetPaths(card) };
+    return {
+      scope: "item",
+      permission: share.permission,
+      card: sanitizeRichFields(stripLocalAssetPaths(card)),
+    };
   }
   const column = (doc.cards || []).find((entry) => entry.id === share.target_id && entry.type === "column");
   if (!column) return null;
@@ -180,12 +185,24 @@ export function cardInShareScope(doc, share, cardId) {
   return false;
 }
 
-export async function createShareLink(db, { projectId, scope, targetId, permission, passwordHash, expiresAt, downloadAllowed, createdBy }) {
+export async function createShareLink(db, {
+  projectId,
+  scope,
+  targetId,
+  permission,
+  passwordHash,
+  expiresAt,
+  downloadAllowed,
+  watermark,
+  downloadLimit,
+  createdBy,
+}) {
   const token = `khn_share_${randomToken(32)}`;
   const id = crypto.randomUUID();
   (await db.run(`INSERT INTO share_links
-     (id, project_id, scope, target_id, permission, token_hash, password_hash, download_allowed, created_by, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id,
+     (id, project_id, scope, target_id, permission, token_hash, password_hash, download_allowed,
+      watermark, download_limit, download_count, created_by, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`, [id,
     projectId,
     scope,
     targetId,
@@ -193,6 +210,8 @@ export async function createShareLink(db, { projectId, scope, targetId, permissi
     hashToken(token),
     passwordHash || null,
     downloadAllowed ? 1 : 0,
+    watermark ? 1 : 0,
+    downloadLimit ?? null,
     createdBy,
     Date.now(),
     expiresAt || null]));

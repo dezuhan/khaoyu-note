@@ -28,7 +28,7 @@ async function purgeOrphanedObjects(db, config, logger) {
   const candidates = (await db.all(`SELECT id FROM objects WHERE NOT EXISTS
        (SELECT 1 FROM project_assets WHERE project_assets.object_id = objects.id)`, []));
   if (!candidates.length) return 0;
-  const store = new ObjectStore(db, config.objectsDir);
+  const store = new ObjectStore(db, config.objectsDir, config.objectEncryptionKey);
   let removed = 0;
   for (const object of candidates) {
     // Keep objects that still appear in a version document; card payloads may reference
@@ -80,6 +80,10 @@ async function pruneTokens(db) {
   const versions = await pruneVersions(db);
   const notifications = (await db.run("DELETE FROM notifications WHERE read_at IS NOT NULL AND read_at < ?", [now - 90 * 86_400_000])).changes;
   const passkeyChallenges = (await db.run("DELETE FROM passkey_challenges WHERE expires_at < ?", [now])).changes;
+  const expiredInvitations = (await db.run(`UPDATE project_invitations SET revoked_at = ?
+       WHERE revoked_at IS NULL AND accepted_at IS NULL AND expires_at < ?`, [now, now])).changes;
+  const expiredShareLinks = (await db.run(`UPDATE share_links SET revoked_at = ?
+       WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at < ?`, [now, now])).changes;
   return {
     access: Number(access),
     email: Number(email),
@@ -89,6 +93,8 @@ async function pruneTokens(db) {
     versions,
     notifications: Number(notifications),
     passkeyChallenges: Number(passkeyChallenges),
+    expiredInvitations: Number(expiredInvitations),
+    expiredShareLinks: Number(expiredShareLinks),
   };
 }
 
@@ -134,7 +140,29 @@ export async function runMaintenance(db, config, logger) {
       auditRemoved: Number(audit.changes || 0),
     });
   }
-  return { tempRemoved, auditRemoved: Number(audit.changes || 0), backup };
+  const finishedAt = Date.now();
+  const summary = JSON.stringify({
+    finishedAt,
+    tempRemoved,
+    auditRemoved: Number(audit.changes || 0),
+    tokens,
+    backup: backup ? path.basename(backup.directory) : null,
+  }).slice(0, 4000);
+  await db.run(
+    "INSERT INTO service_meta (key, value) VALUES ('last_worker_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    [String(finishedAt)]
+  );
+  await db.run(
+    "INSERT INTO service_meta (key, value) VALUES ('last_worker_summary', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    [summary]
+  );
+  if (tokens.expiredInvitations || tokens.expiredShareLinks) {
+    logger.info("sharing.expired", {
+      invitations: tokens.expiredInvitations,
+      shareLinks: tokens.expiredShareLinks,
+    });
+  }
+  return { tempRemoved, auditRemoved: Number(audit.changes || 0), backup, tokens };
 }
 
 export function startWorker(db, config, logger, intervalMs = 60_000, mailer = null) {

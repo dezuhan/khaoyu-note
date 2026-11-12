@@ -297,7 +297,10 @@ command search (Ctrl+K), a host badge, a light/dark toggle and a circular accoun
 theme that opens the Account menu (Admin dashboard, Account settings, Help, Logout). The page reuses
 the main app logo, SVG icon set, fonts and theme tokens. Sharing is rendered inside the same page.
 Admins can create, rename and delete teams, add existing accounts to a team, change their team roles
-and remove them, inspect every audit row and change another account's role or status. Desktop boards can opt in to server sync from
+and remove them, inspect every audit row and change another account's role or status. Share links
+can add a view watermark and a download cap; shared rich text is sanitised server-side, remote embeds
+use an exact host allowlist, and uploaded objects can be encrypted at rest with
+`KHAOYU_SERVICE_OBJECT_KEY`. Desktop boards can opt in to server sync from
 the Sync control in the topbar: open it,
 enter the service URL and your account email and password, then choose Sign in and connect. Use the
 printed frontend URL, for example `http://127.0.0.1:29194`; a remote host defaults to `https`. The

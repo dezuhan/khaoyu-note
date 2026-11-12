@@ -23,6 +23,17 @@ project uses Semantic Versioning.
   gutter), and the rail cannot be dragged.
 - The web app and every service page declare SVG and PNG favicons rendered from the shared brand
   mark, so browser tabs and touch shortcuts show the Khaoyu icon.
+- Share links can carry an optional view watermark and a per-link download cap. The viewer overlays a
+  low-opacity project label when watermarking is enabled; asset downloads increment an atomic counter
+  and return `download_limit_reached` after the cap. Downloaded files themselves are not modified.
+- Shared rich text is sanitised on the server with an allowlist (`html`/`markdown` fields), so public
+  JSON cannot carry scripts, event handlers or unsafe URLs even when API clients render it.
+- Remote video embeds accept only the exact YouTube and Vimeo hostnames; typosquatted hosts such as
+  `evilyoutube.com` no longer render an iframe.
+- Uploaded objects can be encrypted at rest with `KHAOYU_SERVICE_OBJECT_KEY` (AES-256-GCM); existing
+  plaintext objects stay readable. The worker now revokes expired invitations and share links and
+  records `last_worker_at`/`last_worker_summary`, and `service/deploy/postgres-least-privilege.sql`
+  documents a data-only PostgreSQL role.
 - Admins can rename and delete teams from the dashboard. Deleting a team soft-deletes it and its
   child boards, disables public sharing and revokes its share links and invitations. Admins can also
   add an existing account to a team by email with an editor, commenter or viewer role, change that

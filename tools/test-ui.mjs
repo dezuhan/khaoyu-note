@@ -1372,6 +1372,22 @@ await page.keyboard.press("Escape");
 await page.keyboard.press("Delete");
 await page.waitForTimeout(300);
 
+const hostileVideoId = await page.evaluate(async () => {
+  const actions = await import("/js/actions.js");
+  return actions.addCardAtCenter("video", { url: "https://evilyoutube.com/watch?v=dQw4w9WgXcQ" }).id;
+});
+await page.waitForTimeout(350);
+const hostileVideo = byId(hostileVideoId);
+check(
+  "Remote embeds only allow exact YouTube and Vimeo hostnames",
+  (await hostileVideo.locator("iframe").count()) === 0 &&
+    (await hostileVideo.locator("video").getAttribute("src")) ===
+      "https://evilyoutube.com/watch?v=dQw4w9WgXcQ"
+);
+await hostileVideo.click();
+await page.keyboard.press("Delete");
+await page.waitForTimeout(300);
+
 const mapId = await page.evaluate(async () => {
   const actions = await import("/js/actions.js");
   return actions.addCardAtCenter("map").id;
