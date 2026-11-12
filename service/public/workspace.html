@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-ky-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Khaoyu Note workspace</title>
+    <link rel="icon" type="image/svg+xml" href="/khaoyu-note.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/favicon-180.png" />
+    <link rel="stylesheet" href="/fonts.css" />
+    <link rel="stylesheet" href="/ky.css" />
+    <link rel="stylesheet" href="/components.css" />
+    <link rel="stylesheet" href="/ui.css" />
+    <link rel="stylesheet" href="/admin.css" />
+    <link rel="stylesheet" href="/workspace.css" />
+  </head>
+  <body class="workspace-body">
+    <header class="workspace-bar">
+      <a class="admin-logo" href="/workspace">
+        <img class="admin-logo-mark" src="/khaoyu-note.svg" alt="" />
+        <span class="admin-brand-copy"><strong>Khaoyu Note</strong><span>Shared workspace</span></span>
+      </a>
+      <span class="admin-host" id="workspace-host"></span>
+      <div class="workspace-bar-actions">
+        <a class="ky-button" href="/admin" id="workspace-admin-link">Admin</a>
+        <button class="ky-button" type="button" id="workspace-logout">Logout</button>
+      </div>
+    </header>
+
+    <div class="workspace-shell">
+      <aside class="workspace-sidebar">
+        <section class="workspace-side-section">
+          <h2>Servers</h2>
+          <div class="workspace-server-list" id="workspace-servers"></div>
+          <button class="ky-button workspace-add-server" type="button" id="workspace-add-server">+ Add Server</button>
+        </section>
+        <section class="workspace-side-section">
+          <h2>Workspace</h2>
+          <p class="admin-note" id="workspace-account"></p>
+          <p class="admin-note">Boards on this server are shared with approved members. The default role is viewer; an admin can grant edit access.</p>
+        </section>
+      </aside>
+
+      <main class="workspace-main">
+        <header class="workspace-main-head">
+          <div>
+            <h1 id="workspace-title">Team workspace</h1>
+            <p class="admin-note" id="workspace-subtitle">Loading boards...</p>
+          </div>
+          <button class="ky-button" type="button" id="workspace-refresh">Refresh</button>
+        </header>
+        <div class="workspace-boards" id="workspace-boards"></div>
+      </main>
+    </div>
+
+    <div class="workspace-viewer" id="workspace-viewer" hidden>
+      <header class="workspace-viewer-head">
+        <div><strong id="workspace-viewer-title">Board</strong><span id="workspace-viewer-mode" class="admin-badge">viewer</span></div>
+        <button class="ky-button" type="button" id="workspace-viewer-close">Close</button>
+      </header>
+      <div class="workspace-viewer-canvas" id="workspace-viewer-canvas"></div>
+    </div>
+
+    <script type="module" src="/theme-init.js"></script>
+    <script type="module" src="/workspace.js"></script>
+  </body>
+</html>

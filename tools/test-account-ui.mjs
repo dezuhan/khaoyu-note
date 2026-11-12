@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -61,6 +62,11 @@ async function waitForReady() {
 try {
   base = (await waitForRuntime()).frontendUrl;
   await waitForReady();
+  // Keep per-board membership-count checks deterministic; workspace auto-view is covered by the
+  // service suite.
+  const db = new DatabaseSync(path.join(dataDir, "khaoyu-service.db"));
+  db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('workspace_mode', 'private')").run();
+  db.close();
   browser = await chromium.launch();
   const page = await browser.newPage();
   await page.addInitScript(() => localStorage.setItem("khaoyu.auth.theme", "dark"));

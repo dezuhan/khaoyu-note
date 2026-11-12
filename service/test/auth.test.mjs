@@ -82,6 +82,7 @@ async function start() {
   // Exercise the existing auth flows as an open-registration service; the private-mode test below
   // toggles the setting explicitly.
   db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('registration_mode', 'public')").run();
+  db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('workspace_mode', 'private')").run();
   const logger = createLogger({ write() {} });
   const mailer = createFileMailer(config, logger);
   const server = createService({ config, db, logger, mailer });
@@ -1979,4 +1980,33 @@ test("private registration policy gates new accounts until admin approval", asyn
   });
   assert.equal(openRegistered.body.approval, "approved");
   assert.equal((await api.login(publicEmail)).status, 200);
+});
+
+test("team workspace auto-grants approved members viewer access to admin boards", async (t) => {
+  const api = await start();
+  t.after(() => api.close());
+  api.db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('workspace_mode', 'shared')").run();
+  const owner = await api.account(`workspace-owner-${crypto.randomUUID()}@example.com`);
+  const project = await api.call("/api/v1/projects", {
+    method: "POST",
+    jar: owner.jar,
+    body: { title: "Workspace board" },
+  });
+  assert.equal(project.status, 201, JSON.stringify(project.body));
+  const member = await api.account(`workspace-member-${crypto.randomUUID()}@example.com`);
+  const listed = await api.call("/api/v1/projects", { jar: member.jar });
+  const shared = listed.body.projects.find((entry) => entry.id === project.body.id);
+  assert.ok(shared, "approved member should see the team board");
+  assert.equal(shared.role, "viewer");
+  const snapshot = await api.call(`/api/v1/projects/${project.body.id}`, { jar: member.jar });
+  assert.equal(snapshot.status, 200);
+  const workspacePage = await api.raw("/workspace");
+  assert.equal(workspacePage.status, 200);
+  assert.match(workspacePage.text, /Shared workspace/);
+  const denied = await api.call(`/api/v1/projects/${project.body.id}/ops`, {
+    method: "POST",
+    jar: member.jar,
+    body: { baseSeq: 0, ops: [{ opId: "viewer-op", type: "doc.title", payload: { title: "no" } }] },
+  });
+  assert.equal(denied.status, 403);
 });

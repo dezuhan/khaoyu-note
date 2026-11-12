@@ -30,6 +30,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   and an explicit `--purge` path.
 - **Separate public-view domain**: the installer now captures backend and public-share origins and
   uses the latter for generated `/s/:token` links.
+- **Team workspace prototype**: `/workspace` server/board switcher and automatic viewer access for
+  approved accounts.
 - **Private registration default**: admin-controlled Private/Public registration access, account
   approval, and public-share signup links.
 - **Safe uninstall**: `uninstall-team.sh` can stop the team stack with volumes retained, or purge the

@@ -56,6 +56,24 @@ the backend, so cookies, CSRF and the public URL all stay on one origin. Both po
 at startup and written to `<data>/runtime.json`. If no public URL is configured, `config.publicUrl`
 becomes the frontend URL.
 
+## Shared workspace
+
+The server is a single team workspace. Approved accounts automatically receive **viewer** access to
+every board on the server; an admin can promote a member to editor/commenter from the board Members
+panel. This is the default `workspace_mode=shared` policy. Set
+`service_meta.workspace_mode = 'private'` only for deployments that want strict per-board membership.
+
+Open `/workspace` for the web workspace switcher:
+
+- **Local storage** — the local board web host (default `http://127.0.0.1:1430`);
+- the current server workspace;
+- **Add Server** — stores additional Khaoyu service origins in the browser and switches to their
+  `/workspace` page.
+
+The page lists every board visible to the signed-in account and opens a read-only board preview.
+Viewers cannot edit; editors can use the board app after connecting sync. This is a web prototype;
+the client-side remote board editor and desktop server picker remain future work.
+
 ## Admin dashboard
 
 Open `<frontend URL>/admin`, for example `http://127.0.0.1:29194/admin`. Without a session the page
@@ -403,7 +421,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `DELETE` | `/api/v1/account/tokens/:id` | Revoke an API token. |
 | `POST` | `/api/v1/account/delete` | Schedule deletion after the grace period. |
 | `POST` | `/api/v1/account/delete/cancel` | Cancel a scheduled deletion. |
-| `GET` | `/api/v1/projects` | List projects the account can access. |
+| `GET` | `/api/v1/projects` | List projects the account can access. Approved accounts receive viewer access to the team workspace. |
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. The document may be up to 8 MB. |

@@ -238,6 +238,33 @@ async function registrationMode(db) {
   return row?.value === "public" ? "public" : "private";
 }
 
+async function workspaceShared(db) {
+  const row = await db.get("SELECT value FROM service_meta WHERE key = 'workspace_mode'", []);
+  return row?.value !== "private";
+}
+
+async function addWorkspaceViewersForProject(db, projectId) {
+  if (!(await workspaceShared(db))) return;
+  await db.run(
+    `INSERT INTO project_members (project_id, account_id, role, created_at)
+     SELECT ?, a.id, 'viewer', ? FROM accounts a
+     WHERE a.deleted_at IS NULL AND a.status = 'active' AND a.approved_at IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = ? AND m.account_id = a.id)`,
+    [projectId, now(), projectId]
+  );
+}
+
+async function addWorkspaceViewersForAccount(db, accountId) {
+  if (!(await workspaceShared(db))) return;
+  await db.run(
+    `INSERT INTO project_members (project_id, account_id, role, created_at)
+     SELECT p.id, ?, 'viewer', ? FROM projects p
+     WHERE p.deleted_at IS NULL AND p.owner_account_id <> ?
+       AND NOT EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.account_id = ?)`,
+    [accountId, now(), accountId, accountId]
+  );
+}
+
 function accountApproved(account) {
   return account?.approved_at !== null && account?.approved_at !== undefined;
 }
@@ -634,6 +661,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           }
           throw error;
         }
+        await addWorkspaceViewersForAccount(db, id);
         await writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "admin.user_created",
@@ -780,6 +808,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           (await db.run("UPDATE access_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ?) AND revoked_at IS NULL", [now(), targetId]));
           (await db.run("UPDATE refresh_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ?) AND revoked_at IS NULL", [now(), targetId]));
         }
+        if (approved) await addWorkspaceViewersForAccount(db, targetId);
         await writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "admin.user_updated",
@@ -854,6 +883,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             ]
           );
         });
+        await addWorkspaceViewersForProject(db, projectId);
         await writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "admin.team_created",
@@ -955,8 +985,15 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (!account) throw new HttpError(404, "account not found", "account_not_found");
         if (account.status !== "active") throw new HttpError(400, "account is not active", "account_inactive");
         const existing = await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, account.id]);
-        if (existing) throw new HttpError(409, "account is already a member", "already_member");
-        await db.run("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, ?, ?)", [projectId, account.id, role, now()]);
+        if (existing) {
+          // A workspace-wide viewer row is upgraded when an admin explicitly grants a stronger role.
+          if (existing.role !== "viewer" || role === "viewer") {
+            throw new HttpError(409, "account is already a member", "already_member");
+          }
+          await db.run("UPDATE project_members SET role = ? WHERE project_id = ? AND account_id = ?", [role, projectId, account.id]);
+        } else {
+          await db.run("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, ?, ?)", [projectId, account.id, role, now()]);
+        }
         await writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "admin.team_member_added",
@@ -1445,6 +1482,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           const approvedAt = firstAccount || mode === "public" ? now() : null;
           (await db.run("INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)", [id, email, displayName, now(), firstAccount ? "admin" : "member", approvedAt, now(), now()]));
           account = (await db.get("SELECT * FROM accounts WHERE id = ?", [id]));
+          if (approvedAt !== null) await addWorkspaceViewersForAccount(db, account.id);
         }
         if (account.deleted_at) {
           throw new HttpError(403, "account is pending deletion", "account_deleted");
@@ -1640,6 +1678,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           }, config);
           return true;
         }
+        if (approvedAt !== null) await addWorkspaceViewersForAccount(db, account.id);
         sendJson(response, 202, {
           status: "registered",
           approval: approvedAt === null ? "pending" : "approved",
@@ -2886,6 +2925,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             ]
           );
         });
+        await addWorkspaceViewersForProject(db, projectId);
         await writeAudit(db, {
           actorAccountId: auth.account.id,
           action: "project.created",

@@ -116,6 +116,9 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- Added a team workspace model and `/workspace` web prototype: approved accounts automatically get
+  viewer access to every server board (migration 18/6), with an admin able to promote per-board roles.
+  The page lists local/remote servers, supports Add Server links, and opens read-only board previews.
 - Added a Private/Public registration-access control to the admin dashboard, defaulting to Private.
   Private registrations are pending and cannot sign in until an admin approves them; Public
   registrations are active immediately and public share viewers show a Create an account link.

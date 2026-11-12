@@ -76,6 +76,7 @@ async function start() {
   // Exercise the existing auth flows as an open-registration service; the private-mode test below
   // toggles the setting explicitly.
   db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('registration_mode', 'public')").run();
+  db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('workspace_mode', 'private')").run();
   const logger = createLogger({ write() {} });
   const mailer = createFileMailer(config, logger);
   const server = createService({ config, db, logger, mailer });
