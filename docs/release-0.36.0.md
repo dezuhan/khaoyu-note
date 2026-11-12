@@ -18,6 +18,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
 - **Sharing hardening**: optional share-view watermark and per-link download caps, server-side rich
   HTML sanitisation, exact remote-embed host allowlists, optional AES-256-GCM object encryption and
   a data-only PostgreSQL deployment script.
+- **Settings layout**: the Settings dialog stays inside the window below the toolbar and always opens
+  its page content at the top.
 - **Account security**: authenticator-app 2FA setup with a local QR code, enable/disable controls,
   TOTP status, and a passkey readiness/how-to section on `/account`.
 - **Public share links**: the Share dialog follows a configurable public origin, either from

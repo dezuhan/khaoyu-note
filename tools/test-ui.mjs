@@ -2114,6 +2114,23 @@ check(
 await page.click("#settings-btn");
 await page.waitForTimeout(400);
 check("Settings dialog opens", await page.locator(".mn-prefs-dialog").isVisible());
+const settingsGeometry = await page.evaluate(() => {
+  const dialog = document.querySelector(".mn-prefs-dialog").getBoundingClientRect();
+  const content = document.querySelector(".mn-prefs-content");
+  return {
+    top: dialog.top,
+    bottom: dialog.bottom,
+    viewportHeight: window.innerHeight,
+    scrollTop: content.scrollTop,
+  };
+});
+check(
+  "Settings dialog fits inside the window below the toolbar",
+  settingsGeometry.top >= 0 &&
+    settingsGeometry.bottom <= settingsGeometry.viewportHeight &&
+    settingsGeometry.scrollTop === 0,
+  `top ${Math.round(settingsGeometry.top)}, bottom ${Math.round(settingsGeometry.bottom)}, viewport ${settingsGeometry.viewportHeight}`
+);
 check(
   "Settings > Server restores the service connection details",
   (await page.locator('[data-role="account-connection"]').isVisible()) &&
@@ -2378,6 +2395,15 @@ check(
     ((await page.locator(".mn-prefs-content").innerText()).includes(appVersion) ||
       (await page.locator(".mn-prefs-content").innerText()).includes("unknown"))
 );
+await page.evaluate(() => {
+  document.querySelector(".mn-prefs-content").scrollTop = 240;
+});
+await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
+await page.waitForTimeout(200);
+const settingsScrollTop = await page.evaluate(
+  () => document.querySelector(".mn-prefs-content").scrollTop
+);
+check("Settings content starts at the top after changing pages", settingsScrollTop === 0);
 await page.locator('[data-role="done"]').click();
 await page.waitForTimeout(250);
 check("Done closes settings", (await page.locator(".mn-prefs-dialog").count()) === 0);

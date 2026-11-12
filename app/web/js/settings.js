@@ -864,6 +864,7 @@ function renderContent() {
   const content = overlay.querySelector('[data-role="content"]');
   if (!content) return;
   content.innerHTML = "";
+  content.scrollTop = 0;
   const titleEl = overlay.querySelector(".mn-prefs-title");
   if (titleEl) titleEl.textContent = t("common.settings");
   const searchEl = overlay.querySelector('[data-role="search"]');

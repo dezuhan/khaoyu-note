@@ -72,6 +72,9 @@ project uses Semantic Versioning.
 - The Share dialog is reorganized into clear Board link, Create a share link and Active links
   sections: the board URL and copy action share one row, the form fields align in two columns, and
   Create/Copy actions sit together without the previous empty vertical gaps.
+- The Settings dialog now sizes itself below the top toolbar (`min(760px, 100vh - 96px)`), keeps its
+  content scroller bounded, and resets the content scroll position when switching pages so the first
+  section is never clipped.
 - The account security page now exposes authenticator (TOTP) setup with an inline QR code, enable
   and disable flows, and passkey readiness/instructions. `/account` is served directly again instead
   of redirecting to `/admin`, and the dashboard Account section links to it.
