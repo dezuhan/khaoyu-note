@@ -2,6 +2,7 @@
 
 import * as bridge from "./bridge.js";
 import { adoptRemoteBoard, persistBoardSnapshot, state } from "./store.js";
+import { clearRemoteTemp } from "./remote-temp.js";
 import * as sync from "./sync.js";
 import { clearRemoteCursors, renderRemoteCursors } from "./remote-cursors.js";
 
@@ -269,7 +270,8 @@ function onBoardSaved(event) {
   autoTimer = setTimeout(async () => {
     try {
       const result = await sync.pushLiveChanges(state.board);
-      if (result.status === "pushed") {
+      if (result.status === "pushed" || result.status === "noop") {
+        clearRemoteTemp(event.detail.boardId);
         await persistBoardSnapshot();
         refresh();
       } else if (result.status === "conflict") {

@@ -159,7 +159,13 @@ function closeServerMenu() {
   popover?.querySelector(".mn-workspace-server-menu")?.remove();
 }
 
-function removeServer(server) {
+async function removeServer(server) {
+  try {
+    const store = await import("./store.js");
+    await store.flushRemoteBoard();
+  } catch {
+    /* the temporary copy is still written by the store */
+  }
   const next = servers().filter((entry) => entry.url !== server.url);
   saveServers(next);
   try {
@@ -485,13 +491,16 @@ async function openEditableBoard(server, project, token) {
   content.innerHTML = `<p class="mn-server-empty">Opening editable board...</p>`;
   try {
     const data = await jsonFetch(`${server.url}/api/v1/projects/${encodeURIComponent(project.id)}`, {}, token);
-    const doc = JSON.parse(data.snapshot?.doc || "{}");
+    let doc = JSON.parse(data.snapshot?.doc || "{}");
     doc.id = project.id;
-    const [store, sync, syncUi] = await Promise.all([
+    const [store, sync, syncUi, remoteTemp] = await Promise.all([
       import("./store.js"),
       import("./sync.js"),
       import("./sync-ui.js"),
+      import("./remote-temp.js"),
     ]);
+    const pending = remoteTemp.readRemoteTemp(project.id);
+    if (pending?.board?.id === project.id) doc = pending.board;
     await store.openRemoteBoard(doc, {
       projectId: project.id,
       revision: Number(project.revision) || 1,
@@ -499,7 +508,8 @@ async function openEditableBoard(server, project, token) {
       lastSyncedAt: Date.now(),
     });
     sync.saveSyncConfig({ url: server.url, email: server.email || "", token });
-    await sync.pushLiveChanges(store.state.board);
+    const pushed = await sync.pushLiveChanges(store.state.board);
+    if (pushed.status === "pushed" || pushed.status === "noop") remoteTemp.clearRemoteTemp(project.id);
     view.remove();
     boardOverlay = null;
     syncUi.refresh();

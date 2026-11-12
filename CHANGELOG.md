@@ -127,6 +127,10 @@ project uses Semantic Versioning.
   seeds a default team workspace with viewer as the member default board role; existing projects and
   approved accounts are backfilled. Workspace APIs list/create workspaces and list boards with
   effective roles, and the main frontend workspace popover now shows server → workspace → board.
+- Remote workspace editing now writes a durable temporary copy to `ky.remoteTemp.<boardId>` before
+  the network push. Switching boards/workspaces flushes that copy, starts the service push in the
+  background, and recovers pending edits when the board is opened again. Page hide/visibility changes
+  persist the temporary copy for recovery.
 - Remote workspace boards now autosave on a 400 ms throttle while typing and push their operation
   diff to the service within about 120 ms after the local save, so owner/editor changes appear on the
   team database without an explicit Save. A stale timer id from the previous local board could block

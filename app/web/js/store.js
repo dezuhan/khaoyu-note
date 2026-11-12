@@ -3,6 +3,7 @@
 import * as bridge from "./bridge.js";
 import { createCard, layoutColumns, migrateLegacyKanban, newBoardDoc, uid, welcomeBoard } from "./model.js";
 import { applyTheme as applyDocumentTheme, readStoredTheme, storeTheme } from "./theme.js";
+import { clearRemoteTemp, writeRemoteTemp } from "./remote-temp.js";
 
 export const state = {
   board: null,
@@ -141,6 +142,8 @@ export function clearSelection() {
 // ------------------------------------------------------------------ saving
 
 let saveTimer = 0;
+let remoteTempTimer = 0;
+let remoteFlushPromise = null;
 let retryTimer = 0;
 let retryDelay = 1000;
 let saveInFlight = false;
@@ -170,6 +173,12 @@ export function scheduleSave() {
   }
   state.saveState = "saving";
   notify("save");
+  if (state.remote) {
+    clearTimeout(remoteTempTimer);
+    remoteTempTimer = setTimeout(() => {
+      if (state.remote && state.board) writeRemoteTemp(state.board);
+    }, 100);
+  }
   const pending = saveTimer;
   clearTimeout(saveTimer);
   // Remote team boards save on a short throttle even while the user keeps typing. Keep an already
@@ -258,8 +267,10 @@ export async function saveNow() {
   state.dirty = false;
   state.viewDirty = false;
   if (state.remote) {
-    // Remote workspace boards are not mirrored into the local SQLite database. The sync listener
-    // consumes this event and pushes the operation diff to the server.
+    // Remote workspace boards are not mirrored into the local SQLite database. Write the durable
+    // temporary copy first, then let the sync listener push the operation diff in the background.
+    clearTimeout(remoteTempTimer);
+    writeRemoteTemp(state.board);
     state.saveState = "saved";
     window.dispatchEvent(
       new CustomEvent("mn:board-saved", { detail: { boardId: state.board.id, board: state.board } })
@@ -396,7 +407,9 @@ export async function openBoard(id, { flush = true } = {}) {
   }
   if (flush && state.board && state.board.id !== id) {
     // Flush pending edits so the board we leave is consistent on disk (and visible to panels).
+    const leavingRemote = state.remote;
     await saveNow();
+    if (leavingRemote) await flushRemoteBoard();
     if (state.conflict) {
       dispatchConflict(state.conflict);
       return null;
@@ -454,6 +467,7 @@ export async function openBoard(id, { flush = true } = {}) {
 }
 
 export async function createBoard(title = "Untitled board", { withWelcome = false } = {}) {
+  if (state.remote) await flushRemoteBoard();
   const doc = withWelcome ? welcomeBoard() : newBoardDoc(title);
   if (!withWelcome) doc.title = title;
   if (withWelcome) {
@@ -547,9 +561,35 @@ export async function exportCurrentBoard() {
   return bridge.exportBoard(json);
 }
 
+/// Persist the current remote board to the temporary buffer and push it in the background.
+/// Workspace switches call this before changing `state.board` so pending edits are never dropped.
+export async function flushRemoteBoard() {
+  if (!state.remote || !state.board) return { status: "noop" };
+  clearTimeout(remoteTempTimer);
+  const board = state.board;
+  writeRemoteTemp(board);
+  if (remoteFlushPromise) return remoteFlushPromise;
+  remoteFlushPromise = (async () => {
+    try {
+      const sync = await import("./sync.js");
+      if (!sync.syncEnabled(board)) return { status: "temp" };
+      const result = await sync.pushLiveChanges(board);
+      if (result.status === "pushed" || result.status === "noop") clearRemoteTemp(board.id);
+      return result;
+    } catch (error) {
+      // Keep the temporary copy; opening the board again will retry from it.
+      return { status: "pending", error };
+    }
+  })().finally(() => {
+    remoteFlushPromise = null;
+  });
+  return remoteFlushPromise;
+}
+
 /// Open a board hosted by a remote workspace without mirroring it into the local database.
 export async function openRemoteBoard(doc, syncInfo) {
   if (!doc || !doc.id) throw new Error("Remote board document is missing");
+  if (state.remote && state.board?.id && state.board.id !== doc.id) await flushRemoteBoard();
   state.board = doc;
   state.board.sync = { ...syncInfo };
   layoutColumns(doc);
@@ -617,4 +657,17 @@ export async function persistBoardSnapshot() {
     console.error("[store] could not persist sync metadata", error);
     return false;
   }
+}
+
+function persistRemoteOnExit() {
+  if (!state.remote || !state.board) return;
+  clearTimeout(remoteTempTimer);
+  writeRemoteTemp(state.board);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", persistRemoteOnExit);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") persistRemoteOnExit();
+  });
 }
