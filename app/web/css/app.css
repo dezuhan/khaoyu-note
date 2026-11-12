@@ -7658,13 +7658,6 @@ html[data-performance="true"] *::after {
 }
 
 
-.mn-color-hint {
-  margin: 7px 2px 0;
-  color: var(--ky-soft);
-  font-size: 10px;
-  line-height: 1.35;
-}
-
 /* ==========================================================================
    Floating tool rail.
    The rail is detached from the window edges and floats above the canvas. It is

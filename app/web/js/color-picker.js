@@ -93,8 +93,7 @@ export function openColorPicker({ color, anchor, onChange }) {
     <div class="mn-color-bottom">
       <input class="mn-color-hex" data-role="hex" maxlength="7" spellcheck="false" />
       <button type="button" class="mn-color-eyedrop" data-role="eyedrop" title="Pick a color from the screen" aria-label="Pick a color from the screen">${icon("eyedropper", 15)}</button>
-    </div>
-    <p class="mn-color-hint" data-role="hint" hidden>Drag the square or the hue bar, or type a HEX value.</p>`;
+    </div>`;
   document.body.append(backdrop, pop);
 
   const sv = pop.querySelector('[data-role="sv"]');
@@ -103,12 +102,10 @@ export function openColorPicker({ color, anchor, onChange }) {
   const hueMarker = pop.querySelector('[data-role="hue-marker"]');
   const hexInput = pop.querySelector('[data-role="hex"]');
   const eyedrop = pop.querySelector('[data-role="eyedrop"]');
-  const hint = pop.querySelector('[data-role="hint"]');
   const isLinuxDesktop = hasTauri && !hasWeb && /Linux/i.test(navigator.userAgent);
   const screenPickingUnavailable = !("EyeDropper" in window) && (isLinuxDesktop || !hasTauri);
   if (screenPickingUnavailable) {
     eyedrop.hidden = true;
-    hint.hidden = false;
   }
 
   function hexValue() {
