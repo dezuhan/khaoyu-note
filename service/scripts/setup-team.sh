@@ -28,8 +28,10 @@ random_hex() { openssl rand -hex "${1:-24}"; }
 CREATED_ENV=0
 if [[ ! -f "$ENV_FILE" ]]; then
   CREATED_ENV=1
-  read -r -p "Public service URL [http://127.0.0.1:18080]: " PUBLIC_URL
+  read -r -p "Backend/service URL [http://127.0.0.1:18080]: " PUBLIC_URL
   PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:18080}"
+  read -r -p "Public view/share URL [same as backend]: " PUBLIC_VIEW_URL
+  PUBLIC_VIEW_URL="${PUBLIC_VIEW_URL:-$PUBLIC_URL}"
   read -r -p "Initial owner email [owner@localhost]: " BOOTSTRAP_EMAIL
   BOOTSTRAP_EMAIL="${BOOTSTRAP_EMAIL:-owner@localhost}"
   read -r -p "Cloudflare tunnel token (optional, press Enter to skip): " TUNNEL_TOKEN
@@ -37,12 +39,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
   cat > "$ENV_FILE" <<ENV
 KHAOYU_SERVICE_PROFILE=team
 KHAOYU_SERVICE_PUBLIC_URL="${PUBLIC_URL}"
-KHAOYU_SERVICE_SHARE_PUBLIC_URL="${PUBLIC_URL}"
+KHAOYU_SERVICE_SHARE_PUBLIC_URL="${PUBLIC_VIEW_URL}"
 KHAOYU_SERVICE_COOKIE_SECURE=$( [[ "$PUBLIC_URL" == https://* ]] && echo true || echo false )
 KHAOYU_SERVICE_TRUST_PROXY=true
 KHAOYU_SERVICE_PUBLIC_SHARING=true
 KHAOYU_SERVICE_SECRET="$(random_hex 32)"
-KHAOYU_SERVICE_CORS_ORIGINS="tauri://localhost,http://tauri.localhost,http://127.0.0.1:1430,http://localhost:1430"
+KHAOYU_SERVICE_CORS_ORIGINS="tauri://localhost,http://tauri.localhost,http://127.0.0.1:1430,http://localhost:1430,${PUBLIC_URL},${PUBLIC_VIEW_URL}"
 KHAOYU_SERVICE_POSTGRES_DB=khaoyu
 KHAOYU_SERVICE_POSTGRES_USER=khaoyu
 KHAOYU_SERVICE_POSTGRES_PASSWORD="$(random_hex 24)"
@@ -60,7 +62,8 @@ ENV
 fi
 
 # shellcheck disable=SC1090
-set -a; . "./$ENV_FILE"; set +a
+if [[ "$ENV_FILE" = /* ]]; then ENV_PATH="$ENV_FILE"; else ENV_PATH="./$ENV_FILE"; fi
+set -a; . "$ENV_PATH"; set +a
 
 echo "Starting PostgreSQL, Redis and service..."
 $COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml up -d --build
@@ -98,5 +101,6 @@ if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
   $COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml --profile tunnel up -d cloudflared
 fi
 
-echo "Open ${KHAOYU_SERVICE_PUBLIC_URL}/login"
+echo "Backend/admin: ${KHAOYU_SERVICE_PUBLIC_URL}/login"
+echo "Public view:   ${KHAOYU_SERVICE_SHARE_PUBLIC_URL}/s/<share-token>"
 echo "PostgreSQL and Redis are internal-only; only 127.0.0.1:${KHAOYU_SERVICE_PUBLISH_PORT:-18080}/${KHAOYU_SERVICE_PUBLISH_BACKEND_PORT:-18081} are published."

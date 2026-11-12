@@ -24,6 +24,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   keeping the card frame and Load more button visible.
 - **Passkey kill switch**: `KHAOYU_SERVICE_PASSKEYS_ENABLED=false` hides passkey UI and disables the
   passkey endpoints while leaving password, TOTP and backup-code login available.
+- **Separate public-view domain**: the installer now captures backend and public-share origins and
+  uses the latter for generated `/s/:token` links.
 - **Private registration default**: admin-controlled Private/Public registration access, account
   approval, and public-share signup links.
 - **Safe uninstall**: `uninstall-team.sh` can stop the team stack with volumes retained, or purge the

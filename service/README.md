@@ -139,10 +139,10 @@ cd service
 
 The installer asks only for:
 
-1. public service URL (default `http://127.0.0.1:18080`; use the HTTPS tunnel/proxy origin for
-   public access),
-2. first owner email,
-3. optional Cloudflare Tunnel token.
+1. backend/service URL (default `http://127.0.0.1:18080`; login, admin and API),
+2. public view/share URL (defaults to the backend URL; used for generated share links),
+3. first owner email,
+4. optional Cloudflare Tunnel token.
 
 It generates `.env.team` with random service/PostgreSQL/Redis/bootstrap secrets, builds the image,
 starts PostgreSQL and Redis, applies PostgreSQL migrations, starts the service, waits for
@@ -178,6 +178,11 @@ docker compose --env-file .env.team -f docker-compose.team.yml --profile tunnel 
 The service command runs `migrate-postgres` on startup and then starts the server. PostgreSQL and
 Redis are never published to the host. Keep the TLS proxy or Cloudflare Tunnel in front of port
 18080, not 18081.
+
+The backend and public-view domains can be separate hostnames that both point at
+`http://127.0.0.1:18080` (or `http://service:18080` for the Compose tunnel). The backend hostname is
+used for `/login` and `/admin`; the public-view hostname is used for `/s/:token` share links. Set both
+URLs to HTTPS and keep `KHAOYU_SERVICE_COOKIE_SECURE=true` for public TLS deployments.
 
 ### Uninstall the team stack
 

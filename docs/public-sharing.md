@@ -49,6 +49,24 @@ Free tunnel hostnames change unless you configure a stable domain.
   still cannot serve its local `?board=` link to other devices; use a service share link, or run the
   web host and expose that origin.
 
+## Two public hostnames
+
+The team installer accepts two origins:
+
+- `KHAOYU_SERVICE_PUBLIC_URL` — backend/admin origin, for example `https://note.example.com`;
+- `KHAOYU_SERVICE_SHARE_PUBLIC_URL` — public share-view origin, for example
+  `https://view.example.com`.
+
+Both Cloudflare hostnames can point at the same service frontend port `18080`:
+
+```text
+note.example.com  -> http://127.0.0.1:18080   login, admin, API
+view.example.com  -> http://127.0.0.1:18080   /s/:token share links
+```
+
+Generated share links use the public-view origin. The board editor frontend is a separate web host
+and needs its own origin if it is exposed publicly.
+
 ## Troubleshooting the public port
 
 If a public IP URL does not open:

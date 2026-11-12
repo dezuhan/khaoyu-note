@@ -102,6 +102,9 @@ project uses Semantic Versioning.
 - Board viewport position and zoom are now stored per device instead of being written into the board
   row. Opening a board from a phone/tunnel can no longer conflict with a desktop window merely
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
+- The team installer now accepts separate backend/admin and public-view/share domains, and writes
+  them to `KHAOYU_SERVICE_PUBLIC_URL` and `KHAOYU_SERVICE_SHARE_PUBLIC_URL` so generated share links
+  use the public-view origin.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
