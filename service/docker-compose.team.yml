@@ -125,7 +125,7 @@ services:
     image: docker.io/cloudflare/cloudflared:latest
     restart: unless-stopped
     profiles: ["tunnel"]
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
       service:
         condition: service_healthy
