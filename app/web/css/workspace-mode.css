@@ -259,3 +259,29 @@
   color: var(--ky-danger, #d9534f);
   font-size: var(--ky-text-xs);
 }
+
+.mn-workspace-popover-actions {
+  display: flex;
+  gap: var(--ky-space-6);
+  padding: var(--ky-space-4) var(--ky-space-8);
+}
+
+.mn-workspace-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ky-space-10);
+  padding: var(--ky-space-6) 0;
+  border-bottom: 1px solid var(--ky-stroke);
+}
+
+.mn-workspace-member small {
+  display: block;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+.mn-workspace-member select {
+  width: auto;
+  min-width: 90px;
+}

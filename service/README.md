@@ -443,6 +443,10 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/workspaces` | List workspaces the account belongs to. |
 | `POST` | `/api/v1/workspaces` | Create a workspace owned by the account. |
 | `GET` | `/api/v1/workspaces/:id/boards` | List boards in a workspace with effective roles. |
+| `GET/PATCH/DELETE` | `/api/v1/workspaces/:id/members[/:accountId]` | List and manage workspace members. |
+| `GET/POST` | `/api/v1/workspaces/:id/invitations` | List or create workspace invitations. |
+| `GET` | `/api/v1/workspace-invitations` | Pending invitations for the signed-in account. |
+| `POST` | `/api/v1/workspace-invitations/:id/accept\|decline` | Accept or decline an invitation. |
 | `GET` | `/api/v1/projects` | List every board visible through the workspace or a board grant. | |
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |

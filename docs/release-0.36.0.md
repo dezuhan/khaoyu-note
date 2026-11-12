@@ -30,6 +30,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   and an explicit `--purge` path.
 - **Separate public-view domain**: the installer now captures backend and public-share origins and
   uses the latter for generated `/s/:token` links.
+- **Workspace invitations**: invite, member role management and accept/decline from the main
+  frontend workspace popover.
 - **Workspace schema**: first-class workspaces, members, invitations, access policies and
   workspace-scoped boards, with viewer as the default member board role.
 - **Realtime remote save**: remote editor saves are throttled at 400 ms and pushed to the service

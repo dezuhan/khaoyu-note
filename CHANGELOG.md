@@ -116,6 +116,9 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- Workspace invitations and member management are now available through APIs and the main
+  frontend workspace popover: invite by email, list members, change member roles, and accept or
+  decline pending invitations. Board-level grants remain the existing project member overrides.
 - Added first-class workspace schema: `workspaces`, `workspace_members`,
   `workspace_invitations`, `workspace_access_policies`, and `projects.workspace_id`. A fresh service
   seeds a default team workspace with viewer as the member default board role; existing projects and

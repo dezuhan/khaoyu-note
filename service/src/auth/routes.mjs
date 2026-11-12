@@ -2959,6 +2959,109 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      const workspaceMembersMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/members$/);
+      if (method === "GET" && workspaceMembersMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        const workspaceId = decodeURIComponent(workspaceMembersMatch[1]);
+        const member = await db.get("SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, auth.account.id]);
+        if (!member) throw new HttpError(404, "workspace not found", "not_found");
+        const members = await db.all(
+          `SELECT a.id, a.email, a.display_name, a.avatar_color, a.avatar_url, m.role, m.state, m.created_at
+           FROM workspace_members m JOIN accounts a ON a.id = m.account_id
+           WHERE m.workspace_id = ? AND m.state != 'left' AND a.deleted_at IS NULL ORDER BY m.role DESC, a.display_name`,
+          [workspaceId]
+        );
+        sendJson(response, 200, { workspaceId, role: member.role, members }, config);
+        return true;
+      }
+
+      const workspaceMemberMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/members\/([^/]+)$/);
+      if (workspaceMemberMatch && ["PATCH", "DELETE"].includes(method)) {
+        const auth = await requireAuth(request, response, db, config);
+        const workspaceId = decodeURIComponent(workspaceMemberMatch[1]);
+        const targetId = decodeURIComponent(workspaceMemberMatch[2]);
+        const actor = await db.get("SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, auth.account.id]);
+        if (!actor || !["owner", "admin"].includes(actor.role)) throw new HttpError(403, "workspace admin required", "workspace_admin_required");
+        if (targetId === auth.account.id) throw new HttpError(400, "cannot change your own workspace membership", "self_lockout");
+        const target = await db.get("SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, targetId]);
+        if (!target) throw new HttpError(404, "member not found", "not_found");
+        if (method === "DELETE") {
+          await db.run("UPDATE workspace_members SET state = 'left', updated_at = ? WHERE workspace_id = ? AND account_id = ?", [now(), workspaceId, targetId]);
+        } else {
+          const body = await readJson(request);
+          const role = String(body.role || "");
+          if (!["admin", "member"].includes(role)) throw new HttpError(400, "role must be admin or member", "invalid_role");
+          await db.run("UPDATE workspace_members SET role = ?, updated_at = ? WHERE workspace_id = ? AND account_id = ?", [role, now(), workspaceId, targetId]);
+        }
+        await writeAudit(db, { actorAccountId: auth.account.id, action: method === "DELETE" ? "workspace.member_removed" : "workspace.member_role_changed", resourceType: "workspace", resourceId: workspaceId, metadata: { targetId }, ip, secret: config.secret });
+        sendJson(response, 200, { updated: true }, config);
+        return true;
+      }
+
+      const workspaceInvitesMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/invitations$/);
+      if (workspaceInvitesMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        const workspaceId = decodeURIComponent(workspaceInvitesMatch[1]);
+        const actor = await db.get("SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, auth.account.id]);
+        if (!actor || !["owner", "admin"].includes(actor.role)) throw new HttpError(403, "workspace admin required", "workspace_admin_required");
+        if (method === "GET") {
+          const invitations = await db.all("SELECT id, normalized_email, requested_role, status, kind, expires_at, created_at FROM workspace_invitations WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 100", [workspaceId]);
+          sendJson(response, 200, { invitations }, config);
+          return true;
+        }
+        if (method === "POST") {
+          const body = await readJson(request);
+          const email = normalizeEmail(body.email);
+          const role = ["admin", "member"].includes(body.role) ? body.role : "member";
+          const account = await db.get("SELECT id FROM accounts WHERE email = ? AND deleted_at IS NULL", [email]);
+          if (account && (await db.get("SELECT 1 FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, account.id]))) {
+            throw new HttpError(409, "account is already a workspace member", "already_member");
+          }
+          const id = crypto.randomUUID();
+          await db.run(
+            "INSERT INTO workspace_invitations (id, workspace_id, invitee_account_id, normalized_email, inviter_account_id, requested_role, status, kind, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', 'email', ?, ?, ?)",
+            [id, workspaceId, account?.id || null, email, auth.account.id, role, now() + 7 * 86_400_000, now(), now()]
+          );
+          await writeAudit(db, { actorAccountId: auth.account.id, action: "workspace.invited", resourceType: "workspace", resourceId: workspaceId, metadata: { email, role }, ip, secret: config.secret });
+          sendJson(response, 201, { id, email, role, status: "pending" }, config);
+          return true;
+        }
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/workspace-invitations") {
+        const auth = await requireAuth(request, response, db, config);
+        const invitations = await db.all(
+          "SELECT id, workspace_id, requested_role, status, created_at, expires_at FROM workspace_invitations WHERE status = 'pending' AND (invitee_account_id = ? OR normalized_email = ?) ORDER BY created_at DESC",
+          [auth.account.id, auth.account.email]
+        );
+        sendJson(response, 200, { invitations }, config);
+        return true;
+      }
+
+      const inviteActionMatch = url.pathname.match(/^\/api\/v1\/workspace-invitations\/([^/]+)\/(accept|decline)$/);
+      if (inviteActionMatch && method === "POST") {
+        const auth = await requireAuth(request, response, db, config);
+        const invitationId = decodeURIComponent(inviteActionMatch[1]);
+        const action = inviteActionMatch[2];
+        const invitation = await db.get("SELECT * FROM workspace_invitations WHERE id = ? AND status = 'pending'", [invitationId]);
+        if (!invitation || invitation.workspace_id === undefined) throw new HttpError(404, "invitation not found", "not_found");
+        if (invitation.invitee_account_id !== auth.account.id && invitation.normalized_email !== auth.account.email) throw new HttpError(403, "invitation belongs to another account", "forbidden");
+        if (invitation.expires_at && invitation.expires_at < now()) throw new HttpError(410, "invitation expired", "invitation_expired");
+        if (action === "decline") {
+          await db.run("UPDATE workspace_invitations SET status = 'declined', updated_at = ? WHERE id = ?", [now(), invitationId]);
+          sendJson(response, 200, { status: "declined" }, config);
+          return true;
+        }
+        await db.run("UPDATE workspace_invitations SET status = 'accepted', accepted_at = ?, updated_at = ? WHERE id = ?", [now(), now(), invitationId]);
+        await db.run(
+          "INSERT INTO workspace_members (id, workspace_id, account_id, role, state, source, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'invite', ?, ?) ON CONFLICT DO NOTHING",
+          [crypto.randomUUID(), invitation.workspace_id, auth.account.id, invitation.requested_role, now(), now()]
+        );
+        await writeAudit(db, { actorAccountId: auth.account.id, action: "workspace.invitation_accepted", resourceType: "workspace", resourceId: invitation.workspace_id, metadata: { invitationId }, ip, secret: config.secret });
+        sendJson(response, 200, { status: "accepted", workspaceId: invitation.workspace_id }, config);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/projects") {
         const auth = await requireAuth(request, response, db, config);
         requireScope(auth, "projects:read");
