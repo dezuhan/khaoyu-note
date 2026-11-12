@@ -8,6 +8,33 @@ project uses Semantic Versioning.
 - Local storage keys moved from the `mn.` namespace to `ky.` (boards, settings, theme, servers,
   workspace cache, sync queue, templates, views, assets and update cache). A one-time migration
   copies legacy `mn.*` values to `ky.*` and removes the old keys, so existing browser data survives.
+- Server-backed boards now keep a durable local mirror and a per-operation sync queue in IndexedDB
+  (localStorage fallback). Every save is captured as granular operations before the network push, so
+  offline edits survive a reload, retry with exponential backoff and report pending, syncing, blocked
+  or failed states. A `seq_conflict` replays the remote operations and resends the local patches; a
+  whole-document replacement that races a remote change now surfaces as a conflict instead of
+  overwriting it. The last remote workspace board reopens from the mirror after a reload, including
+  offline, and the workspace popover keeps the last known board list.
+- Fixed remote workspace boards that stopped autosaving after the first save: the remote save path
+  kept its in-flight flag set, so every later save was deferred indefinitely and stayed "Saving".
+- A `seq_conflict` rebase now adopts the merged document into the open editor, so the next save cannot
+  emit inverse operations (deleting cards another client added or reverting its edits). Removed card
+  fields are sent as explicit null tombstones, a queued operation for a document that the server
+  rejects fails visibly with a **Discard queued changes** action, and `sync_required` replays pending
+  edits instead of dropping them. Queue ids fall back to a local generator because
+  `crypto.randomUUID` is unavailable on the documented plain-HTTP LAN web host.
+- The generated theme copies were re-synced from `shared/theme` after the `ky.theme` storage-key
+  migration, which fixes the `theme:check` CI drift.
+- Sync queues are now stored per board **and per tab**, so two browser tabs cannot overwrite each
+  other's pending operations; a queue left by a closed tab is drained by the next flush. Overlapping
+  `(cardId, field)` edits discovered during a rebase are reported as field conflicts while the local
+  value wins (last writer per field, server sequence as timestamp), with **Use server values** and
+  **Dismiss** actions in the Sync dialog.
+- Connection edits travel as a `connections.set` operation instead of replacing the whole board
+  document, so a connection change can no longer overwrite unrelated remote cards. Bulk operations
+  (`doc.replace`, `connections.set`) may be up to 4 MB; card operations stay at 256 KB.
+- The sync model, including the deliberate decision not to add vector clocks to a single-sequencer
+  server and the CRDT prerequisites, is documented in `docs/sync-model.md`.
 ## [0.36.0] - 2026-11-12
 
 ### Added

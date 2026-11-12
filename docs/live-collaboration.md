@@ -9,9 +9,15 @@ persisted in PostgreSQL/SQLite before broadcast.
 1. A synced board opens `GET /projects/:id/events?ticket=...`.
 2. Local saves are diffed against the last synced baseline into granular operations:
    `doc.title`, `card.add`, `card.update`, `card.delete`, with `doc.replace` as a fallback for
-   connections/trash/unsupported bulk changes.
-3. The client posts the batch to `POST /projects/:id/ops` with `baseSeq`. PostgreSQL/SQLite allocates
-   per-project sequence numbers atomically and stores `project_ops`.
+   connections/trash/unsupported bulk changes. The operations are appended to a durable per-board
+   queue in IndexedDB (`app/web/js/sync-store.js`) before any network call, so a reload, a crashed
+   tab or an offline period cannot drop them; the document mirror is stored next to the queue.
+3. A single-flight worker posts the batch to `POST /projects/:id/ops` with `baseSeq`. PostgreSQL/SQLite
+   allocates per-project sequence numbers atomically and stores `project_ops`. A retry keeps the same
+   `opId`, so the server treats it as idempotent. Network failures retry with exponential backoff,
+   `card_locked` waits for the lock to expire, and a `seq_conflict` replays `GET /ops?after=`, applies
+   the remote operations to the local base and resends the still-pending local patches. A pending
+   `doc.replace` that races a remote change is reported as a conflict instead of being forced.
 4. Redis fans the committed `ops` event to every service instance; each instance forwards it to local
    SSE clients.
 5. Other clients replay `/projects/:id/ops?after=` and apply the operations to their board. If the log
@@ -49,5 +55,10 @@ persisted in PostgreSQL/SQLite before broadcast.
 - Synthetic concurrent load: **360 operations, 6 clients, ~986 ops/s locally, p95 8 ms, 64 retried
   sequence conflicts, log/card counts consistent** (`npm run test:collab-load`). This is a
   local smoke benchmark, not a production-scale load test.
+- Queues are stored per board **and per tab**, so two tabs cannot overwrite each other's pending
+  operations. A queue left behind by a closed tab is drained by the next flush from any tab; operation
+  ids keep a race between two tabs idempotent. See `docs/sync-model.md` for the full model.
+- A `seq_conflict` rebase records overlapping `(cardId, field)` edits as field conflicts, keeps the
+  local value (server order wins), and the Sync dialog offers **Use server values** or **Dismiss**.
 - Production-scale load testing, penetration testing and CRDT/OT text merging remain release gates;
   see `docs/production-readiness.md`.

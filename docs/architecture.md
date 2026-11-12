@@ -209,8 +209,12 @@ On first launch after upgrading from the JSON version, `migrate_legacy` imports 
 `boards/*.json` file into the database and renames the folder to `boards-json-backup-<timestamp>`.
 The migration is guarded by `meta.schema_version`.
 
-The frontend autosaves 5 seconds after the last mutation (idle debounce), and flushes immediately when
-switching boards, when the window loses focus, when the tab becomes hidden, and on `beforeunload`.
+The frontend autosaves on a short throttle: 80 ms on the web host, 250 ms in the desktop app and
+120 ms for remote workspace boards, so typing is persisted without a five second wait. It flushes
+immediately when switching boards, when the window loses focus, when the tab becomes hidden and on
+`beforeunload`. Remote boards additionally capture each diff into a durable per-operation queue
+(`app/web/js/sync-store.js`, IndexedDB) before the push, which is what makes offline edits and a
+reload safe.
 `saveNow` clears the dirty flag before writing, so the indicator can still report changes that arrive
 mid-save; in that case a follow-up save is scheduled instead of being dropped. The asset protocol is
 enabled for `$APPDATA/**` and `$APPLOCALDATA/**` so images can be displayed by path without turning

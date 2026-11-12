@@ -55,6 +55,7 @@ khaoyu-note/
     data-residency.md        storage locations, retention and deletion
     blockers.md              remaining work and external release blockers
     design-system.md         tokens, components, settings structure and service page rules
+    sync-model.md            durable queue, per-field LWW, vector-clock and CRDT decisions
   scripts/                   static checks, window capture
   tools/                     Playwright preview, UI test suite, screenshots
   shots/                     screenshots used by this README
@@ -117,7 +118,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Card layout | implemented: note/link/document content sits centred, the grip is bottom-right and resizes width only |
 | Undo / redo | implemented (snapshot history) |
 | Context menu | implemented: grouped Khaoyu menu with shortcuts, disabled states, New note/link/to-do/line/heading/board/column/comment/table/image/file at the click point, wrap multi-selection in a column, archive and move-to-trash/restore, and Rename on projects |
-| Autosave | saves 5 seconds after the last change; flushes on board switch, window blur, tab hide and close |
+| Autosave | saves on a short throttle (80 ms web host, 250 ms desktop, 120 ms remote boards); flushes on board switch, window blur, tab hide and close |
 | Delete / trash | implemented: deleting cards moves them to a per-board Trash panel with Restore and Delete, plus Empty trash with confirmation; Cut removes without trashing |
 | Multi-select, marquee, drag, resize | implemented |
 | Keyboard shortcuts | implemented for canvas and cards |
@@ -407,6 +408,9 @@ node tools/test-save-conflict.mjs
 
 # failed save keeps the board dirty and retries automatically
 node tools/test-save-retry.mjs
+
+# durable remote sync: service + preview server, includes an offline period and a reload
+node tools/test-sync-remote.mjs http://127.0.0.1:1430/
 
 # boot and delete never reopen a trashed board
 node tools/test-board-selection.mjs
