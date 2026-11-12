@@ -12,8 +12,9 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   is rate limited to 20 requests per 15-minute window per owner and IP.
 - **Global light/dark theme**: the theme is now an app-wide preference. Boards no longer store or
   apply their own theme, so switching boards or reloading keeps the chosen mode.
-- **Service dashboard refresh**: the admin page keeps the left rail and adds a top menu bar in the
-  app's chrome style with the same logo, SVG icon set and fonts, Dashboard/Help menus, command search
+- **Service dashboard refresh**: unauthenticated visits redirect straight to `/login`, and the login,
+  registration and reset pages reuse the main app logo, fonts and theme icons. The admin page keeps
+  the left rail and adds a top menu bar in the app's chrome style with the same logo, SVG icon set and fonts, Dashboard/Help menus, command search
   (Ctrl+K), host badge, light/dark toggle and a circular account button that opens the Account menu
   (Admin dashboard, Account settings, Help, Logout). Sharing is a section of the same dashboard
   (`/shares` redirects to `/admin#sharing`), the Teams pane fills the page, and the password fields

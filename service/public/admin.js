@@ -104,18 +104,10 @@ async function api(path, { method = "GET", body } = {}) {
   return payload;
 }
 
-function showAuth(message) {
+function showAuth() {
   identity.hidden = true;
-  pane.innerHTML = `
-    <div class="admin-auth">
-      <h2>Admin sign in</h2>
-      <p>${escapeHtml(message || "Sign in with an account that has the admin role.")}</p>
-      <button class="ky-button ky-button-primary admin-signin" id="admin-signin" type="button">Sign in to the service</button>
-      <p class="admin-note">The dashboard reads the service account session and never asks for the operator token.</p>
-    </div>`;
-  pane.querySelector("#admin-signin")?.addEventListener("click", () => {
-    window.location.assign("/login");
-  });
+  // Redirect immediately: the dashboard is only meaningful with a signed-in admin session.
+  window.location.replace("/login");
 }
 
 function showError(error) {

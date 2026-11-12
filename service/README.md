@@ -58,9 +58,9 @@ becomes the frontend URL.
 
 ## Admin dashboard
 
-Open `<frontend URL>/admin`, for example `http://127.0.0.1:29194/admin`. The page uses the normal
-service session and requires an account
-with the global `admin` role. The first account created by `bootstrap`, or the first account registered
+Open `<frontend URL>/admin`, for example `http://127.0.0.1:29194/admin`. Without a session the page
+redirects straight to `/login`; it requires an account with the global `admin` role. The login,
+registration and reset pages reuse the main app logo, fonts and theme icons. The first account created by `bootstrap`, or the first account registered
 on a fresh database, becomes an admin; migration 13 also promotes the oldest existing account.
 
 The dashboard keeps the left rail (Overview, Accounts, Teams, Activity, Sharing) and adds a top menu

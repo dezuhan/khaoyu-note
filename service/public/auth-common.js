@@ -1,3 +1,4 @@
+import { icon } from "./icons.js";
 // Shared helpers for the standalone service auth pages.
 
 const STATUS_CLASSES = ["is-error", "is-success"];
@@ -91,12 +92,18 @@ export function initTheme() {
   document.documentElement.dataset.kyTheme = theme;
   const button = $("auth-theme");
   if (!button) return;
-  button.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+  const paint = (value) => {
+    button.innerHTML = icon(value === "dark" ? "sun" : "moon", 14);
+    const label = value === "dark" ? "Switch to light mode" : "Switch to dark mode";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  };
+  paint(theme);
   button.addEventListener("click", () => {
     const next = document.documentElement.dataset.kyTheme === "dark" ? "light" : "dark";
     document.documentElement.dataset.kyTheme = next;
     localStorage.setItem(key, next);
-    button.textContent = next === "dark" ? "Light mode" : "Dark mode";
+    paint(next);
   });
 }
 

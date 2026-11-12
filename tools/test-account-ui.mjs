@@ -70,13 +70,8 @@ try {
   await page.goto(`${base}/account`, { waitUntil: "load" });
   check("account URL redirects to the admin dashboard", page.url().endsWith("/admin"), page.url());
   await page.goto(`${base}/admin`, { waitUntil: "load" });
-  const signin = page.locator("#admin-signin");
-  check(
-    "signed-out admin offers a primary button, not an underlined link",
-    (await signin.count()) === 1 &&
-      (await signin.evaluate((el) => el.tagName)) === "BUTTON" &&
-      (await signin.evaluate((el) => getComputedStyle(el).textDecorationLine)) === "none"
-  );
+  await page.waitForURL(/\/login$/, { timeout: 15000 });
+  check("signed-out admin redirects straight to the login page", true);
 
   // Registration creates an immediately usable verified account and sends the user to /login.
   await page.goto(`${base}/register`, { waitUntil: "load" });
@@ -85,6 +80,10 @@ try {
     token: getComputedStyle(document.body).getPropertyValue("--ky-bg").trim(),
   }));
   check("auth pages use the shared design tokens", design.css && design.token.length > 0, JSON.stringify(design));
+  check(
+    "auth pages use the main app logo asset",
+    (await page.locator('.auth-brand img[src="/khaoyu-note.svg"]').count()) === 1
+  );
   check(
     "email verification UI is hidden",
     (await page.locator("#verify-token").count()) === 0 &&

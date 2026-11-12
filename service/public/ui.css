@@ -12,6 +12,11 @@ body.ky-scope {
   place-items: center;
   background: var(--ky-bg);
   color: var(--ky-text);
+  --ky-font: "Plus Jakarta Sans", Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --ky-font-body: "Plus Jakarta Sans", Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --ky-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ky-font-code: "Space Mono", ui-monospace, monospace;
+  font-family: var(--ky-font-body);
 }
 
 .ky-auth-panel {
