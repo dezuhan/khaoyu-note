@@ -171,6 +171,28 @@ The service command runs `migrate-postgres` on startup and then starts the serve
 Redis are never published to the host. Keep the TLS proxy or Cloudflare Tunnel in front of port
 18080, not 18081.
 
+### Uninstall the team stack
+
+```bash
+cd service
+./scripts/uninstall-team.sh             # stop containers, keep PostgreSQL/service data volumes
+./scripts/uninstall-team.sh --purge     # also delete the team database, assets and .env.team
+```
+
+`--purge` requires typing `DELETE TEAM DATA` and cannot be undone. It only manages this Compose
+stack; a managed/external PostgreSQL or Redis is untouched. Take a service backup first:
+
+```bash
+docker compose --env-file .env.team -f docker-compose.team.yml exec -T service \
+  node src/cli.mjs backup-postgres
+```
+
+Desktop uninstall is handled by the package manager (or deleting the AppImage); its SQLite database,
+assets and preferences remain in the platform app-data directory unless removed manually. The web
+host has no installer: delete the checkout and its data directory when no longer needed. There is
+intentionally no HTTP or desktop control that drops an entire team service database; destructive
+deletion is limited to the explicit CLI/uninstaller paths above.
+
 The existing single-user `docker-compose.yml` remains unchanged for local SQLite deployments.
 
 ## Configuration

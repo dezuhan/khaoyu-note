@@ -462,9 +462,12 @@ export async function authResetDatabase(input) {
 // Full local reset: boards, assets, accounts, settings and activity. Used by Settings > About.
 export async function resetAllData() {
   if (hasWeb) {
+    const csrfMatch = document.cookie.match(/(?:^|;\s*)khaoyu_local_csrf=([^;]+)/);
+    const headers = { "content-type": "application/json" };
+    if (csrfMatch) headers["x-khaoyu-csrf"] = csrfMatch[1];
     const response = await fetch("/api/reset", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       credentials: "include",
       body: JSON.stringify({ confirmation: "RESET ALL" }),
     });

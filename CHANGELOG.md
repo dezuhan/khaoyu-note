@@ -86,6 +86,11 @@ project uses Semantic Versioning.
 - Added a synthetic concurrent operation load check (`npm run test:collab-load`): six clients,
   360 operations, consistent log/card counts, p95 8 ms locally. Production-scale load testing remains
   a release gate.
+- Added `service/scripts/uninstall-team.sh` with a safe stop mode (volumes retained) and an explicit
+  `--purge` mode for deleting the team database, assets and environment; documented desktop/web
+  uninstall and the intentional absence of a server-wide HTTP database drop.
+- Secured the web host full-reset endpoint behind an authenticated admin session and CSRF token;
+  the destructive action remains explicit and local-only in scope.
 - Added a dedicated team Docker stack (`service/docker-compose.team.yml`), a one-command
   `service/scripts/setup-team.sh` installer that generates secrets and bootstraps the owner, and a
   team `.env.team.example`. PostgreSQL and Redis stay internal; migrations run on service startup and

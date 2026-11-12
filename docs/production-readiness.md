@@ -51,6 +51,18 @@ Not ready for a production team deployment:
 Conclusion: the collaboration backend is a serious beta foundation, but it must not be advertised as
 production-ready until items 1–7 are closed.
 
+## Install/uninstall posture
+
+- Desktop: install via `.deb`, AppImage or portable archive; uninstall via the package manager or by
+  deleting the portable files. Local app data is intentionally retained unless removed manually.
+- Web host: run from a checkout with `npm run web`; no installer/uninstaller, data lives in the
+  platform app-data directory.
+- Team stack: `scripts/setup-team.sh` installs, `scripts/uninstall-team.sh` stops (retaining
+  volumes) or purges the team database, assets and `.env.team` after explicit confirmation.
+- A server-wide HTTP/UI database-drop endpoint does not exist by design. Account deletion has a
+  grace period; project deletion is scoped; full service deletion is an operator action through
+  PostgreSQL or the explicit uninstaller.
+
 ## Latest verification — 2026-11-12
 
 - Full local service suite: **94 pass, 0 fail, 7 skipped** (the skips are the PostgreSQL/Redis

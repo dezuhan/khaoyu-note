@@ -1703,6 +1703,12 @@ const server = http.createServer(async (request, response) => {
       return;
     }
     if (request.method === "POST" && url.pathname === "/api/reset") {
+      const session = requireSession(request);
+      requireCsrf(request, session);
+      if (session.user.role !== "admin") {
+        sendJson(response, 403, { error: "Admin account required" });
+        return;
+      }
       const body = JSON.parse(await readBody(request));
       if (String(body.confirmation || "").trim() !== "RESET ALL") {
         sendJson(response, 400, { error: "Type RESET ALL to confirm" });
