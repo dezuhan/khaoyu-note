@@ -11,6 +11,7 @@ test-results/
 # Local runtime data, databases and sessions
 .env
 service/.env
+service/.env.team
 .khaoyu-service-data/
 service/.khaoyu-service-data/
 service/.tmp-*

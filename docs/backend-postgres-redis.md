@@ -1,6 +1,7 @@
 # Backend: PostgreSQL, Redis and realtime editing
 
-Status: backend protocol implemented, client integration pending. The async SQLite/PostgreSQL
+Status: backend protocol and desktop/web client integration implemented; team Docker deployment is
+available in `service/docker-compose.team.yml`. The async SQLite/PostgreSQL
 storage adapter, PostgreSQL migrations, backup/restore, operation log, single-use SSE tickets,
 advisory edit locks, global Redis presence, worker leader lock and realtime readiness state are
 implemented. `team` starts with PostgreSQL and Redis and fails closed if either is unavailable. The
@@ -103,8 +104,8 @@ compaction is still limited to the existing version history rather than an op-co
    to the snapshot and inserts the rows in `project_ops`; the committed batch is published to Redis and
    forwarded to every instance's SSE clients.
 4. Reconnecting clients replay `GET /ops?after=`; pruned operations return `resync_required`.
-5. Advisory locks and heartbeats live in Redis with a TTL; writes only warn clients, they do not reject
-   a write solely because another client holds a lock.
+5. Hard card locks and heartbeats live in Redis with a TTL; operations on a card held by another
+   account are rejected with `423 card_locked`. Locks are heartbeat refreshed and expire automatically.
 6. `PUT /snapshot` remains available for older clients and sync; it still uses revision conflicts.
 
 ## Planned data flow (compaction, offline merge and client integration)
@@ -143,7 +144,8 @@ compaction is still limited to the existing version history rather than an op-co
 3. [done] Two-instance validation with PostgreSQL 18 + Redis: tickets, global presence, ops propagation,
    lock conflict and readiness passed.
 4. [done] Desktop/web client writes granular operations and applies remote ops from the realtime stream.
-5. [pending] Cursor/selection presence, granular per-card diffs and OIDC onboarding/hardening.
+5. [done] Cursor/selection presence, hard locks, granular per-card operation writes and team
+   Docker deployment; OIDC onboarding/hardening remains.
 
 ## Verification note (2026-11-12)
 
@@ -152,6 +154,18 @@ invitations, project access, ticket-authenticated SSE, global presence across in
 batch propagated through Redis, operation replay on the second instance, cross-instance lock conflict
 and `{"status":"ready","realtime":"ok"}` all passed. The PostgreSQL/Redis-gated suites
 (`storage-migrations`, `postgres-runtime`, `redis-bus`, `coordination`) passed with no skips.
+
+## Team Docker quick start
+
+```bash
+cd service
+./scripts/setup-team.sh
+```
+
+This generates `.env.team`, starts PostgreSQL + Redis + service with migrations on boot, waits for
+`/readyz`, and bootstraps the first owner. PostgreSQL and Redis stay on the internal compose network;
+only loopback frontend/backend ports are published. Enable Cloudflare Tunnel with
+`--profile tunnel` and `CLOUDFLARE_TUNNEL_TOKEN`. See `service/README.md`.
 
 ## Out of scope
 

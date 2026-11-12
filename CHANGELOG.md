@@ -86,6 +86,10 @@ project uses Semantic Versioning.
 - Added a synthetic concurrent operation load check (`npm run test:collab-load`): six clients,
   360 operations, consistent log/card counts, p95 8 ms locally. Production-scale load testing remains
   a release gate.
+- Added a dedicated team Docker stack (`service/docker-compose.team.yml`), a one-command
+  `service/scripts/setup-team.sh` installer that generates secrets and bootstraps the owner, and a
+  team `.env.team.example`. PostgreSQL and Redis stay internal; migrations run on service startup and
+  Cloudflare Tunnel is an optional compose profile.
 - The localhost web host now has a session-authenticated SSE stream (`/api/events`) with a
   1.2-second SQLite change watcher. Edits in one browser/phone/tunnel window reach other open web
   windows without a reload; web autosave runs after two seconds idle, and the desktop app polls the

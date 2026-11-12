@@ -1,0 +1,137 @@
+# Team deployment: one command brings up PostgreSQL, Redis and the service.
+#
+#   cp .env.team.example .env.team
+#   ./scripts/setup-team.sh
+#
+# The service image runs PostgreSQL migrations on startup, then fails closed if PostgreSQL or Redis
+# is unavailable. Only the frontend port is published, and only on loopback; put Cloudflare Tunnel or
+# a TLS reverse proxy in front of it. The backend API port stays private.
+name: khaoyu-note-team
+
+x-service-env: &service-env
+  KHAOYU_SERVICE_PROFILE: team
+  KHAOYU_SERVICE_HOST: 0.0.0.0
+  KHAOYU_SERVICE_FRONTEND_PORT: "18080"
+  KHAOYU_SERVICE_BACKEND_PORT: "18081"
+  KHAOYU_SERVICE_DATA_DIR: /data
+  KHAOYU_SERVICE_SECRET: ${KHAOYU_SERVICE_SECRET:?set KHAOYU_SERVICE_SECRET in .env.team}
+  KHAOYU_SERVICE_PUBLIC_URL: ${KHAOYU_SERVICE_PUBLIC_URL:-http://127.0.0.1:18080}
+  KHAOYU_SERVICE_SHARE_PUBLIC_URL: ${KHAOYU_SERVICE_SHARE_PUBLIC_URL:-http://127.0.0.1:18080}
+  KHAOYU_SERVICE_COOKIE_SECURE: ${KHAOYU_SERVICE_COOKIE_SECURE:-false}
+  KHAOYU_SERVICE_TRUST_PROXY: ${KHAOYU_SERVICE_TRUST_PROXY:-true}
+  KHAOYU_SERVICE_PUBLIC_SHARING: ${KHAOYU_SERVICE_PUBLIC_SHARING:-true}
+  KHAOYU_SERVICE_CORS_ORIGINS: ${KHAOYU_SERVICE_CORS_ORIGINS:-tauri://localhost,http://tauri.localhost,http://127.0.0.1:1430,http://localhost:1430}
+  KHAOYU_SERVICE_DATABASE_URL: postgresql://${KHAOYU_SERVICE_POSTGRES_USER:-khaoyu}:${KHAOYU_SERVICE_POSTGRES_PASSWORD:?set KHAOYU_SERVICE_POSTGRES_PASSWORD in .env.team}@postgres:5432/${KHAOYU_SERVICE_POSTGRES_DB:-khaoyu}
+  KHAOYU_SERVICE_DATABASE_SSL: "false"
+  KHAOYU_SERVICE_DATABASE_POOL_MAX: "10"
+  KHAOYU_SERVICE_REDIS_URL: redis://:${KHAOYU_SERVICE_REDIS_PASSWORD:?set KHAOYU_SERVICE_REDIS_PASSWORD in .env.team}@redis:6379/0
+  KHAOYU_SERVICE_REDIS_PREFIX: khaoyu
+  KHAOYU_SERVICE_PASSKEYS_ENABLED: ${KHAOYU_SERVICE_PASSKEYS_ENABLED:-true}
+  KHAOYU_SERVICE_RP_ID: ${KHAOYU_SERVICE_RP_ID:-}
+  KHAOYU_BOOTSTRAP_EMAIL: ${KHAOYU_BOOTSTRAP_EMAIL:-owner@localhost}
+  KHAOYU_BOOTSTRAP_NAME: ${KHAOYU_BOOTSTRAP_NAME:-Owner}
+  KHAOYU_BOOTSTRAP_PROJECT: ${KHAOYU_BOOTSTRAP_PROJECT:-Khaoyu Note}
+  KHAOYU_BOOTSTRAP_PASSWORD: ${KHAOYU_BOOTSTRAP_PASSWORD:-}
+
+services:
+  service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: khaoyu-note-service:0.36.0
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env.team
+    environment: *service-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${KHAOYU_SERVICE_PUBLISH_PORT:-18080}:18080"
+      - "127.0.0.1:${KHAOYU_SERVICE_PUBLISH_BACKEND_PORT:-18081}:18081"
+    volumes:
+      - khaoyu-service-data:/data
+    command:
+      - sh
+      - -c
+      - node src/cli.mjs migrate-postgres && exec node src/server.mjs
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:18080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    stop_grace_period: 20s
+
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${KHAOYU_SERVICE_POSTGRES_DB:-khaoyu}
+      POSTGRES_USER: ${KHAOYU_SERVICE_POSTGRES_USER:-khaoyu}
+      POSTGRES_PASSWORD: ${KHAOYU_SERVICE_POSTGRES_PASSWORD:?set KHAOYU_SERVICE_POSTGRES_PASSWORD in .env.team}
+    volumes:
+      - khaoyu-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    # Never publish PostgreSQL; only the compose network reaches it.
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    restart: unless-stopped
+    environment:
+      KHAOYU_SERVICE_REDIS_PASSWORD: ${KHAOYU_SERVICE_REDIS_PASSWORD:?set KHAOYU_SERVICE_REDIS_PASSWORD in .env.team}
+    command:
+      - redis-server
+      - --requirepass
+      - ${KHAOYU_SERVICE_REDIS_PASSWORD:?set KHAOYU_SERVICE_REDIS_PASSWORD in .env.team}
+      - --appendonly
+      - "no"
+      - --maxmemory-policy
+      - noeviction
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$KHAOYU_SERVICE_REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    # Redis is ephemeral coordination, so it has no volume by design.
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      service:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  khaoyu-service-data:
+  khaoyu-postgres-data:

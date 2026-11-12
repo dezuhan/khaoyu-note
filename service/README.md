@@ -120,6 +120,59 @@ filesystem, no Linux capabilities and a writable named volume for `/data`.
 Migrations are explicit. The server checks the schema version at startup and refuses to start while
 a migration is pending.
 
+## Team Docker quick start (PostgreSQL + Redis)
+
+The team profile fails closed unless both PostgreSQL and Redis are configured. Use the dedicated
+stack instead of adding the databases to the single-user compose file:
+
+```bash
+cd service
+./scripts/setup-team.sh
+```
+
+The installer asks only for:
+
+1. public service URL (for example `https://notes.example.com`),
+2. first owner email,
+3. optional Cloudflare Tunnel token.
+
+It generates `.env.team` with random service/PostgreSQL/Redis/bootstrap secrets, builds the image,
+starts PostgreSQL and Redis, applies PostgreSQL migrations, starts the service, waits for
+`/readyz`, bootstraps the first owner, and prints the one-time owner password. Re-running it reuses
+the existing `.env.team` and does not reset the password. `.env.team` is gitignored and mode `0600`.
+
+Without the installer:
+
+```bash
+cd service
+cp .env.team.example .env.team
+# edit public URL, service secret, PostgreSQL/Redis passwords, owner email/password
+docker compose --env-file .env.team -f docker-compose.team.yml up -d --build
+docker compose --env-file .env.team -f docker-compose.team.yml exec -T service \
+  node src/cli.mjs bootstrap-postgres
+```
+
+Services in the team stack:
+
+| Service | Exposure |
+|---|---|
+| `service` | `127.0.0.1:18080` frontend and `127.0.0.1:18081` backend |
+| `postgres` | internal compose network only |
+| `redis` | internal compose network only, ephemeral and password-protected |
+| `cloudflared` | only with `--profile tunnel`; set `CLOUDFLARE_TUNNEL_TOKEN` |
+
+Start the tunnel profile after the service is healthy:
+
+```bash
+docker compose --env-file .env.team -f docker-compose.team.yml --profile tunnel up -d cloudflared
+```
+
+The service command runs `migrate-postgres` on startup and then starts the server. PostgreSQL and
+Redis are never published to the host. Keep the TLS proxy or Cloudflare Tunnel in front of port
+18080, not 18081.
+
+The existing single-user `docker-compose.yml` remains unchanged for local SQLite deployments.
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -187,8 +240,9 @@ The multi-user team profile uses PostgreSQL as the system of record and Redis fo
 fanout, single-use SSE tickets, global presence with cursors, hard per-card edit locks, the operation log and the worker
 leader lock.
 PostgreSQL storage, backup/restore, operation log and CLI commands are in place. The desktop/web sync
-client writes `doc.replace` operations and listens to the ticket-authenticated SSE stream; cursor and
-CRDT/OT text merging are still to be implemented. The remaining phases are recorded in
+client writes granular operations, listens to the ticket-authenticated SSE stream, applies remote
+operations and publishes cursor/selection presence; hard card locks are enforced. Character-level
+CRDT/OT text merging remains future editor work. The remaining phases are recorded in
 [docs/backend-postgres-redis.md](../docs/backend-postgres-redis.md).
 
 - `single-user` keeps SQLite and needs no PostgreSQL or Redis.
@@ -204,8 +258,8 @@ CRDT/OT text merging are still to be implemented. The remaining phases are recor
 - The worker records `last_worker_at` and `last_worker_summary` in `service_meta` after each run and
   revokes expired invitations and share links in addition to backups, temp cleanup, token pruning and
   email retry.
-- Docker Compose exposes opt-in `postgres` and `redis` services:
-  `docker compose --profile team up -d postgres redis`.
+- The team stack is `docker-compose.team.yml` with `scripts/setup-team.sh` (see the quick start
+  above); the single-user `docker-compose.yml` still exposes optional helper profiles.
 - PostgreSQL baseline and data migration commands:
 
 ```powershell

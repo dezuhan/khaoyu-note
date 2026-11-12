@@ -39,8 +39,8 @@ services:
       start_period: 10s
     stop_grace_period: 20s
 
-  # Team-profile backend. These services are opt-in until the storage adapter is wired into the
-  # service process: docker compose --profile team up -d
+  # Optional single-user compose helpers. The full team deployment lives in
+  # docker-compose.team.yml and scripts/setup-team.sh.
   postgres:
     image: postgres:17-alpine
     profiles: ["team"]
