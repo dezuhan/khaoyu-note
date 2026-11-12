@@ -87,11 +87,6 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
       response.end();
       return;
     }
-    if (request.method === "GET" && url.pathname === "/workspace" && config.mainAppUrl) {
-      response.writeHead(302, { Location: `${config.mainAppUrl}/?workspace=1` });
-      response.end();
-      return;
-    }
     if (request.method === "GET" && url.pathname === "/") {
       response.writeHead(302, { Location: "/workspace" });
       response.end();
