@@ -81,7 +81,7 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
   immediately usable verified account and `/auth/verify-email` returns 410 `verification_disabled`.
 - [x] Unique, case-normalised email addresses; display name separate from email.
 - [x] Account deletion request with a grace period, export before deletion.
-- [x] Optional second factor: TOTP first, passkeys later (TOTP and WebAuthn passkeys are implemented).
+- [x] Optional second factor: TOTP first, passkeys later (TOTP and WebAuthn passkeys are implemented, with QR setup and passkey readiness in the account security page).
 - [x] Optional SSO for self-hosted enterprise deployments, behind an operator flag (trusted-proxy header SSO with HMAC; OIDC discovery is not included).
 
 ### Authentication

@@ -72,6 +72,9 @@ project uses Semantic Versioning.
 - The Share dialog is reorganized into clear Board link, Create a share link and Active links
   sections: the board URL and copy action share one row, the form fields align in two columns, and
   Create/Copy actions sit together without the previous empty vertical gaps.
+- The account security page now exposes authenticator (TOTP) setup with an inline QR code, enable
+  and disable flows, and passkey readiness/instructions. `/account` is served directly again instead
+  of redirecting to `/admin`, and the dashboard Account section links to it.
 - Share links can use a public origin: `KHAOYU_SERVICE_SHARE_PUBLIC_URL` controls the absolute URL
   returned by the service, and **Settings > Server > Public share links** stores a client-side
   public origin for share links and browser board links. See `docs/public-sharing.md` for port

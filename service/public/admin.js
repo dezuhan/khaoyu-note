@@ -713,6 +713,9 @@ async function renderAccount() {
         ${avatarHtml({ displayName: admin.displayName || account.displayName, email: account.email, avatarUrl: admin.avatarUrl })}
         <span class="admin-user-copy"><strong>${escapeHtml(account.displayName || account.email)}</strong><span>${escapeHtml(account.email)} · Admin</span></span>
       </div>
+      <div class="admin-actions admin-actions-spaced">
+        <a class="ky-button ky-button-quiet" href="/account">Two-factor and passkeys</a>
+      </div>
     </div>
 
     <div class="ky-section admin-section">

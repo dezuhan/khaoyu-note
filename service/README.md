@@ -279,6 +279,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/password-reset/request` | Legacy operator endpoint that queues a single-use reset token. The browser uses current-password reset instead. |
 | `POST` | `/api/v1/auth/password-reset/confirm` | Legacy operator endpoint that consumes a reset token. |
 | `POST` | `/api/v1/auth/reset-password` | Reset with email plus current password; no email token and every session is revoked. |
+| `GET` | `/api/v1/auth/totp` | Read whether TOTP is enabled for the signed-in account. |
 | `POST` | `/api/v1/auth/totp/setup` | Create a TOTP secret and `otpauth` URI. |
 | `POST` | `/api/v1/auth/totp/enable` | Confirm a TOTP code and enable it. |
 | `POST` | `/api/v1/auth/totp/disable` | Disable TOTP with password and code. |
@@ -377,9 +378,10 @@ passkey link. `/register` creates an account immediately; the first account beco
 `/reset` asks for email, current password and a new password, then revokes every session. It never sends
 an email reset token because this service has no email confirmation flow.
 
-`/account` redirects to `/admin`; the dashboard has an Account section for password changes, sessions,
-API tokens and sign out. `/passkeys` handles passkey login and registration. All pages use the same
-cookie and CSRF rules as the API and are served with a strict self-only CSP.
+`/account` is the account security page: TOTP setup with an inline QR code, TOTP enable/disable,
+passkey readiness, sessions, API tokens and sign out. The dashboard Account section links to it and
+keeps the admin profile/password controls. `/passkeys` handles passkey login and registration. All
+pages use the same cookie and CSRF rules as the API and are served with a strict self-only CSP.
 
 ## Passkeys
 

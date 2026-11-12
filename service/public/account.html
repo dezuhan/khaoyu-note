@@ -28,6 +28,47 @@
         </div>
         <p class="muted"><a href="/admin">Open the service admin dashboard</a></p>
 
+        <h2 style="margin-top: 18px">Two-factor authentication</h2>
+        <p id="totp-status" class="muted">Checking...</p>
+        <div id="totp-setup" hidden>
+          <p class="muted">Scan this code with an authenticator app, or enter the secret manually.</p>
+          <div id="totp-qr" class="totp-qr" aria-label="Authenticator QR code"></div>
+          <label class="ky-label" for="totp-secret">Secret</label>
+          <div class="row">
+            <input class="ky-input" id="totp-secret" readonly />
+            <button class="ky-button ky-button-quiet" id="totp-copy-secret" type="button">Copy secret</button>
+          </div>
+          <label class="ky-label" for="totp-code">6-digit code</label>
+          <input class="ky-input" id="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
+          <div class="row">
+            <button class="ky-button ky-button-primary" id="totp-enable" type="button">Enable 2FA</button>
+            <button class="ky-button ky-button-quiet" id="totp-cancel" type="button">Cancel</button>
+          </div>
+        </div>
+        <div id="totp-enabled" hidden>
+          <p class="muted">Authenticator app is enabled. Keep a backup device and recovery plan.</p>
+          <button class="ky-button ky-button-danger" id="totp-disable-start" type="button">Disable 2FA</button>
+        </div>
+        <div id="totp-disable" hidden>
+          <p class="muted">Confirm your password and current 6-digit code to disable 2FA.</p>
+          <label class="ky-label" for="totp-disable-password">Password</label>
+          <input class="ky-input" id="totp-disable-password" type="password" autocomplete="current-password" />
+          <label class="ky-label" for="totp-disable-code">6-digit code</label>
+          <input class="ky-input" id="totp-disable-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+          <div class="row">
+            <button class="ky-button ky-button-danger" id="totp-disable-confirm" type="button">Disable 2FA</button>
+            <button class="ky-button ky-button-quiet" id="totp-disable-cancel" type="button">Cancel</button>
+          </div>
+        </div>
+        <button class="ky-button ky-button-primary" id="totp-setup-start" type="button">Set up authenticator</button>
+
+        <h2 style="margin-top: 18px">Passkeys</h2>
+        <p id="passkey-readiness" class="muted">Checking passkey support...</p>
+        <p class="muted">A passkey is a device credential (Touch ID, Windows Hello, security key or phone) that signs in without a password. Open the passkey page, sign in, then choose Register a passkey.</p>
+        <div class="row">
+          <a class="ky-button ky-button-primary" href="/passkeys">Create or manage passkeys</a>
+        </div>
+
         <h2 style="margin-top: 18px">Sessions</h2>
         <ul id="sessions"></ul>
 
@@ -43,6 +84,7 @@
       <div id="status" role="status"></div>
     </main>
     <script type="module" src="/theme-init.js"></script>
+    <script src="/vendor/qrcode.js"></script>
     <script type="module" src="/account.js"></script>
   </body>
 </html>

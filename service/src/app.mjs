@@ -21,6 +21,7 @@ const AUTH_PAGES = {
   "/auth-common.js": ["auth-common.js", "text/javascript; charset=utf-8"],
   "/account": ["account.html", "text/html; charset=utf-8"],
   "/account.js": ["account.js", "text/javascript; charset=utf-8"],
+  "/vendor/qrcode.js": ["vendor/qrcode.js", "text/javascript; charset=utf-8"],
   "/admin": ["admin.html", "text/html; charset=utf-8"],
   "/admin.js": ["admin.js", "text/javascript; charset=utf-8"],
   "/admin.css": ["admin.css", "text/css; charset=utf-8"],
@@ -76,11 +77,6 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
       return;
     }
     const sharePage = /^\/s\/[^/]+$/.test(url.pathname);
-    if (request.method === "GET" && url.pathname === "/account") {
-      response.writeHead(302, { Location: "/admin" });
-      response.end();
-      return;
-    }
     // Sharing now lives inside the admin dashboard instead of a separate page.
     if (request.method === "GET" && url.pathname === "/shares") {
       response.writeHead(302, { Location: "/admin#sharing" });

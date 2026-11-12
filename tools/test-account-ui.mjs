@@ -1,5 +1,5 @@
 // End-to-end account UI check against the current service pages:
-// /account redirects to /admin; registration lives on /register, sign-in on /login, and the
+// /account is the member security/account page; registration lives on /register, sign-in on /login, and the
 // account section (sessions, API tokens, password, sign-out) is a page inside the admin dashboard.
 // node tools/test-account-ui.mjs
 import { spawn, spawnSync } from "node:child_process";
@@ -67,12 +67,12 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  // /account is now a server-side redirect to the admin dashboard.
-  const accountRedirect = await page.request.get(`${base}/account`, { maxRedirects: 0 });
+  // /account is the member security page and remains directly reachable.
+  const accountPage = await page.request.get(`${base}/account`, { maxRedirects: 0 });
   check(
-    "account URL redirects to the admin dashboard",
-    accountRedirect.status() === 302 && String(accountRedirect.headers().location || "").endsWith("/admin"),
-    `${accountRedirect.status()} ${accountRedirect.headers().location || ""}`
+    "account URL serves the account security page",
+    accountPage.status() === 200 && (await accountPage.text()).includes("Two-factor authentication"),
+    `${accountPage.status()}`
   );
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForURL(/\/login$/, { timeout: 15000 });

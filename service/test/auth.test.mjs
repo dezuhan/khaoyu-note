@@ -1718,6 +1718,9 @@ test("account, login, refresh, session, reset and authorization flows", async (t
 
   await t.test("TOTP can be enabled and is required at login", async () => {
     const user = await api.account(`totp-${crypto.randomUUID()}@example.com`);
+    const before = await api.call("/api/v1/auth/totp", { jar: user.jar });
+    assert.equal(before.status, 200);
+    assert.equal(before.body.enabled, false);
     const setup = await api.call("/api/v1/auth/totp/setup", { method: "POST", jar: user.jar });
     assert.equal(setup.status, 200);
     const code = generateTotp(setup.body.secret);
@@ -1727,6 +1730,8 @@ test("account, login, refresh, session, reset and authorization flows", async (t
       body: { code },
     });
     assert.equal(enabled.status, 204);
+    const after = await api.call("/api/v1/auth/totp", { jar: user.jar });
+    assert.equal(after.body.enabled, true);
     await api.call("/api/v1/auth/logout", { method: "POST", jar: user.jar });
     assert.equal((await api.login(user.email, user.password)).status, 401);
     const withCode = await api.login(user.email, user.password, { totp: generateTotp(setup.body.secret) });

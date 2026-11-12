@@ -104,7 +104,7 @@ scan used Podman and Trivy.
 | Translation audit | 190/190 keys, 10 languages |
 | Main UI suite | **268/268 pass** |
 | Feature browser suites | save-conflict 11/11, save-retry 4/4, board-selection 4/4, rename 8/8, board-card-title 5/5, column-layout 9/9, column-title 7/7, tool-drop 6/6, wrap 5/5, tooltips 7/7, line-area 6/6, card-features 24/24, fonts 5/5, web-mode 10/10, auth-web 44/44, onboarding pass |
-| Service-backed browser suites | passkeys, shares-ui, share-view and the rewritten account suite (14 checks) pass with a disposable service |
+| Service-backed browser suites | passkeys, shares-ui, share-view and the account suite pass with a disposable service; the account suite now covers the security page |
 | Service tests | **77 pass, 0 skipped** against disposable PostgreSQL 17 and local Redis; the suite covers logout CSRF and the invitation rate limit |
 | PostgreSQL integration | pass (baseline parity, durable copy and storage round-trips included) |
 | Web host smoke | `/status` pass, version 0.36.0 on Node 26.13.0 |

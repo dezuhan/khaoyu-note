@@ -182,3 +182,35 @@ body.ky-scope {
   opacity: 0.08;
   white-space: nowrap;
 }
+
+/* Authenticator setup */
+.totp-qr {
+  display: flex;
+  justify-content: center;
+  padding: var(--ky-space-12);
+  margin: var(--ky-space-8) 0;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: #fff;
+}
+
+.totp-qr svg {
+  display: block;
+  width: min(200px, 100%);
+  height: auto;
+}
+
+#totp-secret {
+  font-family: var(--ky-font-mono, monospace);
+  letter-spacing: 0.04em;
+}
+
+#totp-setup .row,
+#totp-disable .row {
+  align-items: center;
+}
+
+.ky-auth-panel a.ky-button-primary {
+  color: var(--ky-on-primary);
+  text-decoration: none;
+}

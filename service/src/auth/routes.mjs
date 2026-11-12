@@ -1898,6 +1898,12 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/auth/totp") {
+        const auth = await requireSessionAuth(request, response, db, config);
+        sendJson(response, 200, { enabled: Boolean(auth.account.totp_enabled_at) }, config);
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/auth/totp/setup") {
         const auth = await requireSessionAuth(request, response, db, config);
         if (auth.account.totp_enabled_at) throw new HttpError(409, "TOTP is already enabled", "totp_enabled");

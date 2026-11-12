@@ -146,12 +146,12 @@ test("service admin dashboard API", async (t) => {
       assert.equal(response.status, 200, route);
       assert.match(response.body, new RegExp(marker), route);
     }
-    for (const asset of ["/auth.css", "/auth-common.js", "/login.js", "/register.js", "/reset.js"]) {
+    for (const asset of ["/auth.css", "/auth-common.js", "/login.js", "/register.js", "/reset.js", "/vendor/qrcode.js"]) {
       assert.equal((await api.call(asset)).status, 200, asset);
     }
-    const accountRedirect = await api.call("/account");
-    assert.equal(accountRedirect.status, 302);
-    assert.equal(accountRedirect.response.headers.get("location"), "/admin");
+    const accountPage = await api.call("/account");
+    assert.equal(accountPage.status, 200);
+    assert.match(accountPage.body, /Two-factor authentication/);
   });
 
   const registered = await api.register("admin@example.com");

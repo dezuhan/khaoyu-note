@@ -120,6 +120,100 @@ async function logout() {
   }
 }
 
+let totpEnabled = false;
+let totpSecret = "";
+
+function renderTotp(enabled) {
+  totpEnabled = Boolean(enabled);
+  const status = $("totp-status");
+  status.textContent = totpEnabled
+    ? "Enabled with an authenticator app."
+    : "Not enabled. Add an authenticator app for a second sign-in step.";
+  $("totp-setup-start").hidden = totpEnabled;
+  $("totp-enabled").hidden = !totpEnabled;
+  $("totp-setup").hidden = true;
+  $("totp-disable").hidden = true;
+}
+
+async function loadTotp() {
+  try {
+    const data = await api("/api/v1/auth/totp");
+    renderTotp(data.enabled);
+  } catch {
+    $("totp-status").textContent = "2FA status unavailable.";
+  }
+}
+
+function renderPasskeyReadiness() {
+  const element = $("passkey-readiness");
+  if (!window.PublicKeyCredential) {
+    element.textContent = "This browser does not expose WebAuthn, so passkeys are unavailable here.";
+    return;
+  }
+  element.textContent = window.isSecureContext
+    ? "Passkeys are available on this device. Use the passkey page to register one."
+    : "Passkeys need a secure context. Use localhost or HTTPS; plain HTTP on a LAN/public IP cannot register a passkey.";
+}
+
+function showPasskeyStatus() {
+  renderPasskeyReadiness();
+}
+
+async function startTotpSetup() {
+  try {
+    const data = await api("/api/v1/auth/totp/setup", { method: "POST", body: {} });
+    totpSecret = data.secret;
+    $("totp-secret").value = data.secret;
+    $("totp-code").value = "";
+    const qr = $("totp-qr");
+    qr.textContent = "";
+    if (window.qrcode) {
+      const code = window.qrcode(0, "M");
+      code.addData(data.uri);
+      code.make();
+      qr.innerHTML = code.createSvgTag(4, 2);
+    } else {
+      qr.textContent = "QR preview unavailable. Enter the secret manually.";
+    }
+    $("totp-setup").hidden = false;
+    $("totp-enabled").hidden = true;
+    $("totp-setup-start").hidden = true;
+    $("totp-status").textContent = "Scan the code, then confirm with a 6-digit code.";
+    setStatus("Authenticator setup started.");
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+async function enableTotp() {
+  const code = $("totp-code").value.trim();
+  if (!/^\d{6}$/.test(code)) return setStatus("Enter the 6-digit code from the authenticator app.");
+  try {
+    await api("/api/v1/auth/totp/enable", { method: "POST", body: { code } });
+    totpSecret = "";
+    setStatus("Two-factor authentication enabled.");
+    await loadTotp();
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+async function disableTotp() {
+  const password = $("totp-disable-password").value;
+  const code = $("totp-disable-code").value.trim();
+  if (!password) return setStatus("Enter your password.");
+  if (!/^\d{6}$/.test(code)) return setStatus("Enter the current 6-digit code.");
+  try {
+    await api("/api/v1/auth/totp/disable", { method: "POST", body: { password, code } });
+    $("totp-disable-password").value = "";
+    $("totp-disable-code").value = "";
+    setStatus("Two-factor authentication disabled.");
+    await loadTotp();
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
 async function refresh() {
   try {
     const sessions = await api("/api/v1/auth/sessions");
@@ -128,6 +222,8 @@ async function refresh() {
     $("account-email").textContent = sessions.account?.email || "Signed in";
     renderSessions(sessions.sessions);
     renderTokens(tokens.tokens);
+    await loadTotp();
+    renderPasskeyReadiness();
   } catch {
     $("account-section").hidden = true;
     $("redirect-note").hidden = false;
@@ -138,4 +234,30 @@ async function refresh() {
 $("token-create").addEventListener("click", createToken);
 $("logout").addEventListener("click", logout);
 $("logout-all").addEventListener("click", logoutAll);
+$("totp-setup-start").addEventListener("click", startTotpSetup);
+$("totp-copy-secret").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(totpSecret || $("totp-secret").value);
+    setStatus("Authenticator secret copied.");
+  } catch {
+    setStatus("Could not copy the secret.");
+  }
+});
+$("totp-enable").addEventListener("click", enableTotp);
+$("totp-cancel").addEventListener("click", () => {
+  $("totp-setup").hidden = true;
+  $("totp-setup-start").hidden = false;
+  $("totp-status").textContent = "Not enabled. Add an authenticator app for a second sign-in step.";
+});
+$("totp-disable-start").addEventListener("click", () => {
+  $("totp-disable").hidden = false;
+  $("totp-enabled").hidden = true;
+});
+$("totp-disable-cancel").addEventListener("click", () => {
+  $("totp-disable").hidden = true;
+  $("totp-enabled").hidden = true;
+  renderTotp(totpEnabled);
+});
+$("totp-disable-confirm").addEventListener("click", disableTotp);
+window.addEventListener("focus", showPasskeyStatus);
 refresh();
