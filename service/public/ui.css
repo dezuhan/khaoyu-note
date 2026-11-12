@@ -244,3 +244,146 @@ body.account-security-page .ky-auth-panel {
   line-height: 1.8;
   white-space: pre-wrap;
 }
+
+/* Read-only board preview for public shares. */
+body.share-page {
+  padding: var(--ky-space-20);
+  place-items: start center;
+}
+
+.share-panel {
+  width: min(1180px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+
+.share-panel #content {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.share-board {
+  position: relative;
+  width: 100%;
+}
+
+.share-board-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-card);
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--ky-soft) 28%, transparent) 1px, transparent 1px) 0 0 / 20px 20px,
+    var(--ky-bg);
+}
+
+.share-board-canvas {
+  position: relative;
+  transform-origin: top left;
+}
+
+.share-card {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: var(--ky-space-10);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  font-size: var(--ky-text-sm);
+  line-height: 1.45;
+  box-shadow: var(--ky-shadow-popup);
+}
+
+.share-card h2,
+.share-card h3,
+.share-card strong,
+.share-card p {
+  margin: 0 0 var(--ky-space-4);
+}
+
+.share-card h2 {
+  font-size: var(--ky-text-xl);
+  line-height: 1.15;
+}
+
+.share-card share-heading,
+.share-heading {
+  font-size: var(--ky-text-xl);
+  font-weight: 600;
+}
+
+.share-card ul {
+  margin: 0;
+  padding-left: var(--ky-space-16);
+}
+
+.share-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ky-text-xs);
+}
+
+.share-card th,
+.share-card td {
+  padding: var(--ky-space-3) var(--ky-space-4);
+  border-bottom: 1px solid var(--ky-stroke);
+  text-align: left;
+}
+
+.share-card a {
+  display: block;
+  overflow: hidden;
+  color: var(--ky-accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-card-meta,
+.share-card .muted {
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+.share-card-color {
+  background: var(--share-card-color, var(--ky-control));
+}
+
+.share-card-section {
+  background: color-mix(in srgb, var(--ky-control) 55%, transparent);
+  box-shadow: none;
+}
+
+.share-card-column {
+  background: color-mix(in srgb, var(--ky-surface) 88%, transparent);
+}
+
+.share-card-board {
+  border-color: var(--ky-accent);
+}
+
+.share-card-sketch,
+.share-card-drawing {
+  background:
+    linear-gradient(135deg, transparent 48%, var(--ky-stroke) 49% 51%, transparent 52%),
+    var(--ky-surface);
+}
+
+.share-card .comments {
+  margin-top: var(--ky-space-6);
+  color: var(--ky-muted);
+  font-size: var(--ky-text-xs);
+}
+
+@media (max-width: 720px) {
+  .share-panel {
+    width: 100%;
+    max-height: none;
+  }
+
+  .share-board-viewport {
+    overflow-x: auto;
+  }
+}

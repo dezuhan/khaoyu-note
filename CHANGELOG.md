@@ -86,6 +86,9 @@ project uses Semantic Versioning.
 - Added a synthetic concurrent operation load check (`npm run test:collab-load`): six clients,
   360 operations, consistent log/card counts, p95 8 ms locally. Production-scale load testing remains
   a release gate.
+- The public share viewer now renders the shared board as a scaled, read-only canvas preview with
+  spatial card positions and themed card styles instead of a raw type label list; column shares show
+  their scoped children and nested boards show their own previews.
 - Live collaboration is now wired end to end: local board saves push granular card/title operations
   through the server-sequenced operation log, SSE ops events are replayed and applied to the other
   clients, and presence reflects connected accounts. Two browser clients merge distinct card edits

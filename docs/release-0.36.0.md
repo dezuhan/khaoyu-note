@@ -24,6 +24,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   keeping the card frame and Load more button visible.
 - **Passkey kill switch**: `KHAOYU_SERVICE_PASSKEYS_ENABLED=false` hides passkey UI and disables the
   passkey endpoints while leaving password, TOTP and backup-code login available.
+- **Share board preview**: `/s/:token` now shows a scaled spatial read-only board instead of a raw
+  card-type list.
 - **Live collaboration hardening**: hard per-card edit locks, remote cursor/selection presence and a
   synthetic six-client concurrent operation load check.
 - **Member account dashboard**: members enter `/admin` with only Account Management visible; admin

@@ -35,41 +35,67 @@ function renderComments(card, parent) {
   parent.append(box);
 }
 
-function renderCard(card) {
-  const article = document.createElement("article");
-  article.className = "card";
-  appendText(article, "h3", card.type || "card");
-  if (card.title) appendText(article, "strong", card.title);
-  if (card.text) appendText(article, "p", card.text);
-  if (card.description) appendText(article, "p", card.description);
-  if (card.caption) appendText(article, "p", card.caption, "muted");
-  if (Array.isArray(card.items)) {
-    const list = document.createElement("ul");
-    for (const item of card.items) {
-      const text = typeof item === "string" ? item : item.text || "";
-      const checked = typeof item === "object" && item.checked ? "☑ " : "☐ ";
-      appendText(list, "li", checked + text);
-    }
-    article.append(list);
+function cardText(card) {
+  return String(card.text || card.description || card.caption || "");
+}
+
+function appendCardContent(article, card) {
+  if (card.type === "heading") {
+    appendText(article, "h2", card.text || card.title || "Heading", "share-heading");
+    return;
   }
-  if (Array.isArray(card.cells)) {
-    const table = document.createElement("table");
-    for (const row of card.cells) {
-      const tr = table.insertRow();
-      for (const cell of row) tr.insertCell().textContent = String(cell ?? "");
+  if (card.type === "note" || card.type === "document") {
+    if (card.title) appendText(article, "strong", card.title);
+    appendText(article, "p", cardText(card));
+  } else if (card.type === "todo") {
+    if (card.title) appendText(article, "strong", card.title);
+    if (Array.isArray(card.items)) {
+      const list = document.createElement("ul");
+      for (const item of card.items) {
+        const text = typeof item === "string" ? item : item.text || "";
+        const checked = (typeof item === "object" && (item.done || item.checked)) ? "☑ " : "☐ ";
+        appendText(list, "li", checked + text);
+      }
+      article.append(list);
     }
-    article.append(table);
-  }
-  if (card.url) {
+  } else if (card.type === "table") {
+    if (Array.isArray(card.cells)) {
+      const table = document.createElement("table");
+      for (const row of card.cells) {
+        const tr = table.insertRow();
+        for (const cell of row) tr.insertCell().textContent = String(cell ?? "");
+      }
+      article.append(table);
+    }
+  } else if (card.type === "link") {
+    appendText(article, "strong", card.title || card.url || "Link");
     const href = safeUrl(card.url);
     if (href) {
       const link = appendText(article, "a", href);
       link.href = href;
       link.target = "_blank";
       link.rel = "noopener noreferrer nofollow";
-    } else {
-      appendText(article, "p", card.url, "muted");
     }
+  } else if (card.type === "board") {
+    appendText(article, "strong", card.title || "Board");
+    appendText(article, "span", "Nested board", "share-card-meta");
+  } else if (card.type === "color") {
+    appendText(article, "strong", card.title || card.color || "Colour");
+  } else if (card.type === "sketch" || card.type === "drawing") {
+    appendText(article, "strong", card.title || "Sketch");
+    appendText(article, "span", "Drawing preview unavailable", "share-card-meta");
+  } else if (card.url) {
+    appendText(article, "strong", card.title || "Media");
+    const href = safeUrl(card.url);
+    if (href) {
+      const link = appendText(article, "a", href);
+      link.href = href;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer nofollow";
+    }
+  } else {
+    appendText(article, "strong", card.title || card.type || "Card");
+    if (cardText(card)) appendText(article, "p", cardText(card));
   }
   if (Array.isArray(card.messages)) {
     for (const message of card.messages) {
@@ -77,13 +103,61 @@ function renderCard(card) {
     }
   }
   renderComments(card, article);
+}
+
+function renderCard(card) {
+  const article = document.createElement("article");
+  article.className = `card share-card share-card-${String(card.type || "card").replace(/[^a-z0-9_-]/gi, "")}`;
+  if (card.type === "color" && /^#[0-9a-f]{6}$/i.test(String(card.color || ""))) {
+    article.style.setProperty("--share-card-color", card.color);
+  }
+  appendCardContent(article, card);
   return article;
 }
 
-function renderDoc(doc) {
-  const cards = [...(doc?.cards || [])].sort((a, b) => Number(a.z || 0) - Number(b.z || 0));
-  for (const card of cards) contentEl.append(renderCard(card));
-  if (!cards.length) appendText(contentEl, "p", "This shared view is empty.", "muted");
+function renderBoard(cards) {
+  const canvas = document.createElement("div");
+  canvas.className = "share-board";
+  if (!cards.length) {
+    appendText(canvas, "p", "This shared view is empty.", "muted");
+    return canvas;
+  }
+  const minX = Math.min(...cards.map((card) => Number(card.x) || 0));
+  const minY = Math.min(...cards.map((card) => Number(card.y) || 0));
+  const maxX = Math.max(...cards.map((card) => (Number(card.x) || 0) + (Number(card.w) || 220)));
+  const maxY = Math.max(...cards.map((card) => (Number(card.y) || 0) + (Number(card.h) || 90)));
+  const padding = 32;
+  const width = Math.max(620, maxX - minX + padding * 2);
+  const height = Math.max(420, maxY - minY + padding * 2);
+  const viewport = document.createElement("div");
+  viewport.className = "share-board-viewport";
+  const inner = document.createElement("div");
+  inner.className = "share-board-canvas";
+  inner.style.width = `${width}px`;
+  inner.style.height = `${height}px`;
+  const available = Math.min(1080, Math.max(320, window.innerWidth - 100));
+  const scale = Math.min(1, available / width);
+  inner.style.transform = `scale(${scale})`;
+  viewport.style.height = `${Math.round(height * scale)}px`;
+  const ordered = [...cards].sort((a, b) => Number(a.z || 0) - Number(b.z || 0));
+  for (const card of ordered) {
+    const element = renderCard(card);
+    element.style.left = `${(Number(card.x) || 0) - minX + padding}px`;
+    element.style.top = `${(Number(card.y) || 0) - minY + padding}px`;
+    element.style.width = `${Math.max(80, Number(card.w) || 220)}px`;
+    element.style.height = `${Math.max(40, Number(card.h) || 90)}px`;
+    element.style.zIndex = String(Number(card.z) || 1);
+    inner.append(element);
+  }
+  viewport.append(inner);
+  canvas.append(viewport);
+  return canvas;
+}
+
+function renderCollection(cards) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(renderBoard(cards));
+  return fragment;
 }
 
 function render(data) {
@@ -91,17 +165,17 @@ function render(data) {
   contentEl.textContent = "";
   if (data.scope === "item") {
     document.getElementById("title").textContent = "Shared card";
-    contentEl.append(renderCard(data.card));
+    contentEl.append(renderCollection([data.card]));
   } else if (data.scope === "column") {
     document.getElementById("title").textContent = "Shared column";
     if (data.notice) appendText(contentEl, "p", data.notice, "muted");
-    for (const card of data.cards || []) contentEl.append(renderCard(card));
+    contentEl.append(renderCollection(data.cards || []));
   } else {
     document.getElementById("title").textContent = data.project?.name || "Shared project";
-    renderDoc(data.doc);
+    contentEl.append(renderCollection(data.doc?.cards || []));
     for (const nested of data.nestedProjects || []) {
       appendText(contentEl, "h2", nested.name || "Nested board");
-      renderDoc(nested.doc);
+      contentEl.append(renderCollection(nested.doc?.cards || []));
     }
     if (data.excludedNestedProjects) {
       appendText(

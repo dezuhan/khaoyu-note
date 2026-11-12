@@ -49,6 +49,24 @@ Free tunnel hostnames change unless you configure a stable domain.
   still cannot serve its local `?board=` link to other devices; use a service share link, or run the
   web host and expose that origin.
 
+## Troubleshooting the public port
+
+If a public IP URL does not open:
+
+1. Check the listener, not just the URL:
+   `ss -ltnp | grep -E ':8080|:18080|:443'`.
+2. A listener bound to `127.0.0.1` is reachable only on this machine. Bind the service/proxy to
+   `0.0.0.0` or terminate TLS on a reverse proxy.
+3. Confirm the router forwards the public port to this host and that the host firewall allows it.
+4. Test from another network; a request from the same machine may succeed through NAT hairpinning even
+   when the public route is broken.
+5. Put the public origin in both `KHAOYU_SERVICE_PUBLIC_URL` and
+   `KHAOYU_SERVICE_SHARE_PUBLIC_URL` (or the app's Public share links setting), then restart.
+6. Prefer a TLS reverse proxy or tunnel. Do not expose the backend API port directly.
+
+The development proxy on `8080` and the service listeners on `18080/18081` are loopback-only by
+default; the local app host on `1430` is not the public service share origin.
+
 ## Checklist
 
 - [ ] Service reachable from outside on the chosen HTTPS origin.

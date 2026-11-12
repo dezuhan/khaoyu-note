@@ -237,8 +237,8 @@ links, shows a new token once and revokes links. The public-sharing API enforces
 public sharing revokes every link for that project.
 
 `/s/:token` is the public read-only viewer for a share link. It asks for the passphrase when one is
-required, renders only the shared scope, shows nested projects allowed by policy, and returns a
-neutral message for invalid, expired, revoked or wrong-passphrase links. The page is `noindex`, has a
+required, renders the shared scope as a scaled spatial board preview, shows nested projects allowed
+by policy, and returns a neutral message for invalid, expired, revoked or wrong-passphrase links. The page is `noindex`, has a
 self-only CSP, and tokens are redacted from request logs.
 
 All service pages load `/ky.css`, the framework design system used by the desktop app, followed by
