@@ -102,6 +102,8 @@ project uses Semantic Versioning.
 - Board viewport position and zoom are now stored per device instead of being written into the board
   row. Opening a board from a phone/tunnel can no longer conflict with a desktop window merely
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
+- Added `scripts/reinstall-team.sh` for a fast uninstall + install cycle: the default keeps
+  PostgreSQL/service data and `.env.team`, while `--purge` performs a destructive fresh reinstall.
 - The team installer now accepts separate backend/admin and public-view/share domains, and writes
   them to `KHAOYU_SERVICE_PUBLIC_URL` and `KHAOYU_SERVICE_SHARE_PUBLIC_URL` so generated share links
   use the public-view origin.

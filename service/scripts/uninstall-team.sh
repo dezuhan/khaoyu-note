@@ -3,6 +3,7 @@
 #
 #   ./scripts/uninstall-team.sh              # stop/remove containers, keep PostgreSQL/service data
 #   ./scripts/uninstall-team.sh --purge      # also delete PostgreSQL + service data volumes and .env.team
+#   ./scripts/uninstall-team.sh --yes        # skip the stop confirmation
 #   ./scripts/uninstall-team.sh --help
 #
 # This only manages the Compose stack. A managed/external PostgreSQL or Redis must be deleted through
@@ -12,9 +13,11 @@ cd "$(dirname "$0")/.."
 
 ENV_FILE="${ENV_FILE:-.env.team}"
 PURGE=0
+ASSUME_YES=0
 for arg in "$@"; do
   case "$arg" in
     --purge) PURGE=1 ;;
+    --yes|-y) ASSUME_YES=1 ;;
     --help|-h)
       sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -46,19 +49,23 @@ fi
 if [[ "$PURGE" == "1" ]]; then
   echo "WARNING: this deletes the PostgreSQL database, service data, assets and backups stored in"
   echo "Docker volumes for this stack. It cannot be undone. External PostgreSQL/Redis are untouched."
-  read -r -p "Type DELETE TEAM DATA to continue: " confirmation
-  if [[ "$confirmation" != "DELETE TEAM DATA" ]]; then
-    echo "Cancelled." >&2
-    exit 1
+  if [[ "$ASSUME_YES" != "1" ]]; then
+    read -r -p "Type DELETE TEAM DATA to continue: " confirmation
+    if [[ "$confirmation" != "DELETE TEAM DATA" ]]; then
+      echo "Cancelled." >&2
+      exit 1
+    fi
   fi
   $COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml --profile tunnel down -v --remove-orphans
   rm -f "$ENV_FILE"
   echo "Removed team containers, volumes and $ENV_FILE."
 else
-  read -r -p "Stop the team stack? Data volumes and $ENV_FILE will be kept [y/N] " confirmation
-  if [[ "$confirmation" != "y" && "$confirmation" != "Y" ]]; then
-    echo "Cancelled." >&2
-    exit 1
+  if [[ "$ASSUME_YES" != "1" ]]; then
+    read -r -p "Stop the team stack? Data volumes and $ENV_FILE will be kept [y/N] " confirmation
+    if [[ "$confirmation" != "y" && "$confirmation" != "Y" ]]; then
+      echo "Cancelled." >&2
+      exit 1
+    fi
   fi
   $COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml --profile tunnel down --remove-orphans
   echo "Stopped team containers. Data volumes and $ENV_FILE were kept."

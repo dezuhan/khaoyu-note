@@ -184,6 +184,20 @@ The backend and public-view domains can be separate hostnames that both point at
 used for `/login` and `/admin`; the public-view hostname is used for `/s/:token` share links. Set both
 URLs to HTTPS and keep `KHAOYU_SERVICE_COOKIE_SECURE=true` for public TLS deployments.
 
+### Fast reinstall
+
+```bash
+cd service
+./scripts/reinstall-team.sh              # stop, keep data volumes/.env.team, rebuild and start
+./scripts/reinstall-team.sh --purge      # delete team data/.env.team first; requires confirmation
+./scripts/reinstall-team.sh --yes        # skip confirmations (safe mode)
+```
+
+The default path is the quickest safe reinstall: it runs `uninstall-team.sh` without removing the
+volumes, then `setup-team.sh` rebuilds and starts the stack using the existing `.env.team`. Use
+`--purge` only when you intend to delete the team database and assets. It is equivalent to the
+explicit uninstall followed by install commands.
+
 ### Uninstall the team stack
 
 ```bash
