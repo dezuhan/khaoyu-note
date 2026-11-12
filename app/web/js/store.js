@@ -149,6 +149,7 @@ let resetInProgress = false;
 // Autosave waits for the user to stop editing. Web/mobile viewers save sooner so another window
 // receives the SSE update quickly; desktop keeps the calmer five-second idle window.
 const IDLE_SAVE_MS = bridge.hasWeb ? 2000 : 5000;
+const REMOTE_SAVE_MS = 400;
 const MAX_RETRY_DELAY = 30000;
 
 export function markDirty(kind = "board") {
@@ -169,8 +170,12 @@ export function scheduleSave() {
   }
   state.saveState = "saving";
   notify("save");
+  const pending = saveTimer;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, IDLE_SAVE_MS);
+  // Remote team boards save on a short throttle even while the user keeps typing. Keep an already
+  // scheduled save instead of resetting it on every keystroke.
+  if (state.remote && pending) return;
+  saveTimer = setTimeout(saveNow, state.remote ? REMOTE_SAVE_MS : IDLE_SAVE_MS);
 }
 
 function autoSaveEnabled() {
@@ -248,6 +253,7 @@ export async function saveNow() {
   }
   saveInFlight = true;
   clearTimeout(saveTimer);
+  saveTimer = 0;
   const hadContentChanges = state.dirty;
   state.dirty = false;
   state.viewDirty = false;
@@ -437,6 +443,7 @@ export async function openBoard(id, { flush = true } = {}) {
   retryDelay = 1000;
   clearRetry();
   clearTimeout(saveTimer);
+  saveTimer = 0;
   localStorage.setItem("mn.lastBoard", doc.id);
   notify("board");
   notify("view");
@@ -481,6 +488,7 @@ export async function createBoard(title = "Untitled board", { withWelcome = fals
   retryDelay = 1000;
   clearRetry();
   clearTimeout(saveTimer);
+  saveTimer = 0;
   localStorage.setItem("mn.lastBoard", doc.id);
   notify("board");
   notify("view");
@@ -557,6 +565,7 @@ export async function openRemoteBoard(doc, syncInfo) {
   state.baseUpdatedAt = null;
   clearRetry();
   clearTimeout(saveTimer);
+  saveTimer = 0;
   notify("board");
   notify("view");
   notify("history");

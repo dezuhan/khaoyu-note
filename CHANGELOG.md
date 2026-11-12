@@ -116,6 +116,10 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- Remote workspace boards now autosave on a 400 ms throttle while typing and push their operation
+  diff to the service within about 120 ms after the local save, so owner/editor changes appear on the
+  team database without an explicit Save. A stale timer id from the previous local board could block
+  the remote save loop; board switches now reset it.
 - Remote workspace boards now open in the real main board editor for owner/editor roles instead of
   the read-only preview. Remote boards use a non-persisted in-memory mode so their operation diff is
   pushed to the service rather than mirrored into the local SQLite card table; viewer accounts still
