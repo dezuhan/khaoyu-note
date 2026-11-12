@@ -14,6 +14,12 @@ project uses Semantic Versioning.
   through the Backup pane are never removed automatically.
 - The Backup pane describes the retention rule in all ten UI languages.
 
+### Fixed
+
+- Light/dark mode is now a global appearance preference. Opening or switching boards no longer
+  applies a legacy theme stored in the board document or dirties the board, so the chosen theme
+  stays the same everywhere and after a reload.
+
 ### Security
 
 - Logout over a cookie session now requires the double-submit CSRF header, so a cross-site form

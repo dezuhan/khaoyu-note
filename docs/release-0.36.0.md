@@ -10,6 +10,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   all ten UI languages.
 - **Security hardening**: cookie-session logout now requires the CSRF header, and invitation creation
   is rate limited to 20 requests per 15-minute window per owner and IP.
+- **Global light/dark theme**: the theme is now an app-wide preference. Boards no longer store or
+  apply their own theme, so switching boards or reloading keeps the chosen mode.
 - **Documentation and verification**: the README, roadmap checkboxes and release docs now match the
   verified 0.36.0 state. The service suite runs against PostgreSQL and Redis, Rust tests and Clippy
   pass, the service image builds and its CRITICAL Trivy scan is clean.

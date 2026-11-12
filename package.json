@@ -38,7 +38,8 @@
     "test:share-view": "node tools/test-share-view.mjs",
     "test:onboarding": "node tools/test-onboarding.mjs",
     "dist:checksums": "node tools/checksums.mjs --dir dist",
-    "i18n:audit": "node tools/i18n-audit.mjs"
+    "i18n:audit": "node tools/i18n-audit.mjs",
+    "test:theme": "node tools/test-theme-global.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3"

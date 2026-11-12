@@ -316,11 +316,9 @@ function applyTheme(theme) {
 }
 
 export function setTheme(theme) {
+  // Theme is a global appearance preference: it is stored once for the app and must not be
+  // written into the board document, otherwise switching boards changes the theme.
   applyTheme(theme);
-  if (state.board) {
-    state.board.theme = theme;
-    markDirty("theme");
-  }
 }
 
 export async function openBoard(id, { flush = true } = {}) {
@@ -363,7 +361,8 @@ export async function openBoard(id, { flush = true } = {}) {
     doc.updatedAt = Date.now();
   }
   state.board = doc;
-  if (doc.theme) applyTheme(doc.theme);
+  // Legacy builds stored a theme per board. Ignore it: the global preference above wins, so a
+  // board saved in the past cannot flip the theme when it is opened.
   layoutColumns(doc);
   state.view = doc.view || { x: 0, y: 0, zoom: 1 };
   state.selection = new Set();
