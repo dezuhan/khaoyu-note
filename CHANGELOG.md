@@ -104,6 +104,8 @@ project uses Semantic Versioning.
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
 - Added `scripts/reinstall-team.sh` for a fast uninstall + install cycle: the default keeps
   PostgreSQL/service data and `.env.team`, while `--purge` performs a destructive fresh reinstall.
+- The installer normalizes bare domains to `https://` and validates both public URLs before
+  starting Compose, preventing a service restart loop from a URL without a scheme.
 - The team installer now accepts separate backend/admin and public-view/share domains, and writes
   them to `KHAOYU_SERVICE_PUBLIC_URL` and `KHAOYU_SERVICE_SHARE_PUBLIC_URL` so generated share links
   use the public-view origin.

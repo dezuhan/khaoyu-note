@@ -57,7 +57,8 @@ The team installer accepts two origins:
 - `KHAOYU_SERVICE_SHARE_PUBLIC_URL` — public share-view origin, for example
   `https://view.example.com`.
 
-Both Cloudflare hostnames can point at the same service frontend port `18080`:
+Both URLs must include `http://` or `https://`; the installer normalizes a bare domain to HTTPS.
+Both Cloudflare hostnames must point at the same service frontend port `18080`:
 
 ```text
 note.example.com  -> http://127.0.0.1:18080   login, admin, API

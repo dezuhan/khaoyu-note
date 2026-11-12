@@ -179,8 +179,8 @@ The service command runs `migrate-postgres` on startup and then starts the serve
 Redis are never published to the host. Keep the TLS proxy or Cloudflare Tunnel in front of port
 18080, not 18081.
 
-The backend and public-view domains can be separate hostnames that both point at
-`http://127.0.0.1:18080` (or `http://service:18080` for the Compose tunnel). The backend hostname is
+URLs may be entered as bare domains in the installer; it normalizes them to `https://`. The backend
+and public-view domains can be separate hostnames that both point at `http://127.0.0.1:18080` (or `http://service:18080` for the Compose tunnel). The backend hostname is
 used for `/login` and `/admin`; the public-view hostname is used for `/s/:token` share links. Set both
 URLs to HTTPS and keep `KHAOYU_SERVICE_COOKIE_SECURE=true` for public TLS deployments.
 

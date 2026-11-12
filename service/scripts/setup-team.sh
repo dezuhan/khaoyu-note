@@ -25,13 +25,21 @@ fi
 
 random_hex() { openssl rand -hex "${1:-24}"; }
 
+normalize_url() {
+  local value="$1"
+  if [[ ! "$value" =~ ^https?:// ]]; then
+    value="https://$value"
+  fi
+  printf '%s' "$value"
+}
+
 CREATED_ENV=0
 if [[ ! -f "$ENV_FILE" ]]; then
   CREATED_ENV=1
   read -r -p "Backend/service URL [http://127.0.0.1:18080]: " PUBLIC_URL
-  PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:18080}"
+  PUBLIC_URL="$(normalize_url "${PUBLIC_URL:-http://127.0.0.1:18080}")"
   read -r -p "Public view/share URL [same as backend]: " PUBLIC_VIEW_URL
-  PUBLIC_VIEW_URL="${PUBLIC_VIEW_URL:-$PUBLIC_URL}"
+  PUBLIC_VIEW_URL="$(normalize_url "${PUBLIC_VIEW_URL:-$PUBLIC_URL}")"
   read -r -p "Initial owner email [owner@localhost]: " BOOTSTRAP_EMAIL
   BOOTSTRAP_EMAIL="${BOOTSTRAP_EMAIL:-owner@localhost}"
   read -r -p "Cloudflare tunnel token (optional, press Enter to skip): " TUNNEL_TOKEN
@@ -64,6 +72,14 @@ fi
 # shellcheck disable=SC1090
 if [[ "$ENV_FILE" = /* ]]; then ENV_PATH="$ENV_FILE"; else ENV_PATH="./$ENV_FILE"; fi
 set -a; . "$ENV_PATH"; set +a
+
+for variable in KHAOYU_SERVICE_PUBLIC_URL KHAOYU_SERVICE_SHARE_PUBLIC_URL; do
+  value="${!variable:-}"
+  if [[ ! "$value" =~ ^https?://[^[:space:]]+$ ]]; then
+    echo "$variable must be an http:// or https:// URL; got: $value" >&2
+    exit 1
+  fi
+done
 
 echo "Starting PostgreSQL, Redis and service..."
 $COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml up -d --build
