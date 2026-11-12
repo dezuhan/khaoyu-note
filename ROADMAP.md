@@ -12,7 +12,9 @@ Where the plan stands: Milestones 1 to 5 are implemented in `service/` and the d
 and are recorded in `CHANGELOG.md` from 0.2.0 onward. Milestone 6 is mostly done, with the external
 penetration test and production-scale load testing still open. Milestone 7 is limited by external
 credentials and native runners, not by missing code. Milestone 8, the AI assistant, has not been
-started and needs its own consent, tool-gateway and prompt-injection design first.
+started and needs its own consent, tool-gateway and prompt-injection design first. Milestone 11,
+full localisation coverage, is planned: the current ten-language catalogue only covers the settings
+surface and parts of the chrome, and the service/admin pages are English-only.
 
 Verification note: checkboxes were reconciled with the 0.36.0 code and test evidence on 2026-11-12.
 `docs/production-readiness.md` carries the current release verdict.
@@ -571,3 +573,119 @@ access. The admin surface lives inside Settings rather than as a separate applic
 - SSO/OIDC group-to-role mapping.
 - Multi-tenant billing.
 - Per-project custom roles.
+
+## Milestone 11: Full localisation coverage
+
+Status: **planned**. The ten-language catalogue currently covers the settings surface, toolbar names,
+the menu bar, the command palette, context-menu actions and the Backup page (190 audited keys across
+ten languages). Most other app copy and every service page — including `/admin` — is still written
+in English inline. This milestone expands localisation from a settings-only layer to every
+user-facing string, title, body, dialog and admin surface, and keeps that coverage enforced as new
+features arrive.
+
+Goal: every string a user can read in the app, the local web host, the service pages and the admin
+dashboard exists in the ten supported languages (English, Português (Brasil), Bahasa Indonesia,
+Español, Français, Deutsch, 日本語, 한국어, 简体中文, Русский) through one shared catalogue, with English
+as the explicit fallback. Board content, card text and user-authored titles stay untranslated by
+design.
+
+### Coverage: app interface and body
+
+- [ ] Move every user-facing string in `app/web` out of inline English into the shared catalogue:
+  menu bar and grouped menus, command palette commands and groups, tool rail names, tooltips and
+  shortcut labels, top-bar controls (sync, share, account, presence, theme, language), context menus,
+  banners, badges and empty states.
+- [ ] Cover every dialog and pane title, section heading, label, placeholder, helper paragraph, status
+  message, toast, confirmation and validation/error text: Settings (all panes), Templates, Share,
+  Sync, Workspace/server popover, Create workspace, Add server, New board, Backup/restore, Update,
+  Onboarding/setup, Documentation, Comments, Notifications, MCP and About.
+- [ ] Cover the full-page editors: Document editor toolbar/menus/export, Drawing editor
+  (pen/pencil/highlighter/undo/size/colour labels), colour picker and screen eyedropper copy,
+  image crop, table and sheet controls, kanban/column actions, trash/archive flows and keyboard help.
+- [ ] Translate titles everywhere they appear: page and pane titles, dialog titles, window/document
+  title suffix, breadcrumb labels for system views (Home, Archive, Trash, Settings), section headings
+  and menu group names. User-authored board, card and project titles are never translated.
+- [ ] Translate body copy: help paragraphs, onboarding explanations, empty-state sentences, security
+  and data-residency notices, backup/restore descriptions, sync/conflict explanations, share-link
+  descriptions, error recovery guidance and the offline Help > Documentation content.
+- [ ] Accessibility and metadata strings: `aria-label`, `title` tooltips, `alt` text, screen-reader
+  hints and focus announcements.
+- [ ] Keep all user content and technical identifiers out of translation: board/card JSON, comments,
+  file and asset names, URLs, command ids, CSS/HTML attributes and service error codes.
+
+### Languages, formats and infrastructure
+
+- [ ] Keep all ten languages complete for every new key; add a per-key translation status so missing
+  entries fail CI instead of silently falling back.
+- [ ] Use `Intl` for dates, times, relative times, numbers, file sizes and currency-like values instead
+  of hardcoded formats; use `Intl.PluralRules` for plural forms and `Intl.ListFormat` where lists are
+  joined.
+- [ ] Allow translations to change string length without breaking the chrome: buttons, menu items,
+  badges, dialog titles and the top bar must handle long German/Russian/Japanese strings without
+  clipping or overlapping.
+- [ ] Language switching is global and immediate: app chrome, settings, dialogs and editors update
+  without a reload; the choice persists per origin and, for service accounts, per account.
+- [ ] Prepare RTL layout (logical CSS properties, icon mirroring) so a future Arabic/Hebrew language
+  can be added without a CSS rewrite; verify CJK and Cyrillic rendering in the bundled fonts.
+
+### Coverage: service pages, admin dashboard and email
+
+- [ ] Localise every service browser page with the same catalogue and a language selector:
+  `/login`, `/register`, `/reset`, `/passkeys`, `/account` (redirect target), `/admin` and
+  `/s/:token` share viewer.
+- [ ] Admin dashboard in full: Overview totals, Accounts (list, detail panel, create member, role,
+  status, sessions, API tokens), Boards (rename/delete/members), Activity/audit filters, Sharing
+  (links, invitations, watermark, download caps, acknowledgement), account menu, command palette,
+  Help menu, empty states, confirmations and error toasts.
+- [ ] Service-side messages: validation errors, neutral 404/410/429 responses, password/TOTP/passkey
+  guidance, sharing and invitation copy, abuse-report pages and operator-facing admin text.
+- [ ] Transactional email and notifications (verification disabled, reset fallback, invitations,
+  mention and share notifications, unsubscribe page) use the recipient's language, with a safe
+  fallback when none is known.
+- [ ] Locale resolution order is explicit: account preference, then browser `Accept-Language`, then the
+  operator default; the UI never switches language silently after sign-in.
+- [ ] Admin can review or set the operator default language and see which languages are enabled.
+
+### Tests, gates and operations
+
+- [ ] Extend `npm run i18n:audit` from the current 190 keys to the whole catalogue and to the service
+  pages: every key exists in every language, and no user-facing inline string remains in `app/web` or
+  the service public pages (automated extraction/scan with an explicit allowlist for user content and
+  technical strings).
+- [ ] Pseudo-localisation run (accented, elongated strings) in CI to catch clipped or untranslated UI.
+- [ ] Playwright language smoke suite: switch language, open menus/dialogs/settings/editors/share/
+  sync/workspace, then sign in on the service and check login, account, admin, sharing and share
+  viewer in at least three layouts (short, long, CJK).
+- [ ] Service locale tests for emails and error responses; admin dashboard text assertions.
+- [ ] Release checklist includes translation review for new keys and a completeness percentage per
+  language; docs list how to add or update a language.
+- [ ] No machine-translated copy ships without a reviewer; each language has a named maintainer.
+
+### Delivery phases
+
+1. **Inventory and extraction**: string inventory across app and service, catalogue format, audit
+   extraction and inline-string scan; no visible change yet.
+2. **App chrome, dialogs and body**: menu bar, top bar, tool rail, context menus, settings, templates,
+   share/sync/workspace, editors, help and empty/error/toast copy across all ten languages.
+3. **Service and admin**: auth pages, account/passkey pages, admin dashboard sections, share viewer,
+   email/notifications, language selector and persistence.
+4. **Formats, RTL, tests and docs**: Intl formats, pluralisation, long-string layout pass, pseudo-locale
+   and Playwright suites, translation review and release documentation.
+
+### Acceptance
+
+- [ ] Zero hardcoded user-facing strings in `app/web` and the service public pages outside the
+  board-content and technical allowlists.
+- [ ] The audit reports 100 percent coverage for all ten languages, with English as the only fallback.
+- [ ] A language switch updates the whole interface, including the admin dashboard, without a reload.
+- [ ] No text clipping in short menus, dialogs, top bar or admin tables in any supported language.
+- [ ] All per-language Playwright and service tests pass in CI; release notes state the current
+  completeness per language.
+
+### Out of scope
+
+- Translating board content, card text, user-authored titles, comments, chat or AI output.
+- Per-board language or mixing several languages inside one board.
+- Automatic machine translation in production and adding languages beyond the ten until each has a
+  reviewer and a maintained catalogue.
+- Localising operator-only logs, CLI output and on-disk formats.
