@@ -48,6 +48,26 @@ if (await accountGate.count()) {
 }
 
 const byId = (id) => page.locator(`.mn-card[data-id="${id}"]`);
+// The tool rail floats over the canvas. Tool-generated cards can land under it or off the right
+// edge after the suite pans the board; bring one back into the clear area before pointer tests.
+async function ensureCardVisible(card) {
+  const size = page.viewportSize();
+  const box = await card.boundingBox();
+  if (!box) return;
+  const leftLimit = 110;
+  const rightLimit = size.width - 80;
+  let dx = 0;
+  if (box.x < leftLimit) dx = leftLimit - box.x;
+  else if (box.x + box.width > rightLimit) dx = rightLimit - (box.x + box.width);
+  if (!dx) return;
+  // Large cards (sections) have their title input near the top edge, so grab lower down.
+  const dragY = box.height > 200 ? box.y + 64 : box.y + 12;
+  await page.mouse.move(box.x + 30, dragY);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 30 + dx, dragY, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(250);
+}
 const cardIds = async () => page.locator(".mn-card").evaluateAll((els) => els.map((el) => el.dataset.id));
 const selectedId = () => page.locator(".mn-card.is-selected").first().getAttribute("data-id");
 const emptyPoint = async (dx = 0, dy = 0) => {
@@ -102,8 +122,8 @@ check(
   JSON.stringify(floatingRail)
 );
 check(
-  "tool rail sits above the canvas and clears it",
-  floatingRail.zIndex >= 1000 && floatingRail.viewportLeft > floatingRail.left + floatingRail.width,
+  "tool rail floats above the canvas without a reserved gutter",
+  floatingRail.zIndex >= 1000 && floatingRail.viewportLeft <= floatingRail.left,
   JSON.stringify(floatingRail)
 );
 const welcomeTypes = await page.evaluate(() =>
@@ -461,6 +481,7 @@ const redoBox = await note.boundingBox();
 check("Redo re-applies move", Math.abs(redoBox.x - dragAfter.x) < 14);
 
 // ---------------------------------------------------------------- horizontal resize
+await ensureCardVisible(note);
 const sizeBefore = await note.boundingBox();
 const handle = await note.locator(".mn-resize").boundingBox();
 await page.mouse.move(handle.x + 3, handle.y + handle.height / 2);
@@ -481,6 +502,12 @@ check(
     Math.abs(grip.y + grip.height - (sizeAfter.y + sizeAfter.height)) < 6,
   `${Math.round(grip.x)},${Math.round(grip.y)}`
 );
+// Park the note away from the canvas centre so later card handles are not covered by it.
+await page.mouse.move(sizeAfter.x + 30, sizeAfter.y + 12);
+await page.mouse.down();
+await page.mouse.move(1240, 800, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(250);
 
 // ---------------------------------------------------------------- todo flow
 await page.click('.mn-tool[data-tool="todo"]');
@@ -1067,8 +1094,28 @@ check(
   "Section title persists after editing",
   (await sectionCard.locator(".mn-section-title").inputValue()) === "Test section"
 );
+await ensureCardVisible(sectionCard);
 const sectionWidthBefore = await sectionCard.evaluate((el) => el.offsetWidth);
 const eastHandle = await sectionCard.locator(".mn-resize-e").boundingBox();
+// Sections intentionally sit below regular cards. If another card covers the east handle, let the
+// pointer reach the handle for this resize gesture, then restore the card's hit testing.
+const blockingCard = eastHandle
+  ? await page.evaluate(
+      ([x, y, section]) => {
+        const el = document.elementFromPoint(x, y);
+        const card = el?.closest?.(".mn-card");
+        return card && card.dataset.id !== section ? card.dataset.id : null;
+      },
+      [eastHandle.x + 4, eastHandle.y + 4, sectionId]
+    )
+  : null;
+if (blockingCard) {
+  await page.evaluate((id) => {
+    const el = document.querySelector(`.mn-card[data-id="${id}"]`);
+    if (el) el.style.pointerEvents = "none";
+  }, blockingCard);
+}
+
 await page.mouse.move(eastHandle.x + 4, eastHandle.y + 4);
 await page.mouse.down();
 await page.mouse.move(eastHandle.x + 52, eastHandle.y + 4, { steps: 5 });
@@ -1078,6 +1125,12 @@ check(
   "Section width can be resized from its east edge",
   (await sectionCard.evaluate((el) => el.offsetWidth)) > sectionWidthBefore
 );
+if (blockingCard) {
+  await page.evaluate((id) => {
+    const el = document.querySelector(`.mn-card[data-id="${id}"]`);
+    if (el) el.style.pointerEvents = "";
+  }, blockingCard);
+}
 await page.locator("[data-section-lock]").click();
 await page.waitForTimeout(300);
 check(

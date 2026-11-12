@@ -63,10 +63,13 @@ service session and requires an account
 with the global `admin` role. The first account created by `bootstrap`, or the first account registered
 on a fresh database, becomes an admin; migration 13 also promotes the oldest existing account.
 
-The dashboard has a left rail and a content pane with Overview, Accounts, Teams and Activity:
+The dashboard keeps the left rail (Overview, Accounts, Teams, Activity, Sharing) and adds a top menu
+bar above the content pane: Dashboard, an Account menu (Admin dashboard, Account settings, Help,
+Logout), a command search with Ctrl+K, the host badge and the light/dark toggle.
 
 - Overview shows account, team, share-link and audit counts plus recent activity and signups.
-- Account holds the signed-in password form, session revocation, scoped API tokens and sign out.
+- Account settings (opened from the Account menu or profile button) holds the signed-in password
+  form, session revocation, scoped API tokens and sign out.
 - Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
   team count, last activity and last update. Admins can change another account's role or status; an
   account cannot demote or disable itself, and the last active admin cannot be removed.
@@ -74,6 +77,8 @@ The dashboard has a left rail and a content pane with Overview, Accounts, Teams 
   project with a fresh snapshot and the signed-in admin as owner. Members expands the member list.
 - Activity reads every audit row with actor, action, resource and time, filterable by text and action
   prefix, with Load more pagination.
+- Sharing lists accessible projects, enables or disables public sharing with an acknowledgement and
+  creates project/item/column links with permission, expiry, passphrase and download controls.
 
 Disabled accounts cannot sign in with a password, email OTP or SSO, cannot rotate a refresh token and
 cannot use scoped API tokens. Admin mutations use the normal CSRF cookie and `x-csrf-token` header and

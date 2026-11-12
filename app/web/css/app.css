@@ -7498,8 +7498,3 @@ html[data-performance="true"] *::after {
 .mn-toolrail::-webkit-scrollbar {
   display: none;
 }
-
-/* Keep the canvas clear of the floating rail: the rail is detached, the canvas starts after it. */
-.mn-viewport {
-  margin-left: 92px;
-}

@@ -105,6 +105,7 @@ try {
     (await page.locator('.admin-nav-item[data-page="account"]').count()) === 0
   );
   await page.click("#admin-identity");
+  await page.click('#admin-account-menu [data-action="account"]');
   await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("Sessions"));
   check("account page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
   const passwordBox = await page.locator('[data-role="password-form"] input').first().boundingBox();

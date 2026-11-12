@@ -109,7 +109,7 @@ the app works offline; only optional video and map embeds need the internet.
 | Local accounts (M1) | disabled in this local-first deploy: boards and settings work without an account, the account button and Settings > Account are hidden, and desktop/web writes no longer require sign-in. Existing account data stays in SQLite but is not used by the UI. |
 | Card height | implemented: width only resize, auto height for every content card (comment, todo, table, board, document and the rest) with the reference 70 px minimum; fixed-height types are image, video, sketch, map, color and column |
 | Settings | implemented: token-based styling with only the essentials (Server, Backup, General, Appearance, Tools, Performance, MCP, About), search, GPU acceleration with restart plus detected GPU/CPU details, Reset and Done. Account is disabled in this local-first deploy. |
-| Tool rail | implemented: the rail floats as a fixed inset panel with rounded corners and a shadow, cannot be dragged, and the canvas starts after it so tools never cover cards; order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and their cards are hidden from boards and templates. Hiding a tool in Settings only removes the rail button and leaves the feature available. |
+| Tool rail | implemented: the rail floats as a fixed inset panel with rounded corners and a shadow, cannot be dragged, and the canvas runs beneath it while the rail stays above board items; order persists in settings, tools can be hidden, tooltip slides in with a key-cap shortcut, single-key tool shortcuts; Map, Video and Audio are temporarily disabled, so they are hidden from the rail and their cards are hidden from boards and templates. Hiding a tool in Settings only removes the rail button and leaves the feature available. |
 | Tool drag to canvas | implemented: floating label plus dashed drop preview, card created at the pointer, works reliably in WebView2 because it does not depend on HTML5 drag (board/document/image keep their own flows) |
 | MCP server | implemented: `khaoyu-note-mcp.exe` with 14 board tools over the same SQLite database |
 | Update check | implemented: the app reads the latest GitHub release of `dezuhan/khaoyu-note` at startup and then once per hour, and from Help > Check for updates or Settings > About. It compares versions, shows the release notes and opens the release page in the browser; it never downloads or runs an installer. A check needs published GitHub Releases, and the request reveals the user IP to GitHub. |
@@ -290,10 +290,11 @@ read-only at `/s/:token`. Sharing is a section of the dashboard; `/shares` redir
 password changes and sign out. Login, signup and reset use
 separate centred pages; password reset asks for the current password and never sends an email token.
 The first registered account (or the account created by
-`bootstrap`) is the service admin. `/admin` uses the same signed-in session and a top menu bar with
-Overview, Accounts, Teams, Activity and Sharing, a host badge and a global light/dark toggle; the
-profile button opens the Account pane. Sharing is rendered inside the same page. Admins can create
-teams, inspect every audit row and change another account's role or status. Desktop boards can opt in to server sync from
+`bootstrap`) is the service admin. `/admin` uses the same signed-in session, keeps the left rail
+(Overview, Accounts, Teams, Activity, Sharing) and adds a top menu bar with Dashboard, an Account
+menu (Admin dashboard, Account settings, Help, Logout), command search (Ctrl+K), a host badge and a
+global light/dark toggle. Sharing is rendered inside the same page. Admins can create teams, inspect
+every audit row and change another account's role or status. Desktop boards can opt in to server sync from
 the Sync control in the topbar: open it,
 enter the service URL and your account email and password, then choose Sign in and connect. Use the
 printed frontend URL, for example `http://127.0.0.1:29194`; a remote host defaults to `https`. The

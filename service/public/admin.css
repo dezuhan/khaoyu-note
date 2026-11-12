@@ -791,3 +791,323 @@ button.admin-admin:hover {
 .admin-check[hidden] {
   display: none !important;
 }
+
+/* ==========================================================================
+   Service top menu bar above the classic rail + content layout.
+   ========================================================================== */
+
+.admin-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.admin-menubar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 380px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ky-stroke);
+  background: var(--ky-surface);
+}
+
+.admin-menubar-left,
+.admin-menubar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-menubar-right {
+  position: relative;
+  justify-content: flex-end;
+}
+
+.admin-menubar-center {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.admin-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-logo:hover {
+  background: var(--ky-control);
+}
+
+.admin-logo .admin-brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.admin-logo .admin-brand-copy strong {
+  font-size: 11px;
+}
+
+.admin-logo .admin-brand-copy span {
+  font-size: 9px;
+}
+
+.admin-menubar-menus {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.admin-menubar-btn {
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ky-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.admin-menubar-btn:hover,
+.admin-menubar-btn[aria-expanded="true"] {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+.admin-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 360px);
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 999px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.admin-search-btn span:first-child {
+  color: var(--ky-soft, var(--ky-muted));
+  font-size: 13px;
+}
+
+.admin-search-btn kbd {
+  margin-left: auto;
+  padding: 1px 5px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 5px;
+  background: var(--ky-surface);
+  color: var(--ky-muted);
+  font-family: var(--ky-font-code, ui-monospace, monospace);
+  font-size: 9px;
+}
+
+.admin-account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 10px;
+  background: var(--ky-surface);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.admin-account-menu[hidden] {
+  display: none;
+}
+
+.admin-account-menu button {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ky-text);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-account-menu button:hover {
+  background: var(--ky-control);
+}
+
+.admin-account-menu button.is-danger {
+  color: var(--ky-danger, #f5566f);
+}
+
+.admin-menu-sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--ky-stroke);
+}
+
+.admin-shell {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Command palette and help dialog. */
+.admin-command-layer,
+.admin-help-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 900000;
+  display: flex;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+}
+
+.admin-command-layer {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.admin-command-layer[hidden],
+.admin-help-layer[hidden] {
+  display: none;
+}
+
+.admin-command {
+  width: min(540px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 12px;
+  background: var(--ky-surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.admin-command-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ky-stroke);
+  outline: none;
+  background: transparent;
+  color: var(--ky-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-command-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.admin-command-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ky-text);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-command-item:hover,
+.admin-command-item.is-active {
+  background: var(--ky-control-active);
+}
+
+.admin-command-item span:last-child {
+  margin-left: auto;
+  color: var(--ky-muted);
+  font-size: 9px;
+}
+
+.admin-help {
+  align-self: center;
+  width: min(520px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 12px;
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.admin-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.admin-help h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.admin-help ul {
+  margin: 8px 0;
+  padding-left: 18px;
+  color: var(--ky-muted);
+}
+
+.admin-help p {
+  margin: 0 0 8px;
+  color: var(--ky-muted);
+}
+
+.admin-help kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 5px;
+  font-family: var(--ky-font-code, ui-monospace, monospace);
+}
+
+@media (max-width: 900px) {
+  .admin-menubar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 6px 10px;
+  }
+
+  .admin-menubar-center {
+    display: none;
+  }
+
+  .admin-host {
+    display: none;
+  }
+}

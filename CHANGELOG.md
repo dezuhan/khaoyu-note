@@ -13,12 +13,13 @@ project uses Semantic Versioning.
   automatic folders are pruned after a successful backup. Manual backups and the folders imported
   through the Backup pane are never removed automatically.
 - The Backup pane describes the retention rule in all ten UI languages.
-- The self-hosted service admin page is now a single dashboard with a top menu bar (Overview,
-  Accounts, Teams, Activity, Sharing), a host badge, a light/dark toggle and a profile button for the
-  account pane. Sharing is rendered inside the dashboard; `/shares` redirects to `/admin#sharing`.
+- The self-hosted service admin keeps the left navigation rail and adds a top menu bar in the app's
+  chrome style: Dashboard and an Account menu (Admin dashboard, Account settings, Help, Logout), a
+  command search with Ctrl+K, the host badge and a light/dark toggle. Sharing stays inside the
+  dashboard; `/shares` redirects to `/admin#sharing`.
 - The main editor tool rail is now a floating inset panel: fixed at 12 px from the left, top and
-  bottom edges, rounded and shadowed above the canvas. The canvas starts after the rail so tools
-  never cover cards, and the rail cannot be dragged.
+  bottom edges, rounded and shadowed above the canvas. The canvas runs beneath it (no reserved
+  gutter), and the rail cannot be dragged.
 
 ### Fixed
 

@@ -10,40 +10,36 @@
   </head>
   <body class="admin-body">
     <header class="admin-menubar">
-      <div class="admin-brand">
-        <span class="admin-brand-mark" aria-hidden="true">K</span>
-        <span class="admin-brand-copy">
-          <strong>Khaoyu Note</strong>
-          <span>Service admin</span>
-        </span>
+      <div class="admin-menubar-left">
+        <button class="admin-logo" id="admin-home" type="button" title="Admin dashboard" aria-label="Khaoyu Note service admin">
+          <span class="admin-brand-mark" aria-hidden="true">K</span>
+          <span class="admin-brand-copy">
+            <strong>Khaoyu Note</strong>
+            <span>Service admin</span>
+          </span>
+        </button>
+        <nav class="admin-menubar-menus" aria-label="Service menus">
+          <button type="button" class="admin-menubar-btn" id="admin-menu-dashboard">Dashboard</button>
+          <button
+            type="button"
+            class="admin-menubar-btn"
+            id="admin-menu-account"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >Account</button>
+        </nav>
       </div>
 
-      <nav class="admin-nav" aria-label="Admin sections">
-        <button type="button" class="admin-nav-item is-active" data-page="overview">
-          <span class="admin-nav-icon" aria-hidden="true">◧</span>
-          <span>Overview</span>
+      <div class="admin-menubar-center">
+        <button class="admin-search-btn" id="admin-search" type="button" title="Search commands (Ctrl+K)">
+          <span aria-hidden="true">⌕</span>
+          <span>Search commands</span>
+          <kbd>Ctrl K</kbd>
         </button>
-        <button type="button" class="admin-nav-item" data-page="accounts">
-          <span class="admin-nav-icon" aria-hidden="true">◎</span>
-          <span>Accounts</span>
-        </button>
-        <button type="button" class="admin-nav-item" data-page="teams">
-          <span class="admin-nav-icon" aria-hidden="true">▦</span>
-          <span>Teams</span>
-        </button>
-        <button type="button" class="admin-nav-item" data-page="activity">
-          <span class="admin-nav-icon" aria-hidden="true">≡</span>
-          <span>Activity</span>
-        </button>
-        <button type="button" class="admin-nav-item" data-page="sharing">
-          <span class="admin-nav-icon" aria-hidden="true">⧉</span>
-          <span>Sharing</span>
-        </button>
-      </nav>
+      </div>
 
-      <span class="admin-menubar-spacer" aria-hidden="true"></span>
-      <span class="admin-host" id="admin-host" title="This service host"></span>
-      <div class="admin-menubar-actions">
+      <div class="admin-menubar-right">
+        <span class="admin-host" id="admin-host" title="This service host"></span>
         <button
           type="button"
           class="admin-icon-button"
@@ -56,7 +52,9 @@
           class="admin-admin"
           id="admin-identity"
           hidden
-          title="Account, sessions and API tokens"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          title="Account menu"
         >
           <span class="admin-avatar" id="admin-avatar" data-tone="0"></span>
           <span class="admin-admin-copy">
@@ -64,18 +62,86 @@
             <span id="admin-email"></span>
           </span>
         </button>
+
+        <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
+          <button type="button" role="menuitem" data-action="dashboard">Admin dashboard</button>
+          <button type="button" role="menuitem" data-action="account">Account settings</button>
+          <button type="button" role="menuitem" data-action="help">Help</button>
+          <div class="admin-menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="is-danger" data-action="logout">Logout</button>
+        </div>
       </div>
     </header>
 
-    <main class="admin-main">
-      <header class="admin-head">
-        <div>
-          <p class="admin-kicker">Self-hosted service</p>
-          <h1 class="admin-title" id="admin-title">Overview</h1>
+    <div class="admin-shell">
+      <aside class="admin-rail">
+        <nav class="admin-nav" aria-label="Admin sections">
+          <button type="button" class="admin-nav-item is-active" data-page="overview">
+            <span class="admin-nav-icon" aria-hidden="true">◧</span>
+            <span>Overview</span>
+          </button>
+          <button type="button" class="admin-nav-item" data-page="accounts">
+            <span class="admin-nav-icon" aria-hidden="true">◎</span>
+            <span>Accounts</span>
+          </button>
+          <button type="button" class="admin-nav-item" data-page="teams">
+            <span class="admin-nav-icon" aria-hidden="true">▦</span>
+            <span>Teams</span>
+          </button>
+          <button type="button" class="admin-nav-item" data-page="activity">
+            <span class="admin-nav-icon" aria-hidden="true">≡</span>
+            <span>Activity</span>
+          </button>
+          <button type="button" class="admin-nav-item" data-page="sharing">
+            <span class="admin-nav-icon" aria-hidden="true">⧉</span>
+            <span>Sharing</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="admin-main">
+        <header class="admin-head">
+          <div>
+            <p class="admin-kicker">Self-hosted service</p>
+            <h1 class="admin-title" id="admin-title">Overview</h1>
+          </div>
+        </header>
+        <div id="admin-pane" class="admin-pane" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <div class="admin-command-layer" id="admin-command-layer" hidden>
+      <div class="admin-command" role="dialog" aria-modal="true" aria-label="Search commands">
+        <input
+          class="admin-command-input"
+          id="admin-command-input"
+          type="text"
+          placeholder="Search commands..."
+          autocomplete="off"
+        />
+        <div class="admin-command-list" id="admin-command-list" role="listbox"></div>
+      </div>
+    </div>
+
+    <div class="admin-help-layer" id="admin-help-layer" hidden>
+      <div class="admin-help" role="dialog" aria-modal="true" aria-label="Service admin help">
+        <div class="admin-help-head">
+          <h2>Service admin help</h2>
+          <button type="button" class="admin-icon-button" id="admin-help-close" aria-label="Close help">✕</button>
         </div>
-      </header>
-      <div id="admin-pane" class="admin-pane" aria-live="polite"></div>
-    </main>
+        <p>The dashboard manages this self-hosted Khaoyu Note service.</p>
+        <ul>
+          <li><strong>Overview</strong> — account, team and activity counts.</li>
+          <li><strong>Accounts</strong> — search accounts, change role or status.</li>
+          <li><strong>Teams</strong> — create teams and inspect members.</li>
+          <li><strong>Activity</strong> — audit trail with filters.</li>
+          <li><strong>Sharing</strong> — public sharing and scoped share links.</li>
+          <li><strong>Account settings</strong> — profile, password, sessions and API tokens.</li>
+        </ul>
+        <p class="admin-note">Press <kbd>Ctrl K</kbd> to search commands. The Account menu is in the top bar.</p>
+      </div>
+    </div>
+
     <script src="/admin.js" type="module"></script>
   </body>
 </html>

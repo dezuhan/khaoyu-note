@@ -6,6 +6,14 @@ const navItems = [...document.querySelectorAll(".admin-nav-item")];
 const identity = document.getElementById("admin-identity");
 const themeButton = document.getElementById("admin-theme");
 const hostBadge = document.getElementById("admin-host");
+const accountMenuButton = document.getElementById("admin-menu-account");
+const accountMenu = document.getElementById("admin-account-menu");
+const searchButton = document.getElementById("admin-search");
+const commandLayer = document.getElementById("admin-command-layer");
+const commandInput = document.getElementById("admin-command-input");
+const commandList = document.getElementById("admin-command-list");
+const helpLayer = document.getElementById("admin-help-layer");
+const helpClose = document.getElementById("admin-help-close");
 
 const THEME_KEY = "khaoyu.admin.theme";
 let page = "overview";
@@ -920,6 +928,117 @@ async function renderSharing() {
   }
 }
 
+// ---------------------------------------------------------------- menus and commands
+
+const COMMANDS = [
+  { id: "overview", label: "Go to Overview", hint: "Dashboard", run: () => void go("overview") },
+  { id: "accounts", label: "Go to Accounts", hint: "Dashboard", run: () => void go("accounts") },
+  { id: "teams", label: "Go to Teams", hint: "Dashboard", run: () => void go("teams") },
+  { id: "activity", label: "Go to Activity", hint: "Dashboard", run: () => void go("activity") },
+  { id: "sharing", label: "Go to Sharing", hint: "Dashboard", run: () => void go("sharing") },
+  { id: "account", label: "Open Account settings", hint: "Account", run: () => void go("account") },
+  { id: "theme", label: "Toggle light or dark theme", hint: "View", run: () => toggleTheme() },
+  { id: "help", label: "Open help", hint: "Help", run: () => openHelp() },
+  { id: "logout", label: "Log out of the service", hint: "Account", run: () => void logout() },
+];
+
+let commandMatches = COMMANDS;
+let commandIndex = 0;
+
+function setAccountMenu(open) {
+  accountMenu.hidden = !open;
+  accountMenuButton.setAttribute("aria-expanded", String(open));
+  identity.setAttribute("aria-expanded", String(open));
+}
+
+function closeAccountMenu() {
+  setAccountMenu(false);
+}
+
+function openHelp() {
+  closeAccountMenu();
+  closeCommandPalette();
+  helpLayer.hidden = false;
+}
+
+function closeHelp() {
+  helpLayer.hidden = true;
+}
+
+function toggleTheme() {
+  setTheme(document.documentElement.dataset.kyTheme === "dark" ? "light" : "dark");
+}
+
+async function logout() {
+  closeAccountMenu();
+  closeCommandPalette();
+  closeHelp();
+  try {
+    await api("/api/v1/auth/logout", { method: "POST" });
+  } catch {
+    /* clearing the session is best effort; the login page still opens */
+  }
+  window.location.replace("/login?signedout=1");
+}
+
+function runAccountAction(action) {
+  closeAccountMenu();
+  if (action === "dashboard") return void go("overview");
+  if (action === "account") return void go("account");
+  if (action === "help") return openHelp();
+  if (action === "logout") return void logout();
+}
+
+function setActiveCommand(index) {
+  const items = [...commandList.querySelectorAll(".admin-command-item")];
+  if (!items.length) return;
+  commandIndex = (index + items.length) % items.length;
+  items.forEach((item, itemIndex) => item.classList.toggle("is-active", itemIndex === commandIndex));
+}
+
+function renderCommands(query = "") {
+  const search = query.trim().toLowerCase();
+  commandMatches = COMMANDS.filter((command) => command.label.toLowerCase().includes(search));
+  commandIndex = 0;
+  commandList.textContent = "";
+  for (const command of commandMatches) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "admin-command-item";
+    item.setAttribute("role", "option");
+    item.dataset.id = command.id;
+    item.innerHTML = `<span>${escapeHtml(command.label)}</span><span>${escapeHtml(command.hint)}</span>`;
+    item.addEventListener("click", () => runCommand(command.id));
+    commandList.append(item);
+  }
+  if (!commandMatches.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-command-item";
+    empty.textContent = "No matching commands.";
+    commandList.append(empty);
+  }
+  setActiveCommand(0);
+}
+
+function openCommandPalette() {
+  closeAccountMenu();
+  closeHelp();
+  commandLayer.hidden = false;
+  commandInput.value = "";
+  renderCommands("");
+  commandInput.focus();
+}
+
+function closeCommandPalette() {
+  commandLayer.hidden = true;
+}
+
+function runCommand(id) {
+  const command = COMMANDS.find((entry) => entry.id === id);
+  closeCommandPalette();
+  if (command) command.run();
+}
+
 const PAGE_TITLES = {
   overview: "Overview",
   accounts: "Accounts",
@@ -961,12 +1080,68 @@ function init() {
   initTheme();
   if (hostBadge) hostBadge.textContent = window.location.host;
   for (const item of navItems) item.addEventListener("click", () => void go(item.dataset.page));
-  // Account settings is intentionally out of the menu for now; the profile button opens it.
-  identity.addEventListener("click", () => {
-    if (!identity.hidden) void go("account");
+
+  document.getElementById("admin-home").addEventListener("click", () => void go("overview"));
+  document.getElementById("admin-menu-dashboard").addEventListener("click", () => void go("overview"));
+  accountMenuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setAccountMenu(accountMenu.hidden);
   });
+  identity.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!identity.hidden) setAccountMenu(accountMenu.hidden);
+  });
+  accountMenu.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (button) runAccountAction(button.dataset.action);
+  });
+
+  searchButton.addEventListener("click", () => openCommandPalette());
+  commandInput.addEventListener("input", () => renderCommands(commandInput.value));
+  commandInput.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveCommand(commandIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveCommand(commandIndex - 1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const command = commandMatches[commandIndex];
+      if (command) runCommand(command.id);
+    }
+  });
+  commandLayer.addEventListener("click", (event) => {
+    if (event.target === commandLayer) closeCommandPalette();
+  });
+  helpLayer.addEventListener("click", (event) => {
+    if (event.target === helpLayer) closeHelp();
+  });
+  helpClose.addEventListener("click", () => closeHelp());
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openCommandPalette();
+    } else if (event.key === "Escape") {
+      closeAccountMenu();
+      closeCommandPalette();
+      closeHelp();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (
+      !accountMenu.hidden &&
+      !accountMenu.contains(event.target) &&
+      !accountMenuButton.contains(event.target) &&
+      !identity.contains(event.target)
+    ) {
+      closeAccountMenu();
+    }
+  });
+
   const initial = window.location.hash.replace(/^#/, "");
-  void go(PAGE_TITLES[initial] && initial !== "account" ? initial : "overview");
+  void go(PAGE_TITLES[initial] ? initial : "overview");
 }
 
 init();
