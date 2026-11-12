@@ -232,6 +232,31 @@
   background: var(--ky-control);
 }
 
+.mn-workspace-local-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mn-workspace-local-row .mn-workspace-popover-board {
+  flex: 1;
+  padding-right: 34px;
+}
+
+.mn-workspace-local-remove {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  color: var(--ky-soft);
+}
+
+.mn-workspace-local-row:hover .mn-workspace-local-remove,
+.mn-workspace-local-remove:focus-visible {
+  opacity: 1;
+}
+
 .mn-workspace-popover-board.is-active {
   background: var(--ky-control-active);
 }

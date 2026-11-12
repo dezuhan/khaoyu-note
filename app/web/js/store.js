@@ -426,8 +426,20 @@ export async function openBoard(id, { flush = true } = {}) {
     }
   }
   if (!doc) {
-    doc = newBoardDoc("Untitled board");
-    doc.id = id;
+    // Never materialise a phantom board from a missing id: board cards, notifications and stale URLs
+    // can point at a board that no longer exists, and silently creating "Untitled board" polluted the
+    // local workspace list. Fall back to another board (or the welcome board) instead.
+    console.warn("[store] board not found", id);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("mn:toast", { detail: { message: "That board no longer exists" } })
+      );
+    }
+    const fallback = state.boards.find(
+      (board) => board.id !== id && !board.trashedAt && !board.archivedAt
+    );
+    if (fallback) return openBoard(fallback.id, { flush: false });
+    return createBoard("Home", { withWelcome: true });
   }
   if (!Array.isArray(doc.trash)) doc.trash = [];
   if (migrateLegacyKanban(doc)) {

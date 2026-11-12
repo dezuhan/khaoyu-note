@@ -165,9 +165,13 @@ async function renderLocalWorkspaces(view) {
       ? boards
           .map(
             (board) =>
-              `<button type="button" class="mn-workspace-popover-board" data-local-board="${escapeText(
+              `<div class="mn-workspace-local-row"><button type="button" class="mn-workspace-popover-board" data-local-board="${escapeText(
                 board.id
-              )}"><strong>${escapeText(board.title || "Untitled")}</strong><span>local board</span></button>`
+              )}"><strong>${escapeText(board.title || "Untitled")}</strong><span>local board</span></button><button type="button" class="mn-icon-btn mn-workspace-local-remove" data-local-remove="${escapeText(
+                board.id
+              )}" title="Remove local board" aria-label="Remove ${escapeText(
+                board.title || "local board"
+              )}">${icon("close", 12)}</button></div>`
           )
           .join("")
       : `<p class="mn-server-note" style="padding:8px">No local workspaces yet.</p>`;
@@ -176,6 +180,23 @@ async function renderLocalWorkspaces(view) {
         const store = await import("./store.js");
         await store.openBoard(button.dataset.localBoard, { flush: false });
         closePopover();
+      });
+    }
+    for (const button of target.querySelectorAll("[data-local-remove]")) {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const board = boards.find((entry) => entry.id === button.dataset.localRemove);
+        if (!board) return;
+        const ui = await import("./ui.js");
+        const store = await import("./store.js");
+        const confirmed = await ui.confirmAction({
+          title: "Remove local board?",
+          message: `“${escapeText(board.title || "Untitled board")}” and its cards will be permanently deleted from this browser.`,
+          confirmLabel: "Remove",
+        });
+        if (!confirmed) return;
+        await store.removeBoard(board.id);
+        await renderLocalWorkspaces(view);
       });
     }
   } catch {

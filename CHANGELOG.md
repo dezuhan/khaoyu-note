@@ -41,6 +41,10 @@ project uses Semantic Versioning.
   adopting a remote document; rebase and live-merge are serialized per board.
 - The sync model documents the causal clocks, the three-way text merge and the remaining
   character-level CRDT prerequisites in `docs/sync-model.md`.
+- Opening a board id that no longer exists (a board card for a deleted/missing board, a stale
+  notification target or an old URL) no longer creates a phantom "Untitled board" in the local
+  workspace list. The app shows a toast and falls back to another local board (or the welcome board).
+- Local boards in the workspace chooser can be removed with the hover × action and a confirmation.
 - Rows and columns now expose edge resize handles (top, bottom, left, right plus the bottom-right
   corner), so a row can be resized vertically as well as horizontally. Dragging the bottom edge adds
   extra height while the automatic height still follows the content; clicking a column raises it to

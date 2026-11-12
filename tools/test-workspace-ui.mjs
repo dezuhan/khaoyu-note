@@ -133,6 +133,24 @@ try {
   const teamWorkspaceActive = state.activeWorkspace === "workspace_default";
   check("the seeded default workspace is not auto-selected", teamWorkspaceActive === false);
 
+  // Opening a stale/missing board id must not create a phantom "Untitled board" in the local list.
+  const phantomGuard = await page.evaluate(async () => {
+    const store = await import("/js/store.js");
+    const bridge = await import("/js/bridge.js");
+    await store.openBoard("missing-board-id", { flush: false });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const boards = await bridge.listBoards();
+    return {
+      boardId: store.state.board?.id || "",
+      hasMissing: boards.some((board) => board.id === "missing-board-id"),
+    };
+  });
+  check(
+    "opening a missing board does not add an Untitled board",
+    phantomGuard.boardId !== "missing-board-id" && phantomGuard.hasMissing === false,
+    JSON.stringify(phantomGuard)
+  );
+
   // New board action creates a board in the selected workspace and opens it.
   await page.click('[data-role="workspace-new-board"]');
   await page.fill('form input[name="title"]', "Created from UI");
