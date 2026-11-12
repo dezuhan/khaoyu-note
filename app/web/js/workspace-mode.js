@@ -119,6 +119,36 @@ function withTimeout(promise, ms = 6000) {
   ]);
 }
 
+async function renderLocalWorkspaces(view) {
+  const target = view.querySelector('[data-role="local-workspaces"]');
+  if (!target) return;
+  try {
+    const bridge = await import("./bridge.js");
+    const boards = (await bridge.listBoards())
+      .filter((board) => !board.parentId && !board.archivedAt && !board.trashedAt)
+      .slice(0, 8);
+    target.innerHTML = boards.length
+      ? boards
+          .map(
+            (board) =>
+              `<button type="button" class="mn-workspace-popover-board" data-local-board="${escapeText(
+                board.id
+              )}"><strong>${escapeText(board.title || "Untitled")}</strong><span>local board</span></button>`
+          )
+          .join("")
+      : `<p class="mn-server-note" style="padding:8px">No local workspaces yet.</p>`;
+    for (const button of target.querySelectorAll("[data-local-board]")) {
+      button.addEventListener("click", async () => {
+        const store = await import("./store.js");
+        await store.openBoard(button.dataset.localBoard, { flush: false });
+        closePopover();
+      });
+    }
+  } catch {
+    target.innerHTML = `<p class="mn-server-note" style="padding:8px">Could not load local workspaces.</p>`;
+  }
+}
+
 function serverTitle(server) {
   return `<div class="mn-workspace-server-title">${icon("globe", 14)}<span><strong>${escapeText(
     server.name || new URL(server.url).host
@@ -171,6 +201,7 @@ export async function openWorkspacePopover(anchor) {
   view.innerHTML = `
     <div class="mn-workspace-popover-head"><span>Workspace</span><span>${escapeText(location.host)}</span></div>
     <button type="button" class="mn-workspace-popover-row is-active" data-local="1">${icon("database", 16)}<span><strong>Local storage</strong><small>This browser’s boards</small></span></button>
+    <div class="mn-workspace-popover-boards" data-role="local-workspaces"><p class="mn-server-note" style="padding:8px">Loading local workspaces...</p></div>
     <div class="mn-workspace-popover-sep"></div>
     <div data-role="server-sections"></div>
     <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>
@@ -185,6 +216,7 @@ export async function openWorkspacePopover(anchor) {
   view.querySelector('[data-role="create-workspace"]').addEventListener("click", () => {
     openCreateWorkspaceDialog(current, anchor);
   });
+  void renderLocalWorkspaces(view);
   const sections = view.querySelector('[data-role="server-sections"]');
   if (!current.length) {
     sections.innerHTML = `<p class="mn-server-note" style="padding:8px">No remote server connected.</p>`;
@@ -323,6 +355,7 @@ function openCreateWorkspaceDialog(serversList, anchor) {
         const store = await import("./store.js");
         await store.createBoard(name);
         close();
+        await openWorkspacePopover(document.getElementById("template-btn"));
         window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Local workspace created" } }));
         return;
       }
