@@ -235,7 +235,7 @@ export function initUI(elements) {
   initContextToolbar();
   initCommandPalette(() => buildCommands().filter((command) => !command.disabled));
   wireMenuBar();
-  applyPerformanceMode(localStorage.getItem("mn.performance") === "1");
+  applyPerformanceMode(localStorage.getItem("ky.performance") === "1");
   window.addEventListener("mn:language-changed", () => {
     buildToolRail();
     buildMenuBar();
@@ -825,7 +825,7 @@ let performanceMode = false;
 function applyPerformanceMode(enabled) {
   performanceMode = enabled;
   document.documentElement.dataset.performance = enabled ? "true" : "false";
-  localStorage.setItem("mn.performance", enabled ? "1" : "0");
+  localStorage.setItem("ky.performance", enabled ? "1" : "0");
 }
 
 export function setPerformanceMode(enabled) {

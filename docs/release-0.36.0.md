@@ -40,6 +40,7 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   read-only. Remote boards are not duplicated into the local SQLite card table.
 - **Create workspace dialog**: name, description, and Local storage/server type selector matching the
   Affine creation flow inside the main toolbar.
+- **Storage keys**: moved all browser storage keys from `mn.*` to `ky.*` with a one-time migration.
 - **Workspace popover**: the template button opens a workspace/server popover; Add Server uses the
   design-system modal, with menu layering and admin-nav polish fixed.
 - **Frontend/backend split**: workspace switching and share viewing moved to the main board

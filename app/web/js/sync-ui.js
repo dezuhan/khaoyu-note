@@ -57,8 +57,8 @@ export function initSyncUI(uiRefs) {
     if (next && card.contains(next)) return;
     scheduleLockRelease(card.dataset.id);
   });
-  if (localStorage.getItem("mn.setupCollaboration") === "1") {
-    localStorage.removeItem("mn.setupCollaboration");
+  if (localStorage.getItem("ky.setupCollaboration") === "1") {
+    localStorage.removeItem("ky.setupCollaboration");
     const openAfterBoard = (attempt = 0) => {
       if (state.board) openSyncDialog();
       else if (attempt < 20) setTimeout(() => openAfterBoard(attempt + 1), 250);

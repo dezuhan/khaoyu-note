@@ -22,12 +22,12 @@ await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(1200);
 
 const before = await page.evaluate(() => {
-  const id = localStorage.getItem("mn.lastBoard");
-  const doc = JSON.parse(localStorage.getItem("mn.board." + id));
+  const id = localStorage.getItem("ky.lastBoard");
+  const doc = JSON.parse(localStorage.getItem("ky.board." + id));
   return {
     id,
     title: doc.title,
-    boards: JSON.parse(localStorage.getItem("mn.boards") || "[]").length,
+    boards: JSON.parse(localStorage.getItem("ky.boards") || "[]").length,
     doc: JSON.stringify(doc),
   };
 });
@@ -49,11 +49,11 @@ await page.waitForFunction(
 ).catch(() => {});
 await page.waitForTimeout(100);
 const afterCopy = await page.evaluate(() => {
-  const id = localStorage.getItem("mn.lastBoard");
+  const id = localStorage.getItem("ky.lastBoard");
   return {
     id,
-    title: JSON.parse(localStorage.getItem("mn.board." + id)).title,
-    boards: JSON.parse(localStorage.getItem("mn.boards") || "[]").length,
+    title: JSON.parse(localStorage.getItem("ky.board." + id)).title,
+    boards: JSON.parse(localStorage.getItem("ky.boards") || "[]").length,
     current: document.querySelector(".mn-crumb.is-current")?.textContent || "",
     saveState: document.getElementById("save-state")?.textContent || "",
   };
@@ -72,7 +72,7 @@ await page.waitForSelector(".mn-modal-title");
 await page.getByRole("button", { name: "Load newer version" }).click();
 await page.waitForTimeout(900);
 const afterRemote = await page.evaluate(() => ({
-  id: localStorage.getItem("mn.lastBoard"),
+  id: localStorage.getItem("ky.lastBoard"),
   current: document.querySelector(".mn-crumb.is-current")?.textContent || "",
   modal: Boolean(document.querySelector(".mn-modal-title")),
 }));

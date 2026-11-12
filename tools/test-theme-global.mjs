@@ -90,7 +90,7 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage();
   await page.goto(`${url}/`, { waitUntil: "load" });
-  await page.evaluate(() => localStorage.setItem("mn.theme", "light"));
+  await page.evaluate(() => localStorage.setItem("ky.theme", "light"));
 
   const theme = () => page.evaluate(() => document.documentElement.dataset.kyTheme);
   const saveState = () => page.locator("#save-state").innerText();
@@ -111,7 +111,7 @@ try {
   await page.click("#theme-btn");
   await page.waitForTimeout(300);
   check("theme button switches to dark", (await theme()) === "dark", await theme());
-  check("theme choice is stored globally", (await page.evaluate(() => localStorage.getItem("mn.theme"))) === "dark");
+  check("theme choice is stored globally", (await page.evaluate(() => localStorage.getItem("ky.theme"))) === "dark");
   check("changing the theme does not dirty the board", (await saveState()) === "Saved", await saveState());
 
   // Switching to a board whose document still says light keeps the global dark preference.

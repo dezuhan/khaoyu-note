@@ -6,8 +6,8 @@ import * as bridge from "./bridge.js";
 export const UPDATE_REPO = "dezuhan/khaoyu-note";
 export const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-const CACHE_KEY = "mn.update.cache";
-const DISMISSED_KEY = "mn.update.dismissed";
+const CACHE_KEY = "ky.update.cache";
+const DISMISSED_KEY = "ky.update.dismissed";
 
 export const updateState = {
   status: "idle",

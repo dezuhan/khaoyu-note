@@ -94,11 +94,11 @@ const child = {
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 await context.addInitScript(({ parent, child }) => {
-  if (localStorage.getItem("mn.boards")) return;
-  localStorage.setItem("mn.board.b_parent", JSON.stringify(parent));
-  localStorage.setItem("mn.board.b_child", JSON.stringify(child));
-  localStorage.setItem("mn.boards", JSON.stringify(["b_parent", "b_child"]));
-  localStorage.setItem("mn.lastBoard", "b_parent");
+  if (localStorage.getItem("ky.boards")) return;
+  localStorage.setItem("ky.board.b_parent", JSON.stringify(parent));
+  localStorage.setItem("ky.board.b_child", JSON.stringify(child));
+  localStorage.setItem("ky.boards", JSON.stringify(["b_parent", "b_child"]));
+  localStorage.setItem("ky.lastBoard", "b_parent");
 }, { parent, child });
 const page = await context.newPage();
 page.on("pageerror", (error) => errors.push("pageerror: " + error.message));

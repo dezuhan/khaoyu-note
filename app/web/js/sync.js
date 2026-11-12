@@ -3,8 +3,8 @@
 
 import * as bridge from "./bridge.js";
 
-const CONFIG_KEY = "mn.sync.config";
-const QUEUE_KEY = "mn.sync.queue";
+const CONFIG_KEY = "ky.sync.config";
+const QUEUE_KEY = "ky.sync.queue";
 const MAX_QUEUE = 20;
 
 export const syncState = {

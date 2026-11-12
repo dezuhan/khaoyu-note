@@ -9,7 +9,7 @@ let list = null;
 let activeIndex = 0;
 let visible = [];
 
-const RECENTS_KEY = "mn.commandRecents";
+const RECENTS_KEY = "ky.commandRecents";
 const MAX_RECENTS = 6;
 
 export function initCommandPalette(provider) {

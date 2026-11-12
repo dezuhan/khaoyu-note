@@ -250,7 +250,7 @@ offline = true;
 await assert.rejects(() => sync.syncBoard(board), (error) => error.offline === true);
 sync.enqueueForOffline(board);
 assert.equal(sync.syncStatusFor(board).status, "offline");
-const queued = JSON.parse(localStorage.getItem("mn.sync.queue"));
+const queued = JSON.parse(localStorage.getItem("ky.sync.queue"));
 assert.equal(queued.length, 1);
 assert.equal(queued[0].projectId, id);
 

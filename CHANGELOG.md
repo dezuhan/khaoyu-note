@@ -5,6 +5,9 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Local storage keys moved from the `mn.` namespace to `ky.` (boards, settings, theme, servers,
+  workspace cache, sync queue, templates, views, assets and update cache). A one-time migration
+  copies legacy `mn.*` values to `ky.*` and removes the old keys, so existing browser data survives.
 ## [0.36.0] - 2026-11-12
 
 ### Added

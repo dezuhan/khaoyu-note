@@ -20,8 +20,8 @@ await page.waitForTimeout(1500);
 
 const storedTitle = () =>
   page.evaluate(() => {
-    const id = localStorage.getItem("mn.lastBoard");
-    return JSON.parse(localStorage.getItem("mn.board." + id)).title;
+    const id = localStorage.getItem("ky.lastBoard");
+    return JSON.parse(localStorage.getItem("ky.board." + id)).title;
   });
 
 await page.locator(".mn-crumb.is-current").dblclick();

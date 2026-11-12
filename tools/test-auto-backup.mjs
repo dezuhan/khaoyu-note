@@ -67,7 +67,7 @@ assert.equal(result.status, "off");
 assert.equal(backups, 0);
 
 // A one-day interval is due immediately when no backup was recorded yet.
-localStorage.setItem("mn.settings", JSON.stringify({ autoBackupDays: 1 }));
+localStorage.setItem("ky.settings", JSON.stringify({ autoBackupDays: 1 }));
 result = await auto.maybeAutoBackup({ now: 1000 });
 assert.equal(result.status, "created");
 assert.equal(backups, 1);
@@ -86,7 +86,7 @@ assert.equal(backups, 2);
 assert.equal(auto.lastBackupAt(), 1000 + DAY);
 
 // Every month uses 30 days.
-localStorage.setItem("mn.settings", JSON.stringify({ autoBackupDays: 30 }));
+localStorage.setItem("ky.settings", JSON.stringify({ autoBackupDays: 30 }));
 await auto.markBackupTaken(2000);
 result = await auto.maybeAutoBackup({ now: 2000 + 29 * DAY });
 assert.equal(result.status, "not-due");

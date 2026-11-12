@@ -15,7 +15,7 @@ async function capture(name, { theme = "light", scale = 1, settingsPage = "" } =
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: scale,
   });
-  await context.addInitScript((value) => localStorage.setItem("mn.theme", value), theme);
+  await context.addInitScript((value) => localStorage.setItem("ky.theme", value), theme);
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -40,7 +40,7 @@ await capture("settings-performance.png", { settingsPage: "Performance" });
 
 async function captureEditor(name, type) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  await context.addInitScript(() => localStorage.setItem("mn.theme", "light"));
+  await context.addInitScript(() => localStorage.setItem("ky.theme", "light"));
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));

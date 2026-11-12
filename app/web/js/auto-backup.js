@@ -44,7 +44,7 @@ function storage() {
 
 function intervalDays() {
   try {
-    const raw = storage()?.getItem("mn.settings");
+    const raw = storage()?.getItem("ky.settings");
     const parsed = raw ? JSON.parse(raw) : null;
     return Number(parsed?.autoBackupDays) || 0;
   } catch {

@@ -17,7 +17,7 @@ page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
 await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(1600);
 
-const parentId = await page.evaluate(() => localStorage.getItem("mn.lastBoard"));
+const parentId = await page.evaluate(() => localStorage.getItem("ky.lastBoard"));
 await page.evaluate(() => document.querySelector('.mn-card[data-type="board"] .mn-board-card').click());
 await page.waitForTimeout(900);
 check("the nested board opens", (await page.locator(".mn-crumb").count()) >= 2);
@@ -43,7 +43,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(700);
 const stored = await page.evaluate((id) => {
-  const doc = JSON.parse(localStorage.getItem("mn.board." + id));
+  const doc = JSON.parse(localStorage.getItem("ky.board." + id));
   return doc.cards.find((card) => card.type === "board")?.title;
 }, parentId);
 check("the parent card title is persisted", stored === "Nested Renamed", stored);

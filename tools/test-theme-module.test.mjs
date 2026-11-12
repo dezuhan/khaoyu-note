@@ -73,9 +73,9 @@ test("setTheme applies, persists and reports the next skin", () => {
 });
 
 test("initTheme reads storage and applies it", () => {
-  const storage = memoryStorage({ "mn.theme": "softLight" });
+  const storage = memoryStorage({ "ky.theme": "softLight" });
   const root = { dataset: {} };
-  assert.equal(initTheme({ key: "mn.theme", fallback: "light", storage, root }), "softLight");
+  assert.equal(initTheme({ key: "ky.theme", fallback: "light", storage, root }), "softLight");
   assert.equal(root.dataset.kyTheme, "softLight");
 });
 

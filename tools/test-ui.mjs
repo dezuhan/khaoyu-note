@@ -1773,7 +1773,7 @@ check(
   await page.locator("#save-state").innerText()
 );
 const strokeData = await page.evaluate((id) => {
-  const raw = localStorage.getItem("mn.board." + localStorage.getItem("mn.lastBoard"));
+  const raw = localStorage.getItem("ky.board." + localStorage.getItem("ky.lastBoard"));
   const doc = raw ? JSON.parse(raw) : null;
   const card = doc?.cards.find((entry) => entry.id === id);
   return card?.strokes || [];
@@ -1866,10 +1866,10 @@ check(
 );
 
 // ---------------------------------------------------------------- nested board + breadcrumb
-const boardsBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("mn.boards") || "[]").length);
+const boardsBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("ky.boards") || "[]").length);
 await page.click('.mn-tool[data-tool="board"]');
 await page.waitForTimeout(500);
-const boardsAfter = await page.evaluate(() => JSON.parse(localStorage.getItem("mn.boards") || "[]").length);
+const boardsAfter = await page.evaluate(() => JSON.parse(localStorage.getItem("ky.boards") || "[]").length);
 check("Board tool creates a nested board", boardsAfter === boardsBefore + 1, `${boardsBefore} -> ${boardsAfter}`);
 const boardCardId = await selectedId();
 const boardCard = byId(boardCardId);
@@ -2004,7 +2004,7 @@ await page.waitForTimeout(500);
 const firstToolAfter = await page.locator(".mn-tool").first().getAttribute("data-tool");
 const savedOrder = await page.evaluate(() => {
   try {
-    return JSON.parse(localStorage.getItem("mn.settings") || "{}").toolOrder;
+    return JSON.parse(localStorage.getItem("ky.settings") || "{}").toolOrder;
   } catch {
     return null;
   }
@@ -2216,7 +2216,7 @@ check(
 await page.locator(".mn-account-backup select").selectOption("7");
 await page.waitForTimeout(300);
 const autoBackupDays = await page.evaluate(
-  () => JSON.parse(localStorage.getItem("mn.settings")).autoBackupDays
+  () => JSON.parse(localStorage.getItem("ky.settings")).autoBackupDays
 );
 check("Automatic backup interval is saved", autoBackupDays === 7, String(autoBackupDays));
 await page.locator(".mn-account-backup select").selectOption("0");
@@ -2373,7 +2373,7 @@ check(
   (await page.locator('.mn-prefs-row', { hasText: "Current mode" }).locator(".mn-prefs-value").innerText()).includes("CPU")
 );
 check("GPU off shows restart hint", (await page.locator(".mn-prefs-hint").innerText()).includes("Restart"));
-const persistedGpu = await page.evaluate(() => localStorage.getItem("mn.settings") || "");
+const persistedGpu = await page.evaluate(() => localStorage.getItem("ky.settings") || "");
 check("GPU preference persists", String(persistedGpu).includes('"gpuAcceleration":false'), String(persistedGpu).slice(0, 80));
 await page.locator('.mn-prefs-check', { hasText: "GPU acceleration" }).locator(".mn-prefs-check-box").click();
 await page.waitForTimeout(300);
@@ -2643,11 +2643,11 @@ await page.waitForTimeout(350);
 // ---------------------------------------------------------------- persistence + screenshot
 await page.waitForTimeout(5600);
 const persisted = await page.evaluate(() => {
-  const ids = JSON.parse(localStorage.getItem("mn.boards") || "[]");
+  const ids = JSON.parse(localStorage.getItem("ky.boards") || "[]");
   let total = 0;
   let max = 0;
   for (const id of ids) {
-    const raw = localStorage.getItem("mn.board." + id);
+    const raw = localStorage.getItem("ky.board." + id);
     if (!raw) continue;
     try {
       const doc = JSON.parse(raw);

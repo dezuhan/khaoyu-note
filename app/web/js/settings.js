@@ -194,7 +194,7 @@ export function saveToolOrder(order) {
 }
 
 function persist() {
-  localStorage.setItem("mn.settings", JSON.stringify(settings));
+  localStorage.setItem("ky.settings", JSON.stringify(settings));
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     bridge.setSetting("ui_settings", JSON.stringify(settings)).catch(() => {});
@@ -731,10 +731,10 @@ function pages() {
             try {
               await bridge.resetAllData();
               for (const key of Object.keys(localStorage)) {
-                if (key.startsWith("mn.")) localStorage.removeItem(key);
+                if (key.startsWith("ky.")) localStorage.removeItem(key);
               }
               sessionStorage.clear();
-              localStorage.setItem("mn.setupRequired", "1");
+              localStorage.setItem("ky.setupRequired", "1");
               window.location.reload();
             } catch (error) {
               setStatus(error?.message || "Could not reset the app data.");
@@ -1304,7 +1304,7 @@ function accountDeleteTab(pane) {
         confirmation: "DELETE ALL",
       });
       for (const key of Object.keys(localStorage)) {
-        if (key.startsWith("mn.")) localStorage.removeItem(key);
+        if (key.startsWith("ky.")) localStorage.removeItem(key);
       }
       sessionStorage.clear();
       status.textContent = "Done. Starting fresh...";

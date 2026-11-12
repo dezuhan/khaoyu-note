@@ -36,8 +36,8 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(600);
 const stored = await page.evaluate(() => {
-  const id = localStorage.getItem("mn.lastBoard");
-  return JSON.parse(localStorage.getItem("mn.board." + id)).cards.find((card) => card.type === "column").title;
+  const id = localStorage.getItem("ky.lastBoard");
+  return JSON.parse(localStorage.getItem("ky.board." + id)).cards.find((card) => card.type === "column").title;
 });
 check("the column title is persisted", stored === "Ideas", stored);
 check("the board reports saved", (await page.locator("#save-state").innerText()).trim() === "Saved");

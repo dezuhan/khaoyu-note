@@ -23,7 +23,7 @@ export const state = {
 };
 
 function viewStorageKey(boardId) {
-  return "mn.view." + boardId;
+  return "ky.view." + boardId;
 }
 
 function readStoredView(boardId) {
@@ -180,7 +180,7 @@ export function scheduleSave() {
 
 function autoSaveEnabled() {
   try {
-    const raw = localStorage.getItem("mn.settings");
+    const raw = localStorage.getItem("ky.settings");
     if (!raw) return true;
     return JSON.parse(raw).autoUpdateOpenDocuments !== false;
   } catch {
@@ -378,7 +378,7 @@ export function firstOpenableBoard() {
 function applyTheme(theme) {
   state.theme = theme;
   applyDocumentTheme(theme);
-  storeTheme(theme, { key: "mn.theme" });
+  storeTheme(theme, { key: "ky.theme" });
   notify("theme");
 }
 
@@ -444,7 +444,7 @@ export async function openBoard(id, { flush = true } = {}) {
   clearRetry();
   clearTimeout(saveTimer);
   saveTimer = 0;
-  localStorage.setItem("mn.lastBoard", doc.id);
+  localStorage.setItem("ky.lastBoard", doc.id);
   notify("board");
   notify("view");
   notify("history");
@@ -489,7 +489,7 @@ export async function createBoard(title = "Untitled board", { withWelcome = fals
   clearRetry();
   clearTimeout(saveTimer);
   saveTimer = 0;
-  localStorage.setItem("mn.lastBoard", doc.id);
+  localStorage.setItem("ky.lastBoard", doc.id);
   notify("board");
   notify("view");
   notify("history");
@@ -538,7 +538,7 @@ export async function removeBoard(id, options = {}) {
 }
 
 export function initTheme() {
-  applyTheme(readStoredTheme({ key: "mn.theme", fallback: "light" }));
+  applyTheme(readStoredTheme({ key: "ky.theme", fallback: "light" }));
 }
 
 export async function exportCurrentBoard() {

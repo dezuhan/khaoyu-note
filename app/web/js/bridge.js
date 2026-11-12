@@ -26,7 +26,7 @@ export function convertFileSrc(path) {
       return path;
     }
   }
-  if (path && String(path).startsWith("mn.asset.")) {
+  if (path && String(path).startsWith("ky.asset.")) {
     const raw = localStorage.getItem(path);
     if (raw) {
       const extension = String(path).split(".").pop()?.toLowerCase();
@@ -58,10 +58,10 @@ export function convertFileSrc(path) {
 
 export async function listBoards() {
   if (hasTauri) return invoke("list_boards");
-  const index = JSON.parse(localStorage.getItem("mn.boards") || "[]");
+  const index = JSON.parse(localStorage.getItem("ky.boards") || "[]");
   const out = [];
   for (const id of index) {
-    const raw = localStorage.getItem("mn.board." + id);
+    const raw = localStorage.getItem("ky.board." + id);
     if (!raw) continue;
     try {
       const doc = JSON.parse(raw);
@@ -83,30 +83,30 @@ export async function listBoards() {
 
 export async function loadBoard(id) {
   if (hasTauri) return invoke("load_board", { id });
-  return localStorage.getItem("mn.board." + id);
+  return localStorage.getItem("ky.board." + id);
 }
 
 export async function saveBoard(id, data, baseUpdatedAt = null) {
   if (hasTauri) return invoke("save_board", { id, data, baseUpdatedAt });
-  localStorage.setItem("mn.board." + id, data);
-  const index = JSON.parse(localStorage.getItem("mn.boards") || "[]");
+  localStorage.setItem("ky.board." + id, data);
+  const index = JSON.parse(localStorage.getItem("ky.boards") || "[]");
   if (!index.includes(id)) {
     index.push(id);
-    localStorage.setItem("mn.boards", JSON.stringify(index));
+    localStorage.setItem("ky.boards", JSON.stringify(index));
   }
   return Date.now();
 }
 
 export async function deleteBoard(id) {
   if (hasTauri) return invoke("delete_board", { id });
-  localStorage.removeItem("mn.board." + id);
-  const index = JSON.parse(localStorage.getItem("mn.boards") || "[]");
-  localStorage.setItem("mn.boards", JSON.stringify(index.filter((x) => x !== id)));
+  localStorage.removeItem("ky.board." + id);
+  const index = JSON.parse(localStorage.getItem("ky.boards") || "[]");
+  localStorage.setItem("ky.boards", JSON.stringify(index.filter((x) => x !== id)));
 }
 
 export async function renameBoard(id, title) {
   if (hasTauri) return invoke("rename_board", { id, title });
-  const raw = localStorage.getItem("mn.board." + id);
+  const raw = localStorage.getItem("ky.board." + id);
   if (!raw) return null;
   const doc = JSON.parse(raw);
   doc.title = title;
@@ -116,7 +116,7 @@ export async function renameBoard(id, title) {
 
 export async function archiveBoard(id, archived) {
   if (hasTauri) return invoke("archive_board", { id, archived });
-  const raw = localStorage.getItem("mn.board." + id);
+  const raw = localStorage.getItem("ky.board." + id);
   if (!raw) return null;
   const doc = JSON.parse(raw);
   if (archived) doc.archivedAt = Date.now();
@@ -126,7 +126,7 @@ export async function archiveBoard(id, archived) {
 
 export async function trashBoard(id, trashed) {
   if (hasTauri) return invoke("trash_board", { id, trashed });
-  const raw = localStorage.getItem("mn.board." + id);
+  const raw = localStorage.getItem("ky.board." + id);
   if (!raw) return null;
   const doc = JSON.parse(raw);
   if (trashed) doc.trashedAt = Date.now();
@@ -136,7 +136,7 @@ export async function trashBoard(id, trashed) {
 
 export async function storeAsset(name, bytesBase64) {
   if (hasTauri) return invoke("store_asset", { name, data: bytesBase64 });
-  const key = "mn.asset." + Date.now() + "-" + name;
+  const key = "ky.asset." + Date.now() + "-" + name;
   localStorage.setItem(key, bytesBase64);
   return key;
 }
@@ -200,12 +200,12 @@ export async function graphicsInfo() {
 
 export async function getSetting(key) {
   if (hasTauri) return invoke("get_setting", { key });
-  return localStorage.getItem("mn.setting." + key);
+  return localStorage.getItem("ky.setting." + key);
 }
 
 export async function setSetting(key, value) {
   if (hasTauri) return invoke("set_setting", { key, value });
-  localStorage.setItem("mn.setting." + key, value);
+  localStorage.setItem("ky.setting." + key, value);
   return null;
 }
 

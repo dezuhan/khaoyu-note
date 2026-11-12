@@ -3,7 +3,7 @@
 //
 // Storage keys are per origin, so every deployment (Tauri webview, local web host, self-hosted
 // service) stores its own choice. Service pages share one `khaoyu.theme` key; the app keeps the
-// historical `mn.theme` key.
+// historical `mn.theme` key; storage-keys.js migrates it to `ky.theme`.
 
 export const SKINS = ["light", "softLight", "softDark", "dark"];
 export const DEFAULT_THEME = "light";

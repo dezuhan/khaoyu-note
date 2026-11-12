@@ -1,3 +1,4 @@
+import "./storage-keys.js";
 import * as bridge from "./bridge.js";
 import { initAutoBackup } from "./auto-backup.js";
 import { initAuth } from "./auth.js";
@@ -112,7 +113,7 @@ async function boot() {
         (board) => board.id === requested && !board.trashedAt && !board.archivedAt
       )
     : null;
-  const last = localStorage.getItem("mn.lastBoard");
+  const last = localStorage.getItem("ky.lastBoard");
   const remembered = state.boards.find(
     (board) => board.id === last && !board.trashedAt && !board.archivedAt
   );

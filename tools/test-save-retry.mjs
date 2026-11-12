@@ -18,14 +18,14 @@ page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
 await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(1200);
 
-const boardId = await page.evaluate(() => localStorage.getItem("mn.lastBoard"));
+const boardId = await page.evaluate(() => localStorage.getItem("ky.lastBoard"));
 
 // Fail exactly the next board write, then let the automatic retry succeed.
 await page.evaluate(() => {
   const original = Storage.prototype.setItem;
   window.__mnFailNextBoardWrite = true;
   Storage.prototype.setItem = function (key, value) {
-    if (window.__mnFailNextBoardWrite && String(key).startsWith("mn.board.")) {
+    if (window.__mnFailNextBoardWrite && String(key).startsWith("ky.board.")) {
       window.__mnFailNextBoardWrite = false;
       throw new DOMException("disk full", "QuotaExceededError");
     }
@@ -53,7 +53,7 @@ const savedLabel = (await page.locator("#save-state").innerText()).trim();
 check("the automatic retry saves without another edit", savedLabel === "Saved", savedLabel);
 
 const persisted = await page.evaluate((id) => {
-  const raw = localStorage.getItem("mn.board." + id);
+  const raw = localStorage.getItem("ky.board." + id);
   if (!raw) return false;
   return raw.includes("retrytoken");
 }, boardId);

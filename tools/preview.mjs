@@ -22,7 +22,7 @@ try {
 await page.waitForTimeout(1500);
 
 const state = await page.evaluate(() => {
-  const board = window.localStorage.getItem("mn.lastBoard");
+  const board = window.localStorage.getItem("ky.lastBoard");
   return {
     boot: document.getElementById("boot")?.textContent?.slice(0, 300) || null,
     cards: document.querySelectorAll(".mn-card").length,

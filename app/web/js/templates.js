@@ -7,8 +7,8 @@ import { createCard, layoutColumns, newBoardDoc, uid, visibleCards, welcomeBoard
 import { checkpoint, markDirty, notify, state } from "./store.js";
 
 const PROTECTED_TEMPLATE_IDS = new Set(["blank"]);
-const CUSTOM_TEMPLATES_KEY = "mn.templates.custom";
-const DELETED_TEMPLATES_KEY = "mn.templates.deleted";
+const CUSTOM_TEMPLATES_KEY = "ky.templates.custom";
+const DELETED_TEMPLATES_KEY = "ky.templates.deleted";
 
 let overlay = null;
 

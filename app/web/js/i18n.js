@@ -1268,7 +1268,7 @@ export function initLanguage() {
 
 export function getLanguage() {
   try {
-    const stored = localStorage.getItem("mn.language") || "en";
+    const stored = localStorage.getItem("ky.language") || "en";
     return LANGUAGES.some((language) => language.id === stored) ? stored : "en";
   } catch {
     return "en";
@@ -1278,7 +1278,7 @@ export function getLanguage() {
 export function setLanguage(id) {
   if (!LANGUAGES.some((language) => language.id === id)) return false;
   try {
-    localStorage.setItem("mn.language", id);
+    localStorage.setItem("ky.language", id);
   } catch {
     /* private mode */
   }

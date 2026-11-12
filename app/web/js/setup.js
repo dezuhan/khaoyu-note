@@ -2,7 +2,7 @@
 // flow sets a one-shot flag so the user explicitly chooses a storage direction before any board is
 // created again.
 
-const FLAG = "mn.setupRequired";
+const FLAG = "ky.setupRequired";
 
 export function setupRequired() {
   try {
@@ -15,7 +15,7 @@ export function setupRequired() {
 function finishLocal() {
   try {
     localStorage.removeItem(FLAG);
-    localStorage.setItem("mn.storageMode", "local");
+    localStorage.setItem("ky.storageMode", "local");
   } catch {
     /* private mode */
   }
@@ -132,7 +132,7 @@ export async function initSetupGate() {
       if (collaboration) {
         collaboration.addEventListener("click", () => {
           try {
-            localStorage.setItem("mn.setupCollaboration", "1");
+            localStorage.setItem("ky.setupCollaboration", "1");
           } catch {
             /* private mode */
           }

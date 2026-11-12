@@ -50,10 +50,10 @@ async function openWithLast(last) {
   page.on("pageerror", (error) => errors.push("pageerror: " + error.message));
   await page.addInitScript(
     ({ fixtures, lastId }) => {
-      for (const doc of fixtures) localStorage.setItem("mn.board." + doc.id, JSON.stringify(doc));
-      localStorage.setItem("mn.boards", JSON.stringify(fixtures.map((doc) => doc.id)));
-      if (lastId) localStorage.setItem("mn.lastBoard", lastId);
-      else localStorage.removeItem("mn.lastBoard");
+      for (const doc of fixtures) localStorage.setItem("ky.board." + doc.id, JSON.stringify(doc));
+      localStorage.setItem("ky.boards", JSON.stringify(fixtures.map((doc) => doc.id)));
+      if (lastId) localStorage.setItem("ky.lastBoard", lastId);
+      else localStorage.removeItem("ky.lastBoard");
     },
     { fixtures: docs, lastId: last }
   );
@@ -64,7 +64,7 @@ async function openWithLast(last) {
 
 let page = await openWithLast(ids.trashed);
 let current = await page.evaluate(() => ({
-  id: localStorage.getItem("mn.lastBoard"),
+  id: localStorage.getItem("ky.lastBoard"),
   crumb: document.querySelector(".mn-crumb.is-current")?.textContent?.trim() || "",
 }));
 check("a trashed last board is not reopened", current.id === ids.active, current.crumb);
@@ -72,7 +72,7 @@ await page.close();
 
 page = await openWithLast(null);
 current = await page.evaluate(() => ({
-  id: localStorage.getItem("mn.lastBoard"),
+  id: localStorage.getItem("ky.lastBoard"),
   crumb: document.querySelector(".mn-crumb.is-current")?.textContent?.trim() || "",
 }));
 check("without a remembered board the root project wins over a nested one", current.id === ids.active, current.crumb);
@@ -80,7 +80,7 @@ await page.close();
 
 page = await openWithLast(ids.nested);
 current = await page.evaluate(() => ({
-  id: localStorage.getItem("mn.lastBoard"),
+  id: localStorage.getItem("ky.lastBoard"),
   crumb: document.querySelector(".mn-crumb.is-current")?.textContent?.trim() || "",
 }));
 check("a remembered nested board still reopens", current.id === ids.nested, current.crumb);

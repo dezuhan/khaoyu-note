@@ -3,8 +3,8 @@
 
 import { icon } from "./icons.js";
 
-const SERVERS_KEY = "mn.servers";
-const WORKSPACE_CACHE_KEY = "mn.workspaceCache";
+const SERVERS_KEY = "ky.servers";
+const WORKSPACE_CACHE_KEY = "ky.workspaceCache";
 let popover = null;
 let boardOverlay = null;
 let activeServer = null;

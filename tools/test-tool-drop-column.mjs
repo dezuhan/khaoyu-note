@@ -18,8 +18,8 @@ await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(1600);
 
 const before = await page.evaluate(() => {
-  const id = localStorage.getItem("mn.lastBoard");
-  const doc = JSON.parse(localStorage.getItem("mn.board." + id));
+  const id = localStorage.getItem("ky.lastBoard");
+  const doc = JSON.parse(localStorage.getItem("ky.board." + id));
   const column = doc.cards.find((card) => card.type === "column");
   return {
     id,
@@ -55,7 +55,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(600);
 const after = await page.evaluate(({ boardId, noteIds }) => {
-  const doc = JSON.parse(localStorage.getItem("mn.board." + boardId));
+  const doc = JSON.parse(localStorage.getItem("ky.board." + boardId));
   const column = doc.cards.find((card) => card.type === "column");
   const children = doc.cards.filter((card) => card.parentId === column.id);
   return {
