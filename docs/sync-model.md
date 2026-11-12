@@ -52,21 +52,42 @@ cards. They now travel as `connections.set`, a single operation containing the c
 (more than 200 operations). Bulk operations may be up to 4 MB; normal card operations stay at 256 KB.
 The operation log body limit is 8 MB.
 
-## Vector clocks
+## Causal clocks and field versions
 
-Not implemented, by decision. The service is a single authoritative sequencer per project: every
-accepted operation gets a `seq`, and every client replays in that order. A vector clock would add
-per-account causal metadata that the server order already provides, without changing the merged
-result. It becomes necessary only if writes can happen without a common sequencer (peer-to-peer,
-multi-master servers, or offline changes merged by a third party). In that scenario the recorded
-per-op `seq`/`actor` columns and the `fieldConflicts` shape are the place to add `{accountId: counter}`
-clocks.
+Every operation carries a small causal clock (`{writerId: counter}`). The client merges the clocks of
+the operations it replays, so an edit made after seeing a remote change is causally after it. The
+service stores the clock on `project_ops` and keeps one row per `(project, card, field)` in
+`project_field_versions` with its `seq`, `clock`, actor and update time.
 
-## CRDT
+When an operation arrives for a field whose stored clock is concurrent with the incoming clock
+(neither dominates), the server keeps the later `seq` as the winner (last writer per field) and
+returns a `fieldConflicts` entry in the ops response with the previous value, `remoteSeq` and
+`remoteClock`. This is causal conflict detection on top of the central sequence: the sequence decides
+the value, the clocks tell the client that two writers acted without seeing each other, even when the
+operation log has already been pruned and a replay alone could not prove it.
 
-Not implemented. The current model is operation-based LWW per field, which converges for card
-metadata, geometry, titles and todo lists, and it deliberately prevents simultaneous same-card text
-editing through the hard card lock. True character-level merging needs a different editor layer:
+The clocks are not a replacement for the sequence and do not make the server multi-master. They become
+the ordering mechanism only if writes can happen without a common sequencer (peer-to-peer or
+multi-master servers); at that point the same `clock` column is the input to a merge/vector-clock
+comparison instead of an advisory conflict signal.
+
+## Text merging and CRDT
+
+The current model is operation-based LWW per field, which converges for card metadata, geometry,
+titles and todo lists. For text fields it adds a **three-way merge**: when a rebase replays a remote
+change, the local pending change is applied on top of the remote value if the two changes touch
+different regions (a single contiguous change per side, compared against the old base value). Two
+people typing in different paragraphs therefore keep both edits; overlapping changes keep the local
+value (server order) and are reported as a field conflict with the server value available.
+
+The live SSE path uses the same merge and captures unsaved local edits before adopting the remote
+document. Rebase and live-merge are serialized per board, so the sequence cursor and the merge base
+cannot be updated by two paths at once.
+
+Character-level CRDT is not implemented. It becomes worthwhile when simultaneous **same-region** text
+editing must merge without a hard lock; the current model deliberately prevents that through the card
+lock and treats the remainder as a visible conflict. True character merging needs a different editor
+layer:
 
 - rich text (document/note/heading): a text CRDT (Yjs or BlockSuite) inside the document editor,
   with the existing operation log carrying incremental updates instead of whole field patches;

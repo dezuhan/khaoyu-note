@@ -33,8 +33,14 @@ project uses Semantic Versioning.
 - Connection edits travel as a `connections.set` operation instead of replacing the whole board
   document, so a connection change can no longer overwrite unrelated remote cards. Bulk operations
   (`doc.replace`, `connections.set`) may be up to 4 MB; card operations stay at 256 KB.
-- The sync model, including the deliberate decision not to add vector clocks to a single-sequencer
-  server and the CRDT prerequisites, is documented in `docs/sync-model.md`.
+- Operations now carry a causal clock. The service stores it on `project_ops` and on a new
+  `project_field_versions` table (SQLite migration 020, PostgreSQL migration 008) and reports a
+  `fieldConflicts` entry when a field write is concurrent with the stored write, so conflicts are
+  detected even when the operation log has been pruned. Disjoint text edits on the same field are
+  three-way merged on rebase and on the live SSE path, which captures unsaved local edits before
+  adopting a remote document; rebase and live-merge are serialized per board.
+- The sync model documents the causal clocks, the three-way text merge and the remaining
+  character-level CRDT prerequisites in `docs/sync-model.md`.
 ## [0.36.0] - 2026-11-12
 
 ### Added

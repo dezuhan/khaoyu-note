@@ -58,7 +58,13 @@ persisted in PostgreSQL/SQLite before broadcast.
 - Queues are stored per board **and per tab**, so two tabs cannot overwrite each other's pending
   operations. A queue left behind by a closed tab is drained by the next flush from any tab; operation
   ids keep a race between two tabs idempotent. See `docs/sync-model.md` for the full model.
+- Operations carry a causal clock. The service stores it on the operation and on one row per
+  `(project, card, field)` (`project_field_versions`) and returns a `fieldConflicts` entry when an
+  incoming write is concurrent with the stored field write, so conflicts are detected even after the
+  operation log was pruned.
 - A `seq_conflict` rebase records overlapping `(cardId, field)` edits as field conflicts, keeps the
   local value (server order wins), and the Sync dialog offers **Use server values** or **Dismiss**.
+  Disjoint text edits on the same field are three-way merged, and the live SSE path captures unsaved
+  local edits before adopting a remote document. Rebase and live-merge are serialized per board.
 - Production-scale load testing, penetration testing and CRDT/OT text merging remain release gates;
   see `docs/production-readiness.md`.
