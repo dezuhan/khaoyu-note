@@ -98,10 +98,17 @@ try {
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
   check("password login shows the signed-in account", (await page.locator("#admin-email").innerText()).includes(email));
 
-  // The account page inside the dashboard owns sessions, tokens and password changes.
-  await page.click('.admin-nav-item[data-page="account"]');
+  // The account page inside the dashboard owns sessions, tokens and password changes. It is opened
+  // from the profile button: the Account entry is temporarily out of the menu bar.
+  check(
+    "account settings is temporarily out of the menu",
+    (await page.locator('.admin-nav-item[data-page="account"]').count()) === 0
+  );
+  await page.click("#admin-identity");
   await page.waitForFunction(() => document.getElementById("admin-pane").textContent.includes("Sessions"));
   check("account page lists the current session", (await page.locator(".admin-table tbody tr").count()) >= 1);
+  const passwordBox = await page.locator('[data-role="password-form"] input').first().boundingBox();
+  check("password inputs stay compact", passwordBox !== null && passwordBox.height <= 30, String(passwordBox?.height));
   check(
     "account page uses the shared design tokens",
     (await page.locator('link[href="/ky.css"]').count()) === 1 &&

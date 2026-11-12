@@ -9,66 +9,73 @@
     <link rel="stylesheet" href="/admin.css" />
   </head>
   <body class="admin-body">
-    <div class="admin-shell">
-      <aside class="admin-rail">
-        <div class="admin-brand">
-          <span class="admin-brand-mark" aria-hidden="true">K</span>
-          <span class="admin-brand-copy">
-            <strong>Khaoyu Note</strong>
-            <span>Service admin</span>
+    <header class="admin-menubar">
+      <div class="admin-brand">
+        <span class="admin-brand-mark" aria-hidden="true">K</span>
+        <span class="admin-brand-copy">
+          <strong>Khaoyu Note</strong>
+          <span>Service admin</span>
+        </span>
+      </div>
+
+      <nav class="admin-nav" aria-label="Admin sections">
+        <button type="button" class="admin-nav-item is-active" data-page="overview">
+          <span class="admin-nav-icon" aria-hidden="true">◧</span>
+          <span>Overview</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-page="accounts">
+          <span class="admin-nav-icon" aria-hidden="true">◎</span>
+          <span>Accounts</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-page="teams">
+          <span class="admin-nav-icon" aria-hidden="true">▦</span>
+          <span>Teams</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-page="activity">
+          <span class="admin-nav-icon" aria-hidden="true">≡</span>
+          <span>Activity</span>
+        </button>
+        <button type="button" class="admin-nav-item" data-page="sharing">
+          <span class="admin-nav-icon" aria-hidden="true">⧉</span>
+          <span>Sharing</span>
+        </button>
+      </nav>
+
+      <span class="admin-menubar-spacer" aria-hidden="true"></span>
+      <span class="admin-host" id="admin-host" title="This service host"></span>
+      <div class="admin-menubar-actions">
+        <button
+          type="button"
+          class="admin-icon-button"
+          id="admin-theme"
+          aria-label="Toggle light or dark mode"
+          title="Toggle theme"
+        ></button>
+        <button
+          type="button"
+          class="admin-admin"
+          id="admin-identity"
+          hidden
+          title="Account, sessions and API tokens"
+        >
+          <span class="admin-avatar" id="admin-avatar" data-tone="0"></span>
+          <span class="admin-admin-copy">
+            <strong id="admin-name">Admin</strong>
+            <span id="admin-email"></span>
           </span>
+        </button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <header class="admin-head">
+        <div>
+          <p class="admin-kicker">Self-hosted service</p>
+          <h1 class="admin-title" id="admin-title">Overview</h1>
         </div>
-
-        <nav class="admin-nav" aria-label="Admin sections">
-          <button type="button" class="admin-nav-item is-active" data-page="overview">
-            <span class="admin-nav-icon" aria-hidden="true">◧</span>
-            <span>Overview</span>
-          </button>
-          <button type="button" class="admin-nav-item" data-page="accounts">
-            <span class="admin-nav-icon" aria-hidden="true">◎</span>
-            <span>Accounts</span>
-          </button>
-          <button type="button" class="admin-nav-item" data-page="teams">
-            <span class="admin-nav-icon" aria-hidden="true">▦</span>
-            <span>Teams</span>
-          </button>
-          <button type="button" class="admin-nav-item" data-page="activity">
-            <span class="admin-nav-icon" aria-hidden="true">≡</span>
-            <span>Activity</span>
-          </button>
-          <button type="button" class="admin-nav-item" data-page="account">
-            <span class="admin-nav-icon" aria-hidden="true">○</span>
-            <span>Account</span>
-          </button>
-        </nav>
-
-        <div class="admin-rail-foot">
-          <button type="button" class="admin-theme" id="admin-theme" aria-label="Toggle light or dark mode">
-            <span id="admin-theme-label">Dark mode</span>
-            <span aria-hidden="true">◐</span>
-          </button>
-          <a class="admin-rail-link" href="/admin">Account settings</a>
-          <a class="admin-rail-link" href="/shares">Shared links</a>
-        </div>
-      </aside>
-
-      <main class="admin-main">
-        <header class="admin-head">
-          <div>
-            <p class="admin-kicker">Self-hosted service</p>
-            <h1 class="admin-title" id="admin-title">Overview</h1>
-          </div>
-          <div class="admin-admin" id="admin-identity" hidden>
-            <span class="admin-avatar" id="admin-avatar" data-tone="0"></span>
-            <span class="admin-admin-copy">
-              <strong id="admin-name">Admin</strong>
-              <span id="admin-email"></span>
-            </span>
-          </div>
-        </header>
-        <div id="admin-pane" class="admin-pane" aria-live="polite"></div>
-      </main>
-    </div>
+      </header>
+      <div id="admin-pane" class="admin-pane" aria-live="polite"></div>
+    </main>
     <script src="/admin.js" type="module"></script>
   </body>
 </html>

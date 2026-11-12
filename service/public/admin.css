@@ -602,3 +602,192 @@ html[data-ky-theme="softLight"] {
   height: 24px;
   font-size: 11px;
 }
+/* Top menu bar: the service dashboard shares the app's compact chrome language. */
+.admin-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-menubar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--ky-stroke);
+  background: var(--ky-surface);
+}
+
+.admin-menubar .admin-brand {
+  padding: 0;
+}
+
+.admin-menubar .admin-nav {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.admin-menubar .admin-nav-item {
+  width: auto;
+  padding: 0 8px;
+}
+
+.admin-menubar-spacer {
+  flex: 1 1 auto;
+}
+
+.admin-host {
+  padding: 2px 8px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 999px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-family: var(--ky-font-code, ui-monospace, monospace);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.admin-menubar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-icon-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ky-radius-control, 7px);
+  background: transparent;
+  color: var(--ky-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-icon-button:hover {
+  background: var(--ky-control);
+  color: var(--ky-text);
+}
+
+button.admin-admin {
+  border: 1px solid var(--ky-stroke);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.admin-admin:hover {
+  background: var(--ky-control);
+}
+
+/* Compact form controls. The row-flex rule for .admin-search must not stretch fields in the
+   column layout used by the password form, or the browser resolves flex-basis as height. */
+.admin-field .admin-search {
+  flex: none;
+  width: 100%;
+  height: 24px;
+}
+
+.admin-form-grid {
+  align-items: start;
+}
+
+.admin-team-create .admin-search {
+  flex: 0 1 280px;
+}
+
+.admin-team-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.admin-team-create {
+  margin-bottom: 12px;
+}
+
+/* Sharing page, rendered inside the same admin shell. */
+.admin-warning {
+  padding: 10px 12px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 8px;
+  background: var(--ky-control);
+  color: var(--ky-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.admin-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--ky-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.admin-share-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.admin-share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: 8px;
+  background: var(--ky-control);
+  font-size: 10px;
+}
+
+.admin-share-token {
+  margin: 8px 0;
+  color: var(--ky-text);
+  font-family: var(--ky-font-code, ui-monospace, monospace);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .admin-menubar {
+    padding: 6px 12px;
+  }
+
+  .admin-main {
+    padding: 16px;
+  }
+
+  .admin-share-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The hidden attribute must win over the flex/grid display rules used by the form fields. */
+.admin-field[hidden],
+.admin-check[hidden] {
+  display: none !important;
+}

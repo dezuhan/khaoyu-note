@@ -5,7 +5,7 @@ const title = document.getElementById("admin-title");
 const navItems = [...document.querySelectorAll(".admin-nav-item")];
 const identity = document.getElementById("admin-identity");
 const themeButton = document.getElementById("admin-theme");
-const themeLabel = document.getElementById("admin-theme-label");
+const hostBadge = document.getElementById("admin-host");
 
 const THEME_KEY = "khaoyu.admin.theme";
 let page = "overview";
@@ -132,7 +132,10 @@ function renderIdentity(admin) {
 function setTheme(theme) {
   document.documentElement.dataset.kyTheme = theme;
   localStorage.setItem(THEME_KEY, theme);
-  themeLabel.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+  themeButton.textContent = theme === "dark" ? "☀" : "☾";
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  themeButton.title = label;
+  themeButton.setAttribute("aria-label", label);
 }
 
 function initTheme() {
@@ -321,7 +324,7 @@ async function renderTeams() {
       <div class="admin-section-head"><div><h2>Teams</h2><p>${data.total} project${
         data.total === 1 ? "" : "s"
       } owned by service accounts.</p></div></div>
-      <form class="admin-toolbar" data-role="team-create">
+      <form class="admin-toolbar admin-team-create" data-role="team-create">
         <input class="admin-search" name="name" placeholder="New team name" maxlength="120" required />
         <button class="ky-button ky-button-primary" type="submit">Create team</button>
       </form>
@@ -661,10 +664,281 @@ async function renderAccount() {
   });
 }
 
+// ---------------------------------------------------------------- sharing
+// The old /shares page is merged into the dashboard: the same forms render inside the admin shell.
+
+let sharingProject = null;
+let sharingDoc = null;
+
+function sharingStatus(message) {
+  const status = document.getElementById("status");
+  if (status) status.textContent = message;
+}
+
+function renderSharingPublicState() {
+  const enabled = Boolean(sharingProject?.publicSharingEnabled);
+  const state = document.getElementById("public-state");
+  if (!state) return;
+  state.textContent = enabled
+    ? "Public sharing is enabled. Anyone with a link can access the selected scope."
+    : "Public sharing is disabled. Create links only after enabling it.";
+  document.getElementById("enable-box").hidden = enabled;
+  document.getElementById("disable-box").hidden = !enabled;
+}
+
+function setSharingTargets() {
+  const scope = document.getElementById("scope").value;
+  const wrap = document.getElementById("target-wrap");
+  wrap.hidden = scope === "project";
+  const select = document.getElementById("target");
+  select.textContent = "";
+  const cards = (sharingDoc?.cards || []).filter((card) =>
+    scope === "column" ? card.type === "column" : true
+  );
+  for (const card of cards) {
+    const option = document.createElement("option");
+    option.value = card.id;
+    option.textContent = `${card.type || "card"} · ${card.text || card.title || card.id}`.slice(0, 80);
+    select.append(option);
+  }
+}
+
+async function loadSharingLinks() {
+  const data = await api(`/api/v1/projects/${sharingProject.id}/shares`);
+  renderSharingLinks(data.shares);
+}
+
+function renderSharingLinks(shares) {
+  const list = document.getElementById("shares");
+  list.textContent = "";
+  const visible = shares.filter((entry) => !entry.revoked);
+  for (const share of visible) {
+    const item = document.createElement("li");
+    item.className = "admin-share-row";
+    const label = document.createElement("span");
+    const expiry = share.expiresAt ? new Date(share.expiresAt).toLocaleDateString() : "no expiry";
+    label.textContent = `${share.scope}${share.targetId ? " · " + share.targetId : ""} · ${
+      share.permission
+    } · ${expiry}`;
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "ky-button ky-button-danger";
+    revoke.textContent = "Revoke";
+    revoke.addEventListener("click", async () => {
+      try {
+        await api(`/api/v1/projects/${sharingProject.id}/shares/${encodeURIComponent(share.id)}`, {
+          method: "DELETE",
+        });
+        sharingStatus("Share link revoked.");
+        await loadSharingLinks();
+      } catch (error) {
+        sharingStatus(error.message);
+      }
+    });
+    item.append(label, revoke);
+    list.append(item);
+  }
+  if (!visible.length) list.textContent = "No share links.";
+}
+
+async function loadSharingProject({ acknowledge = false } = {}) {
+  const projectId = document.getElementById("project").value;
+  const data = await api(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+  sharingProject = data.project;
+  try {
+    sharingDoc = JSON.parse(data.snapshot?.doc || "{}");
+  } catch {
+    sharingDoc = { cards: [] };
+  }
+  document.getElementById("sharing-content").hidden = false;
+  if (acknowledge) document.getElementById("acknowledge").checked = false;
+  renderSharingPublicState();
+  setSharingTargets();
+  await loadSharingLinks();
+}
+
+async function renderSharing() {
+  pane.innerHTML = `<div class="admin-loading">Loading sharing...</div>`;
+  let data;
+  try {
+    data = await api("/api/v1/projects");
+  } catch (error) {
+    if (error instanceof AuthError) return showAuth();
+    pane.innerHTML = "";
+    return showError(error);
+  }
+  pane.innerHTML = `
+    <div class="admin-section">
+      <div class="admin-section-head">
+        <div><h2>Sharing</h2><p>Share a whole project, one card, or a column. Public sharing is off by default and every link is scoped.</p></div>
+        <button class="ky-button ky-button-quiet" id="refresh" type="button">Refresh</button>
+      </div>
+      <label class="admin-field"><span>Project</span><select class="admin-select" id="project"></select></label>
+    </div>
+
+    <div id="sharing-content" hidden>
+      <div class="admin-section">
+        <div class="admin-section-head"><div><h2>Public sharing</h2><p id="public-state" class="admin-note"></p></div></div>
+        <div id="enable-box">
+          <div class="admin-warning">
+            Enabling public sharing allows anyone with a link to view the selected scope. Search engines are excluded, but a copied link is a bearer secret. Do not enable this for private material.
+          </div>
+          <label class="admin-check"><input id="acknowledge" type="checkbox" /> I understand that share links can be forwarded and accessed by anyone who has them.</label>
+          <div class="admin-actions">
+            <button class="ky-button ky-button-primary" id="enable-sharing" type="button">Enable public sharing</button>
+          </div>
+        </div>
+        <div id="disable-box" hidden>
+          <div class="admin-actions">
+            <button id="disable-sharing" type="button" class="ky-button ky-button-danger">Disable and revoke all links</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <div class="admin-section-head"><div><h2>Create a link</h2><p>The raw token is shown once; copy it before leaving this page.</p></div></div>
+        <div class="admin-share-form">
+          <label class="admin-field"><span>Scope</span>
+            <select class="admin-search" id="scope">
+              <option value="project">Whole project</option>
+              <option value="item">One card</option>
+              <option value="column">Column and children</option>
+            </select>
+          </label>
+          <label class="admin-field" id="target-wrap" hidden><span>Target</span><select class="admin-search" id="target"></select></label>
+          <label class="admin-field"><span>Permission</span>
+            <select class="admin-search" id="permission">
+              <option value="view">View</option>
+              <option value="comment">Comment</option>
+              <option value="edit">Edit</option>
+              <option value="manage">Manage</option>
+            </select>
+          </label>
+        </div>
+        <div class="admin-form-grid">
+          <label class="admin-field"><span>Expiry days</span><input class="admin-search" id="expiry" type="number" min="1" max="365" placeholder="Never" /></label>
+          <label class="admin-field"><span>Passphrase</span><input class="admin-search" id="password" type="password" autocomplete="new-password" /></label>
+          <label class="admin-field"><span>Downloads</span><label class="admin-check"><input id="download" type="checkbox" /> Allow asset downloads</label></label>
+        </div>
+        <div class="admin-actions" style="margin-top: 8px">
+          <button class="ky-button ky-button-primary" id="create" type="button">Create share link</button>
+        </div>
+        <p id="token" class="admin-share-token"></p>
+      </div>
+
+      <div class="admin-section">
+        <div class="admin-section-head"><div><h2>Existing links</h2><p>Every link is scoped to the selected project or target.</p></div></div>
+        <ul id="shares" class="admin-share-list"></ul>
+      </div>
+    </div>
+    <p id="status" class="admin-note" role="status"></p>`;
+
+  const projectSelect = document.getElementById("project");
+  for (const project of data.projects || []) {
+    const option = document.createElement("option");
+    option.value = project.id;
+    option.textContent = project.name;
+    projectSelect.append(option);
+  }
+  if (!data.projects?.length) {
+    sharingStatus("Create a project in the app before sharing.");
+  }
+
+  projectSelect.addEventListener("change", async () => {
+    try {
+      await loadSharingProject();
+    } catch (error) {
+      sharingStatus(error.message);
+    }
+  });
+  document.getElementById("refresh").addEventListener("click", async () => {
+    // Rebuild the project list as well: a project may have been created elsewhere since the load.
+    await renderSharing();
+  });
+  document.getElementById("scope").addEventListener("change", setSharingTargets);
+  document.getElementById("enable-sharing").addEventListener("click", async () => {
+    if (!document.getElementById("acknowledge").checked) {
+      sharingStatus("Tick the acknowledgement before enabling public sharing.");
+      return;
+    }
+    try {
+      await api(`/api/v1/projects/${sharingProject.id}/public-sharing`, {
+        method: "POST",
+        body: { enabled: true, acknowledge: true },
+      });
+      sharingStatus("Public sharing enabled.");
+      await loadSharingProject({ acknowledge: true });
+    } catch (error) {
+      sharingStatus(error.message);
+    }
+  });
+  document.getElementById("disable-sharing").addEventListener("click", async () => {
+    try {
+      await api(`/api/v1/projects/${sharingProject.id}/public-sharing`, {
+        method: "POST",
+        body: { enabled: false },
+      });
+      sharingStatus("Public sharing disabled and existing links revoked.");
+      await loadSharingProject({ acknowledge: true });
+    } catch (error) {
+      sharingStatus(error.message);
+    }
+  });
+  document.getElementById("create").addEventListener("click", async () => {
+    try {
+      const scope = document.getElementById("scope").value;
+      const body = {
+        scope,
+        permission: document.getElementById("permission").value,
+        downloadAllowed: document.getElementById("download").checked,
+      };
+      if (scope !== "project") body.targetId = document.getElementById("target").value;
+      if (document.getElementById("expiry").value) {
+        body.expiresInDays = Number(document.getElementById("expiry").value);
+      }
+      if (document.getElementById("password").value) {
+        body.password = document.getElementById("password").value;
+      }
+      const created = await api(`/api/v1/projects/${sharingProject.id}/shares`, {
+        method: "POST",
+        body,
+      });
+      document.getElementById("token").textContent = `Copy this link token now: ${created.token}`;
+      document.getElementById("password").value = "";
+      sharingStatus("Share link created.");
+      await loadSharingLinks();
+    } catch (error) {
+      sharingStatus(error.message);
+    }
+  });
+
+  if (!data.projects?.length) return;
+  try {
+    await loadSharingProject();
+  } catch (error) {
+    sharingStatus(error.message);
+  }
+}
+
+const PAGE_TITLES = {
+  overview: "Overview",
+  accounts: "Accounts",
+  teams: "Teams",
+  activity: "Activity",
+  sharing: "Sharing",
+  account: "Account",
+};
+
 async function go(next) {
+  if (!PAGE_TITLES[next]) next = "overview";
   page = next;
   for (const item of navItems) item.classList.toggle("is-active", item.dataset.page === next);
-  title.textContent = next.charAt(0).toUpperCase() + next.slice(1);
+  title.textContent = PAGE_TITLES[next];
+  try {
+    window.history.replaceState(null, "", next === "overview" ? "/admin" : `/admin#${next}`);
+  } catch {
+    /* the address bar is optional */
+  }
   if (next === "overview") {
     try {
       dashboard = await api("/api/v1/admin/dashboard");
@@ -678,14 +952,21 @@ async function go(next) {
   }
   if (next === "accounts") return renderAccounts();
   if (next === "teams") return renderTeams();
+  if (next === "sharing") return renderSharing();
   if (next === "account") return renderAccount();
   return renderActivity();
 }
 
 function init() {
   initTheme();
+  if (hostBadge) hostBadge.textContent = window.location.host;
   for (const item of navItems) item.addEventListener("click", () => void go(item.dataset.page));
-  void go("overview");
+  // Account settings is intentionally out of the menu for now; the profile button opens it.
+  identity.addEventListener("click", () => {
+    if (!identity.hidden) void go("account");
+  });
+  const initial = window.location.hash.replace(/^#/, "");
+  void go(PAGE_TITLES[initial] && initial !== "account" ? initial : "overview");
 }
 
 init();

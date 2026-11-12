@@ -13,12 +13,17 @@ project uses Semantic Versioning.
   automatic folders are pruned after a successful backup. Manual backups and the folders imported
   through the Backup pane are never removed automatically.
 - The Backup pane describes the retention rule in all ten UI languages.
+- The self-hosted service admin page is now a single dashboard with a top menu bar (Overview,
+  Accounts, Teams, Activity, Sharing), a host badge, a light/dark toggle and a profile button for the
+  account pane. Sharing is rendered inside the dashboard; `/shares` redirects to `/admin#sharing`.
 
 ### Fixed
 
 - Light/dark mode is now a global appearance preference. Opening or switching boards no longer
   applies a legacy theme stored in the board document or dirties the board, so the chosen theme
   stays the same everywhere and after a reload.
+- The Teams pane uses a responsive full-width layout and a compact creation form, and the password
+  fields keep the 24 px control height instead of stretching to the form row.
 
 ### Security
 

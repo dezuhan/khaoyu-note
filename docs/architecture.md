@@ -418,14 +418,14 @@ can be fixed with `KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_POR
 `npm run start:background` launches the pair detached with logs under `<data>/logs`; `npm run stop`
 uses the runtime PID.
 
-The service serves browser pages at `/login`, `/register`, `/reset`, `/passkeys`, `/shares`,
-`/s/:token` and `/admin`. Login, signup and reset are separate centred auth cards using `ky.css` and
+The service serves browser pages at `/login`, `/register`, `/reset`, `/passkeys`, `/s/:token` and
+`/admin`; `/shares` redirects to `/admin#sharing` because sharing is a section of the dashboard. Login, signup and reset are separate centred auth cards using `ky.css` and
 `auth.css`; reset uses the current password and has no email-token step. `/account` redirects to
 `/admin`, where the Account section handles password changes, sessions, API tokens and sign out. The
 admin page uses the normal account session, requires the global admin role and calls
 `/api/v1/admin/dashboard`, `/users`, `/teams` and `/activity`; every mutation goes through the same
-CSRF check and writes `admin.*` audit rows. The page has a left rail and content pane, uses `ky.css`
-tokens for light and dark themes, and shows profile pictures or initials, role and status. The
+CSRF check and writes `admin.*` audit rows. The page uses one top menu bar and a content pane, uses
+`ky.css` tokens for light and dark themes, and shows profile pictures or initials, role and status. The
 operator `KHAOYU_SERVICE_ADMIN_TOKEN` remains only for scripted access to the legacy JSON admin
 endpoints.
 

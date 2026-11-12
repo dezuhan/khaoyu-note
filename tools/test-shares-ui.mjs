@@ -77,11 +77,18 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage();
   page.on("pageerror", (error) => console.log("PAGEERROR", error.message));
-  await page.goto(`${base}/shares`, { waitUntil: "load" });
-  await page.fill("#login-email", email);
-  await page.fill("#login-password", password);
-  await page.click("#login");
-  await page.waitForSelector("#content:not([hidden])");
+  await page.goto(`${base}/login`, { waitUntil: "load" });
+  await page.fill("#email", email);
+  await page.fill("#password", password);
+  await page.click("#login-submit");
+  await page.waitForURL(/\/admin$/);
+  await page.click('.admin-nav-item[data-page="sharing"]');
+  await page.waitForSelector("#project");
+  check(
+    "sharing is rendered inside the admin dashboard",
+    (await page.locator(".admin-menubar .admin-nav-item[data-page=\"sharing\"]").count()) === 1 &&
+      (await page.locator(".admin-menubar .admin-host").count()) === 1
+  );
 
   const projectId = await page.evaluate(async () => {
     const csrf = decodeURIComponent(document.cookie.match(/(?:^|; )khaoyu_csrf=([^;]+)/)[1]);
@@ -111,8 +118,10 @@ try {
     return created.id;
   });
   check("project created through the same session", Boolean(projectId));
-  await page.reload({ waitUntil: "load" });
-  await page.waitForSelector("#content:not([hidden])");
+  await page.click("#refresh");
+  await page.waitForFunction(() =>
+    document.getElementById("public-state")?.textContent.includes("disabled")
+  );
 
   await page.click("#enable-sharing");
   await page.waitForFunction(() => document.getElementById("status").textContent.includes("Tick the acknowledgement"));

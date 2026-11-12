@@ -46,7 +46,8 @@ disabled and its form is hidden. Password reset and invitation mail use SMTP whe
 The service always opens two listeners on different free ports in the 5-digit range 20000 to 59999:
 
 - **Frontend** serves `/login`, `/register`, `/reset`, `/account` (redirects to `/admin`),
-  `/passkeys`, `/shares`, `/s/:token`, `/admin` and the static assets.
+  `/passkeys`, `/s/:token`, `/admin` and the static assets. `/shares` redirects to
+  `/admin#sharing`, because sharing is rendered inside the admin dashboard.
 - **Backend** serves `/api/v1/*`, `/healthz` and `/readyz`; it refuses page requests.
 
 The browser only uses the frontend origin. The frontend proxies `/api`, `/healthz` and `/readyz` to
@@ -194,9 +195,9 @@ node src/cli.mjs invalidate-sessions-postgres --database-url postgres://khaoyu:p
   `backup`, `restore`, `bootstrap` and `invalidate-sessions` work for both dialects. The
   `*-postgres` variants accept an explicit `--database-url` without changing the environment.
 
-`/shares` is the browser sharing page: it lists accessible projects, requires an acknowledgement
-before enabling public sharing, creates project/item/column links, shows a new token once and revokes
-links. The public-sharing API enforces the same acknowledgement with
+`/admin#sharing` is the browser sharing section inside the admin dashboard: it lists accessible
+projects, requires an acknowledgement before enabling public sharing, creates project/item/column
+links, shows a new token once and revokes links. The public-sharing API enforces the same acknowledgement with
 `{"enabled":true,"acknowledge":true}`; omitting it returns 400 `acknowledgement_required`. Disabling
 public sharing revokes every link for that project.
 

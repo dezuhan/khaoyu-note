@@ -284,14 +284,16 @@ sharing endpoints, configuration, backup and upgrade steps are documented in
 
 The service exposes project, item and column share links, passphrase and expiry controls, member
 roles, invitations and ownership transfer. The service pages are `/login`, `/register` and `/reset` for
-auth, `/passkeys`, `/shares`, the admin dashboard at `<frontend URL>/admin`, and a shared link opens
-read-only at `/s/:token`. `/account` redirects to the dashboard, which owns sessions, API tokens,
+auth, `/passkeys`, the admin dashboard at `<frontend URL>/admin`, and a shared link opens
+read-only at `/s/:token`. Sharing is a section of the dashboard; `/shares` redirects to
+`/admin#sharing`. `/account` redirects to the dashboard, which owns sessions, API tokens,
 password changes and sign out. Login, signup and reset use
 separate centred pages; password reset asks for the current password and never sends an email token.
 The first registered account (or the account created by
-`bootstrap`) is the service admin. `/admin` uses the same signed-in session and shows Overview,
-Accounts, Teams and Activity with light and dark themes; admins can create teams, inspect every
-audit row and change another account's role or status. Desktop boards can opt in to server sync from
+`bootstrap`) is the service admin. `/admin` uses the same signed-in session and a top menu bar with
+Overview, Accounts, Teams, Activity and Sharing, a host badge and a global light/dark toggle; the
+profile button opens the Account pane. Sharing is rendered inside the same page. Admins can create
+teams, inspect every audit row and change another account's role or status. Desktop boards can opt in to server sync from
 the Sync control in the topbar: open it,
 enter the service URL and your account email and password, then choose Sign in and connect. Use the
 printed frontend URL, for example `http://127.0.0.1:29194`; a remote host defaults to `https`. The
