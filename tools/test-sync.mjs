@@ -27,6 +27,8 @@ let projectsStatus = 200;
 let readyFails = false;
 let syncLoginStatus = 201;
 let failNextOps = null;
+let nextFieldConflicts = [];
+let lastOpsBody = null;
 const id = "project-sync-test";
 
 function clone(value) {
@@ -150,6 +152,7 @@ globalThis.fetch = async (url, options = {}) => {
       return reply(failure.status, { error: failure.message || "injected", code: failure.code });
     }
     const body = JSON.parse(options.body);
+    lastOpsBody = body;
     const operations = body.ops || [];
     if (operations.some((operation) => appliedOpIds.has(operation.opId))) {
       return reply(200, { idempotent: true, lastSeq: remote.lastSeq, revision: remote.revision, ops: [] });
@@ -162,14 +165,22 @@ globalThis.fetch = async (url, options = {}) => {
       doc = applyMockOperation(doc, operation);
       appliedOpIds.add(operation.opId);
       remote.lastSeq += 1;
-      remoteOps.push({ seq: remote.lastSeq, opId: operation.opId, type: operation.type, payload: operation.payload });
+      remoteOps.push({
+        seq: remote.lastSeq,
+        opId: operation.opId,
+        type: operation.type,
+        payload: operation.payload,
+        clock: operation.clock || {},
+      });
     }
     remote.doc = JSON.stringify(doc);
     remote.revision += 1;
+    const fieldConflicts = nextFieldConflicts.splice(0);
     return reply(200, {
       lastSeq: remote.lastSeq,
       revision: remote.revision,
       idempotent: false,
+      fieldConflicts,
       ops: operations.map((operation, index) => ({ seq: remote.lastSeq - operations.length + 1 + index, opId: operation.opId, type: operation.type })),
     });
   }
@@ -541,6 +552,136 @@ const appliedServerValues = await sync.applyServerFieldValues(conflictBoard);
 assert.equal(appliedServerValues.applied, 1);
 assert.equal(conflictBoard.cards[0].text, "remote edit");
 assert.equal((await sync.readCachedBoard("b1")).fieldConflicts.length, 0);
+
+// Operations carry a causal clock, and the server can report a concurrent field write directly even
+// when no operation replay is needed.
+sync._resetRuntimeForTests();
+await sync.attachRemoteBoard(conflictBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+conflictBoard.cards[0].text = "clocked edit";
+await sync.captureBoardChanges(conflictBoard);
+const clocked = await sync.readCachedBoard("b1");
+const clockedOp = clocked.pendingOps[0];
+assert.ok(clockedOp.clock && Object.keys(clockedOp.clock).length === 1);
+assert.ok(Object.values(clockedOp.clock)[0] >= 1);
+nextFieldConflicts = [
+  {
+    cardId: "cf",
+    field: "text",
+    remoteValue: "server side",
+    remoteSeq: remote.lastSeq + 1,
+    remoteClock: { other: 1 },
+  },
+];
+const clockPush = await sync.flushBoardNow(conflictBoard);
+assert.equal(clockPush.status, "pushed");
+assert.equal((await sync.readCachedBoard("b1")).fieldConflicts.length, 1);
+assert.equal((await sync.readCachedBoard("b1")).fieldConflicts[0].remoteValue, "server side");
+
+// Replaying an operation with a foreign clock merges it, so the next operation is causally after it.
+sync._resetRuntimeForTests();
+await sync.attachRemoteBoard(conflictBoard, {
+  projectId: id,
+  revision: remote.revision,
+  lastSeq: remote.lastSeq,
+  baseDoc: JSON.parse(remote.doc),
+});
+conflictBoard.cards[0].text = "before replay";
+await sync.captureBoardChanges(conflictBoard);
+applyRemoteOperation({
+  type: "card.update",
+  payload: { id: "cf", patch: { text: "clocked remote" } },
+  clock: { otherTab: 1 },
+});
+const replayPush = await sync.flushBoardNow(conflictBoard);
+assert.equal(replayPush.status, "pushed");
+assert.equal((await sync.readCachedBoard("b1")).clock.otherTab, 1);
+conflictBoard.cards[0].text = "after merge";
+await sync.captureBoardChanges(conflictBoard);
+const mergedClock = await sync.readCachedBoard("b1");
+assert.equal(mergedClock.pendingOps[0].clock.otherTab, 1);
+await sync.flushBoardNow(conflictBoard);
+assert.equal(lastOpsBody.ops[0].clock.otherTab, 1);
+
+// Concurrent text edits in different regions merge instead of replacing each other.
+assert.equal(sync.mergeTextValues("hello world", "hi world", "hello there"), "hi there");
+assert.equal(sync.mergeTextValues("hello world", "hello world", "hello there"), "hello there");
+assert.equal(sync.mergeTextValues("hello world", "hi world", "hello world"), "hi world");
+assert.equal(sync.mergeTextValues("same", "same local", "same remote"), null);
+
+sync._resetRuntimeForTests();
+remote.doc = JSON.stringify({
+  id: "b1",
+  title: "Text merge",
+  cards: [{ id: "cf", type: "note", text: "hello world" }],
+  connections: [],
+  trash: [],
+});
+remote.lastSeq = 0;
+remote.revision = 1;
+remoteOps = [];
+appliedOpIds.clear();
+const textBoard = {
+  id: "b1",
+  title: "Text merge",
+  cards: [{ id: "cf", type: "note", text: "hello world" }],
+  connections: [],
+  trash: [],
+  sync: { projectId: id, revision: 1, lastSeq: 0 },
+};
+await sync.attachRemoteBoard(textBoard, {
+  projectId: id,
+  revision: 1,
+  lastSeq: 0,
+  baseDoc: JSON.parse(remote.doc),
+});
+textBoard.cards[0].text = "hi world";
+await sync.captureBoardChanges(textBoard);
+applyRemoteOperation({ type: "card.update", payload: { id: "cf", patch: { text: "hello there" } } });
+const textMerged = await sync.flushBoardNow(textBoard);
+assert.equal(textMerged.status, "pushed");
+assert.equal(JSON.parse(remote.doc).cards[0].text, "hi there");
+assert.equal((await sync.readCachedBoard("b1")).fieldConflicts.length, 0);
+
+// Overlapping text edits cannot merge, so the local value wins and the conflict is reported.
+sync._resetRuntimeForTests();
+remote.doc = JSON.stringify({
+  id: "b1",
+  title: "Text overlap",
+  cards: [{ id: "cf", type: "note", text: "same" }],
+  connections: [],
+  trash: [],
+});
+remote.lastSeq = 0;
+remote.revision = 1;
+remoteOps = [];
+appliedOpIds.clear();
+const overlapBoard = {
+  id: "b1",
+  title: "Text overlap",
+  cards: [{ id: "cf", type: "note", text: "same" }],
+  connections: [],
+  trash: [],
+  sync: { projectId: id, revision: 1, lastSeq: 0 },
+};
+await sync.attachRemoteBoard(overlapBoard, {
+  projectId: id,
+  revision: 1,
+  lastSeq: 0,
+  baseDoc: JSON.parse(remote.doc),
+});
+overlapBoard.cards[0].text = "same local";
+await sync.captureBoardChanges(overlapBoard);
+applyRemoteOperation({ type: "card.update", payload: { id: "cf", patch: { text: "same remote" } } });
+const overlapPush = await sync.flushBoardNow(overlapBoard);
+assert.equal(overlapPush.status, "pushed");
+assert.equal(JSON.parse(remote.doc).cards[0].text, "same local");
+assert.equal((await sync.readCachedBoard("b1")).fieldConflicts.length, 1);
+await sync.dismissFieldConflicts(overlapBoard);
 
 // Queues are per tab: a queue left by another tab is drained instead of being overwritten.
 sync._resetRuntimeForTests();

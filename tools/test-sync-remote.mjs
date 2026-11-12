@@ -221,14 +221,17 @@ try {
   check("status returns to synced", finalStatus === "synced", finalStatus);
 
   // Concurrent same-field edit: the local value wins, but the overlap is reported as a field
-  // conflict with the server value available to apply.
-  await page.route("**/api/v1/**", (route) => route.abort());
-  await page.evaluate(async () => {
+  // conflict with the server value available to apply. The browser is taken offline explicitly and
+  // the capture is awaited, so no autosave timer can race the phase.
+  await context.setOffline(true);
+  const conflictPending = await page.evaluate(async () => {
     const store = await import("/js/store.js");
+    const sync = await import("/js/sync.js");
     store.state.board.cards[0].text = "conflict local";
-    store.markDirty("board");
+    const captured = await sync.captureBoardChanges(store.state.board);
+    return { pending: captured.pending };
   });
-  await page.waitForTimeout(600);
+  check("the local edit is queued offline", conflictPending.pending === 1, JSON.stringify(conflictPending));
   const remoteProject = await (
     await fetch(`${base}/api/v1/projects/${projectId}`, { headers: { authorization: `Bearer ${token}` } })
   ).json();
@@ -247,7 +250,7 @@ try {
     }),
   });
   check("a second client edits the same field", directOp.ok, `status ${directOp.status}`);
-  await page.unroute("**/api/v1/**");
+  await context.setOffline(false);
   await page.evaluate(async () => {
     const sync = await import("/js/sync.js");
     await sync.flushQueue();
@@ -286,6 +289,60 @@ try {
     "the server value can be applied to the editor",
     appliedServer.applied === 1 && appliedServer.text === "conflict remote",
     JSON.stringify(appliedServer)
+  );
+
+  // Concurrent edits in different regions of the same text field merge instead of one replacing the
+  // other.
+  await context.setOffline(true);
+  const mergePending = await page.evaluate(async () => {
+    const store = await import("/js/store.js");
+    const sync = await import("/js/sync.js");
+    store.state.board.cards[0].text = "LOCAL conflict remote";
+    const captured = await sync.captureBoardChanges(store.state.board);
+    return { pending: captured.pending };
+  });
+  check("the second local edit is queued offline", mergePending.pending === 1, JSON.stringify(mergePending));
+  const mergeProject = await (
+    await fetch(`${base}/api/v1/projects/${projectId}`, { headers: { authorization: `Bearer ${token}` } })
+  ).json();
+  const mergeDirect = await fetch(`${base}/api/v1/projects/${projectId}/ops`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      baseSeq: Number(mergeProject.project.lastSeq),
+      ops: [
+        {
+          opId: `merge-remote-${Date.now()}`,
+          type: "card.update",
+          payload: { id: "remote-note", patch: { text: "conflict remote REMOTE" } },
+        },
+      ],
+    }),
+  });
+  check("a second client edits another region of the field", mergeDirect.ok, `status ${mergeDirect.status}`);
+  await context.setOffline(false);
+  await page.evaluate(async () => {
+    const sync = await import("/js/sync.js");
+    await sync.flushQueue();
+  });
+  let mergedTextState = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    mergedTextState = await page.evaluate(async ({ projectId }) => {
+      const sync = await import("/js/sync.js");
+      const store = await import("/js/store.js");
+      const record = await sync.readCachedBoard(projectId);
+      return { text: store.state.board?.cards?.[0]?.text || "", conflicts: record?.fieldConflicts || [] };
+    }, { projectId });
+    if (mergedTextState.text === "LOCAL conflict remote REMOTE") break;
+    await page.waitForTimeout(150);
+  }
+  const mergedRemote = await remoteDoc(base, token, projectId);
+  check(
+    "disjoint text edits merge on both sides",
+    mergedTextState?.text === "LOCAL conflict remote REMOTE" &&
+      mergedRemote?.cards?.[0]?.text === "LOCAL conflict remote REMOTE" &&
+      mergedTextState.conflicts.length === 0,
+    JSON.stringify({ local: mergedTextState, remote: mergedRemote?.cards?.[0]?.text })
   );
 
   check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));

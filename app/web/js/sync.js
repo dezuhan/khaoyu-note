@@ -419,6 +419,42 @@ function serializedBoard(board) {
   return JSON.stringify(copy);
 }
 
+function normalizeClockObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const clock = {};
+  for (const [key, rawCount] of Object.entries(value)) {
+    const count = Number(rawCount);
+    if (!key || !Number.isFinite(count) || count < 0) continue;
+    clock[String(key).slice(0, 80)] = Math.floor(count);
+    if (Object.keys(clock).length >= 64) break;
+  }
+  return clock;
+}
+
+function mergeClockObjects(first, second) {
+  const merged = { ...normalizeClockObject(first) };
+  for (const [key, count] of Object.entries(normalizeClockObject(second))) {
+    merged[key] = Math.max(Number(merged[key] || 0), count);
+  }
+  return merged;
+}
+
+// The server reports a concurrent field write in the ops response. Keep the notice list bounded and
+// de-duplicated by card and field.
+function mergeFieldConflictLists(existing, incoming) {
+  const merged = [];
+  const seen = new Set();
+  for (const conflict of [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])]) {
+    if (!conflict?.cardId || !conflict?.field) continue;
+    const key = `${conflict.cardId}|${conflict.field}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(conflict);
+    if (merged.length >= 50) break;
+  }
+  return merged;
+}
+
 function boardPayload(record) {
   return {
     boardId: record.boardId,
@@ -429,6 +465,7 @@ function boardPayload(record) {
     revision: Number(record.revision || 0),
     lastSeq: Number(record.lastSeq || 0),
     fieldConflicts: Array.isArray(record.fieldConflicts) ? record.fieldConflicts : [],
+    clock: record.clock && typeof record.clock === "object" ? record.clock : {},
     lastSyncedAt: Number(record.lastSyncedAt || 0),
     updatedAt: Date.now(),
   };
@@ -571,6 +608,7 @@ function fromPersisted(persisted, queue, board) {
     ...(persisted || {}),
     pendingOps,
     fieldConflicts: Array.isArray(persisted?.fieldConflicts) ? persisted.fieldConflicts : [],
+    clock: normalizeClockObject(persisted?.clock),
     attempts: Number(queue?.attempts ?? persisted?.attempts ?? 0),
     nextAttemptAt: Number(queue?.nextAttemptAt ?? persisted?.nextAttemptAt ?? 0),
     lastError: String(queue?.lastError ?? persisted?.lastError ?? ""),
@@ -660,6 +698,7 @@ async function ensureAttached(board, info = {}) {
       lastSeq: Number(info.lastSeq ?? board.sync.lastSeq ?? 0),
       pendingOps: [],
       fieldConflicts: [],
+      clock: {},
       attempts: 0,
       nextAttemptAt: 0,
       lastError: "",
@@ -711,11 +750,15 @@ export async function captureBoardChanges(board) {
   record.doc = current;
   record.boardRef = board;
   if (operations.length) {
+    const clock = { ...normalizeClockObject(record.clock) };
+    clock[TAB_ID] = (Number(clock[TAB_ID]) || 0) + 1;
+    record.clock = clock;
     for (const operation of operations) {
       record.pendingOps.push({
         opId: `op-${operationId()}`,
         type: operation.type,
         payload: operation.payload,
+        clock: clone(clock),
         createdAt: Date.now(),
       });
     }
@@ -791,6 +834,7 @@ async function postOperations(record, batch) {
         opId: operation.opId,
         type: operation.type,
         payload: operation.payload,
+        clock: normalizeClockObject(operation.clock || record.clock),
       })),
     },
   });
@@ -847,6 +891,72 @@ async function adoptRecordDocument(record) {
   }
   board.updatedAt = Date.now();
   board.sync = merged.sync;
+}
+
+// A single contiguous change between two strings: the common prefix and suffix are kept and only the
+// middle is replaced. This is the shape produced by normal typing, pasting or deleting a selection.
+function singleTextChange(before, after) {
+  if (typeof before !== "string" || typeof after !== "string" || before === after) return null;
+  let start = 0;
+  const limit = Math.min(before.length, after.length);
+  while (start < limit && before[start] === after[start]) start += 1;
+  let beforeEnd = before.length;
+  let afterEnd = after.length;
+  while (beforeEnd > start && afterEnd > start && before[beforeEnd - 1] === after[afterEnd - 1]) {
+    beforeEnd -= 1;
+    afterEnd -= 1;
+  }
+  return { start, end: beforeEnd, insert: after.slice(start, afterEnd) };
+}
+
+// Three-way merge for a text field: apply the local change on top of the remote value when the two
+// changes are disjoint. Overlapping changes return null and keep the field as a reported conflict.
+export function mergeTextValues(base, local, remote) {
+  if (typeof base !== "string" || typeof local !== "string" || typeof remote !== "string") return null;
+  if (local === base) return remote;
+  if (remote === base) return local;
+  if (local === remote) return local;
+  const localChange = singleTextChange(base, local);
+  const remoteChange = singleTextChange(base, remote);
+  if (!localChange || !remoteChange) return null;
+  const changes = [localChange, remoteChange].sort((first, second) => first.start - second.start);
+  // Two insertions at the same caret are ambiguous: keep the local value and report a conflict.
+  if (
+    changes[0].start === changes[1].start &&
+    changes[0].end === changes[0].start &&
+    changes[1].end === changes[1].start
+  ) {
+    return null;
+  }
+  let cursor = 0;
+  let merged = "";
+  for (const change of changes) {
+    if (change.start < cursor) return null;
+    merged += base.slice(cursor, change.start) + change.insert;
+    cursor = change.end;
+  }
+  return merged + base.slice(cursor);
+}
+
+function applyTextMerges(record, previousBase, remoteBase) {
+  const mergedFields = new Set();
+  for (const operation of record.pendingOps) {
+    if (operation.type !== "card.update") continue;
+    const cardId = operation.payload?.id;
+    const patch = operation.payload?.patch;
+    if (!cardId || !patch) continue;
+    const baseCard = (previousBase.cards || []).find((card) => card.id === cardId);
+    const remoteCard = (remoteBase.cards || []).find((card) => card.id === cardId);
+    if (!baseCard || !remoteCard) continue;
+    for (const field of Object.keys(patch)) {
+      if (typeof patch[field] !== "string") continue;
+      const merged = mergeTextValues(baseCard[field], patch[field], remoteCard[field]);
+      if (merged === null) continue;
+      patch[field] = merged;
+      mergedFields.add(`${cardId}|${field}`);
+    }
+  }
+  return mergedFields;
 }
 
 // Per-field view of the operations that touch card fields, keyed by `cardId|field`. A `*` field
@@ -909,22 +1019,56 @@ function detectFieldConflicts(record, remoteOperations) {
   return conflicts;
 }
 
-async function rebaseFromRemote(record) {
-  const replay = await replayRecordOperations(record, record.lastSeq);
-  const conflicts = detectFieldConflicts(record, replay.ops);
-  if (conflicts.length) record.fieldConflicts = conflicts;
-  if (replay.ops.length) {
-    record.baseDoc = applyBoardOperations(record.baseDoc, replay.ops);
+
+// A record can be updated by the flush conflict path and by the SSE path at the same time. Both read
+// lastSeq and rewrite the merge base, so they are serialized per board.
+function withRecordLock(record, task) {
+  const previous = record.reconcilePromise || Promise.resolve();
+  const next = previous.then(task, task);
+  record.reconcilePromise = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
+// Shared by the conflict rebase and the live SSE path: merge replayed remote operations into the
+// server base, apply the three-way text merge, then rebuild the local document from the merged base
+// plus the still-pending local operations.
+function mergeReplayIntoRecord(record, replay) {
+  const replayed = Array.isArray(replay.ops) ? replay.ops : [];
+  for (const operation of replayed) {
+    if (operation.clock) record.clock = mergeClockObjects(record.clock, operation.clock);
   }
-  // Rebuild the local document from the merged server base plus the still-pending local operations.
-  // Applying the remote operations to the old local document instead would lose remote additions the
-  // local document never saw (for example a card added by another client).
+  if (!replayed.length) {
+    record.lastSeq = Number(replay.lastSeq);
+    if (replay.revision !== undefined) record.revision = Number(replay.revision);
+    return record.doc;
+  }
+  const previousBase = clone(record.baseDoc);
+  const conflicts = detectFieldConflicts(record, replay.ops);
+  const remoteBase = replay.ops.length
+    ? applyBoardOperations(previousBase, replay.ops)
+    : clone(previousBase);
+  const mergedTextFields = applyTextMerges(record, previousBase, remoteBase);
+  record.fieldConflicts = conflicts.filter(
+    (conflict) => !mergedTextFields.has(`${conflict.cardId}|${conflict.field}`)
+  );
+  record.baseDoc = remoteBase;
   record.doc = applyBoardOperations(record.baseDoc, record.pendingOps);
   record.lastSeq = Number(replay.lastSeq);
   if (replay.revision !== undefined) record.revision = Number(replay.revision);
-  await persistRecord(record);
-  applyRecordToBoard(record);
-  await adoptRecordDocument(record);
+  return record.doc;
+}
+
+async function rebaseFromRemote(record) {
+  return withRecordLock(record, async () => {
+    const replay = await replayRecordOperations(record, record.lastSeq);
+    mergeReplayIntoRecord(record, replay);
+    await persistRecord(record);
+    applyRecordToBoard(record);
+    await adoptRecordDocument(record);
+  });
 }
 
 async function resyncFromSnapshot(record) {
@@ -1065,6 +1209,10 @@ function flushRecord(record) {
           return outcome;
         }
         record.baseDoc = applyBoardOperations(record.baseDoc, batch);
+        record.clock = mergeClockObjects(record.clock, batch[0]?.clock || {});
+        if (Array.isArray(result.fieldConflicts) && result.fieldConflicts.length) {
+          record.fieldConflicts = mergeFieldConflictLists(record.fieldConflicts, result.fieldConflicts);
+        }
         record.lastSeq = Number(result.lastSeq ?? record.lastSeq);
         record.revision = Number(result.revision ?? record.revision);
         record.pendingOps = record.pendingOps.slice(batch.length);
@@ -1420,31 +1568,31 @@ export async function consumeRemoteOperations(board) {
   if (!syncEnabled(board)) return { status: "disabled" };
   const record = await ensureAttached(board);
   try {
-    const replay = await replayRecordOperations(record, record.lastSeq);
-    if (!replay.ops.length) return { status: "current", lastSeq: record.lastSeq };
-    const conflicts = detectFieldConflicts(record, replay.ops);
-    if (conflicts.length) record.fieldConflicts = conflicts;
-    record.baseDoc = applyBoardOperations(record.baseDoc, replay.ops);
-    record.doc = applyBoardOperations(record.baseDoc, record.pendingOps);
-    record.lastSeq = Number(replay.lastSeq);
-    if (replay.revision !== undefined) record.revision = Number(replay.revision);
-    record.lastSyncedAt = Date.now();
-    record.conflict = false;
-    await persistRecord(record);
-    emitStatus(record);
-    const doc = applyBoardOperations(documentFromBoard(board), replay.ops);
-    // Viewport/theme are per-device preferences, not shared board content.
-    for (const key of ["view", "grid", "showGrid", "theme"]) {
-      if (board[key] !== undefined) doc[key] = clone(board[key]);
-    }
-    doc.sync = { ...board.sync };
-    return { status: "applied", doc, lastSeq: record.lastSeq };
+    return await withRecordLock(record, async () => {
+      // A live remote operation can arrive while local edits are still unsaved. Capture them first so
+      // the adoption below merges both sides and the queue keeps the local changes.
+      await captureBoardChanges(board);
+      const replay = await replayRecordOperations(record, record.lastSeq);
+      if (!replay.ops.length) return { status: "current", lastSeq: record.lastSeq };
+      mergeReplayIntoRecord(record, replay);
+      record.lastSyncedAt = Date.now();
+      record.conflict = false;
+      await persistRecord(record);
+      emitStatus(record);
+      const doc = clone(record.doc);
+      // Viewport/theme are per-device preferences, not shared board content.
+      for (const key of ["view", "grid", "showGrid", "theme"]) {
+        if (board[key] !== undefined) doc[key] = clone(board[key]);
+      }
+      doc.sync = { ...board.sync };
+      return { status: "applied", doc, lastSeq: record.lastSeq };
+    });
   } catch (error) {
     if (error.code === "resync_required") {
       if (record.pendingOps.length) {
         // Keep the queued local edits: reload the snapshot and replay them on top instead of
         // pulling (which would silently drop the queue).
-        await resyncFromSnapshot(record);
+        await withRecordLock(record, () => resyncFromSnapshot(record));
         const doc = clone(record.doc);
         doc.id = board.id;
         for (const key of ["view", "grid", "showGrid", "theme"]) {
@@ -1563,6 +1711,9 @@ export async function pushBoard(board) {
   const baseSeq = Number(record.lastSeq || 0);
   const doc = JSON.parse(serializedBoard(board));
   const pendingBefore = record.pendingOps.length;
+  const clock = { ...normalizeClockObject(record.clock) };
+  clock[TAB_ID] = (Number(clock[TAB_ID]) || 0) + 1;
+  record.clock = clock;
   const result = await api(`/api/v1/projects/${record.projectId}/ops`, {
     serverUrl: record.serverUrl,
     timeoutMs: 30000,
@@ -1574,6 +1725,7 @@ export async function pushBoard(board) {
           opId: `client-${operationId()}`,
           type: "doc.replace",
           payload: { doc },
+          clock: clone(clock),
         },
       ],
     },
