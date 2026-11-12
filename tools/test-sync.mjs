@@ -18,7 +18,7 @@ class MemoryStorage {
 
 globalThis.localStorage = new MemoryStorage();
 const calls = [];
-let remote = { revision: 0, doc: null };
+let remote = { revision: 0, doc: null, lastSeq: 0 };
 let offline = false;
 let readyStatus = 200;
 let projectsStatus = 200;
@@ -66,14 +66,27 @@ globalThis.fetch = async (url, options = {}) => {
     );
   }
   if (method === "POST" && path === "/api/v1/projects") {
-    remote = { revision: 1, doc: null };
-    return reply(201, { id, title: "Board", revision: 1, role: "owner" });
+    remote = { revision: 1, doc: null, lastSeq: 0 };
+    return reply(201, { id, title: "Board", revision: 1, lastSeq: 0, role: "owner" });
   }
   if (method === "GET" && path === `/api/v1/projects/${id}`) {
     return reply(200, {
-      project: { id, revision: remote.revision },
+      project: { id, revision: remote.revision, lastSeq: remote.lastSeq },
       snapshot: remote.doc ? { revision: remote.revision, doc: remote.doc } : null,
     });
+  }
+  if (method === "POST" && path === `/api/v1/projects/${id}/ops`) {
+    const body = JSON.parse(options.body);
+    if (Number(body.baseSeq) !== Number(remote.lastSeq)) {
+      return reply(409, { error: "sequence conflict", code: "seq_conflict" });
+    }
+    const doc = body.ops?.[0]?.payload?.doc;
+    remote = {
+      revision: remote.revision + 1,
+      doc: doc ? JSON.stringify(doc) : remote.doc,
+      lastSeq: remote.lastSeq + 1,
+    };
+    return reply(200, { lastSeq: remote.lastSeq, revision: remote.revision, idempotent: false });
   }
   if (method === "PUT" && path === `/api/v1/projects/${id}/snapshot`) {
     const body = JSON.parse(options.body);
@@ -196,6 +209,7 @@ assert.equal(JSON.parse(remote.doc).cards[0].text, "hello");
 
 remote = {
   revision: 4,
+  lastSeq: 2,
   doc: JSON.stringify({ id: "server-board", title: "Server", cards: [], updatedAt: 3000 }),
 };
 board.updatedAt = board.sync.lastSyncedAt - 1;
@@ -207,6 +221,7 @@ board.sync = pulled.doc.sync;
 
 remote = {
   revision: 5,
+  lastSeq: 2,
   doc: JSON.stringify({ id: "server-board", title: "Remote change", cards: [], updatedAt: 4000 }),
 };
 board.updatedAt = board.sync.lastSyncedAt + 1000;

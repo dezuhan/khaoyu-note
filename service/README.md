@@ -129,7 +129,7 @@ a migration is pending.
 | `KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS` | `60000` | Lifetime of a single-use SSE ticket. |
 | `KHAOYU_SERVICE_EDIT_LOCK_TTL_MS` | `15000` | Advisory edit-lock lifetime. |
 | `KHAOYU_SERVICE_OP_RETENTION_DAYS` | `7` | Operation-log retention before clients must resync. |
-| `KHAOYU_SERVICE_COMPACT_OPS` | `100` | Reserved for the planned operation-log compaction phase; not used yet. |
+| `KHAOYU_SERVICE_COMPACT_OPS` | `100` | Operation-log rows retained per project; older rows are compacted by the worker. |
 | `KHAOYU_SERVICE_COMPACT_MS` | `30000` | Reserved for the planned operation-log compaction phase; not used yet. |
 | `KHAOYU_SERVICE_FRONTEND_PORT` | random 5-digit | Frontend listener port (pages and API proxy). |
 | `KHAOYU_SERVICE_BACKEND_PORT` | random 5-digit | Backend listener port (API and health only). |
@@ -178,8 +178,9 @@ existing objects first.
 The multi-user team profile uses PostgreSQL as the system of record and Redis for cross-instance SSE
 fanout, single-use SSE tickets, global presence, advisory edit locks, the operation log and the worker
 leader lock.
-PostgreSQL storage, backup/restore, operation log and CLI commands are in place. Cursor/selection
-presence and the desktop client operation-sync integration are still to be implemented. The remaining phases are recorded in
+PostgreSQL storage, backup/restore, operation log and CLI commands are in place. The desktop/web sync
+client writes `doc.replace` operations and listens to the ticket-authenticated SSE stream; cursor and
+selection presence are still to be implemented. The remaining phases are recorded in
 [docs/backend-postgres-redis.md](../docs/backend-postgres-redis.md).
 
 - `single-user` keeps SQLite and needs no PostgreSQL or Redis.

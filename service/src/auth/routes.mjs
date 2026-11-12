@@ -2950,6 +2950,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             id: project.id,
             name: project.name,
             revision: project.revision,
+            lastSeq: Number(project.last_seq || 0),
             role,
             parentProjectId: project.parent_project_id,
             publicSharingEnabled: Boolean(project.public_sharing_enabled),

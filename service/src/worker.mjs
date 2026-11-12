@@ -102,6 +102,26 @@ async function pruneTokens(db, config = {}) {
   };
 }
 
+async function compactOperationLogs(db, limit) {
+  const keep = Math.max(1, Number(limit) || 100);
+  let removed = 0;
+  const projects = await db.all("SELECT project_id, COUNT(*) AS count FROM project_ops GROUP BY project_id");
+  for (const project of projects) {
+    if (Number(project.count) <= keep) continue;
+    const cutoff = await db.get(
+      "SELECT seq FROM project_ops WHERE project_id = ? ORDER BY seq DESC LIMIT 1 OFFSET ?",
+      [project.project_id, keep - 1]
+    );
+    if (!cutoff) continue;
+    const result = await db.run("DELETE FROM project_ops WHERE project_id = ? AND seq < ?", [
+      project.project_id,
+      Number(cutoff.seq),
+    ]);
+    removed += Number(result.changes || 0);
+  }
+  return removed;
+}
+
 async function pruneVersions(db) {
   let removed = 0;
   const projects = (await db.all("SELECT id FROM projects", []));
@@ -118,6 +138,7 @@ export async function runMaintenance(db, config, logger) {
   const audit = (await db.run("DELETE FROM audit_log WHERE created_at < ?", [Date.now() - config.auditRetentionDays * 86_400_000]));
   const purged = await purgeDeletedAccounts(db, logger, config);
   const tokens = await pruneTokens(db, config);
+  const compactedOps = await compactOperationLogs(db, config.compactOps);
   await pruneLoginAttempts(db, 30);
 
   const last = (await db.get("SELECT value FROM service_meta WHERE key = 'last_backup_at'", []));
@@ -150,6 +171,7 @@ export async function runMaintenance(db, config, logger) {
     tempRemoved,
     auditRemoved: Number(audit.changes || 0),
     tokens,
+    compactedOps,
     backup: backup ? path.basename(backup.directory) : null,
   }).slice(0, 4000);
   await db.run(
@@ -160,13 +182,14 @@ export async function runMaintenance(db, config, logger) {
     "INSERT INTO service_meta (key, value) VALUES ('last_worker_summary', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     [summary]
   );
+  if (compactedOps) logger.info("operations.compacted", { removed: compactedOps });
   if (tokens.expiredInvitations || tokens.expiredShareLinks) {
     logger.info("sharing.expired", {
       invitations: tokens.expiredInvitations,
       shareLinks: tokens.expiredShareLinks,
     });
   }
-  return { tempRemoved, auditRemoved: Number(audit.changes || 0), backup, tokens };
+  return { tempRemoved, auditRemoved: Number(audit.changes || 0), backup, tokens, compactedOps };
 }
 
 export function startWorker(db, config, logger, intervalMs = 60_000, mailer = null, coordination = null) {

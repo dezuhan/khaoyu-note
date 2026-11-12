@@ -347,6 +347,7 @@ function enqueue(board) {
     boardId: board.id,
     projectId: board.sync.projectId,
     baseRevision: board.sync.revision,
+    baseSeq: Number(board.sync.lastSeq || 0),
     doc: serializedBoard(board),
     queuedAt: Date.now(),
   });
@@ -379,6 +380,7 @@ export async function enableBoardSync(board) {
     board.sync = {
       projectId: created.id,
       revision: created.revision || 1,
+      lastSeq: 0,
       lastSyncedAt: 0,
     };
   }
@@ -387,16 +389,26 @@ export async function enableBoardSync(board) {
 
 export async function pushBoard(board) {
   if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
-  const baseRevision = board.sync.revision;
-  const result = await api(`/api/v1/projects/${board.sync.projectId}/snapshot`, {
-    method: "PUT",
-    body: { doc: serializedBoard(board), revision: baseRevision },
+  const baseSeq = Number(board.sync.lastSeq || 0);
+  const result = await api(`/api/v1/projects/${board.sync.projectId}/ops`, {
+    method: "POST",
+    body: {
+      baseSeq,
+      ops: [
+        {
+          opId: `client-${crypto.randomUUID()}`,
+          type: "doc.replace",
+          payload: { doc: JSON.parse(serializedBoard(board)) },
+        },
+      ],
+    },
   });
   board.sync.revision = result.revision;
+  board.sync.lastSeq = result.lastSeq;
   board.sync.lastSyncedAt = Date.now();
   board.sync.conflict = null;
   clearQueue(board.id);
-  return { status: "pushed", revision: result.revision };
+  return { status: "pushed", revision: result.revision, lastSeq: result.lastSeq };
 }
 
 export async function pullBoard(board) {
@@ -407,7 +419,13 @@ export async function pullBoard(board) {
   if (revision <= board.sync.revision) return { status: "current", revision };
   const doc = JSON.parse(remote.snapshot.doc);
   doc.id = board.id;
-  doc.sync = { ...board.sync, revision, lastSyncedAt: Date.now(), conflict: null };
+  doc.sync = {
+    ...board.sync,
+    revision,
+    lastSeq: Number(remote.project.lastSeq ?? board.sync.lastSeq ?? 0),
+    lastSyncedAt: Date.now(),
+    conflict: null,
+  };
   return { status: "pulled", revision, doc };
 }
 
@@ -432,7 +450,20 @@ export async function syncBoard(board) {
   const baseRevision = Number(board.sync.revision || 0);
   const localChanged = Number(board.updatedAt || 0) > Number(board.sync.lastSyncedAt || 0);
   if (remoteRevision <= baseRevision) {
-    if (localChanged) return pushBoard(board);
+    if (localChanged) {
+      try {
+        return await pushBoard(board);
+      } catch (error) {
+        if (error.code !== "seq_conflict") throw error;
+        const latest = await api(`/api/v1/projects/${board.sync.projectId}`);
+        return {
+          status: "conflict",
+          remoteRevision: Number(latest.project.revision),
+          baseRevision,
+          remoteDoc: latest.snapshot?.doc ? JSON.parse(latest.snapshot.doc) : null,
+        };
+      }
+    }
     return { status: "current", revision: baseRevision };
   }
   if (!localChanged) return pullBoard(board);
@@ -444,6 +475,42 @@ export async function syncBoard(board) {
   };
 }
 
+export async function fetchOps(board, after = 0) {
+  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
+  return api(`/api/v1/projects/${board.sync.projectId}/ops?after=${encodeURIComponent(String(after))}`);
+}
+
+// Opens the single-use-ticket SSE stream for a synced board. The caller decides whether to adopt a
+// remote document; the stream itself only reports that a change is available.
+export async function openRealtime(board, { onUpdate, onStatus } = {}) {
+  if (!syncEnabled(board)) throw new Error("Sync is not enabled for this board");
+  if (typeof EventSource === "undefined") return { close() {}, supported: false };
+  const config = requireConfig();
+  const ticket = await api(`/api/v1/projects/${board.sync.projectId}/realtime-ticket`, {
+    method: "POST",
+  });
+  const source = new EventSource(
+    `${config.url}/api/v1/projects/${board.sync.projectId}/events?ticket=${encodeURIComponent(ticket.token)}`
+  );
+  for (const type of ["ops", "snapshot", "presence"]) {
+    source.addEventListener(type, (event) => {
+      try {
+        onUpdate?.({ type, data: JSON.parse(event.data) });
+      } catch {
+        onUpdate?.({ type, data: null });
+      }
+    });
+  }
+  source.onerror = () => onStatus?.("offline");
+  source.onopen = () => onStatus?.("connected");
+  return {
+    supported: true,
+    close() {
+      source.close();
+    },
+  };
+}
+
 export async function flushQueue() {
   const queue = loadQueue();
   if (!queue.length) return { flushed: 0 };
@@ -451,9 +518,18 @@ export async function flushQueue() {
   let flushed = 0;
   for (const entry of queue) {
     try {
-      const result = await api(`/api/v1/projects/${entry.projectId}/snapshot`, {
-        method: "PUT",
-        body: { doc: entry.doc, revision: entry.baseRevision },
+      const result = await api(`/api/v1/projects/${entry.projectId}/ops`, {
+        method: "POST",
+        body: {
+          baseSeq: Number(entry.baseSeq || 0),
+          ops: [
+            {
+              opId: `offline-${crypto.randomUUID()}`,
+              type: "doc.replace",
+              payload: { doc: JSON.parse(entry.doc) },
+            },
+          ],
+        },
       });
       void result;
       flushed += 1;

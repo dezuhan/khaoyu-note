@@ -8,6 +8,9 @@ let refs = null;
 let overlay = null;
 let autoTimer = 0;
 let running = false;
+let realtime = null;
+let realtimeBoardId = null;
+let realtimeStarting = false;
 
 function toast(message) {
   window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message } }));
@@ -20,6 +23,15 @@ export function initSyncUI(uiRefs) {
   window.addEventListener("online", () => {
     sync.flushQueue().finally(refresh);
   });
+  window.addEventListener("beforeunload", closeRealtime);
+  if (localStorage.getItem("mn.setupCollaboration") === "1") {
+    localStorage.removeItem("mn.setupCollaboration");
+    const openAfterBoard = (attempt = 0) => {
+      if (state.board) openSyncDialog();
+      else if (attempt < 20) setTimeout(() => openAfterBoard(attempt + 1), 250);
+    };
+    setTimeout(() => openAfterBoard(), 500);
+  }
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && overlay) closeDialog();
   });
@@ -38,6 +50,67 @@ export function refresh() {
     status.status === "synced" ? status.message : status.message || "Sync";
   refs.syncState.dataset.status = status.status;
   if (overlay) renderStatus();
+  ensureRealtime();
+}
+
+function closeRealtime() {
+  realtime?.close?.();
+  realtime = null;
+  realtimeBoardId = null;
+  realtimeStarting = false;
+}
+
+function ensureRealtime() {
+  const board = state.board;
+  if (!board || !sync.syncEnabled(board) || !sync.loadSyncConfig().token) {
+    closeRealtime();
+    return;
+  }
+  if (realtimeBoardId === board.id || realtimeStarting) return;
+  closeRealtime();
+  realtimeStarting = true;
+  sync
+    .openRealtime(board, {
+      onUpdate: async ({ type, data }) => {
+        if (type === "presence") {
+          if (Number.isFinite(Number(data?.accounts))) {
+            refs?.syncState?.setAttribute("data-presence", String(data.accounts));
+          }
+          return;
+        }
+        if (type !== "ops" && type !== "snapshot") return;
+        if (state.dirty) {
+          if (state.board) state.board.sync.conflict = true;
+          refresh();
+          return;
+        }
+        try {
+          const pulled = await sync.pullBoard(state.board);
+          if (pulled.status === "pulled") {
+            await adoptRemoteBoard(pulled.doc);
+            await persistBoardSnapshot();
+          }
+          refresh();
+        } catch {
+          /* the normal sync pass will surface errors */
+        }
+      },
+      onStatus: (status) => {
+        if (status === "offline") {
+          closeRealtime();
+          setTimeout(ensureRealtime, 4000);
+        }
+      },
+    })
+    .then((handle) => {
+      realtimeStarting = false;
+      if (!handle?.supported) return;
+      realtime = handle;
+      realtimeBoardId = board.id;
+    })
+    .catch(() => {
+      realtimeStarting = false;
+    });
 }
 
 function onBoardSaved(event) {

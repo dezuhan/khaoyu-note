@@ -12,6 +12,9 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   is rate limited to 20 requests per 15-minute window per owner and IP.
 - **Global light/dark theme**: the theme is now an app-wide preference. Boards no longer store or
   apply their own theme, so switching boards or reloading keeps the chosen mode.
+- **Collaboration client**: sync now writes `doc.replace` operations with sequence tracking and
+  refreshes clean boards from the ticket-authenticated SSE stream; the setup wizard enables the
+  Collaboration path and opens Server sync.
 - **Sharing hardening**: optional share-view watermark and per-link download caps, server-side rich
   HTML sanitisation, exact remote-embed host allowlists, optional AES-256-GCM object encryption and
   a data-only PostgreSQL deployment script.

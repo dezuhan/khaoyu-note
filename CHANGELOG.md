@@ -42,6 +42,11 @@ project uses Semantic Versioning.
 - Project sync gained an operation log: `POST /projects/:id/ops` applies idempotent operation batches
   with per-project sequence numbers, `GET /projects/:id/ops?after=` replays or asks for a resync, and
   worker retention keeps the log bounded.
+- The desktop/web sync client now pushes `doc.replace` operations with `baseSeq`, tracks `lastSeq`,
+  opens the ticket-authenticated SSE stream and refreshes a clean board when a remote operation or
+  snapshot arrives. The setup wizard enables the Collaboration path and hands off to Server sync.
+- The worker compacts operation rows beyond `KHAOYU_SERVICE_COMPACT_OPS` and continues to prune by
+  retention age.
 - The realtime backend now issues single-use SSE tickets, aggregates presence globally through Redis,
   provides advisory edit locks with TTL/heartbeat, runs maintenance behind a Redis worker leader lock,
   and reports `realtime: ok/degraded` from `/readyz`. Migration 015 / PostgreSQL 003 adds

@@ -23,6 +23,8 @@ Implemented in this repository:
   advisory edit locks;
 - per-project operation log with idempotent batches, sequence conflicts and replay/resync;
 - worker leader lock and readiness reporting PostgreSQL plus realtime `ok/degraded`;
+- desktop/web sync writes operation batches and refreshes from ticket-authenticated SSE; worker
+  compacts old operation rows;
 - team Docker profile with PostgreSQL and Redis and fail-closed configuration;
 - service auth, sharing scopes, memberships, audit log and security tests.
 
@@ -36,8 +38,8 @@ Not ready for a production team deployment:
 3. External penetration testing and production-scale load tests are outstanding.
 4. [verified 2026-11-12] Two-instance PostgreSQL 18 + Redis validation passed for ticket-authenticated
    SSE, global presence, operation propagation/replay, cross-instance lock conflict and readiness.
-   The desktop/web client still needs to consume the operation protocol; cursor/selection presence
-   and snapshot compaction remain pending.
+   The desktop/web client writes operations and refreshes from SSE; granular per-card diffs,
+   cursor/selection presence and full production load testing remain pending.
 5. Asset storage is local to the service instance; shared/object storage and asset migration are not
    production-ready.
 6. Object/backup encryption and a least-privilege PostgreSQL role script are implemented; encrypted

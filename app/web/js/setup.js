@@ -68,7 +68,7 @@ export async function initSetupGate() {
             <p class="mn-setup-lead">Choose how this installation will store its boards.</p>
             <div class="mn-setup-options" role="radiogroup" aria-label="Storage mode">
               ${option("single", "Single user", "One local database. No Redis, no account required.", mode === "single", "mode", "mode")}
-              ${option("collaboration", "Collaboration", "PostgreSQL + Redis, accounts, sharing and a team service. Disabled until the admin dashboard is ready.", mode === "collaboration", "mode", "mode", true)}
+              ${option("collaboration", "Collaboration", "Local board plus a team service with PostgreSQL, Redis, accounts and sharing. Connect from Server sync after setup.", mode === "collaboration", "mode", "mode")}
             </div>
             ${nav(null, "mode-next", !mode)}
           </div>`;
@@ -93,9 +93,16 @@ export async function initSetupGate() {
             <p class="mn-setup-lead">${
               isTurso
                 ? "Turso support is on the roadmap. This build keeps the local SQLite database."
-                : "Collaboration needs the self-hosted service with PostgreSQL and Redis. This local web host cannot switch to it from here."
+                : "This device keeps a local database and connects the board to the team service through Server sync (PostgreSQL + Redis on the service). Continue, then sign in to the service from the sync dialog."
             }</p>
-            ${nav(isTurso ? "storage" : "mode", "unavailable", true)}
+            ${
+              isTurso
+                ? nav("storage", "unavailable", true)
+                : `<div class="mn-setup-nav">
+                    <button type="button" class="mn-btn" data-back="mode">Back</button>
+                    <button type="button" class="mn-btn mn-btn-primary" data-collaboration>Continue to Server sync</button>
+                  </div>`
+            }
           </div>`;
       }
 
@@ -119,6 +126,17 @@ export async function initSetupGate() {
             step = target;
             render();
           }
+        });
+      }
+      const collaboration = modal.querySelector("[data-collaboration]");
+      if (collaboration) {
+        collaboration.addEventListener("click", () => {
+          try {
+            localStorage.setItem("mn.setupCollaboration", "1");
+          } catch {
+            /* private mode */
+          }
+          finishLocal();
         });
       }
       const next = modal.querySelector("[data-next]");
