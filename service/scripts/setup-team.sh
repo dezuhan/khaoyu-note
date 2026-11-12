@@ -76,19 +76,21 @@ curl -fsS "http://127.0.0.1:${KHAOYU_SERVICE_PUBLISH_PORT:-18080}/readyz" || {
 }
 echo
 
-if [[ "$CREATED_ENV" == "1" ]]; then
-  echo "Creating the first owner account..."
-  BOOTSTRAP_OUTPUT="$($COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml exec -T service \
-    node src/cli.mjs bootstrap-postgres)"
-  if echo "$BOOTSTRAP_OUTPUT" | grep -q '"createdAccount": true'; then
-    echo "First owner email: ${KHAOYU_BOOTSTRAP_EMAIL}"
-    echo "First owner password: ${KHAOYU_BOOTSTRAP_PASSWORD}"
-    echo "Change this password immediately after signing in."
-  else
-    echo "Owner already exists in PostgreSQL; bootstrap password was not changed."
-  fi
+# Always run the idempotent bootstrap after startup. This also handles a first run that failed after
+# creating .env.team but before the database existed: the owner is created and the generated password
+# is printed exactly once.
+echo "Ensuring the first owner account..."
+BOOTSTRAP_OUTPUT="$($COMPOSE --env-file "$ENV_FILE" -f docker-compose.team.yml exec -T service \
+  node src/cli.mjs bootstrap-postgres)"
+if echo "$BOOTSTRAP_OUTPUT" | grep -q '"createdAccount": true'; then
+  echo
+  echo "First owner login"
+  echo "  email:    ${KHAOYU_BOOTSTRAP_EMAIL}"
+  echo "  password: ${KHAOYU_BOOTSTRAP_PASSWORD}"
+  echo "Change this password immediately after signing in."
 else
-  echo "Existing $ENV_FILE reused; owner password was not changed."
+  echo "Owner already exists in PostgreSQL; the existing password was not changed."
+  echo "If you lost it, use the service password-reset flow or the owner account in the admin dashboard."
 fi
 
 if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
