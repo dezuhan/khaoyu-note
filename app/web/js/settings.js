@@ -14,7 +14,7 @@ import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } 
 import { icon } from "./icons.js";
 import { LANGUAGES, getLanguage, setLanguage, t } from "./i18n.js";
 import { toolDisabledReason } from "./limits.js";
-import { exportCurrentBoard, history, notify, setTheme, state } from "./store.js";
+import { exportCurrentBoard, history, notify, setTheme, state, prepareForReset } from "./store.js";
 import { checkConnection, describeConnection, loadSyncConfig, saveSyncConfig, signOut } from "./sync.js";
 import { currentVersion, initCurrentVersion, releaseSummary } from "./update.js";
 import { openSyncDialog } from "./sync-ui.js";
@@ -727,6 +727,7 @@ function pages() {
               confirmLabel: "Reset everything",
             });
             if (!confirmed) return;
+            prepareForReset();
             try {
               await bridge.resetAllData();
               for (const key of Object.keys(localStorage)) {
@@ -737,6 +738,8 @@ function pages() {
               window.location.reload();
             } catch (error) {
               setStatus(error?.message || "Could not reset the app data.");
+              // The in-memory state was cleared; reload to restore it from the database.
+              setTimeout(() => window.location.reload(), 1500);
             }
           },
         },
@@ -1294,6 +1297,7 @@ function accountDeleteTab(pane) {
     password.disabled = true;
     confirmation.disabled = true;
     status.textContent = "Deleting the local database...";
+    prepareForReset();
     try {
       await bridge.authResetDatabase({
         password: password.value,
@@ -1310,6 +1314,7 @@ function accountDeleteTab(pane) {
       submit.disabled = false;
       password.disabled = false;
       confirmation.disabled = false;
+      setTimeout(() => window.location.reload(), 1500);
     }
   });
 

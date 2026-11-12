@@ -143,6 +143,7 @@ let saveTimer = 0;
 let retryTimer = 0;
 let retryDelay = 1000;
 let saveInFlight = false;
+let resetInProgress = false;
 
 // Autosave waits for the user to stop editing. Web/mobile viewers save sooner so another window
 // receives the SSE update quickly; desktop keeps the calmer five-second idle window.
@@ -158,7 +159,7 @@ export function markDirty(kind = "board") {
 }
 
 export function scheduleSave() {
-  if (!state.board) return;
+  if (resetInProgress || !state.board) return;
   state.dirty = true;
   if (!autoSaveEnabled()) {
     state.saveState = "unsaved";
@@ -210,8 +211,26 @@ function dispatchConflict(conflict) {
   );
 }
 
+// Called by the destructive reset flows before the native/web database is wiped. The in-memory
+// board must not be written back by an autosave or beforeunload handler during the reload.
+export function prepareForReset() {
+  resetInProgress = true;
+  clearTimeout(saveTimer);
+  clearTimeout(retryTimer);
+  saveTimer = 0;
+  retryTimer = 0;
+  state.dirty = false;
+  state.viewDirty = false;
+  state.conflict = null;
+  state.board = null;
+  state.boards = [];
+  state.selection = new Set();
+  state.editing = null;
+  state.loaded = false;
+}
+
 export async function saveNow() {
-  if (!state.board) return;
+  if (resetInProgress || !state.board) return;
   if (state.conflict) {
     // Keep asking the user to resolve the conflict instead of overwriting either version.
     // A pan or zoom alone must not interrupt them with a dialog; that view is simply not saved.

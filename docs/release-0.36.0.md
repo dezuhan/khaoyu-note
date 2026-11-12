@@ -24,6 +24,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   keeping the card frame and Load more button visible.
 - **Passkey kill switch**: `KHAOYU_SERVICE_PASSKEYS_ENABLED=false` hides passkey UI and disables the
   passkey endpoints while leaving password, TOTP and backup-code login available.
+- **Reliable app-data reset**: reset suppresses autosave/beforeunload writes and clears in-memory
+  state before reloading, so boards cannot reappear after a reset.
 - **Fast reinstall**: `reinstall-team.sh` wraps uninstall + install, with a safe data-retaining default
   and an explicit `--purge` path.
 - **Separate public-view domain**: the installer now captures backend and public-share origins and

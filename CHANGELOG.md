@@ -104,6 +104,10 @@ project uses Semantic Versioning.
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
 - Added `scripts/reinstall-team.sh` for a fast uninstall + install cycle: the default keeps
   PostgreSQL/service data and `.env.team`, while `--purge` performs a destructive fresh reinstall.
+- Desktop/web "Reset app data" now prepares the store before wiping: autosave timers and the
+  beforeunload save are suppressed, in-memory boards are detached, and a failed reset reloads the
+  existing data instead of leaving a blank session. This prevents a pending save from writing the old
+  board back after the database was cleared.
 - The installer normalizes bare domains to `https://` and validates both public URLs before
   starting Compose, preventing a service restart loop from a URL without a scheme.
 - The team installer now accepts separate backend/admin and public-view/share domains, and writes
