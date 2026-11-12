@@ -284,16 +284,30 @@ const rowResizedMetrics = await page.evaluate(async (columnId) => {
   const column = state.board.cards.find((card) => card.id === columnId);
   return {
     width: column.w,
-    extraWidth: Number(column.extraWidth || 0),
+    fitChildren: Boolean(column.fitChildren),
     childWidths: columnChildren(state.board, columnId).map((child) => child.w),
   };
 }, firstColumnId);
 check(
-  "Auto-width rows can still be resized without changing child widths",
+  "Resizing a row switches it from auto-size to stretched child widths",
   rowResizedMetrics.width > rowResizeMetrics.width + 60 &&
-    rowResizedMetrics.extraWidth > 0 &&
-    JSON.stringify(rowResizedMetrics.childWidths) === JSON.stringify(rowResizeMetrics.childWidths),
-  `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)} extra ${rowResizedMetrics.extraWidth}`
+    rowResizedMetrics.fitChildren &&
+    JSON.stringify(rowResizedMetrics.childWidths) !== JSON.stringify(rowResizeMetrics.childWidths),
+  `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)}`
+);
+const rowFitReset = await page.evaluate(async (columnId) => {
+  const actions = await import("/js/actions.js");
+  const { state } = await import("/js/store.js");
+  const { columnChildren } = await import("/js/model.js");
+  actions.fitColumnToContent(columnId);
+  const column = state.board.cards.find((card) => card.id === columnId);
+  const expected = 28 + columnChildren(state.board, columnId).reduce((sum, child) => sum + child.w, 0) + 10 * Math.max(0, columnChildren(state.board, columnId).length - 1);
+  return { width: column.w, fitChildren: Boolean(column.fitChildren), expected };
+}, firstColumnId);
+check(
+  "Fit container to items restores the auto-width row",
+  !rowFitReset.fitChildren && Math.abs(rowFitReset.width - rowFitReset.expected) <= 2,
+  `${rowFitReset.width} vs ${rowFitReset.expected}`
 );
 check(
   "Column auto-height and row auto-width changes animate",

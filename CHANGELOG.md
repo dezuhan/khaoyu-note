@@ -74,9 +74,9 @@ project uses Semantic Versioning.
 - Rows now follow the width of their cards instead of stretching every card to fill the row. Columns
   keep auto height and rows auto width after drops, with a short width/height transition so the
   reflow is visible without delaying resize drags.
-- Auto-width rows and auto-height columns remain manually resizable: a resize stores only the extra
-  width/height beyond the content, so new cards still grow the auto dimension while the operator can
-  keep extra space.
+- Rows default to the width of their cards. Manually resizing a row switches it to the previous
+  stretch mode so the cards follow the row width; the context menu action "Fit container to items"
+  restores the content-driven auto width. Auto-height columns keep their manual extra height.
 
 - While a card or rail tool hovers a column or row, the target container now reserves the insertion
   slot live: a dashed drop placeholder appears, the column grows or the row widens, and cards after

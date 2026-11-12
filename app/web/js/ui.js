@@ -2151,6 +2151,9 @@ window.addEventListener("mn:open-menu", (event) => {
           text: card.direction === "row" ? "Convert to column" : "Convert to row",
           onClick: () => setColumnDirection(card.id, card.direction === "row" ? "column" : "row"),
         });
+        if (card.fitChildren || card.extraWidth || card.extraHeight) {
+          items.push({ text: "Fit container to items", onClick: () => fitColumnToContent(card.id) });
+        }
         if (canReleaseContainer(card.id)) {
           items.push({
             text: card.kanban

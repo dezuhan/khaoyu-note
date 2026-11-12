@@ -280,14 +280,17 @@ export function layoutColumn(board, column) {
     (card) => !isTemporarilyDisabledType(card.type)
   );
   if (column.direction === "row") {
-    // Rows follow their children instead of stretching children to fill the row: each card keeps
-    // its own width and the row grows to fit, so a new item widens the row by exactly its width.
+    // Default: the row follows its cards. After the operator resizes the row, fitChildren switches
+    // to the old stretch mode: every card follows the row width again.
+    const fitted = Boolean(column.fitChildren) && children.length > 0;
+    const available = Math.max(160, Number(column.w) - padding * 2 - gap * Math.max(0, children.length - 1));
+    const fittedWidth = fitted ? Math.max(120, Math.floor(available / children.length)) : null;
     let x = column.x + padding;
     let maxH = 0;
     for (const child of children) {
       child.x = x;
       child.y = column.y + header;
-      child.w = Math.max(120, Number(child.w) || 120);
+      child.w = fitted ? fittedWidth : Math.max(120, Number(child.w) || 120);
       if (child.type === "column") {
         layoutColumn(board, child);
       } else {
@@ -298,8 +301,10 @@ export function layoutColumn(board, column) {
       maxH = Math.max(maxH, child.h);
     }
     if (children.length) {
-      const contentWidth = padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1);
-      column.w = Math.max(160, contentWidth + Math.max(0, Number(column.extraWidth) || 0));
+      if (!fitted) {
+        const contentWidth = padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1);
+        column.w = Math.max(160, contentWidth + Math.max(0, Number(column.extraWidth) || 0));
+      }
       column.h =
         Math.max(column.minHeight || 160, header + maxH + padding) +
         Math.max(0, Number(column.extraHeight) || 0);

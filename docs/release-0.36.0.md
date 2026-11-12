@@ -18,8 +18,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
 - **Sharing hardening**: optional share-view watermark and per-link download caps, server-side rich
   HTML sanitisation, exact remote-embed host allowlists, optional AES-256-GCM object encryption and
   a data-only PostgreSQL deployment script.
-- **Resizable auto-layout**: auto-width rows and auto-height columns store extra space separately, so
-  they stay resizable without breaking the content-driven default.
+- **Resizable auto-layout**: rows start auto-width from their cards; resizing a row switches its
+  cards to fill the row (the old stretch behavior), and "Fit container to items" returns to auto.
 - **Live drop preview**: hovering a column or row with a card or rail tool reserves the exact slot,
   grows the container and shifts the following cards before the drop; leaving restores the layout.
 - **Auto-sized columns and rows**: rows follow their card widths instead of stretching cards; after a

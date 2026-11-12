@@ -617,11 +617,27 @@ export function setSectionPositionLocked(cardId, locked) {
   markDirty("board");
 }
 
+export function fitColumnToContent(cardId) {
+  if (!state.board) return false;
+  const card = getCard(state.board, cardId);
+  if (!card || card.type !== "column") return false;
+  checkpoint();
+  delete card.fitChildren;
+  delete card.extraWidth;
+  delete card.extraHeight;
+  layoutColumns(state.board);
+  markDirty("board");
+  return true;
+}
+
 export function setColumnDirection(cardId, direction) {
   if (!state.board) return;
   const card = getCard(state.board, cardId);
   if (!card || card.type !== "column") return;
   checkpoint();
+  delete card.fitChildren;
+  delete card.extraWidth;
+  delete card.extraHeight;
   card.direction = direction === "row" ? "row" : "column";
   if (card.direction === "row") {
     const count = columnChildren(state.board, card.id).length;
