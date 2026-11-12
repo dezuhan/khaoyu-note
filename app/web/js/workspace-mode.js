@@ -132,7 +132,46 @@ async function loadServerBoards(server, view) {
   const target = view.querySelector('[data-role="server-boards"]');
   target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading ${escapeText(server.name)}...</p>`;
   try {
-    const data = await jsonFetch(`${server.url}/api/v1/projects`, {}, server.token);
+    const data = await jsonFetch(`${server.url}/api/v1/workspaces`, {}, server.token);
+    const workspaces = data.workspaces || [];
+    if (!workspaces.length) {
+      target.innerHTML = `<p class="mn-server-note" style="padding:8px">No workspace is shared with this account.</p>`;
+      return;
+    }
+    target.innerHTML = `<div class="mn-workspace-popover-head"><span>Workspaces</span></div><div data-role="workspace-rows">${workspaces
+      .map(
+        (workspace) =>
+          `<button type="button" class="mn-workspace-popover-row" data-workspace="${escapeText(workspace.id)}"><span><strong>${escapeText(
+            workspace.name || "Workspace"
+          )}</strong><small>${escapeText(workspace.role || "member")} · default ${escapeText(
+            workspace.memberDefaultBoardRole || "viewer"
+          )}</small></span></button>`
+      )
+      .join("")}</div><div data-role="workspace-boards"></div>`;
+    const workspaceRows = target.querySelector('[data-role="workspace-rows"]');
+    for (const button of workspaceRows.querySelectorAll("[data-workspace]")) {
+      const workspace = workspaces.find((entry) => entry.id === button.dataset.workspace);
+      button.addEventListener("click", () => loadWorkspaceBoards(server, workspace, target));
+    }
+    await loadWorkspaceBoards(server, workspaces[0], target);
+  } catch (error) {
+    target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
+  }
+}
+
+async function loadWorkspaceBoards(server, workspace, root) {
+  if (!server || !workspace || !root) return;
+  for (const button of root.querySelectorAll("[data-workspace]")) {
+    button.classList.toggle("is-active", button.dataset.workspace === workspace.id);
+  }
+  const target = root.querySelector('[data-role="workspace-boards"]');
+  target.innerHTML = `<p class="mn-server-note" style="padding:8px">Loading boards...</p>`;
+  try {
+    const data = await jsonFetch(
+      `${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/boards`,
+      {},
+      server.token
+    );
     const projects = data.projects || [];
     target.innerHTML = projects.length
       ? `<div class="mn-workspace-popover-boards">${projects
@@ -143,7 +182,7 @@ async function loadServerBoards(server, view) {
               )}</strong><span>${escapeText(project.role || "viewer")} · revision ${escapeText(project.revision ?? 1)}</span></button>`
           )
           .join("")}</div>`
-      : `<p class="mn-server-note" style="padding:8px">No boards shared with this account.</p>`;
+      : `<p class="mn-server-note" style="padding:8px">No boards in this workspace.</p>`;
     for (const button of target.querySelectorAll("[data-project]")) {
       const project = projects.find((entry) => entry.id === button.dataset.project);
       button.addEventListener("click", () => {

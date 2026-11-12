@@ -30,6 +30,8 @@ A focused release for backup hygiene and service hardening on top of the 0.35.0 
   and an explicit `--purge` path.
 - **Separate public-view domain**: the installer now captures backend and public-share origins and
   uses the latter for generated `/s/:token` links.
+- **Workspace schema**: first-class workspaces, members, invitations, access policies and
+  workspace-scoped boards, with viewer as the default member board role.
 - **Realtime remote save**: remote editor saves are throttled at 400 ms and pushed to the service
   immediately; viewers stay read-only.
 - **Editable remote workspaces**: owners/editors open team boards in the main editor; viewers remain

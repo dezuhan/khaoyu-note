@@ -10,7 +10,35 @@ export function hasRole(role, minimum) {
 }
 
 export async function projectRole(db, projectId, accountId) {
-  return (await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, accountId]))?.role;
+  const project = await db.get(
+    "SELECT owner_account_id, workspace_id FROM projects WHERE id = ? AND deleted_at IS NULL",
+    [projectId]
+  );
+  if (!project) return null;
+  if (project.owner_account_id === accountId) return "owner";
+  const explicit = await db.get(
+    "SELECT role FROM project_members WHERE project_id = ? AND account_id = ?",
+    [projectId, accountId]
+  );
+  const workspaceMember = project.workspace_id
+    ? await db.get(
+        "SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'",
+        [project.workspace_id, accountId]
+      )
+    : null;
+  if (workspaceMember && ["owner", "admin"].includes(workspaceMember.role)) {
+    return explicit?.role && explicit.role !== "owner" ? explicit.role : "editor";
+  }
+  if (explicit?.role) return explicit.role;
+  if (!workspaceMember) return null;
+  const mode = await db.get("SELECT value FROM service_meta WHERE key = 'workspace_mode'", []);
+  if (mode?.value === "private") return null;
+  const policy = await db.get(
+    "SELECT member_default_board_role FROM workspace_access_policies WHERE workspace_id = ?",
+    [project.workspace_id]
+  );
+  const role = policy?.member_default_board_role || "viewer";
+  return role === "none" ? null : role;
 }
 
 export async function projectSnapshot(db, projectId) {

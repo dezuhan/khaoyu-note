@@ -116,6 +116,11 @@ project uses Semantic Versioning.
 - Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
   actions. Both actions open a confirmation dialog; rejection disables the account and approval can
   re-enable it later.
+- Added first-class workspace schema: `workspaces`, `workspace_members`,
+  `workspace_invitations`, `workspace_access_policies`, and `projects.workspace_id`. A fresh service
+  seeds a default team workspace with viewer as the member default board role; existing projects and
+  approved accounts are backfilled. Workspace APIs list/create workspaces and list boards with
+  effective roles, and the main frontend workspace popover now shows server → workspace → board.
 - Remote workspace boards now autosave on a 400 ms throttle while typing and push their operation
   diff to the service within about 120 ms after the local save, so owner/editor changes appear on the
   team database without an explicit Save. A stale timer id from the previous local board could block

@@ -20,6 +20,7 @@ import {
   createShareLink,
   findShare,
   hasRole,
+  projectRole,
   projectSnapshot,
   recordShareAttempt,
   revokeShare,
@@ -243,26 +244,29 @@ async function workspaceShared(db) {
   return row?.value !== "private";
 }
 
-async function addWorkspaceViewersForProject(db, projectId) {
-  if (!(await workspaceShared(db))) return;
+async function addWorkspaceViewersForProject() {
+  // Workspace-level membership is the source of truth; no per-project viewer rows are needed.
+}
+
+async function addDefaultWorkspaceMember(db, accountId, role = "member") {
   await db.run(
-    `INSERT INTO project_members (project_id, account_id, role, created_at)
-     SELECT ?, a.id, 'viewer', ? FROM accounts a
-     WHERE a.deleted_at IS NULL AND a.status = 'active' AND a.approved_at IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = ? AND m.account_id = a.id)`,
-    [projectId, now(), projectId]
+    `INSERT INTO workspace_members (id, workspace_id, account_id, role, state, source, created_at, updated_at)
+     SELECT ?, 'workspace_default', ?, ?, 'active', 'system', ?, ?
+     WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = 'workspace_default')
+       AND NOT EXISTS (SELECT 1 FROM workspace_members WHERE workspace_id = 'workspace_default' AND account_id = ? AND state = 'active')`,
+    [`wm_default_${accountId}`, accountId, role, now(), now(), accountId]
   );
+  if (role === "admin") {
+    await db.run(
+      "UPDATE workspaces SET owner_account_id = COALESCE(owner_account_id, ?), updated_at = ? WHERE id = 'workspace_default'",
+      [accountId, now()]
+    );
+  }
 }
 
 async function addWorkspaceViewersForAccount(db, accountId) {
-  if (!(await workspaceShared(db))) return;
-  await db.run(
-    `INSERT INTO project_members (project_id, account_id, role, created_at)
-     SELECT p.id, ?, 'viewer', ? FROM projects p
-     WHERE p.deleted_at IS NULL AND p.owner_account_id <> ?
-       AND NOT EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.account_id = ?)`,
-    [accountId, now(), accountId, accountId]
-  );
+  const account = await db.get("SELECT role FROM accounts WHERE id = ?", [accountId]);
+  await addDefaultWorkspaceMember(db, accountId, account?.role === "admin" ? "admin" : "member");
 }
 
 function accountApproved(account) {
@@ -300,10 +304,6 @@ function requireScope(auth, scope) {
   if (auth.method === "api" && !auth.scopes?.includes(scope)) {
     throw new HttpError(403, `scope ${scope} required`, "insufficient_scope");
   }
-}
-
-async function projectRole(db, projectId, accountId) {
-  return (await db.get("SELECT role FROM project_members WHERE project_id = ? AND account_id = ?", [projectId, accountId]))?.role;
 }
 
 async function sendReset(db, config, mailer, account, token) {
@@ -866,8 +866,8 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const projectId = crypto.randomUUID();
         await db.transaction(async (tx) => {
           await tx.run(
-            "INSERT INTO projects (id, owner_account_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            [projectId, ownerId, name, now(), now()]
+            "INSERT INTO projects (id, owner_account_id, name, workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [projectId, ownerId, name, "workspace_default", now(), now()]
           );
           await tx.run(
             "INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'owner', ?)",
@@ -2886,12 +2886,91 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/workspaces") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:read");
+        const workspaces = await db.all(
+          `SELECT w.id, w.name, w.owner_account_id, wm.role,
+                  COALESCE(policy.member_default_board_role, 'viewer') AS memberDefaultBoardRole
+           FROM workspaces w
+           JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.state = 'active'
+           LEFT JOIN workspace_access_policies policy ON policy.workspace_id = w.id
+           WHERE wm.account_id = ? AND w.deleted_at IS NULL
+           ORDER BY w.updated_at DESC`,
+          [auth.account.id]
+        );
+        sendJson(response, 200, { workspaces }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/workspaces") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
+        const body = await readJson(request);
+        const name = requireString(body.name, "name", 120);
+        const id = crypto.randomUUID();
+        await db.transaction(async (tx) => {
+          await tx.run(
+            "INSERT INTO workspaces (id, name, owner_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            [id, name, auth.account.id, now(), now()]
+          );
+          await tx.run(
+            "INSERT INTO workspace_access_policies (workspace_id, visibility, sharing_enabled, member_default_board_role, created_at, updated_at) VALUES (?, 'private', 1, 'viewer', ?, ?)",
+            [id, now(), now()]
+          );
+          await tx.run(
+            "INSERT INTO workspace_members (id, workspace_id, account_id, role, state, source, created_at, updated_at) VALUES (?, ?, ?, 'owner', 'active', 'system', ?, ?)",
+            [crypto.randomUUID(), id, auth.account.id, now(), now()]
+          );
+        });
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "workspace.created",
+          resourceType: "workspace",
+          resourceId: id,
+          metadata: { name },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { id, name, role: "owner" }, config);
+        return true;
+      }
+
+      const workspaceBoardsMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/boards$/);
+      if (method === "GET" && workspaceBoardsMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:read");
+        const workspaceId = decodeURIComponent(workspaceBoardsMatch[1]);
+        const member = await db.get(
+          "SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'",
+          [workspaceId, auth.account.id]
+        );
+        if (!member) throw new HttpError(404, "workspace not found", "not_found");
+        const rows = await db.all(
+          "SELECT id, name, revision, created_at, updated_at, parent_project_id FROM projects WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC",
+          [workspaceId]
+        );
+        const projects = [];
+        for (const project of rows) {
+          const role = await projectRole(db, project.id, auth.account.id);
+          if (role) projects.push({ ...project, role });
+        }
+        sendJson(response, 200, { workspace: { id: workspaceId, role: member.role }, projects }, config);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/projects") {
         const auth = await requireAuth(request, response, db, config);
         requireScope(auth, "projects:read");
-        const projects = (await db.all(`SELECT p.id, p.name, p.revision, p.created_at, p.updated_at, p.parent_project_id, m.role
-             FROM projects p JOIN project_members m ON m.project_id = p.id
-             WHERE m.account_id = ? AND p.deleted_at IS NULL ORDER BY p.updated_at DESC`, [auth.account.id]));
+        const rows = await db.all(
+          `SELECT p.id, p.name, p.revision, p.created_at, p.updated_at, p.parent_project_id
+           FROM projects p WHERE p.deleted_at IS NULL ORDER BY p.updated_at DESC`
+        );
+        const projects = [];
+        for (const project of rows) {
+          const role = await projectRole(db, project.id, auth.account.id);
+          if (role) projects.push({ ...project, role });
+        }
         sendJson(response, 200, { projects }, config);
         return true;
       }
@@ -2912,8 +2991,8 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const projectId = crypto.randomUUID();
         await db.transaction(async (tx) => {
           await tx.run(
-            "INSERT INTO projects (id, owner_account_id, name, parent_project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-            [projectId, auth.account.id, title, parentProjectId, now(), now()]
+            "INSERT INTO projects (id, owner_account_id, name, parent_project_id, workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [projectId, auth.account.id, title, parentProjectId, "workspace_default", now(), now()]
           );
           await tx.run(
             "INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'owner', ?)",

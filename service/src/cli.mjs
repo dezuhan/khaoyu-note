@@ -83,6 +83,17 @@ async function bootstrap(config, db, password) {
       [password.hash, Date.now(), Date.now(), account.id]
     );
   }
+  await db.run(
+    `INSERT INTO workspace_members (id, workspace_id, account_id, role, state, source, created_at, updated_at)
+     SELECT ?, 'workspace_default', ?, 'owner', 'active', 'system', ?, ?
+     WHERE EXISTS (SELECT 1 FROM workspaces WHERE id = 'workspace_default')
+       AND NOT EXISTS (SELECT 1 FROM workspace_members WHERE workspace_id = 'workspace_default' AND account_id = ? AND state = 'active')`,
+    [`wm_default_${account.id}`, account.id, now, now, account.id]
+  );
+  await db.run(
+    "UPDATE workspaces SET owner_account_id = COALESCE(owner_account_id, ?), updated_at = ? WHERE id = 'workspace_default'",
+    [account.id, now]
+  );
   let project = await db.get(
     "SELECT id, name FROM projects WHERE owner_account_id = ? AND name = ?",
     [account.id, projectName]

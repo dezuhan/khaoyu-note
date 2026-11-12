@@ -59,10 +59,19 @@ becomes the frontend URL.
 
 ## Shared workspace
 
-The server is a single team workspace. Approved accounts automatically receive **viewer** access to
-every board on the server; an admin can promote a member to editor/commenter from the board Members
-panel. This is the default `workspace_mode=shared` policy. Set
-`service_meta.workspace_mode = 'private'` only for deployments that want strict per-board membership.
+The service now has first-class workspace records:
+
+```text
+workspaces -> workspace_members -> projects/boards
+               workspace_invitations
+               workspace_access_policies
+```
+
+A fresh service seeds `workspace_default` ("Team workspace"). Approved accounts become workspace
+members; the workspace policy defaults to `member_default_board_role = viewer`, so members can read
+every board in that workspace. An admin can promote a member to editor/commenter from the board
+Members panel. Project/board membership remains an optional per-board override. Legacy
+`workspace_mode=private` can disable workspace defaults for strict per-board deployments.
 
 The service root redirects to the administration dashboard:
 
@@ -431,7 +440,10 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `DELETE` | `/api/v1/account/tokens/:id` | Revoke an API token. |
 | `POST` | `/api/v1/account/delete` | Schedule deletion after the grace period. |
 | `POST` | `/api/v1/account/delete/cancel` | Cancel a scheduled deletion. |
-| `GET` | `/api/v1/projects` | List projects the account can access. Approved accounts receive viewer access to the team workspace. |
+| `GET` | `/api/v1/workspaces` | List workspaces the account belongs to. |
+| `POST` | `/api/v1/workspaces` | Create a workspace owned by the account. |
+| `GET` | `/api/v1/workspaces/:id/boards` | List boards in a workspace with effective roles. |
+| `GET` | `/api/v1/projects` | List every board visible through the workspace or a board grant. | |
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. The document may be up to 8 MB. |
