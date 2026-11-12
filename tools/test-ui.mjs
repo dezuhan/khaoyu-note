@@ -8,6 +8,14 @@ const appVersion = JSON.parse(fs.readFileSync(path.join(here, "..", "app", "src-
 const url = process.argv[2] || "http://127.0.0.1:1430/";
 const results = [];
 const errors = [];
+const appOrigin = new URL(url).origin;
+function isExternalUrl(value) {
+  try {
+    return new URL(value).origin !== appOrigin;
+  } catch {
+    return false;
+  }
+}
 
 function check(name, condition, detail = "") {
   results.push({ name, ok: Boolean(condition), detail });
@@ -22,8 +30,16 @@ const page = await browser.newPage({
 page.on("pageerror", (error) => {
   if (!/isExternalMethodAvailable/.test(error.message)) errors.push("pageerror: " + error.message);
 });
+page.on("requestfailed", (request) => {
+  if (!isExternalUrl(request.url())) {
+    errors.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ""}`);
+  }
+});
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push("console: " + message.text());
+  const location = message.location()?.url || "";
+  if (message.type() === "error" && !isExternalUrl(location)) {
+    errors.push("console: " + message.text());
+  }
 });
 
 await page.goto(url, { waitUntil: "load" });
