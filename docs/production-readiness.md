@@ -19,9 +19,11 @@ Implemented in this repository:
 - PostgreSQL baseline and reversible migration runner;
 - `migrate-to-postgres` row copy that deliberately skips live tokens and forces re-authentication;
 - PostgreSQL logical backup/restore with checksums/encryption support;
-- Redis event bus for cross-instance SSE snapshot fanout;
-- snapshot revisions and per-project SSE rooms with per-instance presence;
-- team Docker profile with PostgreSQL and Redis, PostgreSQL readiness and fail-closed configuration;
+- Redis event bus for cross-instance SSE fanout, global presence, single-use SSE tickets and
+  advisory edit locks;
+- per-project operation log with idempotent batches, sequence conflicts and replay/resync;
+- worker leader lock and readiness reporting PostgreSQL plus realtime `ok/degraded`;
+- team Docker profile with PostgreSQL and Redis and fail-closed configuration;
 - service auth, sharing scopes, memberships, audit log and security tests.
 
 Not ready for a production team deployment:
@@ -32,9 +34,10 @@ Not ready for a production team deployment:
 2. OIDC is not implemented; the current SSO path is a trusted-proxy header mode. A real OIDC
    discovery/callback flow is still required for normal deployments.
 3. External penetration testing and production-scale load tests are outstanding.
-4. [verified 2026-11-12] Multi-instance Redis/SSE snapshot propagation passed a two-instance
-   PostgreSQL 18 + Redis run, including invitations and membership. Full realtime editing
-   (operation log, SSE tickets, edit locks, global presence) is still not implemented.
+4. [verified 2026-11-12] Two-instance PostgreSQL 18 + Redis validation passed for ticket-authenticated
+   SSE, global presence, operation propagation/replay, cross-instance lock conflict and readiness.
+   The desktop/web client still needs to consume the operation protocol; cursor/selection presence
+   and snapshot compaction remain pending.
 5. Asset storage is local to the service instance; shared/object storage and asset migration are not
    production-ready.
 6. Object/backup encryption and a least-privilege PostgreSQL role script are implemented; encrypted

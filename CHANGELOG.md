@@ -39,6 +39,13 @@ project uses Semantic Versioning.
   add an existing account to a team by email with an editor, commenter or viewer role, change that
   role and remove the member; the owner row is immutable. Every action writes an `admin.*` audit row
   and all endpoints require the admin role and CSRF token.
+- Project sync gained an operation log: `POST /projects/:id/ops` applies idempotent operation batches
+  with per-project sequence numbers, `GET /projects/:id/ops?after=` replays or asks for a resync, and
+  worker retention keeps the log bounded.
+- The realtime backend now issues single-use SSE tickets, aggregates presence globally through Redis,
+  provides advisory edit locks with TTL/heartbeat, runs maintenance behind a Redis worker leader lock,
+  and reports `realtime: ok/degraded` from `/readyz`. Migration 015 / PostgreSQL 003 adds
+  `project_ops` and sequence columns.
 - `shared/theme/` is now the single source for the token stylesheet, fonts, SVG icon set, brand mark
   and theme runtime. `npm run theme:sync` generates the app and service copies, and CI runs
   `npm run theme:check` to fail on drift.

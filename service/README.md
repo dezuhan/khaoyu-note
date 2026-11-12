@@ -126,9 +126,9 @@ a migration is pending.
 | `KHAOYU_SERVICE_REDIS_URL` | empty | Redis connection string for team mode. |
 | `KHAOYU_SERVICE_REDIS_PREFIX` | `khaoyu` | Namespace for Redis keys. |
 | `KHAOYU_SERVICE_INSTANCE_ID` | hostname plus PID | Instance identity used by the worker leader lock. |
-| `KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS` | `60000` | Reserved for the planned single-use SSE ticket phase; not used yet. |
-| `KHAOYU_SERVICE_EDIT_LOCK_TTL_MS` | `15000` | Reserved for the planned advisory edit-lock phase; not used yet. |
-| `KHAOYU_SERVICE_OP_RETENTION_DAYS` | `7` | Reserved for the planned operation-log phase; not used yet. |
+| `KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS` | `60000` | Lifetime of a single-use SSE ticket. |
+| `KHAOYU_SERVICE_EDIT_LOCK_TTL_MS` | `15000` | Advisory edit-lock lifetime. |
+| `KHAOYU_SERVICE_OP_RETENTION_DAYS` | `7` | Operation-log retention before clients must resync. |
 | `KHAOYU_SERVICE_COMPACT_OPS` | `100` | Reserved for the planned operation-log compaction phase; not used yet. |
 | `KHAOYU_SERVICE_COMPACT_MS` | `30000` | Reserved for the planned operation-log compaction phase; not used yet. |
 | `KHAOYU_SERVICE_FRONTEND_PORT` | random 5-digit | Frontend listener port (pages and API proxy). |
@@ -176,9 +176,10 @@ existing objects first.
 ## Team backend
 
 The multi-user team profile uses PostgreSQL as the system of record and Redis for cross-instance SSE
-fanout. PostgreSQL storage, backup/restore, CLI commands and the Redis bus are in place. Presence is
-currently per-instance; global presence, SSE tickets, edit locks and the operation log are still
-being implemented. The remaining phases are recorded in
+fanout, single-use SSE tickets, global presence, advisory edit locks, the operation log and the worker
+leader lock.
+PostgreSQL storage, backup/restore, operation log and CLI commands are in place. Cursor/selection
+presence and the desktop client operation-sync integration are still to be implemented. The remaining phases are recorded in
 [docs/backend-postgres-redis.md](../docs/backend-postgres-redis.md).
 
 - `single-user` keeps SQLite and needs no PostgreSQL or Redis.
@@ -288,6 +289,12 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/projects` | Create a project owned by the account. |
 | `GET` | `/api/v1/projects/:id` | Read a project when the account is a member. |
 | `PUT` | `/api/v1/projects/:id/snapshot` | Update a snapshot as owner or editor, with revision check. The document may be up to 8 MB. |
+| `POST` | `/api/v1/projects/:id/ops` | Apply an idempotent operation batch with `baseSeq`; editor or owner. |
+| `GET` | `/api/v1/projects/:id/ops?after=` | Replay operations after a sequence, or return `resync_required` when pruned. |
+| `POST` | `/api/v1/projects/:id/realtime-ticket` | Issue a single-use 60 second SSE ticket. |
+| `GET` | `/api/v1/projects/:id/events?ticket=` | SSE room for snapshot, ops and global presence events (session auth is still accepted). |
+| `POST` | `/api/v1/projects/:id/locks` | Acquire an advisory lock, or heartbeat with a lock token. |
+| `DELETE` | `/api/v1/projects/:id/locks` | Release an advisory lock with its token. |
 | `GET` | `/api/v1/account/presence` | Read presence opt-in state. |
 | `PATCH` | `/api/v1/account/presence` | Opt in or out of project presence. |
 | `GET` | `/api/v1/account/email-preferences` | Read the email notification preference. |

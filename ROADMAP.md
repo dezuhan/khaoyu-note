@@ -215,23 +215,24 @@ record what exists and what is still partial.
   - Migrate self-hosted collaborative deployments to PostgreSQL for ACID guarantees, relational integrity, and high-concurrency multi-user transactions.
   - Unified repository interface in the service layer to isolate SQLite vs PostgreSQL differences.
   - Reversible schema migration tooling compatible with both SQLite (local) and PostgreSQL (self-hosted).
-- [~] **Redis for real-time pub/sub and state** (cross-instance SSE snapshot fanout is implemented;
-  global presence, advisory edit locks, worker leader lock and Redis-backed limits are pending):
+- [~] **Redis for real-time pub/sub and state** (cross-instance SSE fanout, global presence,
+  single-use SSE tickets, advisory edit locks and worker leader lock are implemented; Redis-backed
+  rate limiting and session caching plus cursor/selection presence are pending):
   - Redis Pub/Sub backend for broadcasting realtime events across server processes and worker nodes.
   - Ephemeral presence tracking (online users, live cursor positions, and active card selection highlights).
   - Distributed lock management for board/column operations and real-time conflict avoidance.
   - Redis-backed rate limiting and session caching for collaborative endpoints.
-- [~] **Live collaboration protocol** (current transport is authenticated SSE snapshot/presence rooms
-  with revision conflicts; idempotent op batches, operation log, SSE tickets, edit locks, offline merge
-  and cursor awareness are pending):
+- [~] **Live collaboration protocol** (idempotent operation batches, per-project operation log, SSE
+  tickets, advisory edit locks, snapshot fallback and revision conflicts are implemented; desktop
+  client operation sync, offline merge and cursor/selection awareness are pending):
   - Operational sync protocol for low-latency broadcast of card movements, edits, and column reordering.
   - Heartbeat-driven presence rooms with graceful disconnect handling and state reconciliation.
   - Offline sync merge: replay offline queue from local SQLite into the PostgreSQL project upon reconnection.
 - [x] **Deployment and operations**:
   - Updated Docker Compose stack including khaoyu-note-service, PostgreSQL, and Redis.
   - Automated backup and restore tooling (pg_dump coordinated with asset storage).
-  - Health checks cover PostgreSQL; Redis is required at startup and the readiness endpoint does not
-    yet report realtime degradation.
+  - Health checks cover PostgreSQL and report `realtime: ok/degraded` from the Redis coordination
+    layer; Redis connectivity is also required at team-mode startup.
 
 ## Milestone 5: Notifications and activity (server side)
 

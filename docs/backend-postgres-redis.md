@@ -1,11 +1,11 @@
 # Backend: PostgreSQL, Redis and realtime editing
 
-Status: accepted, not feature-complete. The async SQLite/PostgreSQL storage adapter,
-PostgreSQL migrations, PostgreSQL backup/restore and the Redis SSE fanout are implemented. `team`
-starts with PostgreSQL and Redis and fails closed if either is unavailable. The realtime editing
-protocol below (operation batches, SSE tickets, advisory edit locks, global presence and worker
-leadership) is **planned and not implemented yet**; the current API only has authenticated
-per-project SSE rooms for snapshot and presence events, with presence counted per instance.
+Status: backend protocol implemented, client integration pending. The async SQLite/PostgreSQL
+storage adapter, PostgreSQL migrations, backup/restore, operation log, single-use SSE tickets,
+advisory edit locks, global Redis presence, worker leader lock and realtime readiness state are
+implemented. `team` starts with PostgreSQL and Redis and fails closed if either is unavailable. The
+desktop/web sync client still uses snapshot pushes and does not yet consume operation batches or
+cursor presence.
 
 ## Decision
 
@@ -51,7 +51,7 @@ against both dialects. This avoids changing behaviour and storage at the same ti
   existing code semantics.
 - SQLite migrations stay in `service/src/migrations`; PostgreSQL has a baseline in
   `service/src/migrations/postgres/001_baseline` and receives the same new migrations. The baseline
-  is validated against the 13 SQLite migrations by a table/column parity test.
+  is validated against the 15 SQLite migrations by a table/column parity test.
 
 ### Migration commands
 
@@ -73,10 +73,10 @@ checksums as the SQLite backup. `restore-postgres` writes into a migrated databa
 `--force` when rows already exist. The `TEST_DATABASE_URL` used by CI and local tests must point at a
 disposable database because the PostgreSQL parity test drops and recreates the public schema tables.
 
-## Planned API (not implemented)
+## Realtime API
 
-The following endpoints and error codes are the target of the realtime phase; they are documented so
-clients and tests can be built against the contract, but the current service does not route them.
+The operation, ticket and lock endpoints below are implemented with membership checks, CSRF, audit
+and stable error codes.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -89,19 +89,24 @@ clients and tests can be built against the contract, but the current service doe
 New error codes: `seq_conflict`, `resync_required`, `op_invalid`, `op_too_large`, `rate_limited`.
 Locks are advisory; the server does not reject a write only because another client holds a lock.
 
-The currently implemented endpoint is `GET /api/v1/projects/:id/events` with session auth; it emits
-`presence` and `snapshot` events. Config values for ticket TTL, edit-lock TTL, operation retention and
-compaction are reserved for this phase and are not used by the current routes.
+`GET /api/v1/projects/:id/events` accepts either a session or a single-use ticket and emits `snapshot`,
+`ops`, `presence` (local and global) events. Operation retention is enforced by the worker; snapshot
+compaction is still limited to the existing version history rather than an op-count compactor.
 
 ## Implemented flow (current)
 
-1. A signed-in project member opens `GET /api/v1/projects/:id/events` with the session cookie.
-2. The instance checks membership, registers the SSE client and emits a local `presence` event.
-3. A `PUT /snapshot` writes the revision to PostgreSQL, publishes a `snapshot` event to Redis, and each
-   instance forwards it to its local SSE clients. Desktop sync still uses snapshot writes and revision
-   conflict detection rather than the operation protocol below.
+1. A client asks for a single-use ticket, then opens `GET /api/v1/projects/:id/events?ticket=...`.
+2. The instance checks membership, registers the SSE client, joins global Redis presence and emits
+   local/global `presence` events.
+3. `POST /ops` validates operations, allocates per-project sequence numbers in PostgreSQL, applies them
+   to the snapshot and inserts the rows in `project_ops`; the committed batch is published to Redis and
+   forwarded to every instance's SSE clients.
+4. Reconnecting clients replay `GET /ops?after=`; pruned operations return `resync_required`.
+5. Advisory locks and heartbeats live in Redis with a TTL; writes only warn clients, they do not reject
+   a write solely because another client holds a lock.
+6. `PUT /snapshot` remains available for older clients and sync; it still uses revision conflicts.
 
-## Planned data flow (not implemented)
+## Planned data flow (compaction, offline merge and client integration)
 
 1. A client obtains a realtime ticket and opens the SSE stream.
 2. The server validates membership and sends the current snapshot, `lastSeq` and presence.
@@ -123,23 +128,29 @@ compaction are reserved for this phase and are not used by the current routes.
   degradation.
 - PostgreSQL down: requests that need data return 503/errors; `/readyz` returns
   `{"status":"not_ready"}` with HTTP 503.
-- Worker leadership, operation sequences, edit locks and SSE tickets are not implemented yet; the
-  corresponding failure behaviour below is part of the planned protocol.
+- Redis leader loss: another instance acquires the worker lock; maintenance jobs are idempotent.
+- Missing or stale sequence: `seq_conflict`; pruned operations return `resync_required`.
+- Duplicate operation id: the existing sequence is returned without applying the batch again.
+- Oversized or unauthorized operation batch: rejected with a stable error code. Ticket/lock failures
+  return `ticket_invalid` or `lock_conflict`.
 
 ## Rollout
 
 1. [done] Async SQLite adapter, PostgreSQL driver and migrations; service suite runs on both.
-2. [done] Redis SSE fanout and two-instance snapshot propagation; invitations/membership work.
-3. [planned] Presence aggregation, SSE tickets, advisory edit locks, worker leader.
-4. [planned] Operation log, client sync integration, compaction and conflict UX.
+2. [done] Redis SSE fanout, operation log, single-use tickets, advisory locks, global presence and
+   worker leadership.
+3. [done] Two-instance validation with PostgreSQL 18 + Redis: tickets, global presence, ops propagation,
+   lock conflict and readiness passed.
+4. [pending] Desktop/web client operation sync, cursor/selection presence, compaction and conflict UX.
 5. [pending] Team onboarding UI/OIDC and production hardening.
 
 ## Verification note (2026-11-12)
 
-Two team-mode instances were started against local PostgreSQL 18 and Redis. Registration and login,
-project creation, invitation email delivery, invitation acceptance, project access, SSE presence and
-cross-instance snapshot propagation via Redis all passed. The PostgreSQL/Redis-gated suites
-(`storage-migrations`, `postgres-runtime`, `redis-bus`) passed 6/6 with no skips.
+Two team-mode instances were started against local PostgreSQL 18 and Redis. Registration/login,
+invitations, project access, ticket-authenticated SSE, global presence across instances, an operation
+batch propagated through Redis, operation replay on the second instance, cross-instance lock conflict
+and `{"status":"ready","realtime":"ok"}` all passed. The PostgreSQL/Redis-gated suites
+(`storage-migrations`, `postgres-runtime`, `redis-bus`, `coordination`) passed with no skips.
 
 ## Out of scope
 

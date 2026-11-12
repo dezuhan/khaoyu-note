@@ -268,6 +268,122 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(rejected.status, 413, JSON.stringify(rejected.body));
   });
 
+  await t.test("realtime tickets and advisory locks are scoped to the project", async () => {
+    const owner = await api.account(`realtime-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Realtime board");
+    const ticket = await api.call(`/api/v1/projects/${projectId}/realtime-ticket`, {
+      method: "POST",
+      jar: owner.jar,
+    });
+    assert.equal(ticket.status, 201, JSON.stringify(ticket.body));
+    assert.ok(ticket.body.token);
+    assert.ok(ticket.body.expiresAt > Date.now());
+    const invalidTicket = await api.call(`/api/v1/projects/${projectId}/events?ticket=not-a-ticket`, {
+      jar: owner.jar,
+    });
+    assert.equal(invalidTicket.status, 401);
+    assert.equal(invalidTicket.body.code, "ticket_invalid");
+
+    const lock = await api.call(`/api/v1/projects/${projectId}/locks`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { key: "card:one" },
+    });
+    assert.equal(lock.status, 201, JSON.stringify(lock.body));
+    assert.ok(lock.body.token);
+    const conflict = await api.call(`/api/v1/projects/${projectId}/locks`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { key: "card:one" },
+    });
+    assert.equal(conflict.status, 409);
+    assert.equal(conflict.body.code, "lock_conflict");
+    const heartbeat = await api.call(`/api/v1/projects/${projectId}/locks`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { key: "card:one", token: lock.body.token },
+    });
+    assert.equal(heartbeat.status, 200);
+    const released = await api.call(`/api/v1/projects/${projectId}/locks`, {
+      method: "DELETE",
+      jar: owner.jar,
+      body: { key: "card:one", token: lock.body.token },
+    });
+    assert.equal(released.status, 200);
+    assert.equal(released.body.released, true);
+  });
+
+  await t.test("project operations are sequenced, idempotent and replayable", async () => {
+    const owner = await api.account(`ops-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Operation board");
+    const doc = { id: projectId, title: "Operation board", cards: [], connections: [], trash: [] };
+    await putSnapshot(owner, projectId, doc, 1);
+    const batch = [
+      { opId: "op-add", type: "card.add", payload: { card: { id: "n1", type: "note", x: 0, y: 0, w: 200, h: 70, z: 1, text: "one" } } },
+      { opId: "op-text", type: "card.update", payload: { id: "n1", patch: { text: "live text" } } },
+      { opId: "op-move", type: "card.move", payload: { id: "n1", x: 120, y: 80, parentId: null } },
+    ];
+    const applied = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { baseSeq: 0, ops: batch },
+    });
+    assert.equal(applied.status, 200, JSON.stringify(applied.body));
+    assert.equal(applied.body.idempotent, false);
+    assert.equal(applied.body.lastSeq, 3);
+    assert.deepEqual(applied.body.ops.map((op) => op.seq), [1, 2, 3]);
+
+    const project = await api.call(`/api/v1/projects/${projectId}`, { jar: owner.jar });
+    const stored = JSON.parse(project.body.snapshot.doc);
+    assert.equal(stored.cards[0].text, "live text");
+    assert.equal(stored.cards[0].x, 120);
+
+    const replay = await api.call(`/api/v1/projects/${projectId}/ops?after=0`, { jar: owner.jar });
+    assert.equal(replay.status, 200, JSON.stringify(replay.body));
+    assert.equal(replay.body.lastSeq, 3);
+    assert.equal(replay.body.ops.length, 3);
+    assert.equal(replay.body.ops[1].type, "card.update");
+    const tail = await api.call(`/api/v1/projects/${projectId}/ops?after=2`, { jar: owner.jar });
+    assert.deepEqual(tail.body.ops.map((op) => op.seq), [3]);
+
+    const retry = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { baseSeq: 0, ops: batch },
+    });
+    assert.equal(retry.status, 200, JSON.stringify(retry.body));
+    assert.equal(retry.body.idempotent, true);
+    assert.equal(retry.body.seq, 1);
+
+    const conflict = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { baseSeq: 0, ops: [{ opId: "op-late", type: "doc.title", payload: { title: "late" } }] },
+    });
+    assert.equal(conflict.status, 409);
+    assert.equal(conflict.body.code, "seq_conflict");
+
+    const invalid = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: { baseSeq: 3, ops: [{ opId: "op-bad", type: "unsupported", payload: {} }] },
+    });
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.code, "op_invalid");
+
+    const viewer = await api.account(`ops-viewer-${crypto.randomUUID()}@example.com`);
+    api.db
+      .prepare("INSERT INTO project_members (project_id, account_id, role, created_at) VALUES (?, ?, 'viewer', ?)")
+      .run(projectId, viewer.account.id, Date.now());
+    const denied = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: viewer.jar,
+      body: { baseSeq: 3, ops: [{ opId: "op-viewer", type: "doc.title", payload: { title: "no" } }] },
+    });
+    assert.equal(denied.status, 403);
+    assert.equal((await api.call(`/api/v1/projects/${projectId}/ops`, { jar: viewer.jar })).status, 200);
+  });
+
   await t.test("registration does not require email verification before login", async () => {
     const email = `verify-${crypto.randomUUID()}@example.com`;
     await api.register(email);

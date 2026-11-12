@@ -69,7 +69,7 @@ export async function purgeDeletedAccounts(db, logger, config = null) {
   return purged;
 }
 
-async function pruneTokens(db) {
+async function pruneTokens(db, config = {}) {
   const now = Date.now();
   const access = (await db.run("DELETE FROM access_tokens WHERE expires_at < ? OR revoked_at < ?", [now - 86_400_000, now - 86_400_000])).changes;
   const email = (await db.run("DELETE FROM email_tokens WHERE expires_at < ? OR used_at < ?", [now - 86_400_000, now - 86_400_000])).changes;
@@ -84,6 +84,9 @@ async function pruneTokens(db) {
        WHERE revoked_at IS NULL AND accepted_at IS NULL AND expires_at < ?`, [now, now])).changes;
   const expiredShareLinks = (await db.run(`UPDATE share_links SET revoked_at = ?
        WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at < ?`, [now, now])).changes;
+  const ops = (await db.run("DELETE FROM project_ops WHERE created_at < ?", [
+    now - (Number(config.opRetentionDays) || 7) * 86_400_000,
+  ])).changes;
   return {
     access: Number(access),
     email: Number(email),
@@ -95,6 +98,7 @@ async function pruneTokens(db) {
     passkeyChallenges: Number(passkeyChallenges),
     expiredInvitations: Number(expiredInvitations),
     expiredShareLinks: Number(expiredShareLinks),
+    ops: Number(ops),
   };
 }
 
@@ -113,7 +117,7 @@ export async function runMaintenance(db, config, logger) {
   const tempRemoved = removeOldEntries(config.tempDir, config.tempMaxAgeHours * 3600_000);
   const audit = (await db.run("DELETE FROM audit_log WHERE created_at < ?", [Date.now() - config.auditRetentionDays * 86_400_000]));
   const purged = await purgeDeletedAccounts(db, logger, config);
-  const tokens = await pruneTokens(db);
+  const tokens = await pruneTokens(db, config);
   await pruneLoginAttempts(db, 30);
 
   const last = (await db.get("SELECT value FROM service_meta WHERE key = 'last_backup_at'", []));
@@ -165,13 +169,26 @@ export async function runMaintenance(db, config, logger) {
   return { tempRemoved, auditRemoved: Number(audit.changes || 0), backup, tokens };
 }
 
-export function startWorker(db, config, logger, intervalMs = 60_000, mailer = null) {
+export function startWorker(db, config, logger, intervalMs = 60_000, mailer = null, coordination = null) {
   let timer = null;
   let running = false;
+  let leaderToken = null;
   const tick = async () => {
     if (running) return;
     running = true;
     try {
+      if (coordination) {
+        const ttlMs = Math.max(30_000, intervalMs * 3);
+        if (leaderToken) {
+          const renewed = await coordination.renewLeader({ token: leaderToken, ttlMs });
+          if (!renewed) leaderToken = null;
+        }
+        if (!leaderToken) {
+          const leader = await coordination.acquireLeader({ ttlMs });
+          if (!leader) return;
+          leaderToken = leader.token;
+        }
+      }
       await runMaintenance(db, config, logger);
       if (mailer?.flush) {
         const result = await mailer.flush();
@@ -190,6 +207,10 @@ export function startWorker(db, config, logger, intervalMs = 60_000, mailer = nu
     stop: () => {
       if (timer) clearInterval(timer);
       timer = null;
+      if (leaderToken && coordination?.releaseLeader) {
+        void coordination.releaseLeader({ token: leaderToken }).catch(() => {});
+        leaderToken = null;
+      }
     },
   };
 }

@@ -58,8 +58,8 @@ export function logPath(pathname) {
     .replace(/^\/s\/[^/]+$/, "/s/[redacted]");
 }
 
-export function createServiceHandler({ config, db, logger, mailer, events }) {
-  const api = createApiRouter({ db, config, logger, mailer, events });
+export function createServiceHandler({ config, db, logger, mailer, events, coordination }) {
+  const api = createApiRouter({ db, config, logger, mailer, events, coordination });
   const handler = async (request, response) => {
     const started = Date.now();
     let url;
@@ -137,7 +137,18 @@ export function createServiceHandler({ config, db, logger, mailer, events }) {
       if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/readyz") {
         try {
           await db.get("SELECT 1");
-          sendJson(response, 200, { status: "ready" }, config);
+          if (!coordination) {
+            sendJson(response, 200, { status: "ready" }, config);
+            return;
+          }
+          let realtime = "ok";
+          try {
+            const health = await coordination.health?.();
+            if (health && health.ready === false) realtime = "degraded";
+          } catch {
+            realtime = "degraded";
+          }
+          sendJson(response, 200, { status: "ready", realtime }, config);
         } catch {
           sendJson(response, 503, { status: "not_ready" }, config);
         }

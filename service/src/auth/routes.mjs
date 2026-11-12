@@ -45,6 +45,8 @@ import {
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
 import { createEventHub } from "../events.mjs";
+import { OpError, applyOperation, validateOperations } from "../collab-ops.mjs";
+import { createMemoryCoordination } from "../realtime/coordination.mjs";
 import { scanUpload, validateUpload } from "../uploads.mjs";
 import { sendAlert } from "../alerts.mjs";
 import {
@@ -285,9 +287,13 @@ async function verifyShareForWrite(db, config, { token, body, ip, minimum }) {
   return share;
 }
 
-export function createApiRouter({ db, config, logger, mailer, events: providedEvents }) {
+export function createApiRouter({ db, config, logger, mailer, events: providedEvents, coordination: providedCoordination }) {
   const objects = new ObjectStore(db, config.objectsDir, config.objectEncryptionKey);
   const events = providedEvents || createEventHub();
+  const collab = providedCoordination || createMemoryCoordination({
+    ticket: config.realtimeTicketTtlMs,
+    lock: config.editLockTtlMs,
+  });
   const adminRate = new Map();
   const blockedExtensions = new Set([
     "exe", "msi", "bat", "cmd", "ps1", "scr", "com", "dll", "jar", "vbs", "js", "lnk",
@@ -2654,10 +2660,99 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      const realtimeTicketMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/realtime-ticket$/);
+      if (method === "POST" && realtimeTicketMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:read");
+        const projectId = decodeURIComponent(realtimeTicketMatch[1]);
+        const role = await projectRole(db, projectId, auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        const ticket = await collab.issueTicket({
+          projectId,
+          accountId: auth.account.id,
+          ttlMs: config.realtimeTicketTtlMs,
+        });
+        sendJson(response, 201, ticket, config);
+        return true;
+      }
+
+      const locksMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/locks$/);
+      if ((method === "POST" || method === "DELETE") && locksMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
+        const projectId = decodeURIComponent(locksMatch[1]);
+        const role = await projectRole(db, projectId, auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        if (!["owner", "editor"].includes(role)) throw new HttpError(403, "editor role required", "forbidden");
+        const body = await readJson(request);
+        const key = requireString(body.key, "key", 200);
+        if (method === "DELETE") {
+          const released = await collab.releaseLock({
+            projectId,
+            key,
+            token: requireString(body.token, "token", 200),
+          });
+          if (!released) throw new HttpError(409, "lock does not belong to this token", "lock_conflict");
+          await writeAudit(db, {
+            actorAccountId: auth.account.id,
+            action: "project.lock_released",
+            resourceType: "project",
+            resourceId: projectId,
+            metadata: { key },
+            ip,
+            secret: config.secret,
+          });
+          sendJson(response, 200, { released: true }, config);
+          return true;
+        }
+        if (body.token !== undefined) {
+          const renewed = await collab.heartbeatLock({
+            projectId,
+            key,
+            token: requireString(body.token, "token", 200),
+            ttlMs: config.editLockTtlMs,
+          });
+          if (!renewed) throw new HttpError(409, "lock expired or belongs to another client", "lock_conflict");
+          sendJson(response, 200, { renewed: true, key }, config);
+          return true;
+        }
+        const lock = await collab.acquireLock({
+          projectId,
+          key,
+          accountId: auth.account.id,
+          ttlMs: config.editLockTtlMs,
+        });
+        if (!lock) throw new HttpError(409, "lock is held by another client", "lock_conflict");
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "project.lock_acquired",
+          resourceType: "project",
+          resourceId: projectId,
+          metadata: { key },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { key, ...lock }, config);
+        return true;
+      }
+
       const eventsMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/events$/);
       if (method === "GET" && eventsMatch) {
-        const auth = await requireAuth(request, response, db, config);
-        const role = await projectRole(db, eventsMatch[1], auth.account.id);
+        const projectId = decodeURIComponent(eventsMatch[1]);
+        const ticketValue = url.searchParams.get("ticket");
+        let auth;
+        if (ticketValue) {
+          const consumed = await collab.consumeTicket(ticketValue);
+          if (!consumed || consumed.projectId !== projectId) {
+            throw new HttpError(401, "invalid or expired realtime ticket", "ticket_invalid");
+          }
+          const account = await db.get("SELECT id, email, display_name FROM accounts WHERE id = ? AND deleted_at IS NULL AND status = 'active'", [consumed.accountId]);
+          if (!account) throw new HttpError(401, "invalid or expired realtime ticket", "ticket_invalid");
+          auth = { account: { id: account.id, email: account.email, displayName: account.display_name } };
+        } else {
+          auth = await requireAuth(request, response, db, config);
+        }
+        const role = await projectRole(db, projectId, auth.account.id);
         if (!role) throw new HttpError(404, "project not found", "not_found");
         applySecurityHeaders(response, config);
         response.writeHead(200, {
@@ -2669,10 +2764,35 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         response.flushHeaders();
         const preference = (await db.get("SELECT presence_enabled FROM email_preferences WHERE account_id = ?", [auth.account.id]));
         const presenceEnabled = preference ? Boolean(preference.presence_enabled) : true;
-        const client = events.subscribe(eventsMatch[1], auth.account.id, response, {
+        const client = events.subscribe(projectId, auth.account.id, response, {
           presence: presenceEnabled,
         });
-        request.on("close", () => events.unsubscribe(client));
+        const connectionId = crypto.randomUUID();
+        const publishGlobalPresence = async () => {
+          if (!presenceEnabled) return;
+          await collab.joinPresence({ projectId, accountId: auth.account.id, connectionId });
+          const counts = await collab.presenceCount(projectId);
+          events.publish(projectId, { type: "presence", projectId, ...counts, global: true });
+        };
+        let presenceTimer = null;
+        if (presenceEnabled) {
+          void publishGlobalPresence().catch((error) => logger.error("presence.join_failed", { message: error.message }));
+          presenceTimer = setInterval(() => {
+            void publishGlobalPresence().catch((error) => logger.error("presence.refresh_failed", { message: error.message }));
+          }, 20_000);
+          presenceTimer.unref?.();
+        }
+        request.on("close", () => {
+          events.unsubscribe(client);
+          if (presenceTimer) clearInterval(presenceTimer);
+          if (!presenceEnabled) return;
+          void collab.leavePresence({ projectId, connectionId })
+            .then(async () => {
+              const counts = await collab.presenceCount(projectId);
+              events.publish(projectId, { type: "presence", projectId, ...counts, global: true });
+            })
+            .catch((error) => logger.error("presence.leave_failed", { message: error.message }));
+        });
         return true;
       }
 
@@ -2835,6 +2955,162 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             publicSharingEnabled: Boolean(project.public_sharing_enabled),
           },
           snapshot,
+        }, config);
+        return true;
+      }
+
+      const opsMatch = url.pathname.match(/^\/api\/v1\/projects\/([^/]+)\/ops$/);
+      if (method === "POST" && opsMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
+        const projectId = decodeURIComponent(opsMatch[1]);
+        const role = await projectRole(db, projectId, auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        if (!["owner", "editor"].includes(role)) throw new HttpError(403, "editor role required", "forbidden");
+        const body = await readJson(request, 8 * 1024 * 1024);
+        let operations;
+        try {
+          operations = validateOperations(body.ops);
+        } catch (error) {
+          if (error instanceof OpError) throw new HttpError(error.status || 400, error.message, error.code);
+          throw error;
+        }
+        const baseSeq = Number(body.baseSeq ?? 0);
+        if (!Number.isInteger(baseSeq) || baseSeq < 0) {
+          throw new HttpError(400, "baseSeq must be a non-negative integer", "op_invalid");
+        }
+        let result;
+        try {
+          result = await db.transaction(async (tx) => {
+            const project = (await tx.get("SELECT id, revision, last_seq FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+            if (!project) throw new HttpError(404, "project not found", "not_found");
+            const marks = operations.map(() => "?").join(",");
+            const existing = (await tx.all(
+              `SELECT op_id, seq FROM project_ops WHERE project_id = ? AND op_id IN (${marks})`,
+              [projectId, ...operations.map((op) => op.opId)]
+            ));
+            if (existing.length) {
+              return {
+                idempotent: true,
+                seq: Number(existing[0].seq),
+                lastSeq: Number(project.last_seq),
+                revision: Number(project.revision),
+              };
+            }
+            if (Number(baseSeq) !== Number(project.last_seq)) {
+              throw new HttpError(409, "sequence conflict", "seq_conflict");
+            }
+            const snapshot = (await tx.get("SELECT doc FROM project_snapshots WHERE project_id = ?", [projectId]));
+            let doc;
+            try {
+              doc = JSON.parse(snapshot?.doc || "{}");
+            } catch {
+              doc = { id: projectId, title: "Untitled", cards: [], connections: [], trash: [] };
+            }
+            let seq = Number(project.last_seq);
+            const applied = [];
+            for (const operation of operations) {
+              try {
+                applyOperation(doc, operation);
+              } catch (error) {
+                if (error instanceof OpError) throw new HttpError(400, error.message, error.code);
+                throw error;
+              }
+              seq += 1;
+              await tx.run(
+                `INSERT INTO project_ops (project_id, seq, op_id, actor_account_id, type, payload, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [projectId, seq, operation.opId, auth.account.id, operation.type, JSON.stringify(operation.payload), now()]
+              );
+              applied.push({ seq, opId: operation.opId, type: operation.type });
+            }
+            const revision = Number(project.revision) + 1;
+            const serialized = JSON.stringify(doc);
+            await tx.run(
+              "UPDATE project_snapshots SET revision = ?, doc = ?, last_seq = ?, updated_by = ?, updated_at = ? WHERE project_id = ?",
+              [revision, serialized, seq, auth.account.id, now(), projectId]
+            );
+            await tx.run(
+              "UPDATE projects SET revision = ?, last_seq = ?, updated_at = ? WHERE id = ?",
+              [revision, seq, now(), projectId]
+            );
+            await tx.run(
+              `INSERT INTO project_versions (id, project_id, revision, doc, created_by, created_at, last_seq, kind)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'ops')`,
+              [crypto.randomUUID(), projectId, revision, serialized, auth.account.id, now(), seq]
+            );
+            return { idempotent: false, seq, lastSeq: seq, revision, ops: applied };
+          });
+        } catch (error) {
+          if (error instanceof OpError) throw new HttpError(400, error.message, error.code);
+          throw error;
+        }
+        if (!result.idempotent) {
+          events.publish(projectId, {
+            type: "ops",
+            projectId,
+            seq: result.seq,
+            lastSeq: result.lastSeq,
+            revision: result.revision,
+            ops: result.ops,
+            actor: auth.account.id,
+          });
+          await writeAudit(db, {
+            actorAccountId: auth.account.id,
+            action: "project.ops_applied",
+            resourceType: "project",
+            resourceId: projectId,
+            metadata: { fromSeq: baseSeq, toSeq: result.lastSeq, count: result.ops.length },
+            ip,
+            secret: config.secret,
+          });
+        }
+        sendJson(response, 200, result, config);
+        return true;
+      }
+
+      if (method === "GET" && opsMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:read");
+        const projectId = decodeURIComponent(opsMatch[1]);
+        const role = await projectRole(db, projectId, auth.account.id);
+        if (!role) throw new HttpError(404, "project not found", "not_found");
+        const project = (await db.get("SELECT last_seq FROM projects WHERE id = ? AND deleted_at IS NULL", [projectId]));
+        if (!project) throw new HttpError(404, "project not found", "not_found");
+        const after = Math.max(0, Number(url.searchParams.get("after")) || 0);
+        const limit = Math.max(1, Math.min(500, Number(url.searchParams.get("limit")) || 200));
+        const minRow = (await db.get("SELECT MIN(seq) AS min_seq FROM project_ops WHERE project_id = ?", [projectId]));
+        const minSeq = minRow?.min_seq === null || minRow?.min_seq === undefined ? null : Number(minRow.min_seq);
+        if (after > 0 && minSeq !== null && after < minSeq - 1) {
+          throw new HttpError(409, "operation log pruned; reload the snapshot", "resync_required");
+        }
+        const rows = (await db.all(
+          `SELECT seq, op_id, actor_account_id, type, payload, created_at
+           FROM project_ops WHERE project_id = ? AND seq > ? ORDER BY seq LIMIT ?`,
+          [projectId, after, limit]
+        ));
+        const ops = rows.map((row) => {
+          let payload = null;
+          try {
+            payload = JSON.parse(row.payload);
+          } catch {
+            payload = null;
+          }
+          return {
+            seq: Number(row.seq),
+            opId: row.op_id,
+            actor: row.actor_account_id,
+            type: row.type,
+            payload,
+            createdAt: Number(row.created_at),
+          };
+        });
+        sendJson(response, 200, {
+          projectId,
+          lastSeq: Number(project.last_seq),
+          after,
+          ops,
+          hasMore: ops.length > 0 && ops[ops.length - 1].seq < Number(project.last_seq),
         }, config);
         return true;
       }

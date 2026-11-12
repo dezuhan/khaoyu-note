@@ -12,6 +12,7 @@ import {
 import { createQueuedMailer } from "./auth/mailer.mjs";
 import { createEventHub } from "./events.mjs";
 import { createRedisBus } from "./realtime/redis-bus.mjs";
+import { createCoordination } from "./realtime/coordination.mjs";
 import { pickServicePorts, displayHost } from "./ports.mjs";
 import { startWorker } from "./worker.mjs";
 
@@ -48,6 +49,17 @@ async function main() {
         logger,
       })
     : createEventHub();
+  const coordination = await createCoordination({
+    redisUrl: config.redisUrl,
+    prefix: config.redisPrefix,
+    logger,
+    ttl: {
+      ticket: config.realtimeTicketTtlMs,
+      lock: config.editLockTtlMs,
+      presence: 45_000,
+      leader: 90_000,
+    },
+  });
 
   const { frontendPort, backendPort } = await pickServicePorts(config.host);
   const host = displayHost(config.host);
@@ -58,7 +70,7 @@ async function main() {
   }
   config.port = backendPort;
 
-  const handler = createServiceHandler({ config, db, logger, mailer, events });
+  const handler = createServiceHandler({ config, db, logger, mailer, events, coordination });
   const backend = http.createServer((request, response) => {
     let pathname = "/";
     try {
@@ -97,7 +109,7 @@ async function main() {
     mode: 0o600,
   });
 
-  const worker = startWorker(db, config, logger, 60_000, mailer);
+  const worker = startWorker(db, config, logger, 60_000, mailer, coordination);
   logger.info("service.started", {
     frontendUrl,
     backendUrl,
@@ -119,6 +131,7 @@ async function main() {
       pending -= 1;
       if (pending > 0) return;
       await db.close();
+      await coordination.close?.();
       await mailer.close?.();
       fs.rmSync(path.join(config.dataDir, "runtime.json"), { force: true });
       logger.info("service.stopped");
