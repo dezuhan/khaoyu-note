@@ -288,7 +288,7 @@ const rowResizeMetrics = await page.evaluate(async (columnId) => {
     childWidths: columnChildren(state.board, columnId).map((child) => child.w),
   };
 }, firstColumnId);
-const rowResizeHandle = await firstColumnCard.locator(".mn-resize").boundingBox();
+const rowResizeHandle = await firstColumnCard.locator(".mn-resize-se").boundingBox();
 await page.mouse.move(rowResizeHandle.x + 4, rowResizeHandle.y + 4);
 await page.mouse.down();
 await page.mouse.move(rowResizeHandle.x + 84, rowResizeHandle.y + 4, { steps: 8 });
@@ -311,6 +311,35 @@ check(
     JSON.stringify(rowResizedMetrics.childWidths) !== JSON.stringify(rowResizeMetrics.childWidths),
   `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)}`
 );
+const rowHeightBefore = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return { height: column.h, extraHeight: Number(column.extraHeight || 0) };
+}, firstColumnId);
+await firstColumnCard.hover();
+const rowBottomHandle = await firstColumnCard.locator(".mn-resize-s").boundingBox();
+check(
+  "A row exposes a vertical edge handle",
+  Boolean(rowBottomHandle) && Number.isFinite(rowBottomHandle.y),
+  rowBottomHandle ? `${Math.round(rowBottomHandle.x)},${Math.round(rowBottomHandle.y)}` : "missing"
+);
+await page.mouse.move(rowBottomHandle.x + 5, rowBottomHandle.y + 5);
+await page.mouse.down();
+await page.mouse.move(rowBottomHandle.x + 5, rowBottomHandle.y + 95, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(400);
+const rowHeightAfter = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return { height: column.h, extraHeight: Number(column.extraHeight || 0) };
+}, firstColumnId);
+check(
+  "Dragging the bottom edge resizes a row downward",
+  rowHeightAfter.height > rowHeightBefore.height + 60 &&
+    rowHeightAfter.extraHeight > rowHeightBefore.extraHeight + 60,
+  `${Math.round(rowHeightBefore.height)} -> ${Math.round(rowHeightAfter.height)}, extra ${Math.round(rowHeightAfter.extraHeight)}`
+);
+
 const rowFitReset = await page.evaluate(async (columnId) => {
   const actions = await import("/js/actions.js");
   const { state } = await import("/js/store.js");

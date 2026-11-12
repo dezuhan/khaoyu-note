@@ -282,6 +282,7 @@ function onPointerDown(event) {
   }
 
   if (card) {
+    if (card.type === "column" && !card.parentId && !card.locked) raiseColumnToFront(card);
     const isResize =
       !card.parentId &&
       card.type !== "drawing" &&
@@ -404,6 +405,9 @@ function beginDrag(card, event) {
 function beginResize(card, event) {
   checkpoint();
   const handle = event.target.closest('[data-role="resize"]')?.dataset.handle || "se";
+  const vertical = handle.includes("n") || handle.includes("s");
+  const horizontal = handle.includes("e") || handle.includes("w");
+  viewportEl.style.cursor = vertical && horizontal ? "nwse-resize" : vertical ? "ns-resize" : "ew-resize";
   gesture = {
     type: "resize",
     id: card.id,
@@ -750,6 +754,16 @@ function applyCardGeometry(card) {
   el.style.zIndex = String(zIndexFor(card));
 }
 
+function raiseColumnToFront(column) {
+  if (!column || column.type !== "column" || column.parentId) return;
+  const top = Math.max(...state.board.cards.map((item) => item.z || 1)) + 1;
+  if (Number(column.z) === top) return;
+  column.z = top;
+  const el = cardElement(column.id);
+  if (el) el.style.zIndex = String(top * 1000);
+  syncColumnStack(column);
+}
+
 function syncColumnStack(column) {
   if (!column || column.type !== "column") return;
   for (const child of columnChildren(state.board, column.id)) {
@@ -805,6 +819,7 @@ function onPointerUp(event) {
   const current = gesture;
   gesture = null;
   viewportEl.classList.remove("is-panning", "is-resizing");
+  viewportEl.style.cursor = "";
 
   if (current.type === "draw") {
     finishFreehand(current);

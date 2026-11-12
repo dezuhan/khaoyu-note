@@ -2017,6 +2017,51 @@ html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
     linear-gradient(135deg, transparent 45%, var(--ky-muted) 45%, var(--ky-muted) 55%, transparent 55%) bottom right / 10px 10px no-repeat;
 }
 
+/* Rows and columns are free containers: the edge handles make both axes directly reachable, not just
+   the bottom-right corner. */
+.mn-card-column .mn-resize-n,
+.mn-card-column .mn-resize-s,
+.mn-card-column .mn-resize-e,
+.mn-card-column .mn-resize-w {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ky-muted);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ky-bg) 70%, transparent);
+}
+.mn-card-column .mn-resize-n {
+  left: 50%;
+  right: auto;
+  top: -5px;
+  bottom: auto;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+.mn-card-column .mn-resize-s {
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: -5px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+.mn-card-column .mn-resize-e {
+  left: auto;
+  right: -5px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+.mn-card-column .mn-resize-w {
+  left: -5px;
+  right: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
 .mn-viewport.is-resizing {
   cursor: ew-resize;
 }
