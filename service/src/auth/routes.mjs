@@ -46,7 +46,43 @@ import {
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
 import { createEventHub } from "../events.mjs";
-import { OpError, applyOperation, validateOperations } from "../collab-ops.mjs";
+import { OpError, applyOperation, clocksConcurrent, mergeClocks, normalizeClock, validateOperations } from "../collab-ops.mjs";
+
+function parseStoredClock(value) {
+  try {
+    return normalizeClock(JSON.parse(value));
+  } catch {
+    return {};
+  }
+}
+
+async function loadFieldVersions(tx, projectId, cardId, fields) {
+  const wanted = [...new Set((fields || []).filter(Boolean))];
+  if (!wanted.length) return new Map();
+  const marks = wanted.map(() => "?").join(",");
+  const rows = await tx.all(
+    `SELECT card_id, field, seq, clock FROM project_field_versions WHERE project_id = ? AND card_id = ? AND field IN (${marks})`,
+    [projectId, cardId, ...wanted]
+  );
+  return new Map(
+    rows.map((row) => [
+      `${row.card_id}|${row.field}`,
+      { seq: Number(row.seq), clock: parseStoredClock(row.clock) },
+    ])
+  );
+}
+
+async function storeFieldVersion(tx, { projectId, cardId, field, seq, actorId, clock, previous }) {
+  await tx.run(
+    `INSERT INTO project_field_versions (project_id, card_id, field, seq, actor_account_id, clock, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(project_id, card_id, field)
+     DO UPDATE SET seq = excluded.seq, actor_account_id = excluded.actor_account_id,
+       clock = excluded.clock, updated_at = excluded.updated_at`,
+    [projectId, cardId, field, seq, actorId, JSON.stringify(mergeClocks(previous, clock)), now()]
+  );
+}
+
 import { createMemoryCoordination } from "../realtime/coordination.mjs";
 import { scanUpload, validateUpload } from "../uploads.mjs";
 import { sendAlert } from "../alerts.mjs";
@@ -3624,6 +3660,8 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (lockedCards.length) {
           throw new HttpError(423, "card is locked by another editor", "card_locked");
         }
+        const opClocks = operations.map((operation) => normalizeClock(operation.clock));
+        const fieldConflicts = [];
         let result;
         try {
           result = await db.transaction(async (tx) => {
@@ -3640,6 +3678,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
                 seq: Number(existing[0].seq),
                 lastSeq: Number(project.last_seq),
                 revision: Number(project.revision),
+                fieldConflicts: [],
               };
             }
             if (Number(baseSeq) !== Number(project.last_seq)) {
@@ -3654,7 +3693,40 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             }
             let seq = Number(project.last_seq);
             const applied = [];
-            for (const operation of operations) {
+            for (const [index, operation] of operations.entries()) {
+              const clock = opClocks[index];
+              const payload = operation.payload || {};
+              const fieldNames = [];
+              if (operation.type === "card.update" && payload.id) {
+                for (const field of Object.keys(payload.patch || {})) {
+                  if (!["id", "type"].includes(field)) fieldNames.push(field);
+                }
+              } else if (operation.type === "card.move" && payload.id) {
+                for (const field of ["x", "y", "order", "parentId"]) {
+                  if (payload[field] !== undefined) fieldNames.push(field);
+                }
+              }
+              const previousVersions =
+                fieldNames.length && payload.id
+                  ? await loadFieldVersions(tx, projectId, payload.id, fieldNames)
+                  : new Map();
+              if (fieldNames.length) {
+                const card = (doc.cards || []).find((entry) => entry.id === payload.id);
+                for (const field of fieldNames) {
+                  const previous = previousVersions.get(`${payload.id}|${field}`);
+                  if (!previous) continue;
+                  if (clocksConcurrent(previous.clock, clock) && fieldConflicts.length < 200) {
+                    fieldConflicts.push({
+                      cardId: payload.id,
+                      field,
+                      remoteValue: card && field in card ? card[field] : null,
+                      remoteSeq: previous.seq,
+                      remoteClock: previous.clock,
+                    });
+                  }
+                }
+              }
+              const cardsBefore = new Set((doc.cards || []).map((card) => card.id));
               try {
                 applyOperation(doc, operation);
               } catch (error) {
@@ -3663,11 +3735,76 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
               }
               seq += 1;
               await tx.run(
-                `INSERT INTO project_ops (project_id, seq, op_id, actor_account_id, type, payload, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [projectId, seq, operation.opId, auth.account.id, operation.type, JSON.stringify(operation.payload), now()]
+                `INSERT INTO project_ops (project_id, seq, op_id, actor_account_id, type, payload, clock, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  projectId,
+                  seq,
+                  operation.opId,
+                  auth.account.id,
+                  operation.type,
+                  JSON.stringify(operation.payload),
+                  JSON.stringify(clock),
+                  now(),
+                ]
               );
               applied.push({ seq, opId: operation.opId, type: operation.type });
+              if (fieldNames.length) {
+                for (const field of fieldNames) {
+                  const previous = previousVersions.get(`${payload.id}|${field}`);
+                  await storeFieldVersion(tx, {
+                    projectId,
+                    cardId: payload.id,
+                    field,
+                    seq,
+                    actorId: auth.account.id,
+                    clock,
+                    previous: previous?.clock || {},
+                  });
+                }
+              }
+              if (operation.type === "card.add" && payload.card?.id) {
+                for (const field of Object.keys(payload.card)) {
+                  if (field === "id") continue;
+                  await storeFieldVersion(tx, {
+                    projectId,
+                    cardId: payload.card.id,
+                    field,
+                    seq,
+                    actorId: auth.account.id,
+                    clock,
+                    previous: {},
+                  });
+                }
+              }
+              if (operation.type === "card.delete") {
+                const afterIds = new Set((doc.cards || []).map((card) => card.id));
+                for (const cardId of cardsBefore) {
+                  if (afterIds.has(cardId)) continue;
+                  await tx.run("DELETE FROM project_field_versions WHERE project_id = ? AND card_id = ?", [
+                    projectId,
+                    cardId,
+                  ]);
+                }
+              }
+              if (operation.type === "doc.replace") {
+                await tx.run("DELETE FROM project_field_versions WHERE project_id = ?", [projectId]);
+                for (const card of doc.cards || []) {
+                  if (!card?.id) continue;
+                  for (const field of Object.keys(card)) {
+                    if (field === "id") continue;
+                    await storeFieldVersion(tx, {
+                      projectId,
+                      cardId: card.id,
+                      field,
+                      seq,
+                      actorId: auth.account.id,
+                      clock,
+                      previous: {},
+                    });
+                  }
+                }
+              }
             }
             const revision = Number(project.revision) + 1;
             const serialized = JSON.stringify(doc);
@@ -3684,7 +3821,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
                VALUES (?, ?, ?, ?, ?, ?, ?, 'ops')`,
               [crypto.randomUUID(), projectId, revision, serialized, auth.account.id, now(), seq]
             );
-            return { idempotent: false, seq, lastSeq: seq, revision, ops: applied };
+            return { idempotent: false, seq, lastSeq: seq, revision, ops: applied, fieldConflicts };
           });
         } catch (error) {
           if (error instanceof OpError) throw new HttpError(400, error.message, error.code);
@@ -3730,7 +3867,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           throw new HttpError(409, "operation log pruned; reload the snapshot", "resync_required");
         }
         const rows = (await db.all(
-          `SELECT seq, op_id, actor_account_id, type, payload, created_at
+          `SELECT seq, op_id, actor_account_id, type, payload, clock, created_at
            FROM project_ops WHERE project_id = ? AND seq > ? ORDER BY seq LIMIT ?`,
           [projectId, after, limit]
         ));
@@ -3747,6 +3884,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             actor: row.actor_account_id,
             type: row.type,
             payload,
+            clock: parseStoredClock(row.clock),
             createdAt: Number(row.created_at),
           };
         });

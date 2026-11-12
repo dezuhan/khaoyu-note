@@ -16,6 +16,47 @@ export const OP_TYPES = new Set([
   "connections.set",
 ]);
 
+export const MAX_CLOCK_ENTRIES = 64;
+export const MAX_CLOCK_BYTES = 4096;
+
+// A client clock is a small map of writer id -> counter. Values are normalised so a malformed or
+// oversized clock cannot grow the operation log or field version rows without bound.
+export function normalizeClock(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const clock = {};
+  for (const [rawKey, rawCount] of Object.entries(value)) {
+    if (Object.keys(clock).length >= MAX_CLOCK_ENTRIES) break;
+    const key = String(rawKey).slice(0, 80);
+    const count = Number(rawCount);
+    if (!key || !Number.isFinite(count) || count < 0) continue;
+    clock[key] = Math.floor(Math.min(count, Number.MAX_SAFE_INTEGER));
+  }
+  return clock;
+}
+
+export function mergeClocks(first, second) {
+  const merged = { ...normalizeClock(first) };
+  for (const [key, count] of Object.entries(normalizeClock(second))) {
+    merged[key] = Math.max(Number(merged[key] || 0), count);
+  }
+  return merged;
+}
+
+// Neither clock dominates the other: the two writes were made without knowledge of each other.
+export function clocksConcurrent(first, second) {
+  const a = normalizeClock(first);
+  const b = normalizeClock(second);
+  let aAhead = false;
+  let bAhead = false;
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const left = Number(a[key] || 0);
+    const right = Number(b[key] || 0);
+    if (left > right) aAhead = true;
+    else if (right > left) bAhead = true;
+  }
+  return aAhead && bAhead;
+}
+
 export class OpError extends Error {
   constructor(message, code = "op_invalid") {
     super(message);
@@ -156,6 +197,14 @@ export function validateOperations(ops) {
     const limit = BULK_OP_TYPES.has(type) ? MAX_BULK_OP_BYTES : MAX_OP_BYTES;
     if (Buffer.byteLength(JSON.stringify(op.payload), "utf8") > limit) {
       throw new OpError("operation payload is too large", "op_too_large");
+    }
+    if (op.clock !== undefined) {
+      if (!op.clock || typeof op.clock !== "object" || Array.isArray(op.clock)) {
+        throw new OpError("clock must be an object", "op_invalid");
+      }
+      if (Buffer.byteLength(JSON.stringify(op.clock), "utf8") > MAX_CLOCK_BYTES) {
+        throw new OpError("clock is too large", "op_too_large");
+      }
     }
   }
   return ops;

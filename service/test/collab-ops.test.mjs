@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { OpError, applyOperation, validateOperations } from "../src/collab-ops.mjs";
+import {
+  OpError,
+  applyOperation,
+  clocksConcurrent,
+  mergeClocks,
+  normalizeClock,
+  validateOperations,
+} from "../src/collab-ops.mjs";
 
 test("operations apply to a board document", () => {
   const doc = { id: "p1", title: "Board", cards: [], connections: [], trash: [] };
@@ -57,6 +64,24 @@ test("connections can be replaced without sending the whole document", () => {
   );
   assert.doesNotThrow(() =>
     validateOperations([{ opId: "c1", type: "connections.set", payload: { connections: [] } }])
+  );
+});
+
+test("client clocks detect concurrent writes and merge causally", () => {
+  assert.deepEqual(normalizeClock({ a: 3, b: -1, c: "x", d: 2.9 }), { a: 3, d: 2 });
+  assert.deepEqual(normalizeClock("nope"), {});
+  assert.deepEqual(mergeClocks({ a: 2 }, { a: 1, b: 4 }), { a: 2, b: 4 });
+  assert.equal(clocksConcurrent({ a: 2 }, { a: 1 }), false);
+  assert.equal(clocksConcurrent({ a: 2, b: 1 }, { a: 1 }), false);
+  assert.equal(clocksConcurrent({ a: 2 }, { a: 1, b: 1 }), true);
+  assert.equal(clocksConcurrent({ a: 2 }, { b: 1 }), true);
+  assert.equal(clocksConcurrent({ a: 2, c: 1 }, { b: 1, c: 1 }), true);
+  assert.doesNotThrow(() =>
+    validateOperations([{ opId: "clock-1", type: "doc.title", payload: { title: "x" }, clock: { tab: 1 } }])
+  );
+  assert.throws(
+    () => validateOperations([{ opId: "clock-2", type: "doc.title", payload: { title: "x" }, clock: "bad" }]),
+    /clock/
   );
 });
 

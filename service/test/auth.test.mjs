@@ -423,6 +423,89 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal((await api.call(`/api/v1/projects/${projectId}/ops`, { jar: viewer.jar })).status, 200);
   });
 
+  await t.test("vector clocks record concurrent field writes without blocking the sequence", async () => {
+    const owner = await api.account(`clock-${crypto.randomUUID()}@example.com`);
+    const projectId = await createProject(owner, "Clock board");
+    const doc = {
+      id: projectId,
+      title: "Clock board",
+      cards: [{ id: "clock-note", type: "note", x: 0, y: 0, w: 200, h: 70, z: 1, text: "base" }],
+      connections: [],
+      trash: [],
+    };
+    await putSnapshot(owner, projectId, doc, 1);
+
+    const firstWrite = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: {
+        baseSeq: 0,
+        ops: [
+          {
+            opId: "clock-a-1",
+            type: "card.update",
+            payload: { id: "clock-note", patch: { text: "from A" } },
+            clock: { A: 1 },
+          },
+        ],
+      },
+    });
+    assert.equal(firstWrite.status, 200, JSON.stringify(firstWrite.body));
+    assert.deepEqual(firstWrite.body.fieldConflicts, []);
+
+    const concurrentWrite = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: {
+        baseSeq: 1,
+        ops: [
+          {
+            opId: "clock-b-1",
+            type: "card.update",
+            payload: { id: "clock-note", patch: { text: "from B" } },
+            clock: { B: 1 },
+          },
+        ],
+      },
+    });
+    assert.equal(concurrentWrite.status, 200, JSON.stringify(concurrentWrite.body));
+    assert.equal(concurrentWrite.body.fieldConflicts.length, 1);
+    assert.equal(concurrentWrite.body.fieldConflicts[0].cardId, "clock-note");
+    assert.equal(concurrentWrite.body.fieldConflicts[0].field, "text");
+    assert.equal(concurrentWrite.body.fieldConflicts[0].remoteValue, "from A");
+
+    const causalWrite = await api.call(`/api/v1/projects/${projectId}/ops`, {
+      method: "POST",
+      jar: owner.jar,
+      body: {
+        baseSeq: 2,
+        ops: [
+          {
+            opId: "clock-b-2",
+            type: "card.update",
+            payload: { id: "clock-note", patch: { text: "from B after A" } },
+            clock: { A: 1, B: 2 },
+          },
+        ],
+      },
+    });
+    assert.equal(causalWrite.status, 200, JSON.stringify(causalWrite.body));
+    assert.deepEqual(causalWrite.body.fieldConflicts, []);
+
+    const replay = await api.call(`/api/v1/projects/${projectId}/ops?after=0`, { jar: owner.jar });
+    assert.deepEqual(
+      replay.body.ops.map((operation) => operation.clock),
+      [{ A: 1 }, { B: 1 }, { A: 1, B: 2 }]
+    );
+    const snapshot = await api.call(`/api/v1/projects/${projectId}`, { jar: owner.jar });
+    assert.equal(JSON.parse(snapshot.body.snapshot.doc).cards[0].text, "from B after A");
+    const version = api.db
+      .prepare("SELECT clock, seq FROM project_field_versions WHERE project_id = ? AND card_id = 'clock-note' AND field = 'text'")
+      .get(projectId);
+    assert.equal(Number(version.seq), 3);
+    assert.deepEqual(JSON.parse(version.clock), { A: 1, B: 2 });
+  });
+
   await t.test("registration does not require email verification before login", async () => {
     const email = `verify-${crypto.randomUUID()}@example.com`;
     await api.register(email);
