@@ -326,3 +326,21 @@
 .mn-workspace-form select.ky-input {
   width: 100%;
 }
+
+/* Workspace UI should render at full opacity. Functional states such as hidden overlays and
+   drag-and-drop affordances retain their own opacity outside these selectors. */
+.mn-workspace-popover,
+.mn-workspace-popover .mn-workspace-popover-head,
+.mn-workspace-popover .mn-workspace-popover-row,
+.mn-workspace-popover .mn-workspace-popover-board,
+.mn-workspace-popover .mn-workspace-server-title,
+.mn-workspace-popover .mn-server-note,
+.mn-workspace-popover .mn-workspace-form-error,
+.mn-workspace-form,
+.mn-workspace-form .mn-modal-title,
+.mn-workspace-form label,
+.mn-workspace-form input,
+.mn-workspace-form select,
+.mn-workspace-form .mn-workspace-form-note {
+  opacity: 1;
+}
