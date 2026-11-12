@@ -1692,10 +1692,9 @@ function renderServerPage(content) {
   const intro = document.createElement("p");
   intro.className = "mn-prefs-note";
   intro.textContent =
-    "Local runtime details. Accounts, sync and sharing are disabled in this local-first build.";
+    "Connection details for this computer and the optional self-hosted service.";
   content.append(intro);
   renderServerRuntime(content);
-  return;
   const status = document.createElement("div");
   status.className = "mn-account-status";
   const server = document.createElement("div");

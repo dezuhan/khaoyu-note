@@ -435,12 +435,10 @@ check(
     (await page.locator("#command-search-btn").isVisible())
 );
 check(
-  "Share and Sync controls are hidden in local-first mode",
-  (await page.locator("#share-btn").isHidden()) && (await page.locator("#sync-state").isHidden())
-);
-check(
-  "Account avatar button is disabled in local-first mode",
-  await page.locator("#account-btn").isHidden()
+  "Share, Sync and Account controls are visible in the header",
+  (await page.locator("#share-btn").isVisible()) &&
+    (await page.locator("#sync-state").isVisible()) &&
+    (await page.locator("#account-btn").isVisible())
 );
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
 check(
@@ -2103,6 +2101,11 @@ await page.click("#settings-btn");
 await page.waitForTimeout(400);
 check("Settings dialog opens", await page.locator(".mn-prefs-dialog").isVisible());
 check(
+  "Settings > Server restores the service connection details",
+  (await page.locator('[data-role="account-connection"]').isVisible()) &&
+    (await page.locator('[data-role="account-connection"]').innerText()).includes("Status:")
+);
+check(
   "Topbar language button is enabled",
   (await page.locator("#language-btn").isVisible()) && !(await page.locator("#language-btn").isDisabled())
 );
@@ -2128,10 +2131,10 @@ check(
 await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
 await page.waitForTimeout(300);
 check(
-  "Server page shows local runtime details only",
+  "Server page shows local runtime details and service connection options",
   (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
-    (await page.locator('[data-role="content"]').innerText()).includes("Accounts, sync and sharing are disabled") &&
-    (await page.locator(".mn-account-grid").count()) === 0
+    (await page.locator('[data-role="content"]').innerText()).includes("Connection details for this computer") &&
+    (await page.locator(".mn-account-card").count()) === 3
 );
 check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
 await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();
@@ -2587,7 +2590,7 @@ const persisted = await page.evaluate(() => {
 });
 check("Board persists card edits", persisted.max >= 15, JSON.stringify(persisted));
 check("Single-file header keeps the template menu visible", await page.locator("#template-btn").isVisible());
-check("Sync and Share are hidden from the header", (await page.locator("#sync-state").isHidden()) && (await page.locator("#share-btn").isHidden()));
+check("Sync and Share remain visible from the header", (await page.locator("#sync-state").isVisible()) && (await page.locator("#share-btn").isVisible()));
 await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
 await page.waitForTimeout(200);
 const documentationItem = page.locator(".mn-menu-item", { hasText: "Documentation" });
