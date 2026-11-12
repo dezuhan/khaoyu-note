@@ -1,9 +1,11 @@
 # Backend: PostgreSQL, Redis and realtime editing
 
-Status: accepted. Phase 1 storage conversion, PostgreSQL backup/restore and the Redis SSE fanout are
-implemented. The server uses the async storage adapter for both SQLite and PostgreSQL; `team` starts
-with PostgreSQL and Redis and fails closed if either is unavailable. Presence is still per-instance,
-and SSE tickets, edit locks and the operation log remain for the next realtime phase.
+Status: accepted, not feature-complete. The async SQLite/PostgreSQL storage adapter,
+PostgreSQL migrations, PostgreSQL backup/restore and the Redis SSE fanout are implemented. `team`
+starts with PostgreSQL and Redis and fails closed if either is unavailable. The realtime editing
+protocol below (operation batches, SSE tickets, advisory edit locks, global presence and worker
+leadership) is **planned and not implemented yet**; the current API only has authenticated
+per-project SSE rooms for snapshot and presence events, with presence counted per instance.
 
 ## Decision
 
@@ -71,7 +73,10 @@ checksums as the SQLite backup. `restore-postgres` writes into a migrated databa
 `--force` when rows already exist. The `TEST_DATABASE_URL` used by CI and local tests must point at a
 disposable database because the PostgreSQL parity test drops and recreates the public schema tables.
 
-## API additions
+## Planned API (not implemented)
+
+The following endpoints and error codes are the target of the realtime phase; they are documented so
+clients and tests can be built against the contract, but the current service does not route them.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -84,7 +89,19 @@ disposable database because the PostgreSQL parity test drops and recreates the p
 New error codes: `seq_conflict`, `resync_required`, `op_invalid`, `op_too_large`, `rate_limited`.
 Locks are advisory; the server does not reject a write only because another client holds a lock.
 
-## Data flow
+The currently implemented endpoint is `GET /api/v1/projects/:id/events` with session auth; it emits
+`presence` and `snapshot` events. Config values for ticket TTL, edit-lock TTL, operation retention and
+compaction are reserved for this phase and are not used by the current routes.
+
+## Implemented flow (current)
+
+1. A signed-in project member opens `GET /api/v1/projects/:id/events` with the session cookie.
+2. The instance checks membership, registers the SSE client and emits a local `presence` event.
+3. A `PUT /snapshot` writes the revision to PostgreSQL, publishes a `snapshot` event to Redis, and each
+   instance forwards it to its local SSE clients. Desktop sync still uses snapshot writes and revision
+   conflict detection rather than the operation protocol below.
+
+## Planned data flow (not implemented)
 
 1. A client obtains a realtime ticket and opens the SSE stream.
 2. The server validates membership and sends the current snapshot, `lastSeq` and presence.
@@ -98,22 +115,31 @@ Locks are advisory; the server does not reject a write only because another clie
 7. Compaction writes a snapshot and a revision every `compactOps` operations or `compactMs`
    milliseconds. Old operations are pruned after `opRetentionDays`.
 
-## Failure behaviour
+## Current failure behaviour
 
-- Redis down: writes continue against PostgreSQL; realtime falls back to the local hub; `/readyz`
-  reports `realtime: degraded` rather than failing readiness.
-- PostgreSQL down: requests that need data return 503; the process stays alive and reconnects.
-- Worker leader loss: another instance acquires the Redis lock; maintenance jobs are idempotent.
-- Missing or stale sequence: `seq_conflict` with the operations since the base, or `resync_required`.
-- Duplicate `opId`: return the existing sequence instead of writing the operation again.
-- Oversized or unauthorised batch: rejected before the transaction with a stable error code.
+- Redis unavailable at startup: team mode fails closed while connecting the Redis bus; this is
+  intentional because the team profile requires Redis. A live Redis disconnect falls back to the
+  local event hub for publishing, but `/readyz` only probes PostgreSQL and does not report realtime
+  degradation.
+- PostgreSQL down: requests that need data return 503/errors; `/readyz` returns
+  `{"status":"not_ready"}` with HTTP 503.
+- Worker leadership, operation sequences, edit locks and SSE tickets are not implemented yet; the
+  corresponding failure behaviour below is part of the planned protocol.
 
 ## Rollout
 
-1. Async SQLite adapter, then PostgreSQL driver and migrations; run the service suite on both.
-2. Redis bus, presence, tickets, locks, worker leader; verify two instances.
-3. Operation log, client sync integration, compaction and conflict UX.
-4. Team onboarding (invitations, account pages, OIDC) and production hardening.
+1. [done] Async SQLite adapter, PostgreSQL driver and migrations; service suite runs on both.
+2. [done] Redis SSE fanout and two-instance snapshot propagation; invitations/membership work.
+3. [planned] Presence aggregation, SSE tickets, advisory edit locks, worker leader.
+4. [planned] Operation log, client sync integration, compaction and conflict UX.
+5. [pending] Team onboarding UI/OIDC and production hardening.
+
+## Verification note (2026-11-12)
+
+Two team-mode instances were started against local PostgreSQL 18 and Redis. Registration and login,
+project creation, invitation email delivery, invitation acceptance, project access, SSE presence and
+cross-instance snapshot propagation via Redis all passed. The PostgreSQL/Redis-gated suites
+(`storage-migrations`, `postgres-runtime`, `redis-bus`) passed 6/6 with no skips.
 
 ## Out of scope
 

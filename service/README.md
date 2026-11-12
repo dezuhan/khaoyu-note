@@ -126,11 +126,11 @@ a migration is pending.
 | `KHAOYU_SERVICE_REDIS_URL` | empty | Redis connection string for team mode. |
 | `KHAOYU_SERVICE_REDIS_PREFIX` | `khaoyu` | Namespace for Redis keys. |
 | `KHAOYU_SERVICE_INSTANCE_ID` | hostname plus PID | Instance identity used by the worker leader lock. |
-| `KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS` | `60000` | Lifetime of a single-use SSE ticket. |
-| `KHAOYU_SERVICE_EDIT_LOCK_TTL_MS` | `15000` | Advisory edit lock lifetime. |
-| `KHAOYU_SERVICE_OP_RETENTION_DAYS` | `7` | Operation log retention before clients must resync. |
-| `KHAOYU_SERVICE_COMPACT_OPS` | `100` | Operations between snapshot compactions. |
-| `KHAOYU_SERVICE_COMPACT_MS` | `30000` | Maximum interval between snapshot compactions. |
+| `KHAOYU_SERVICE_REALTIME_TICKET_TTL_MS` | `60000` | Reserved for the planned single-use SSE ticket phase; not used yet. |
+| `KHAOYU_SERVICE_EDIT_LOCK_TTL_MS` | `15000` | Reserved for the planned advisory edit-lock phase; not used yet. |
+| `KHAOYU_SERVICE_OP_RETENTION_DAYS` | `7` | Reserved for the planned operation-log phase; not used yet. |
+| `KHAOYU_SERVICE_COMPACT_OPS` | `100` | Reserved for the planned operation-log compaction phase; not used yet. |
+| `KHAOYU_SERVICE_COMPACT_MS` | `30000` | Reserved for the planned operation-log compaction phase; not used yet. |
 | `KHAOYU_SERVICE_FRONTEND_PORT` | random 5-digit | Frontend listener port (pages and API proxy). |
 | `KHAOYU_SERVICE_BACKEND_PORT` | random 5-digit | Backend listener port (API and health only). |
 | `KHAOYU_SERVICE_DATA_DIR` | `.khaoyu-service-data` | Database, objects, temp files, outbox, backups, logs and `runtime.json`. |

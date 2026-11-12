@@ -19,9 +19,9 @@ Implemented in this repository:
 - PostgreSQL baseline and reversible migration runner;
 - `migrate-to-postgres` row copy that deliberately skips live tokens and forces re-authentication;
 - PostgreSQL logical backup/restore with checksums/encryption support;
-- Redis event bus for cross-instance SSE fanout, presence/lock primitives and worker leadership;
-- operation log, snapshots, revisions, SSE tickets and advisory edit locks;
-- team Docker profile with PostgreSQL and Redis, ready/health checks and fail-closed configuration;
+- Redis event bus for cross-instance SSE snapshot fanout;
+- snapshot revisions and per-project SSE rooms with per-instance presence;
+- team Docker profile with PostgreSQL and Redis, PostgreSQL readiness and fail-closed configuration;
 - service auth, sharing scopes, memberships, audit log and security tests.
 
 Not ready for a production team deployment:
@@ -32,11 +32,13 @@ Not ready for a production team deployment:
 2. OIDC is not implemented; the current SSO path is a trusted-proxy header mode. A real OIDC
    discovery/callback flow is still required for normal deployments.
 3. External penetration testing and production-scale load tests are outstanding.
-4. Multi-instance Redis/SSE behavior needs a dedicated two-instance validation run.
+4. [verified 2026-11-12] Multi-instance Redis/SSE snapshot propagation passed a two-instance
+   PostgreSQL 18 + Redis run, including invitations and membership. Full realtime editing
+   (operation log, SSE tickets, edit locks, global presence) is still not implemented.
 5. Asset storage is local to the service instance; shared/object storage and asset migration are not
    production-ready.
-6. Encryption at rest, least-privilege database roles and a documented multi-instance backup rehearsal
-   remain release gates.
+6. Object/backup encryption and a least-privilege PostgreSQL role script are implemented; encrypted
+   database volumes, multi-instance backup rehearsal and realtime protocol work remain release gates.
 7. `service/test/*` PostgreSQL and Redis tests are CI-gated as well. In the 2026-11-11 verification
    pass both ran locally against a disposable PostgreSQL 17 container and Redis (77 pass, 0 skipped).
 
