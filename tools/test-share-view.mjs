@@ -115,6 +115,12 @@ try {
     jar,
     body: { enabled: true, acknowledge: true },
   });
+  const publicMode = await api("/api/v1/admin/settings", {
+    method: "PATCH",
+    jar,
+    body: { registrationMode: "public" },
+  });
+  if (publicMode.status !== 200) throw new Error(`could not enable public registration: ${publicMode.status}`);
   const protectedShare = await api(`/api/v1/projects/${project.body.id}/shares`, {
     method: "POST",
     jar,
@@ -138,6 +144,8 @@ try {
   check("correct passphrase renders the project", true);
   check("shared note is visible", (await page.locator("#content").innerText()).includes("Visible shared note"));
   check("shared column child is visible", (await page.locator("#content").innerText()).includes("Column child"));
+  await page.waitForFunction(() => [...document.querySelectorAll("#content a")].some((link) => link.textContent === "Create an account"));
+  check("public share links expose account creation", true);
 
   const columnPage = await browser.newPage();
   await columnPage.goto(`${base}/s/${columnShare.body.token}`, { waitUntil: "load" });

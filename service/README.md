@@ -72,10 +72,15 @@ set, fonts and theme tokens.
 - Overview shows account, board, share-link and audit counts plus recent activity and signups.
 - Account settings (opened from the Account menu or profile button) holds the signed-in password
   form, session revocation, scoped API tokens and sign out.
+- Registration access defaults to **Private**: new accounts are created pending and cannot sign in or
+  reach boards until an admin clicks Approve. **Public** enables self-registration immediately, and
+  public share links show a Create an account link. The toggle is stored in `service_meta` as
+  `registration_mode`; the first account is always an approved admin.
 - Accounts lists profile pictures or initials, name, email, global role, active or disabled status,
-  board count, last activity and last update. Admins can create a member account manually (email,
-  display name, temporary password, member/admin role) and change another account's role or status;
-  an account cannot demote or disable itself, and the last active admin cannot be removed.
+  approval state, board count, last activity and last update. Admins can create a member account
+  manually (email, display name, temporary password, member/admin role) and change another account's
+  role, status or approval; an account cannot demote, disable or unapprove itself, and the last
+  active admin cannot be removed.
 - Boards lists projects with their owner, member count, revision and last update. Create board adds a
   project with a fresh snapshot and the signed-in admin as owner. Rename and Delete update or
   soft-delete a board (deleting revokes its share links and invitations and cascades to child boards).
@@ -403,6 +408,8 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/admin/audit` | Operator audit export, latest 500. |
 | `GET` | `/api/v1/admin/abuse-reports` | Operator abuse report review. |
 | `GET` | `/api/v1/admin/stats` | Operator counts for accounts, projects, shares, reports and audit. |
+| `GET` | `/api/v1/admin/settings` | Read `registrationMode` (`private` by default). |
+| `PATCH` | `/api/v1/admin/settings` | Set `registrationMode` to `private` or `public`; audited. |
 | `GET` | `/api/v1/notifications` | List scoped notifications and the unread count. |
 | `PATCH` | `/api/v1/notifications/:id/read` | Mark one owned notification as read. |
 | `POST` | `/api/v1/notifications/read-all` | Mark all owned notifications as read. |

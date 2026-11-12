@@ -144,6 +144,19 @@ try {
   // Admin-only manual account creation from the Accounts pane.
   await page.click('.admin-nav-item[data-page="accounts"]');
   await page.waitForSelector('[data-role="account-create"]');
+  const privateSelected = await page.locator('[data-registration-mode="private"]').getAttribute("class");
+  check("registration access defaults to private", /is-selected/.test(privateSelected || ""));
+  await page.click('[data-registration-mode="public"]');
+  await page.waitForFunction(() =>
+    document.querySelector('[data-role="registration-status"]')?.textContent.includes("Public")
+  );
+  check("admin can switch registration access to public", true);
+  await page.click('[data-registration-mode="private"]');
+  await page.waitForFunction(() =>
+    document.querySelector('[data-role="registration-status"]')?.textContent.includes("Default")
+  );
+  check("admin can switch registration access back to private", true);
+
   const manualEmail = `manual-${crypto.randomUUID()}@example.com`;
   await page.fill('[data-role="account-create"] input[name="email"]', manualEmail);
   await page.fill('[data-role="account-create"] input[name="displayName"]', "Manual Member");
@@ -181,6 +194,26 @@ try {
     body: JSON.stringify({ email: teammateEmail, password: "teammate-password-123", displayName: "Teammate" }),
   });
   check("teammate account registered", teammate.status === 202, String(teammate.status));
+  await page.click('.admin-nav-item[data-page="accounts"]');
+  await page.waitForFunction(
+    (email) => [...document.querySelectorAll("tr[data-user]")].some((row) => row.textContent.includes(email)),
+    teammateEmail
+  );
+  const teammateRow = page.locator("tr[data-user]", { hasText: teammateEmail });
+  check(
+    "private registration marks a new account pending",
+    (await teammateRow.innerText()).includes("Pending")
+  );
+  await teammateRow.locator('[data-role="approve-account"]').click();
+  await page.waitForFunction(
+    (email) => {
+      const row = [...document.querySelectorAll("tr[data-user]")].find((entry) => entry.textContent.includes(email));
+      return row && row.textContent.includes("Approved");
+    },
+    teammateEmail
+  );
+  check("admin can approve a pending account", true);
+
   await page.click('.admin-nav-item[data-page="boards"]');
   await page.waitForSelector('[data-role="team-create"]');
   await page.fill('[data-role="team-create"] input[name="name"]', "CRUD team");

@@ -32,13 +32,13 @@ test("async migration runner applies and rolls back the SQLite schema", async ()
   try {
     assert.deepEqual(
       await migrateStorage(db, { directory: MIGRATIONS_DIR }),
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
     const status = await migrationStatus(db, MIGRATIONS_DIR);
-    assert.equal(status.length, 16);
+    assert.equal(status.length, 17);
     assert.equal(status.every((entry) => entry.applied), true);
-    assert.deepEqual(await rollbackStorage(db, { directory: MIGRATIONS_DIR, steps: 16 }), [
-      16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+    assert.deepEqual(await rollbackStorage(db, { directory: MIGRATIONS_DIR, steps: 17 }), [
+      17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
     ]);
     assert.equal(
       await db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'"),
@@ -61,7 +61,7 @@ test(
     const sqlite = openDatabase(path.join(sqliteDir, "parity.db"));
     try {
       await resetPostgresSchema(storage);
-      assert.deepEqual(await migrateStorage(storage, { directory: POSTGRES_MIGRATIONS_DIR }), [1, 2, 3, 4]);
+      assert.deepEqual(await migrateStorage(storage, { directory: POSTGRES_MIGRATIONS_DIR }), [1, 2, 3, 4, 5]);
       assert.equal(
         (await migrationStatus(storage, POSTGRES_MIGRATIONS_DIR))[0].applied,
         true
@@ -101,7 +101,7 @@ test(
         assert.deepEqual(postgresColumns, sqliteColumns, `columns for ${table}`);
       }
 
-      assert.deepEqual(await rollbackStorage(storage, { directory: POSTGRES_MIGRATIONS_DIR, steps: 4 }), [4, 3, 2, 1]);
+      assert.deepEqual(await rollbackStorage(storage, { directory: POSTGRES_MIGRATIONS_DIR, steps: 5 }), [5, 4, 3, 2, 1]);
       assert.equal(
         await storage.get(
           "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accounts'"

@@ -31,7 +31,7 @@ form.addEventListener("submit", async (event) => {
   setBusy(submit, true);
   setStatus("Creating your account...");
   try {
-    await api("/api/v1/auth/register", {
+    const result = await api("/api/v1/auth/register", {
       method: "POST",
       body: {
         email,
@@ -39,7 +39,9 @@ form.addEventListener("submit", async (event) => {
         password,
       },
     });
-    window.location.replace("/login?registered=1");
+    window.location.replace(
+      result?.approval === "pending" ? "/login?pending=1" : "/login?registered=1"
+    );
   } catch (error) {
     setStatus(error.message || "Could not create the account.", "error");
     setBusy(submit, false);

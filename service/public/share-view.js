@@ -190,6 +190,7 @@ function render(data) {
     appendText(contentEl, "p", `This link expires ${new Date(data.expiresAt).toLocaleString()}.`, "muted");
   }
   appendText(contentEl, "p", "Shared read-only view. Do not forward this link to people who should not have access.", "muted");
+  if (data.scope !== "item") void showRegistrationLink();
   if (data.watermark) {
     const watermark = document.createElement("div");
     watermark.className = "share-watermark";
@@ -203,6 +204,25 @@ function render(data) {
     document.body.append(watermark);
   }
   unlockEl.hidden = true;
+}
+
+async function showRegistrationLink() {
+  try {
+    const response = await fetch("/api/v1/auth/features", { credentials: "same-origin" });
+    if (!response.ok) return;
+    const features = await response.json();
+    if (features.registrationMode !== "public") return;
+    const line = document.createElement("p");
+    line.className = "muted";
+    line.append("New here? ");
+    const link = document.createElement("a");
+    link.href = "/register";
+    link.textContent = "Create an account";
+    line.append(link);
+    contentEl.append(line);
+  } catch {
+    /* the register link is optional */
+  }
 }
 
 async function openShare() {

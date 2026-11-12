@@ -15,6 +15,7 @@ export function publicAccount(account) {
     email: account.email,
     displayName: account.display_name,
     role: account.role || "member",
+    approved: account.approved_at !== null && account.approved_at !== undefined,
     emailVerified: Boolean(account.email_verified_at),
     deletionPending: Boolean(account.deletion_requested_at),
   };
@@ -77,7 +78,7 @@ export async function authenticateAccess(db, token) {
     `SELECT at.id AS access_id, at.expires_at AS access_expires_at,
             s.id AS session_id, s.family_id, s.csrf_hash, s.last_seen_at,
             a.id, a.email, a.display_name, a.username, a.first_name, a.last_name,
-            a.avatar_color, a.avatar_url, a.role, a.status,
+            a.avatar_color, a.avatar_url, a.role, a.status, a.approved_at,
             a.email_verified_at, a.deletion_requested_at,
             a.deleted_at, a.totp_secret, a.totp_enabled_at
      FROM access_tokens at
@@ -85,7 +86,7 @@ export async function authenticateAccess(db, token) {
      JOIN accounts a ON a.id = s.account_id
      WHERE at.token_hash = ? AND at.revoked_at IS NULL AND at.expires_at > ?
        AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL
-       AND a.status = 'active'`,
+       AND a.status = 'active' AND a.approved_at IS NOT NULL`,
     [hashToken(token), Date.now(), Date.now()]
   );
   if (!row) return null;
@@ -279,12 +280,12 @@ export async function authenticateApiToken(db, token) {
   const row = await db.get(
     `SELECT t.id AS token_id, t.scopes, t.expires_at,
             a.id, a.email, a.display_name, a.username, a.avatar_color, a.avatar_url,
-            a.role, a.status, a.email_verified_at, a.deletion_requested_at,
+            a.role, a.status, a.approved_at, a.email_verified_at, a.deletion_requested_at,
             a.deleted_at
      FROM api_tokens t JOIN accounts a ON a.id = t.account_id
      WHERE t.token_hash = ? AND t.revoked_at IS NULL
        AND (t.expires_at IS NULL OR t.expires_at > ?) AND a.deleted_at IS NULL
-       AND a.status = 'active'`,
+       AND a.status = 'active' AND a.approved_at IS NOT NULL`,
     [hashToken(token), Date.now()]
   );
   if (!row) return null;

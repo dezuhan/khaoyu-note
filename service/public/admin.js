@@ -312,15 +312,32 @@ function accountDetailRows(data) {
 async function renderAccounts(query = "") {
   pane.innerHTML = `<div class="admin-loading">Loading accounts...</div>`;
   let data;
+  let settings;
   try {
-    data = await api(`/api/v1/admin/users?limit=100&q=${encodeURIComponent(query)}`);
+    [data, settings] = await Promise.all([
+      api(`/api/v1/admin/users?limit=100&q=${encodeURIComponent(query)}`),
+      api("/api/v1/admin/settings"),
+    ]);
   } catch (error) {
     if (error instanceof AuthError) return showAuth();
     pane.innerHTML = "";
     return showError(error);
   }
   const selfId = dashboard?.admin?.id;
+  const mode = settings?.registrationMode === "public" ? "public" : "private";
   pane.innerHTML = `
+    <div class="ky-section admin-section">
+      <div class="admin-section-head"><div><h2>Registration access</h2><p>Private requires an admin to approve every new account before it can sign in. Public opens self-registration immediately.</p></div></div>
+      <div class="admin-segmented" role="radiogroup" aria-label="Registration access">
+        <button type="button" class="admin-segment${mode === "private" ? " is-selected" : ""}" data-registration-mode="private" role="radio" aria-checked="${mode === "private"}">Private</button>
+        <button type="button" class="admin-segment${mode === "public" ? " is-selected" : ""}" data-registration-mode="public" role="radio" aria-checked="${mode === "public"}">Public</button>
+      </div>
+      <p class="admin-note" data-role="registration-status" role="status">${
+        mode === "private"
+          ? "Default: new accounts wait for approval."
+          : "Public: anyone with a public link can create an account without approval."
+      }</p>
+    </div>
     <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>Accounts</h2><p>${data.total} service account${
         data.total === 1 ? "" : "s"
@@ -343,7 +360,7 @@ async function renderAccounts(query = "") {
       ${
         data.users.length
           ? `<table class="ky-table admin-table">
-        <thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Boards</th><th>Last active</th><th>Updated</th></tr></thead>
+        <thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Approval</th><th>Boards</th><th>Last active</th><th>Updated</th></tr></thead>
         <tbody>
           ${data.users
             .map(
@@ -366,6 +383,14 @@ async function renderAccounts(query = "") {
                   <option value="disabled"${user.status === "disabled" ? " selected" : ""}>Disabled</option>
                 </select>
               </td>
+              <td>
+                ${
+                  user.approved
+                    ? `<span class="admin-badge is-active">Approved</span>`
+                    : `<span class="admin-badge is-pending">Pending</span>
+                       <button class="admin-detail-button" type="button" data-role="approve-account" data-user="${escapeHtml(user.id)}">Approve</button>`
+                }
+              </td>
               <td>${escapeHtml(user.projectCount)}</td>
               <td class="admin-time">${escapeHtml(formatTime(user.lastSeenAt))}</td>
               <td class="admin-time">${escapeHtml(formatTime(user.updatedAt))}</td>
@@ -377,6 +402,44 @@ async function renderAccounts(query = "") {
           : `<div class="admin-empty">No accounts match that search.</div>`
       }
     </div>`;
+  for (const button of pane.querySelectorAll('[data-registration-mode]')) {
+    button.addEventListener("click", async () => {
+      if (button.dataset.registrationMode === mode) return;
+      const status = pane.querySelector('[data-role="registration-status"]');
+      if (status) status.textContent = "Saving registration access...";
+      try {
+        await api("/api/v1/admin/settings", {
+          method: "PATCH",
+          body: { registrationMode: button.dataset.registrationMode },
+        });
+        dashboard = await api("/api/v1/admin/dashboard");
+        await renderAccounts(query);
+      } catch (error) {
+        if (error instanceof AuthError) return showAuth();
+        if (status) status.textContent = error.message;
+      }
+    });
+  }
+
+  for (const button of pane.querySelectorAll('[data-role="approve-account"]')) {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await api(`/api/v1/admin/users/${encodeURIComponent(button.dataset.user)}`, {
+          method: "PATCH",
+          body: { approved: true },
+        });
+        dashboard = await api("/api/v1/admin/dashboard");
+        await renderAccounts(query);
+      } catch (error) {
+        if (error instanceof AuthError) return showAuth();
+        showError(error);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   pane.querySelector('[data-role="account-search"]').addEventListener("submit", (event) => {
     event.preventDefault();
     renderAccounts(event.target.q.value.trim());

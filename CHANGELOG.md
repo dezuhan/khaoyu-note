@@ -102,6 +102,10 @@ project uses Semantic Versioning.
 - Board viewport position and zoom are now stored per device instead of being written into the board
   row. Opening a board from a phone/tunnel can no longer conflict with a desktop window merely
   because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
+- Added a Private/Public registration-access control to the admin dashboard, defaulting to Private.
+  Private registrations are pending and cannot sign in until an admin approves them; Public
+  registrations are active immediately and public share viewers show a Create an account link.
+  Existing accounts and the bootstrap owner are auto-approved by migration 17/5.
 - The public share viewer now renders the shared board as a scaled, read-only canvas preview with
   spatial card positions and themed card styles instead of a raw type label list; column shares show
   their scoped children and nested boards show their own previews.

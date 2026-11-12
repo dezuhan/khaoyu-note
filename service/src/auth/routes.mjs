@@ -220,6 +220,8 @@ function adminAccount(row) {
     avatarUrl: row.avatar_url || "",
     role: row.role || "member",
     status: row.status || "active",
+    approved: row.approved_at !== null && row.approved_at !== undefined,
+    approvedAt: row.approved_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastSeenAt: row.last_seen_at ?? null,
@@ -228,7 +230,28 @@ function adminAccount(row) {
 }
 
 const ADMIN_ACCOUNT_COLUMNS =
-  "a.id, a.email, a.display_name, a.username, a.first_name, a.last_name, a.avatar_color, a.avatar_url, a.role, a.status, a.created_at, a.updated_at";
+  "a.id, a.email, a.display_name, a.username, a.first_name, a.last_name, a.avatar_color, a.avatar_url, a.role, a.status, a.approved_at, a.created_at, a.updated_at";
+const REGISTRATION_MODE_KEY = "registration_mode";
+
+async function registrationMode(db) {
+  const row = await db.get("SELECT value FROM service_meta WHERE key = ?", [REGISTRATION_MODE_KEY]);
+  return row?.value === "public" ? "public" : "private";
+}
+
+function accountApproved(account) {
+  return account?.approved_at !== null && account?.approved_at !== undefined;
+}
+
+function requireApproved(account) {
+  if (!accountApproved(account)) {
+    throw new HttpError(403, "account is waiting for administrator approval", "account_pending");
+  }
+}
+
+async function startSession(db, config, account, options) {
+  requireApproved(account);
+  return createSession(db, config, account, options);
+}
 
 function validateAdminAvatar(value) {
   if (value === null || value === undefined || value === "") return "";
@@ -518,6 +541,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
               activeAccounts: await count(
                 "SELECT COUNT(*) AS count FROM accounts WHERE deleted_at IS NULL AND status = 'active'"
               ),
+              pendingAccounts: await count(
+                "SELECT COUNT(*) AS count FROM accounts WHERE deleted_at IS NULL AND approved_at IS NULL"
+              ),
               boards: await count("SELECT COUNT(*) AS count FROM projects WHERE deleted_at IS NULL"),
               teams: await count("SELECT COUNT(*) AS count FROM projects WHERE deleted_at IS NULL"),
               auditEntries: await count("SELECT COUNT(*) AS count FROM audit_log"),
@@ -552,6 +578,36 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      if (method === "GET" && url.pathname === "/api/v1/admin/settings") {
+        await requireAdminAccount(request, response, db, config);
+        sendJson(response, 200, { registrationMode: await registrationMode(db) }, config);
+        return true;
+      }
+
+      if (method === "PATCH" && url.pathname === "/api/v1/admin/settings") {
+        const auth = await requireAdminAccount(request, response, db, config);
+        const body = await readJson(request);
+        const mode = String(body.registrationMode || "");
+        if (!["private", "public"].includes(mode)) {
+          throw new HttpError(400, "registrationMode must be private or public", "invalid_registration_mode");
+        }
+        await db.run(
+          "INSERT INTO service_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+          [REGISTRATION_MODE_KEY, mode]
+        );
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "admin.registration_mode_changed",
+          resourceType: "service",
+          resourceId: null,
+          metadata: { mode },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { registrationMode: mode }, config);
+        return true;
+      }
+
       if (method === "POST" && url.pathname === "/api/v1/admin/users") {
         const auth = await requireAdminAccount(request, response, db, config);
         const body = await readJson(request);
@@ -568,9 +624,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const id = crypto.randomUUID();
         try {
           await db.run(
-            `INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, email, displayName, await hashPassword(password), now(), role, now(), now()]
+            `INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, email, displayName, await hashPassword(password), now(), role, now(), now(), now()]
           );
         } catch (error) {
           if (/UNIQUE|duplicate key/i.test(String(error.message || ""))) {
@@ -670,14 +726,15 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const body = await readJson(request);
         const role = body.role === undefined ? current.role : String(body.role);
         const status = body.status === undefined ? current.status : String(body.status);
+        const approved = body.approved === undefined ? accountApproved(current) : Boolean(body.approved);
         if (!["admin", "member"].includes(role)) {
           throw new HttpError(400, "role is invalid", "invalid_role");
         }
         if (!["active", "disabled"].includes(status)) {
           throw new HttpError(400, "status is invalid", "invalid_status");
         }
-        if (targetId === auth.account.id && (role !== "admin" || status !== "active")) {
-          throw new HttpError(400, "you cannot demote or disable your own account", "self_lockout");
+        if (targetId === auth.account.id && (role !== "admin" || status !== "active" || !approved)) {
+          throw new HttpError(400, "you cannot demote, disable or unapprove your own account", "self_lockout");
         }
         if (
           (role !== "admin" || status !== "active") &&
@@ -707,13 +764,14 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const avatarUrl =
           body.avatarUrl === undefined ? current.avatar_url : validateAdminAvatar(body.avatarUrl);
         (await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, avatar_color = ?,
-             avatar_url = ?, role = ?, status = ?, updated_at = ? WHERE id = ?`, [displayName,
+             avatar_url = ?, role = ?, status = ?, approved_at = ?, updated_at = ? WHERE id = ?`, [displayName,
           firstName || null,
           lastName || null,
           avatarColor || null,
           avatarUrl || null,
           role,
           status,
+          approved ? (current.approved_at ?? now()) : null,
           now(),
           targetId]));
         if (status === "disabled" && current.status !== "disabled") {
@@ -727,7 +785,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           action: "admin.user_updated",
           resourceType: "account",
           resourceId: targetId,
-          metadata: { role, status },
+          metadata: { role, status, approved },
           ip,
           secret: config.secret,
         });
@@ -1383,7 +1441,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           ).slice(0, 120);
           const id = crypto.randomUUID();
           const firstAccount = Number((await db.get("SELECT COUNT(*) AS count FROM accounts", [])).count) === 0;
-          (await db.run("INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)", [id, email, displayName, now(), firstAccount ? "admin" : "member", now(), now()]));
+          const mode = await registrationMode(db);
+          const approvedAt = firstAccount || mode === "public" ? now() : null;
+          (await db.run("INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)", [id, email, displayName, now(), firstAccount ? "admin" : "member", approvedAt, now(), now()]));
           account = (await db.get("SELECT * FROM accounts WHERE id = ?", [id]));
         }
         if (account.deleted_at) {
@@ -1392,7 +1452,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (account.status === "disabled") {
           throw new HttpError(403, "account is disabled", "account_disabled");
         }
-        const session = await createSession(db, config, account, {
+        const session = await startSession(db, config, account, {
           ipHash,
           userAgent: request.headers["user-agent"],
         });
@@ -1466,7 +1526,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const email = normalizeEmail(body.email);
         try {
           const account = await verifyAuthentication(db, config, email, body.response);
-          const session = await createSession(db, config, account, {
+          const session = await startSession(db, config, account, {
             ipHash,
             userAgent: request.headers["user-agent"],
           });
@@ -1532,7 +1592,10 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       }
 
       if (method === "GET" && url.pathname === "/api/v1/auth/features") {
-        sendJson(response, 200, { passkeysEnabled: Boolean(config.passkeysEnabled) }, config);
+        sendJson(response, 200, {
+          passkeysEnabled: Boolean(config.passkeysEnabled),
+          registrationMode: await registrationMode(db),
+        }, config);
         return true;
       }
 
@@ -1546,6 +1609,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             ? requireString(body.displayName, "displayName", 80)
             : email.split("@")[0];
         let account;
+        let approvedAt = null;
         try {
           account = {
             id: crypto.randomUUID(),
@@ -1556,20 +1620,30 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             deleted_at: null,
           };
           const firstAccount = Number((await db.get("SELECT COUNT(*) AS count FROM accounts", [])).count) === 0;
-          (await db.run("INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [account.id,
+          const mode = await registrationMode(db);
+          approvedAt = firstAccount || mode === "public" ? now() : null;
+          (await db.run("INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [account.id,
             email,
             displayName,
             await hashPassword(password),
             now(),
             firstAccount ? "admin" : "member",
+            approvedAt,
             now(),
             now()]));
         } catch (error) {
           if (!/UNIQUE/.test(error.message)) throw error;
-          sendJson(response, 202, { status: "registered" }, config);
+          const duplicateMode = await registrationMode(db);
+          sendJson(response, 202, {
+            status: "registered",
+            approval: duplicateMode === "public" ? "approved" : "pending",
+          }, config);
           return true;
         }
-        sendJson(response, 202, { status: "registered" }, config);
+        sendJson(response, 202, {
+          status: "registered",
+          approval: approvedAt === null ? "pending" : "approved",
+        }, config);
         return true;
       }
 
@@ -1648,7 +1722,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         (await db.run("UPDATE email_otps SET used_at = ? WHERE id = ?", [now(), otp.id]));
         await clearLoginFailures(db, { email, ip, secret: config.secret });
-        const session = await createSession(db, config, account, {
+        const session = await startSession(db, config, account, {
           ipHash,
           userAgent: request.headers["user-agent"],
         });
@@ -1748,7 +1822,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         (await db.run("UPDATE recovery_codes SET used_at = ? WHERE id = ?", [now(), recovery.id]));
         await clearLoginFailures(db, { email, ip, secret: config.secret });
-        const session = await createSession(db, config, account, {
+        const session = await startSession(db, config, account, {
           ipHash,
           userAgent: request.headers["user-agent"],
         });
@@ -1809,7 +1883,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           return true;
         }
         await clearLoginFailures(db, { email, ip, secret: config.secret });
-        const session = await createSession(db, config, account, {
+        const session = await startSession(db, config, account, {
           ipHash,
           userAgent: request.headers["user-agent"],
         });
@@ -1878,6 +1952,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           sendJson(response, 401, { error: "Invalid email or password" }, config);
           return true;
         }
+        requireApproved(account);
         await clearLoginFailures(db, { email });
         const scopes = ["projects:read", "projects:write"];
         const expiresAt = now() + 365 * 86_400_000;

@@ -73,8 +73,8 @@ async function bootstrap(config, db, password) {
     account = { id: crypto.randomUUID(), email };
     const now = Date.now();
     await db.run(
-      "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'admin', ?, ?)",
-      [account.id, email, name, password.hash, now, now, now]
+      "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'admin', ?, ?, ?)",
+      [account.id, email, name, password.hash, now, now, now, now]
     );
     createdAccount = true;
   } else {

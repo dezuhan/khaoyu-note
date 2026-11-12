@@ -1561,3 +1561,36 @@ body.admin-body {
 .admin-body[data-role="member"] .admin-nav-sep {
   margin-top: var(--ky-space-2);
 }
+
+/* Registration access control */
+.admin-segmented {
+  display: inline-flex;
+  gap: var(--ky-space-2);
+  padding: var(--ky-space-2);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+}
+
+.admin-segment {
+  min-width: 88px;
+  padding: var(--ky-space-6) var(--ky-space-14);
+  border: 0;
+  border-radius: var(--ky-radius-2xs);
+  background: transparent;
+  color: var(--ky-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin-segment.is-selected {
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  box-shadow: var(--ky-shadow-popup);
+}
+
+.admin-badge.is-pending {
+  border-color: color-mix(in srgb, var(--ky-accent) 55%, var(--ky-stroke));
+  background: color-mix(in srgb, var(--ky-accent) 14%, var(--ky-surface));
+  color: var(--ky-text);
+}

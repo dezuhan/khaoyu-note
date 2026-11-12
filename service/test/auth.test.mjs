@@ -79,6 +79,9 @@ async function start() {
   const config = configFor(dataDir);
   const db = openDatabase(config.databasePath);
   migrate(db, { directory: MIGRATIONS_DIR });
+  // Exercise the existing auth flows as an open-registration service; the private-mode test below
+  // toggles the setting explicitly.
+  db.prepare("INSERT OR REPLACE INTO service_meta (key, value) VALUES ('registration_mode', 'public')").run();
   const logger = createLogger({ write() {} });
   const mailer = createFileMailer(config, logger);
   const server = createService({ config, db, logger, mailer });
@@ -1755,6 +1758,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     const features = await api.call("/api/v1/auth/features");
     assert.equal(features.status, 200);
     assert.equal(features.body.passkeysEnabled, true);
+    assert.equal(features.body.registrationMode, "public");
   });
 
   await t.test("TOTP can be enabled and is required at login", async () => {
@@ -1919,4 +1923,60 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(response.body.code, "rate_limited");
     assert.ok(Number(response.response.headers.get("retry-after")) >= 1);
   });
+});
+
+test("private registration policy gates new accounts until admin approval", async (t) => {
+  const api = await start();
+  t.after(() => api.close());
+  const admin = await api.account(`approval-admin-${crypto.randomUUID()}@example.com`);
+  const privateMode = await api.call("/api/v1/admin/settings", {
+    method: "PATCH",
+    jar: admin.jar,
+    body: { registrationMode: "private" },
+  });
+  assert.equal(privateMode.status, 200, JSON.stringify(privateMode.body));
+  assert.equal(privateMode.body.registrationMode, "private");
+  assert.equal((await api.call("/api/v1/auth/features")).body.registrationMode, "private");
+
+  const pendingEmail = `pending-${crypto.randomUUID()}@example.com`;
+  const registered = await api.call("/api/v1/auth/register", {
+    method: "POST",
+    body: { email: pendingEmail, password: PASSWORD, displayName: "Pending" },
+  });
+  assert.equal(registered.status, 202, JSON.stringify(registered.body));
+  assert.equal(registered.body.approval, "pending");
+  const blocked = await api.login(pendingEmail);
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.code, "account_pending");
+
+  const listed = await api.call(`/api/v1/admin/users?q=${encodeURIComponent(pendingEmail)}`, {
+    jar: admin.jar,
+  });
+  assert.equal(listed.status, 200);
+  const pendingUser = listed.body.users.find((user) => user.email === pendingEmail);
+  assert.ok(pendingUser);
+  assert.equal(pendingUser.approved, false);
+  const approved = await api.call(`/api/v1/admin/users/${encodeURIComponent(pendingUser.id)}`, {
+    method: "PATCH",
+    jar: admin.jar,
+    body: { approved: true },
+  });
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  assert.equal(approved.body.user.approved, true);
+  const allowed = await api.login(pendingEmail);
+  assert.equal(allowed.status, 200, JSON.stringify(allowed.body));
+
+  const publicMode = await api.call("/api/v1/admin/settings", {
+    method: "PATCH",
+    jar: admin.jar,
+    body: { registrationMode: "public" },
+  });
+  assert.equal(publicMode.status, 200);
+  const publicEmail = `open-${crypto.randomUUID()}@example.com`;
+  const openRegistered = await api.call("/api/v1/auth/register", {
+    method: "POST",
+    body: { email: publicEmail, password: PASSWORD, displayName: "Open" },
+  });
+  assert.equal(openRegistered.body.approval, "approved");
+  assert.equal((await api.login(publicEmail)).status, 200);
 });

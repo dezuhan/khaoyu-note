@@ -78,6 +78,12 @@ export function queryMessage() {
   if (params.get("registered") === "1") {
     return { message: "Account created. Sign in with your new account.", kind: "success" };
   }
+  if (params.get("pending") === "1") {
+    return {
+      message: "Account created. An administrator must approve it before you can sign in.",
+      kind: "",
+    };
+  }
   if (params.get("reset") === "1") {
     return { message: "Password updated. Sign in with the new password.", kind: "success" };
   }
