@@ -116,8 +116,6 @@ async function renderLocalShareSection(body) {
   input.className = "ky-input mn-share-local-url";
   input.readOnly = true;
   input.value = "Loading...";
-  const actions = document.createElement("div");
-  actions.className = "mn-account-actions";
   const copy = document.createElement("button");
   copy.type = "button";
   copy.className = "mn-btn mn-btn-primary";
@@ -133,8 +131,10 @@ async function renderLocalShareSection(body) {
       toast("Could not copy the board link");
     }
   });
-  actions.append(copy);
-  section.append(input, actions, hint);
+  const copyRow = document.createElement("div");
+  copyRow.className = "mn-share-copy-row";
+  copyRow.append(input, copy);
+  section.append(copyRow, hint);
   body.append(section);
 
   const url = await boardShareUrl();
@@ -216,6 +216,11 @@ async function renderPanel() {
     return;
   }
 
+  const createHeading = document.createElement("div");
+  createHeading.className = "mn-share-section-title";
+  createHeading.textContent = "Create a share link";
+  body.append(createHeading);
+
   const targetLabel = document.createElement("div");
   targetLabel.className = "mn-share-target";
   targetLabel.textContent = target
@@ -279,9 +284,10 @@ async function renderPanel() {
 
   const tokenOutput = document.createElement("p");
   tokenOutput.className = "mn-share-token";
-  body.append(tokenOutput);
 
-  body.append(
+  const actions = document.createElement("div");
+  actions.className = "mn-share-actions";
+  actions.append(
     button("Create share link", "mn-btn mn-btn-primary", async () => {
       try {
         const created = await sharing.createShare(projectId, {
@@ -301,8 +307,7 @@ async function renderPanel() {
       }
     })
   );
-
-  body.append(
+  actions.append(
     button("Copy last link", "mn-btn mn-btn-quiet", async () => {
       if (!tokenOutput.dataset.url) return toast("Create a link first");
       try {
@@ -313,6 +318,12 @@ async function renderPanel() {
       }
     })
   );
+  body.append(actions, tokenOutput);
+
+  const linksHeading = document.createElement("div");
+  linksHeading.className = "mn-share-section-title";
+  linksHeading.textContent = "Active links";
+  body.append(linksHeading);
 
   const list = document.createElement("ul");
   list.className = "mn-share-list";

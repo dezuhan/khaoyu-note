@@ -6078,7 +6078,7 @@ html[data-performance="true"] *::after {
   background: color-mix(in srgb, #000 42%, transparent);
 }
 .mn-share-panel {
-  width: min(560px, calc(100vw - 48px));
+  width: min(600px, calc(100vw - 48px));
 }
 .mn-share-body {
   display: flex;
@@ -6161,6 +6161,92 @@ html[data-performance="true"] *::after {
   margin-top: 5px;
   font-size: 11px;
   color: var(--ky-soft);
+}
+
+.mn-share-body {
+  gap: 12px;
+}
+
+.mn-share-local {
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 0;
+}
+
+.mn-share-local-title,
+.mn-share-section-title {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mn-share-section-title {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ky-stroke);
+}
+
+.mn-share-copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.mn-share-copy-row .ky-input {
+  min-width: 0;
+}
+
+.mn-share-fields {
+  gap: 10px 14px;
+}
+
+.mn-share-fields > label {
+  min-width: 0;
+}
+
+.mn-share-fields .ky-input {
+  min-width: 0;
+}
+
+.mn-share-fields > .mn-share-check {
+  flex-direction: row;
+  align-items: center;
+  align-self: end;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.mn-share-fields > .mn-share-check input {
+  flex: 0 0 auto;
+}
+
+.mn-share-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mn-share-actions .mn-btn-primary {
+  flex: 1 1 auto;
+}
+
+.mn-share-actions .mn-btn-quiet {
+  flex: 0 0 auto;
+}
+
+.mn-share-token:empty {
+  display: none;
+}
+
+.mn-share-token {
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  padding: 8px;
+  background: var(--ky-control);
+}
+
+.mn-share-list {
+  margin-top: 2px;
 }
 
 /* First-run onboarding */

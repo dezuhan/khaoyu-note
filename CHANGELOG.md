@@ -69,6 +69,10 @@ project uses Semantic Versioning.
 
 - Board cards are focusable groups: selecting a card inside a column now shows the accent selection
   ring (it was hidden by the child hairline), and keyboard focus shows a 2 px accent outline.
+- The Share dialog is reorganized into clear Board link, Create a share link and Active links
+  sections: the board URL and copy action share one row, the form fields align in two columns, and
+  Create/Copy actions sit together without the previous empty vertical gaps.
+
 - Dragging a tool from the rail into a column or row inserts it at the pointer position, including
   before the first child; the drop preview line shows the target slot instead of always appending.
 - Rows now follow the width of their cards instead of stretching every card to fill the row. Columns
