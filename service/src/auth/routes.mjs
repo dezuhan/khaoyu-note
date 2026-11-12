@@ -192,6 +192,22 @@ async function requireAdminAccount(request, response, db, config) {
   return auth;
 }
 
+const RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function createRecoveryCode() {
+  let raw = "";
+  for (let index = 0; index < 10; index += 1) {
+    raw += RECOVERY_ALPHABET[crypto.randomInt(RECOVERY_ALPHABET.length)];
+  }
+  return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+}
+
+function normalizeRecoveryCode(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
 function adminAccount(row) {
   return {
     id: row.id,
@@ -303,6 +319,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
   const passwordResetRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const otpRequestRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const passkeyLoginRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
+  const recoveryLoginRate = createRateLimiter({ windowMs: rateWindowMs, max: 10 });
   const shareReportRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const invitationRate = createRateLimiter({ windowMs: rateWindowMs, max: 20 });
 
@@ -1629,6 +1646,100 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           },
           config
         );
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/recovery-codes") {
+        const auth = await requireSessionAuth(request, response, db, config);
+        const codes = Array.from({ length: 10 }, () => createRecoveryCode());
+        await db.transaction(async (tx) => {
+          await tx.run("DELETE FROM recovery_codes WHERE account_id = ?", [auth.account.id]);
+          for (const code of codes) {
+            await tx.run(
+              "INSERT INTO recovery_codes (id, account_id, code_hash, created_at) VALUES (?, ?, ?, ?)",
+              [crypto.randomUUID(), auth.account.id, hashToken(normalizeRecoveryCode(code)), now()]
+            );
+          }
+        });
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "auth.recovery_codes_created",
+          resourceType: "account",
+          resourceId: auth.account.id,
+          metadata: { count: codes.length },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 201, { codes, remaining: codes.length }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/auth/recovery-codes") {
+        const auth = await requireSessionAuth(request, response, db, config);
+        const row = (await db.get(
+          `SELECT COUNT(*) AS remaining, MIN(created_at) AS created_at
+           FROM recovery_codes WHERE account_id = ? AND used_at IS NULL`,
+          [auth.account.id]
+        ));
+        sendJson(response, 200, {
+          remaining: Number(row?.remaining || 0),
+          createdAt: row?.created_at || null,
+        }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/recovery-login") {
+        enforceRate(recoveryLoginRate, ipHash);
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const code = normalizeRecoveryCode(body.code);
+        if (code.length !== 10) {
+          throw new HttpError(401, "Invalid email or backup code", "invalid_credentials");
+        }
+        const throttle = await loginBlocked(db, { email, ip, config });
+        if (throttle.blocked) {
+          await recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const account = (await db.get(
+          "SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL AND status = 'active'",
+          [email]
+        ));
+        const recovery = account
+          ? (await db.get(
+              `SELECT id FROM recovery_codes
+               WHERE account_id = ? AND code_hash = ? AND used_at IS NULL`,
+              [account.id, hashToken(code)]
+            ))
+          : null;
+        if (!recovery) {
+          await recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or backup code", code: "invalid_credentials" }, config);
+          return true;
+        }
+        (await db.run("UPDATE recovery_codes SET used_at = ? WHERE id = ?", [now(), recovery.id]));
+        await clearLoginFailures(db, { email, ip, secret: config.secret });
+        const session = await createSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        await writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.recovery_login",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, {
+          account: publicAccount(account),
+          csrfToken: session.csrfToken,
+          accessExpiresAt: session.accessExpiresAt,
+        }, config);
         return true;
       }
 

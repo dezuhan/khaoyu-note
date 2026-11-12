@@ -72,6 +72,9 @@ project uses Semantic Versioning.
 - The Share dialog is reorganized into clear Board link, Create a share link and Active links
   sections: the board URL and copy action share one row, the form fields align in two columns, and
   Create/Copy actions sit together without the previous empty vertical gaps.
+- Passkey registration now issues ten one-time **backup codes** (both in the admin Security page and
+  on `/passkeys`). Codes are hashed at rest, shown once, invalidated on regeneration, and can be used
+  with an email on the login page as a passwordless fallback. Migration 016 adds `recovery_codes`.
 - The admin dashboard now owns the viewport: the service sidebar and menubar stay fixed while the active
   page scrolls inside the content pane. Account security pages use the same fixed-viewport model, so
   long pages no longer scroll the whole document.

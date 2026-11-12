@@ -51,7 +51,7 @@ against both dialects. This avoids changing behaviour and storage at the same ti
   existing code semantics.
 - SQLite migrations stay in `service/src/migrations`; PostgreSQL has a baseline in
   `service/src/migrations/postgres/001_baseline` and receives the same new migrations. The baseline
-  is validated against the 15 SQLite migrations by a table/column parity test.
+  is validated against the 16 SQLite migrations by a table/column parity test.
 
 ### Migration commands
 

@@ -231,3 +231,16 @@ body.account-security-page .ky-auth-panel {
   max-height: 100%;
   overscroll-behavior: contain;
 }
+
+.backup-codes {
+  margin: var(--ky-space-10) 0 0;
+  padding: var(--ky-space-12);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+  color: var(--ky-text);
+  font-family: var(--ky-mono);
+  font-size: var(--ky-text-sm);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}

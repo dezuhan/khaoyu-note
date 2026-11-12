@@ -309,6 +309,12 @@ try {
   await page.click('[data-role="totp-cancel"]');
   check("security page uses the shared design tokens", (await page.locator(".ky-button").count()) >= 1);
 
+  await page.click('[data-role="recovery-generate"]');
+  await page.waitForSelector(".admin-backup-codes [data-role=\"recovery-list\"] code");
+  const backupCodes = await page.locator('[data-role="recovery-list"] code').allInnerTexts();
+  check("backup codes are generated as a one-time set", backupCodes.length === 10, String(backupCodes.length));
+  const backupCode = backupCodes[0];
+
   await page.fill('[data-role="token-form"] input[name="name"]', "Desktop sync");
   await page.click('[data-role="token-form"] button[type="submit"]');
   await page.waitForFunction(
@@ -345,6 +351,17 @@ try {
   await page.click("#login-submit");
   await page.waitForURL(/\/admin$/, { timeout: 15000 });
   check("login with the new password", (await page.locator("#admin-email").innerText()).includes(email));
+
+  await page.click('.admin-nav-item[data-page="sessions"]');
+  await page.waitForSelector('[data-role="logout-all"]');
+  await page.click('[data-role="logout-all"]');
+  await page.waitForURL(/\/login\?signedout=1/, { timeout: 15000 });
+  await page.fill("#email", email);
+  await page.locator("summary", { hasText: "Use a backup code" }).click();
+  await page.fill("#recovery-code", backupCode);
+  await page.click("#login-submit");
+  await page.waitForURL(/\/admin$/, { timeout: 15000 });
+  check("login with a backup code works without a password", (await page.locator("#admin-email").innerText()).includes(email));
 
   check("no unexpected page errors", pageErrors.length === 0, pageErrors.join(" | "));
 } catch (error) {

@@ -1738,6 +1738,45 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(withCode.status, 200);
   });
 
+  await t.test("backup codes are one-time credentials after passkey setup", async () => {
+    const user = await api.account(`recovery-${crypto.randomUUID()}@example.com`);
+    const guest = await api.call("/api/v1/auth/recovery-codes", { method: "POST", body: {} });
+    assert.equal(guest.status, 401);
+    const created = await api.call("/api/v1/auth/recovery-codes", { method: "POST", jar: user.jar, body: {} });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    assert.equal(created.body.codes.length, 10);
+    assert.ok(created.body.codes.every((code) => /^[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(code)));
+    const status = await api.call("/api/v1/auth/recovery-codes", { jar: user.jar });
+    assert.equal(status.body.remaining, 10);
+    const loginJar = {};
+    const login = await api.call("/api/v1/auth/recovery-login", {
+      method: "POST",
+      jar: loginJar,
+      body: { email: user.email, code: created.body.codes[0] },
+    });
+    assert.equal(login.status, 200, JSON.stringify(login.body));
+    assert.ok(loginJar.khaoyu_access);
+    const afterUse = await api.call("/api/v1/auth/recovery-codes", { jar: user.jar });
+    assert.equal(afterUse.body.remaining, 9);
+    const reuse = await api.call("/api/v1/auth/recovery-login", {
+      method: "POST",
+      body: { email: user.email, code: created.body.codes[0] },
+    });
+    assert.equal(reuse.status, 401);
+    const wrong = await api.call("/api/v1/auth/recovery-login", {
+      method: "POST",
+      body: { email: user.email, code: "AAAAA-AAAAA" },
+    });
+    assert.equal(wrong.status, 401);
+    const regenerated = await api.call("/api/v1/auth/recovery-codes", { method: "POST", jar: user.jar, body: {} });
+    assert.equal(regenerated.status, 201);
+    const oldCode = await api.call("/api/v1/auth/recovery-login", {
+      method: "POST",
+      body: { email: user.email, code: created.body.codes[1] },
+    });
+    assert.equal(oldCode.status, 401);
+  });
+
   await t.test("account deletion has a grace period and can be cancelled", async () => {
     const user = await api.account(`delete-${crypto.randomUUID()}@example.com`);
     const projectId = await createProject(user, "Deletion assets");

@@ -37,6 +37,12 @@
         <button id="logout" class="ky-button ky-button-quiet">Sign out</button>
         <ul id="passkey-list"></ul>
       </section>
+      <section class="ky-auth-section">
+        <h2>Backup codes</h2>
+        <p>Save these one-time codes for signing in when your passkey is unavailable. Each code works once.</p>
+        <button class="ky-button ky-button-quiet" id="backup-generate" type="button">Generate backup codes</button>
+        <pre id="backup-codes" class="backup-codes" hidden></pre>
+      </section>
 
       <div id="status" role="status"></div>
     </main>

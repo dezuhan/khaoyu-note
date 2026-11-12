@@ -36,6 +36,10 @@
             <summary>Use an authenticator code</summary>
             <input id="totp" name="totp" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
           </details>
+          <details>
+            <summary>Use a backup code</summary>
+            <input id="recovery-code" name="recovery-code" autocomplete="one-time-code" placeholder="XXXXX-XXXXX" />
+          </details>
         </div>
         <p class="auth-status" id="status" role="status"></p>
         <button class="auth-submit" id="login-submit" type="submit">Sign in</button>

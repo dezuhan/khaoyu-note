@@ -1068,6 +1068,22 @@ async function renderSecurity() {
     </div>
 
     <div class="ky-section admin-section">
+      <div class="admin-section-head"><div><h2>Backup codes</h2><p>One-time codes for signing in when your passkey is unavailable. Each code works once.</p></div></div>
+      <p class="admin-note" data-role="recovery-status">Checking backup codes...</p>
+      <div class="admin-actions admin-actions-spaced">
+        <button class="ky-button ky-button-quiet" type="button" data-role="recovery-generate">Generate new backup codes</button>
+      </div>
+      <div class="admin-backup-codes" data-role="recovery-codes" hidden>
+        <p class="admin-note">Save these codes somewhere safe. They are shown only once.</p>
+        <ol data-role="recovery-list"></ol>
+        <div class="admin-actions">
+          <button class="ky-button ky-button-quiet" type="button" data-role="recovery-copy">Copy codes</button>
+          <button class="ky-button ky-button-quiet" type="button" data-role="recovery-download">Download .txt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ky-section admin-section">
       <div class="admin-section-head"><div><h2>API tokens</h2><p>Scoped tokens for desktop sync.</p></div></div>
       <form class="admin-toolbar" data-role="token-form">
         <input class="admin-search" name="name" value="Desktop sync" maxlength="80" />
@@ -1203,7 +1219,8 @@ async function renderSecurity() {
         body: { response: serializePasskey(credential), name: "Admin dashboard" },
       });
       await loadPasskeyList();
-      pageStatus("Passkey registered.");
+      await generateRecoveryCodes();
+      pageStatus("Passkey registered. Save the backup codes below.");
     } catch (error) {
       pageStatus(error.message || "Passkey registration was cancelled.");
     } finally {
@@ -1211,6 +1228,57 @@ async function renderSecurity() {
     }
   });
   await loadPasskeyList();
+
+  const recoveryStatus = pane.querySelector('[data-role="recovery-status"]');
+  const recoveryBox = pane.querySelector('[data-role="recovery-codes"]');
+  const recoveryList = pane.querySelector('[data-role="recovery-list"]');
+  let recoveryCodes = [];
+  const refreshRecoveryStatus = async () => {
+    try {
+      const data = await api("/api/v1/auth/recovery-codes");
+      recoveryStatus.textContent = data.remaining
+        ? `${data.remaining} unused backup code${data.remaining === 1 ? "" : "s"}.`
+        : "No unused backup codes. Generate a new set.";
+    } catch {
+      recoveryStatus.textContent = "Backup code status unavailable.";
+    }
+  };
+  const showRecoveryCodes = (codes) => {
+    recoveryCodes = codes;
+    recoveryList.innerHTML = codes.map((code) => `<li><code>${escapeHtml(code)}</code></li>`).join("");
+    recoveryBox.hidden = false;
+    refreshRecoveryStatus();
+  };
+  const generateRecoveryCodes = async () => {
+    try {
+      const data = await api("/api/v1/auth/recovery-codes", { method: "POST", body: {} });
+      showRecoveryCodes(data.codes || []);
+      pageStatus("Backup codes generated. Save them now.");
+    } catch (error) {
+      pageStatus(error.message);
+    }
+  };
+  pane.querySelector('[data-role="recovery-generate"]').addEventListener("click", generateRecoveryCodes);
+  pane.querySelector('[data-role="recovery-copy"]').addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+      pageStatus("Backup codes copied.");
+    } catch {
+      pageStatus("Could not copy the backup codes.");
+    }
+  });
+  pane.querySelector('[data-role="recovery-download"]').addEventListener("click", () => {
+    const blob = new Blob(
+      [`Khaoyu Note backup codes for ${dashboard?.admin?.email || "this account"}\nEach code works once.\n\n${recoveryCodes.join("\n")}\n`],
+      { type: "text/plain" }
+    );
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "khaoyu-note-backup-codes.txt";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+  await refreshRecoveryStatus();
 
   pane.querySelector('[data-role="token-form"]').addEventListener("submit", async (event) => {
     event.preventDefault();

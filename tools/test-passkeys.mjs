@@ -122,6 +122,14 @@ try {
   await page.waitForFunction(() => document.getElementById("passkey-list").textContent.includes("This device"));
   check("passkey appears in the account list", true);
 
+  await page.waitForSelector("#backup-codes:not([hidden])", { timeout: 15000 });
+  const autoBackupCodes = await page.locator("#backup-codes").innerText();
+  check(
+    "backup codes are issued after the passkey",
+    autoBackupCodes.split("\n").filter(Boolean).length === 10,
+    autoBackupCodes
+  );
+
   await page.click("#logout");
   await page.waitForFunction(() => document.getElementById("status").textContent.includes("Signed out"));
   await page.fill("#passkey-email", email);

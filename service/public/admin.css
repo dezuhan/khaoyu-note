@@ -1489,3 +1489,26 @@ body.admin-body {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+.admin-backup-codes {
+  margin-top: var(--ky-space-10);
+  padding: var(--ky-space-12);
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-control);
+}
+
+.admin-backup-codes ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--ky-space-6) var(--ky-space-12);
+  margin: var(--ky-space-10) 0;
+  padding-left: var(--ky-space-18);
+}
+
+.admin-backup-codes code {
+  color: var(--ky-text);
+  font-family: var(--ky-mono);
+  font-size: var(--ky-text-sm);
+  letter-spacing: 0.04em;
+}

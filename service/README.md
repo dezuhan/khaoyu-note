@@ -271,6 +271,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/sync-token` | Exchange email and password for a scoped project token for desktop sync; each sign-in revokes the previous app-sync token. |
 | `POST` | `/api/v1/auth/otp/request` | Queue a one-time login code by email. |
 | `POST` | `/api/v1/auth/otp/login` | Login with a one-time code; TOTP still applies. |
+| `POST` | `/api/v1/auth/recovery-codes` | Generate ten one-time backup codes for the signed-in account; replaces previous codes. |
+| `GET` | `/api/v1/auth/recovery-codes` | Read the number of unused backup codes. |
+| `POST` | `/api/v1/auth/recovery-login` | Sign in with an email and one unused backup code. |
 | `POST` | `/api/v1/auth/passkeys/register/options` | Start passkey registration for the signed-in account. |
 | `POST` | `/api/v1/auth/passkeys/register/verify` | Verify and store a passkey credential. |
 | `POST` | `/api/v1/auth/passkeys/login/options` | Start passkey login for an email. |
@@ -391,8 +394,11 @@ pages use the same cookie and CSRF rules as the API and are served with a strict
 
 ## Passkeys
 
-`/passkeys` is a small browser page for password login, passkey registration, passkey login and
-listing the account's credentials. WebAuthn requires a secure context: use HTTPS or localhost.
+`/passkeys` is a small browser page for password login, passkey registration, passkey login,
+listing the account's credentials and generating one-time backup codes. Registering a passkey
+automatically issues a fresh backup-code set. Codes are stored as SHA-256 hashes, shown once,
+invalidated when a new set is generated, and consumed atomically on login. The login page accepts
+an email plus a backup code as a passwordless fallback. WebAuthn requires a secure context: use HTTPS or localhost.
 `KHAOYU_SERVICE_RP_ID` must match the browser origin host and defaults to the public URL hostname.
 
 Challenges are random, single use, bound to the email and expire after five minutes; the worker
