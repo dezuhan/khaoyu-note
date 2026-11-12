@@ -21,14 +21,43 @@ export const state = {
   loaded: false,
 };
 
+function viewStorageKey(boardId) {
+  return "mn.view." + boardId;
+}
+
+function readStoredView(boardId) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(viewStorageKey(boardId)) || "null");
+    return parsed && Number.isFinite(Number(parsed.zoom)) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeView(boardId, view) {
+  if (!boardId || !view) return;
+  try {
+    localStorage.setItem(
+      viewStorageKey(boardId),
+      JSON.stringify({ x: Number(view.x) || 0, y: Number(view.y) || 0, zoom: Number(view.zoom) || 1 })
+    );
+  } catch {
+    /* private mode */
+  }
+}
+
 const subscribers = new Set();
 export function subscribe(fn) {
   subscribers.add(fn);
   return () => subscribers.delete(fn);
 }
 export function notify(kind = "board") {
-  // Pan and zoom do not mark the document dirty, but they still need a flush on close or switch.
-  if (kind === "view" && state.loaded) state.viewDirty = true;
+  // Viewport is a per-device preference. Keeping it out of the board row avoids multi-window
+  // write conflicts when the same board is open on a desktop and a phone/tunnel at once.
+  if (kind === "view" && state.loaded && state.board) {
+    state.viewDirty = false;
+    storeView(state.board.id, state.view);
+  }
   for (const fn of subscribers) {
     try {
       fn(kind);
@@ -56,7 +85,7 @@ function restoreHistory() {
   state.selection = new Set();
   state.editing = null;
   layoutColumns(board);
-  state.view = board.view || state.view;
+  state.view = readStoredView(board.id) || state.view;
   notify("board");
   notify("view");
   notify("history");
@@ -200,7 +229,7 @@ export async function saveNow() {
   clearTimeout(saveTimer);
   const hadContentChanges = state.dirty;
   state.dirty = false;
-  state.board.view = { ...state.view };
+  state.viewDirty = false;
   const snapshot = JSON.stringify(state.board);
   const boardId = state.board.id;
   const base = Number.isFinite(state.baseUpdatedAt) ? state.baseUpdatedAt : null;
@@ -365,7 +394,7 @@ export async function openBoard(id, { flush = true } = {}) {
   // Legacy builds stored a theme per board. Ignore it: the global preference above wins, so a
   // board saved in the past cannot flip the theme when it is opened.
   layoutColumns(doc);
-  state.view = doc.view || { x: 0, y: 0, zoom: 1 };
+  state.view = readStoredView(doc.id) || doc.view || { x: 0, y: 0, zoom: 1 };
   state.selection = new Set();
   state.editing = null;
   state.loaded = true;
@@ -483,7 +512,6 @@ export async function adoptRemoteBoard(doc) {
   const previousBase = state.baseUpdatedAt;
   state.board = doc;
   layoutColumns(doc);
-  state.view = doc.view || state.view;
   state.selection = new Set();
   state.editing = null;
   state.conflict = null;
