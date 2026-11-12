@@ -344,3 +344,9 @@
 .mn-workspace-form .mn-workspace-form-note {
   opacity: 1;
 }
+
+/* The workspace popover is a solid surface, not a translucent glass plate. */
+.mn-workspace-popover {
+  background: var(--ky-surface);
+  backdrop-filter: none;
+}
