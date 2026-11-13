@@ -2902,6 +2902,21 @@ await page.evaluate(async (columnId) => {
 }, dropColumnId);
 await page.waitForTimeout(500);
 
+const middlePasteBlocked = await page.evaluate(() => {
+  const editable = document.createElement("div");
+  editable.contentEditable = "true";
+  document.body.append(editable);
+  const event = new MouseEvent("mousedown", { button: 1, bubbles: true, cancelable: true });
+  editable.dispatchEvent(event);
+  editable.remove();
+  return event.defaultPrevented;
+});
+check(
+  "Middle click does not paste into editable fields",
+  middlePasteBlocked === true,
+  String(middlePasteBlocked)
+);
+
 check("No runtime errors", errors.length === 0, errors.slice(0, 4).join(" | "));
 
 const failed = results.filter((entry) => !entry.ok);

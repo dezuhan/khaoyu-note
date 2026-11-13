@@ -5,6 +5,9 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Middle-click no longer pastes the X11/Wayland primary selection into note, document, comment or
+  other editable fields on Ubuntu/WebKitGTK. Middle drag still pans the canvas; the paste default is
+  suppressed only while the pointer is over an editable field.
 - The self-hosted service can now sign in with **Google OpenID Connect** and **GitHub OAuth 2.0**
   behind per-provider operator flags. Google uses discovery, PKCE S256, JWKS `id_token` verification
   and nonce checks; GitHub reads `/user` and `/user/emails` and requires a verified primary email.

@@ -87,6 +87,23 @@ export function initInteractions(refs) {
   cardsEl = refs.cards;
 
   viewportEl.addEventListener("pointerdown", onPointerDown);
+  // GTK/WebKitGTK pastes the primary selection on middle click in editable fields. The board uses
+  // middle drag for panning, so keep that gesture on the canvas but suppress the implicit paste in
+  // text fields (Ubuntu enables primary-selection paste by default).
+  document.addEventListener(
+    "mousedown",
+    (event) => {
+      if (event.button !== 1) return;
+      if (
+        event.target?.closest?.(
+          'input, textarea, [contenteditable="true"], [contenteditable=""]'
+        )
+      ) {
+        event.preventDefault();
+      }
+    },
+    true
+  );
   viewportEl.addEventListener("mousedown", onViewportMouseDown);
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
