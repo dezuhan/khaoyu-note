@@ -9,6 +9,14 @@ network. An optional self-hosted service adds team accounts, sync and sharing wh
 > boards, with **New Board** in the Workspace popover. The service source remains in `service/` for a
 > later release, and backend connection files are gitignored.
 
+## Downloads
+
+Version 0.36.0 local-first builds:
+
+- Windows: `Khaoyu Note_0.36.0_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.0_x64_en-US.msi`
+- Linux: `Khaoyu-Note_0.36.0_amd64.deb`, `Khaoyu-Note_0.36.0_amd64.AppImage` or the portable
+  `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz`
+
 ![Khaoyu Note board](shots/board-light.png)
 
 ## About
