@@ -33,6 +33,15 @@ function normalizeUrl(value) {
   }
 }
 
+function isLoopbackHost(value) {
+  try {
+    const host = new URL(value).hostname;
+    return host === "127.0.0.1" || host === "localhost" || host === "[::1]" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
 function servers() {
   try {
     const parsed = JSON.parse(localStorage.getItem(SERVERS_KEY) || "[]");
@@ -896,9 +905,16 @@ async function fetchAccountProfile(url, token) {
 async function saveServerConnection(url, email, token) {
   const profile = await fetchAccountProfile(url, token);
   const previous = servers().find((entry) => entry.url === url);
-  // A rotated app token makes older entries for the same account unusable; drop them so a previous
-  // loopback/public-URL mix-up does not leave a second server section behind.
-  const entries = servers().filter((entry) => entry.url !== url && entry.token !== token);
+  // A rotated app token or a previous loopback/public-URL mix-up must not leave a second server
+  // section for the same account behind.
+  const entries = servers().filter((entry) => {
+    if (entry.url === url || entry.token === token) return false;
+    return !(
+      entry.email === email &&
+      isLoopbackHost(entry.url) &&
+      !isLoopbackHost(url)
+    );
+  });
   entries.unshift({
     url,
     name: new URL(url).host,
