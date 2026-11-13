@@ -537,3 +537,21 @@
 .mn-workspace-challenge-link:hover {
   color: var(--ky-text);
 }
+
+.mn-workspace-sharing-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+  color: var(--ky-text);
+  font-size: var(--ky-text-sm);
+}
+
+.mn-workspace-sharing-policy small {
+  display: block;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}

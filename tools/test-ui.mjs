@@ -2248,9 +2248,8 @@ check(
     (await page.locator('[data-role="account-connection"]').innerText()).includes("Status:")
 );
 check(
-  "Settings > Server offers a public share URL field",
-  (await page.locator(".mn-public-share input").isVisible()) &&
-    (await page.locator(".mn-public-share input").getAttribute("placeholder")).includes("https://")
+  "Settings > Server no longer exposes the public share URL field",
+  (await page.locator(".mn-public-share").count()) === 0
 );
 check(
   "Topbar language button is enabled",
@@ -2263,7 +2262,8 @@ check(
 const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
 check(
   "Settings navigation follows the local-first order",
-  navLabels.join(",") === "Server,Backup,General,Appearance,Tools,Board templates,Performance,MCP,About",
+  navLabels.join(",") ===
+    "Server,Profile,Security,Login sessions,General,Backup,Appearance,Tools,Board templates,Performance,MCP,About",
   navLabels.join(", ")
 );
 check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
@@ -2281,7 +2281,9 @@ check(
   "Server page shows local runtime details and service connection options",
   (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
     (await page.locator('[data-role="content"]').innerText()).includes("Connection details for this computer") &&
-    (await page.locator(".mn-account-card").count()) === 2 &&
+    (await page.locator(".mn-account-card").count()) === 1 &&
+    (await page.locator('[data-role="content"]').innerText()).includes("Change connection") &&
+    !(await page.locator('[data-role="content"]').innerText()).includes("Account or change server") &&
     (await page.locator('.mn-account-card[data-action="passkeys"]').count()) === 0
 );
 check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
@@ -2329,7 +2331,7 @@ check(
 check(
   "Language switch updates settings labels",
   (await page.locator(".mn-prefs-nav-item").first().innerText()).includes("Server") &&
-    (await page.locator(".mn-prefs-nav-item").nth(2).innerText()).includes("Umum"),
+    (await page.locator(".mn-prefs-nav-item").nth(4).innerText()).includes("Umum"),
   (await page.locator(".mn-prefs-nav").innerText()).replace(/\n/g, ",")
 );
 await page.locator(".mn-prefs-select select").first().selectOption("en");
@@ -2360,7 +2362,7 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 9, String(await page.locator(".mn-prefs-nav-item").count()));
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 12, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
   "Language and Canvas are merged away",
   !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),

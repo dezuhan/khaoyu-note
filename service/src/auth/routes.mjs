@@ -368,6 +368,17 @@ async function registrationMode(db) {
   return row?.value === "public" ? "public" : "private";
 }
 
+async function workspaceSharingEnabled(db, projectId) {
+  const row = await db.get(
+    `SELECT policy.sharing_enabled
+     FROM projects p LEFT JOIN workspace_access_policies policy ON policy.workspace_id = p.workspace_id
+     WHERE p.id = ?`,
+    [projectId]
+  );
+  if (!row || row.sharing_enabled === null || row.sharing_enabled === undefined) return true;
+  return row.sharing_enabled !== false && Number(row.sharing_enabled) !== 0;
+}
+
 async function workspaceShared(db) {
   const row = await db.get("SELECT value FROM service_meta WHERE key = 'workspace_mode'", []);
   return row?.value !== "private";
@@ -414,7 +425,7 @@ async function startSession(db, config, account, options) {
 }
 
 async function issueAppSyncToken(db, config, account, { ip }) {
-  const scopes = ["projects:read", "projects:write"];
+  const scopes = ["projects:read", "projects:write", "account:read", "account:write"];
   const expiresAt = now() + 365 * 86_400_000;
   (await db.run(
     "UPDATE api_tokens SET revoked_at = ? WHERE account_id = ? AND name = ? AND revoked_at IS NULL",
@@ -2065,7 +2076,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (appRedirect) {
           // The desktop/web host cannot read the browser's session cookie, so hand it a scoped
           // app-sync token in the fragment. The fragment is never sent to a server or logged.
-          const scopes = ["projects:read", "projects:write"];
+          const scopes = ["projects:read", "projects:write", "account:read", "account:write"];
           const expiresAt = now() + 365 * 86_400_000;
           await db.run(
             "UPDATE api_tokens SET revoked_at = ? WHERE account_id = ? AND name = ? AND revoked_at IS NULL",
@@ -2766,7 +2777,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         requireApproved(account);
         await clearLoginFailures(db, { email });
-        const scopes = ["projects:read", "projects:write"];
+        const scopes = ["projects:read", "projects:write", "account:read", "account:write"];
         const expiresAt = now() + 365 * 86_400_000;
         (await db.run("UPDATE api_tokens SET revoked_at = ? WHERE account_id = ? AND name = ? AND revoked_at IS NULL", [now(), account.id, "app-sync"]));
         const created = await createApiToken(db, account.id, { name: "app-sync", scopes, expiresAt });
@@ -3311,6 +3322,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (!snapshot.project.public_sharing_enabled) {
           throw new HttpError(409, "public sharing is disabled for this project", "sharing_disabled");
         }
+        if (!(await workspaceSharingEnabled(db, projectId))) {
+          throw new HttpError(403, "the workspace admin disabled shared links", "workspace_sharing_disabled");
+        }
         const scope = ["project", "item", "column"].includes(body.scope) ? body.scope : null;
         const permission = ["view", "comment", "edit", "manage"].includes(body.permission)
           ? body.permission
@@ -3434,6 +3448,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             "public sharing requires explicit acknowledgement",
             "acknowledgement_required"
           );
+        }
+        if (body.enabled === true && !(await workspaceSharingEnabled(db, publicFlagMatch[1]))) {
+          throw new HttpError(403, "the workspace admin disabled shared links", "workspace_sharing_disabled");
         }
         (await db.run("UPDATE projects SET public_sharing_enabled = ?, updated_at = ? WHERE id = ?", [body.enabled ? 1 : 0,
           now(),
@@ -3743,6 +3760,54 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       }
 
       const workspaceMembersMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/members$/);
+      const workspacePolicyMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/policy$/);
+      if (method === "PATCH" && workspacePolicyMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "projects:write");
+        const workspaceId = decodeURIComponent(workspacePolicyMatch[1]);
+        const actor = await db.get(
+          "SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'",
+          [workspaceId, auth.account.id]
+        );
+        if (!actor || !["owner", "admin"].includes(actor.role)) {
+          throw new HttpError(403, "workspace admin required", "workspace_admin_required");
+        }
+        const body = await readJson(request);
+        if (typeof body.sharingEnabled !== "boolean") {
+          throw new HttpError(400, "sharingEnabled must be a boolean", "invalid_input");
+        }
+        const sharingLiteral = body.sharingEnabled ? "TRUE" : "FALSE";
+        await db.transaction(async (tx) => {
+          await tx.run(
+            `INSERT INTO workspace_access_policies (workspace_id, visibility, sharing_enabled, member_default_board_role, created_at, updated_at)
+             VALUES (?, 'private', ${sharingLiteral}, 'viewer', ?, ?)
+             ON CONFLICT(workspace_id) DO UPDATE SET sharing_enabled = excluded.sharing_enabled, updated_at = excluded.updated_at`,
+            [workspaceId, now(), now()]
+          );
+          if (!body.sharingEnabled) {
+            await tx.run(
+              "UPDATE projects SET public_sharing_enabled = 0, updated_at = ? WHERE workspace_id = ?",
+              [now(), workspaceId]
+            );
+            await tx.run(
+              "UPDATE share_links SET revoked_at = ? WHERE project_id IN (SELECT id FROM projects WHERE workspace_id = ?) AND revoked_at IS NULL",
+              [now(), workspaceId]
+            );
+          }
+        });
+        await writeAudit(db, {
+          actorAccountId: auth.account.id,
+          action: "workspace.sharing_policy_changed",
+          resourceType: "workspace",
+          resourceId: workspaceId,
+          metadata: { sharingEnabled: body.sharingEnabled },
+          ip,
+          secret: config.secret,
+        });
+        sendJson(response, 200, { workspaceId, sharingEnabled: body.sharingEnabled }, config);
+        return true;
+      }
+
       if (method === "GET" && workspaceMembersMatch) {
         const auth = await requireAuth(request, response, db, config);
         const workspaceId = decodeURIComponent(workspaceMembersMatch[1]);
@@ -3754,7 +3819,19 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
            WHERE m.workspace_id = ? AND m.state != 'left' AND a.deleted_at IS NULL ORDER BY m.role DESC, a.display_name`,
           [workspaceId]
         );
-        sendJson(response, 200, { workspaceId, role: member.role, members }, config);
+        const policy = await db.get(
+          "SELECT sharing_enabled FROM workspace_access_policies WHERE workspace_id = ?",
+          [workspaceId]
+        );
+        sendJson(response, 200, {
+          workspaceId,
+          role: member.role,
+          sharingEnabled:
+            policy?.sharing_enabled === undefined || policy?.sharing_enabled === null
+              ? true
+              : policy.sharing_enabled !== false && Number(policy.sharing_enabled) !== 0,
+          members,
+        }, config);
         return true;
       }
 
@@ -3863,6 +3940,98 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         );
         await writeAudit(db, { actorAccountId: auth.account.id, action: "workspace.invitation_accepted", resourceType: "workspace", resourceId: invitation.workspace_id, metadata: { invitationId }, ip, secret: config.secret });
         sendJson(response, 200, { status: "accepted", workspaceId: invitation.workspace_id }, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/app/account/profile") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "account:read");
+        const user = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS}, a.totp_enabled_at,
+                    (SELECT COUNT(*) FROM recovery_codes WHERE account_id = a.id AND used_at IS NULL) AS recovery_codes,
+                    (SELECT COUNT(*) FROM passkey_credentials WHERE account_id = a.id) AS passkey_count
+             FROM accounts a WHERE a.id = ? AND a.deleted_at IS NULL`, [auth.account.id]));
+        if (!user) throw new HttpError(404, "account not found", "not_found");
+        sendJson(response, 200, {
+          user: adminAccount(user),
+          security: {
+            totpEnabled: Boolean(user.totp_enabled_at),
+            recoveryCodes: Number(user.recovery_codes || 0),
+            passkeys: Number(user.passkey_count || 0),
+          },
+        }, config);
+        return true;
+      }
+
+      if (method === "PATCH" && url.pathname === "/api/v1/app/account/profile") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "account:write");
+        enforceRate(accountSecurityRate, accountKey(auth, ipHash));
+        const current = (await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS} FROM accounts a WHERE a.id = ? AND a.deleted_at IS NULL`, [auth.account.id]));
+        if (!current) throw new HttpError(404, "account not found", "not_found");
+        const body = await readJson(request);
+        const displayName = body.displayName === undefined ? current.display_name : requireString(body.displayName, "displayName", 120);
+        const firstName = body.firstName === undefined ? current.first_name : String(body.firstName).trim().slice(0, 80);
+        const lastName = body.lastName === undefined ? current.last_name : String(body.lastName).trim().slice(0, 80);
+        const username = body.username === undefined ? current.username || "" : normalizeUsername(body.username);
+        if (username && username !== current.username && (await usernameTaken(db, username, auth.account.id))) {
+          throw new HttpError(409, "username is already taken", "username_taken");
+        }
+        let avatarColor = body.avatarColor === undefined ? current.avatar_color : String(body.avatarColor || "").trim();
+        if (avatarColor && !/^#[0-9a-f]{6}$/i.test(avatarColor)) {
+          throw new HttpError(400, "avatarColor must be a hex color", "invalid_avatar");
+        }
+        const avatarUrl = body.avatarUrl === undefined ? current.avatar_url : validateAdminAvatar(body.avatarUrl);
+        await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, username = ?,
+             avatar_color = ?, avatar_url = ?, updated_at = ? WHERE id = ?`,
+          [displayName, firstName || null, lastName || null, username || null, avatarColor || null, avatarUrl || null, now(), auth.account.id]);
+        await writeAudit(db, { actorAccountId: auth.account.id, action: "account.profile_updated", resourceType: "account", resourceId: auth.account.id, ip, secret: config.secret });
+        const updated = await db.get(`SELECT ${ADMIN_ACCOUNT_COLUMNS} FROM accounts a WHERE a.id = ?`, [auth.account.id]);
+        sendJson(response, 200, { user: adminAccount(updated) }, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/app/account/password") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "account:write");
+        enforceRate(accountPasswordRate, accountKey(auth, ipHash));
+        const body = await readJson(request);
+        const account = await accountById(db, auth.account.id);
+        if (!(await verifyPassword(String(body.currentPassword || ""), account.password_hash))) {
+          throw new HttpError(400, "Current password is not correct", "invalid_password");
+        }
+        const password = requirePassword(body.newPassword);
+        await db.run("UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?", [await hashPassword(password), now(), account.id]);
+        await db.run("UPDATE sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL", [now(), account.id]);
+        await db.run("UPDATE access_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ?) AND revoked_at IS NULL", [now(), account.id]);
+        await db.run("UPDATE refresh_tokens SET revoked_at = ? WHERE session_id IN (SELECT id FROM sessions WHERE account_id = ?) AND revoked_at IS NULL", [now(), account.id]);
+        await writeAudit(db, { actorAccountId: account.id, action: "auth.password_changed", resourceType: "account", resourceId: account.id, ip, secret: config.secret });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
+      if (method === "GET" && url.pathname === "/api/v1/app/account/sessions") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "account:read");
+        sendJson(response, 200, { sessions: await listSessions(db, auth.account.id) }, config);
+        return true;
+      }
+
+      const appSessionMatch = url.pathname.match(/^\/api\/v1\/app\/account\/sessions\/([^/]+)$/);
+      if (method === "DELETE" && appSessionMatch) {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "account:write");
+        await revokeSession(db, decodeURIComponent(appSessionMatch[1]), auth.account.id);
+        await writeAudit(db, { actorAccountId: auth.account.id, action: "auth.session_revoked", resourceType: "session", resourceId: decodeURIComponent(appSessionMatch[1]), ip, secret: config.secret });
+        sendNoContent(response, 204, config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/app/account/sessions/revoke-all") {
+        const auth = await requireAuth(request, response, db, config);
+        requireScope(auth, "account:write");
+        await revokeAllSessions(db, auth.account.id);
+        await writeAudit(db, { actorAccountId: auth.account.id, action: "auth.sessions_revoked", resourceType: "account", resourceId: auth.account.id, ip, secret: config.secret });
+        sendNoContent(response, 204, config);
         return true;
       }
 

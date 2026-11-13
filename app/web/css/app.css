@@ -7772,3 +7772,71 @@ html[data-performance="true"] *::after {
 .mn-toolrail {
   z-index: 1000;
 }
+
+/* Settings > Profile / Security / Login sessions (service account over the app-sync token). */
+.mn-account-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mn-account-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  max-width: 720px;
+  margin: 0 0 12px;
+}
+
+.mn-account-field {
+  display: grid;
+  gap: 4px;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-xs);
+}
+
+.mn-account-field .ky-input {
+  width: 100%;
+}
+
+.mn-account-color {
+  width: 100%;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: transparent;
+}
+
+.mn-account-form-grid .mn-prefs-note,
+.mn-account-form-grid .mn-prefs-inline-status,
+.mn-account-form-grid .mn-btn {
+  grid-column: 1 / -1;
+}
+
+.mn-account-session-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.mn-account-session {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--ky-stroke);
+  border-radius: var(--ky-radius-control);
+  background: var(--ky-surface);
+}
+
+.mn-account-session small {
+  display: block;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-2xs);
+}
+
+@media (max-width: 720px) {
+  .mn-account-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -2,7 +2,7 @@
 
 import * as bridge from "./bridge.js";
 import { state } from "./store.js";
-import { loadSyncConfig } from "./sync.js";
+import { enableBoardSync, loadSyncConfig } from "./sync.js";
 import * as sharing from "./share.js";
 
 let overlay = null;
@@ -159,8 +159,26 @@ async function renderPanel() {
   const body = panelShell();
   await renderLocalShareSection(body);
   const board = state.board;
-  const projectId = board.sync?.projectId;
+  let projectId = board.sync?.projectId;
   const sync = loadSyncConfig();
+  if (sync.url && sync.token && !projectId) {
+    const loading = document.createElement("p");
+    loading.className = "mn-prefs-note";
+    loading.textContent = "Connecting this board to the server...";
+    body.append(loading);
+    try {
+      await enableBoardSync(board);
+      projectId = board.sync?.projectId;
+      loading.remove();
+    } catch (error) {
+      loading.textContent = error.message || "Could not connect the board to the server.";
+      body.append(button("Change connection", "mn-btn", () => {
+        closeSharePanel();
+        void import("./settings.js").then((settingsModule) => settingsModule.openSettingsPage("server"));
+      }));
+      return;
+    }
+  }
   if (!sync.url || !sync.token || !projectId) {
     const note = document.createElement("p");
     note.className = "mn-prefs-note";

@@ -200,6 +200,21 @@ try {
   await page.waitForSelector(".mn-workspace-member", { timeout: 10000 });
   const memberText = await page.locator(".mn-modal").innerText();
   check("Members lists the workspace members", memberText.includes(email), memberText.replace(/\s+/g, " ").slice(0, 160));
+  const sharingToggle = page.locator('[data-role="workspace-sharing"]');
+  check("Members exposes the workspace sharing policy", await sharingToggle.isChecked());
+  await sharingToggle.uncheck();
+  await page.waitForTimeout(600);
+  const blockedShare = await fetch(
+    `${base}/api/v1/projects/${board.id}/public-sharing`,
+    { method: "POST", headers, body: JSON.stringify({ enabled: true, acknowledge: true }) }
+  );
+  check(
+    "workspace admin can disable board sharing",
+    blockedShare.status === 403 && (await blockedShare.json()).code === "workspace_sharing_disabled",
+    `status ${blockedShare.status}`
+  );
+  await sharingToggle.check();
+  await page.waitForTimeout(400);
   await page.click(".mn-modal .mn-modal-close");
   await page.waitForSelector(".mn-modal", { state: "detached" });
   await page.waitForSelector(".mn-workspace-popover");

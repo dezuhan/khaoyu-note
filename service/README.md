@@ -429,7 +429,7 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/login/begin` | Interactive password step: signs in directly without 2FA, otherwise returns `{totpRequired, challenge}`. |
 | `POST` | `/api/v1/auth/login/totp` | Complete a challenge with a 6-digit authenticator code; sets session cookies. |
 | `POST` | `/api/v1/auth/login/backup` | Complete a challenge with an unused backup code; sets session cookies. |
-| `POST` | `/api/v1/auth/sync-token` | Exchange email and password for a scoped project token for desktop sync; each sign-in revokes the previous app-sync token. |
+| `POST` | `/api/v1/auth/sync-token` | Exchange email and password for a scoped app token (projects + account settings) for desktop sync; each sign-in revokes the previous app-sync token. |
 | `POST` | `/api/v1/auth/sync-token/begin` | App-token password step; returns `{totpRequired, challenge}` when the account has 2FA. |
 | `POST` | `/api/v1/auth/sync-token/totp` | Complete an app-token challenge with an authenticator code. |
 | `POST` | `/api/v1/auth/sync-token/backup` | Complete an app-token challenge with an unused backup code. |
@@ -497,6 +497,12 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `GET` | `/api/v1/admin/audit` | Operator audit export, latest 500. |
 | `GET` | `/api/v1/admin/abuse-reports` | Operator abuse report review. |
 | `GET` | `/api/v1/admin/stats` | Operator counts for accounts, projects, shares, reports and audit. |
+| `GET` | `/api/v1/app/account/profile` | Read the signed-in app-token account profile, 2FA and backup-code status. |
+| `PATCH` | `/api/v1/app/account/profile` | Edit username/display name/names/avatar colour with app-token scope. |
+| `POST` | `/api/v1/app/account/password` | Change the password and revoke other browser sessions. |
+| `GET` | `/api/v1/app/account/sessions` | List active sessions for the app-token account. |
+| `DELETE` | `/api/v1/app/account/sessions/:id` | Revoke one session; `POST /sessions/revoke-all` revokes all. |
+| `PATCH` | `/api/v1/workspaces/:id/policy` | Owner/admin can toggle workspace board sharing; disabling it revokes links. |
 | `GET` | `/api/v1/admin/settings` | Read `registrationMode` (`private` by default). |
 | `PATCH` | `/api/v1/admin/settings` | Set `registrationMode` to `private` or `public`; audited. |
 | `GET` | `/api/v1/notifications` | List scoped notifications and the unread count. |

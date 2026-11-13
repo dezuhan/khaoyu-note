@@ -64,10 +64,12 @@ export function loadSyncConfig() {
     const raw = storage().getItem(CONFIG_KEY);
     if (!raw) return { url: "", email: "", token: "" };
     const parsed = JSON.parse(raw);
+    const url = String(parsed.url || "");
+    const token = String(parsed.token || "") || findServerToken(url);
     return {
-      url: String(parsed.url || ""),
+      url,
       email: String(parsed.email || ""),
-      token: String(parsed.token || ""),
+      token,
       publicShareUrl: String(parsed.publicShareUrl || ""),
     };
   } catch {
@@ -294,7 +296,26 @@ export async function checkConnection({ timeoutMs = 8000 } = {}) {
     return recordConnection("unreachable", `No response from ${url}`, { url });
   }
   if (response.status === 401) {
-    return recordConnection("unauthorized", "The API token was rejected", { url });
+    // Add Server keeps the newest token in ky.servers. If the Sync pane still has an older token,
+    // adopt the server entry instead of showing a misleading authentication failure.
+    const alternate = findServerToken(url);
+    if (alternate && alternate !== token) {
+      try {
+        const retry = await fetch(`${url}/api/v1/projects`, {
+          headers: { authorization: `Bearer ${alternate}`, accept: "application/json" },
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (retry.ok) {
+          saveSyncConfig({ url, email, token: alternate, publicShareUrl: loadSyncConfig().publicShareUrl });
+          response = retry;
+        }
+      } catch {
+        /* keep the original rejection */
+      }
+    }
+    if (response.status === 401) {
+      return recordConnection("unauthorized", "The API token was rejected", { url });
+    }
   }
   if (response.status === 403) {
     return recordConnection("forbidden", "The token is missing the projects:read scope", { url });

@@ -83,9 +83,12 @@ const HEADING_FONT_CHOICES = [["Georgia", "Georgia (system serif)"], ...FONT_CHO
 
 const NAV = [
   { id: "server", label: "Server" },
-  { id: "backup", label: "Backup" },
+  { id: "account-profile", label: "Profile" },
+  { id: "account-security", label: "Security" },
+  { id: "account-sessions", label: "Login sessions" },
   { divider: true },
   { id: "general", label: "General" },
+  { id: "backup", label: "Backup" },
   { id: "appearance", label: "Appearance" },
   { id: "tools", label: "Tools" },
   { id: "templates", label: "Board templates" },
@@ -399,11 +402,19 @@ function pages() {
       ],
     },
     {
-      id: "backup",
-      title: t("nav.backup"),
-      rows: () => [
-        { type: "note", text: "Back up or export the local database, assets and settings." },
-      ],
+      id: "account-profile",
+      title: "Profile",
+      rows: () => [{ type: "note", text: "Edit the signed-in service account profile." }],
+    },
+    {
+      id: "account-security",
+      title: "Security",
+      rows: () => [{ type: "note", text: "Account security, password and two-factor status." }],
+    },
+    {
+      id: "account-sessions",
+      title: "Login sessions",
+      rows: () => [{ type: "note", text: "Active sessions for the signed-in service account." }],
     },
     { divider: true },
     {
@@ -445,6 +456,13 @@ function pages() {
           buttonLabel: t("general.export"),
           run: () => exportBoard(),
         },
+      ],
+    },
+    {
+      id: "backup",
+      title: t("nav.backup"),
+      rows: () => [
+        { type: "note", text: "Back up or export the local database, assets and settings." },
       ],
     },
     {
@@ -903,6 +921,12 @@ function renderContent() {
   const page = pages().find((entry) => !entry.divider && entry.id === activePage);
   if (activePage === "server") {
     renderServerPage(content);
+  } else if (activePage === "account-profile") {
+    renderServiceAccountProfile(content);
+  } else if (activePage === "account-security") {
+    renderServiceAccountSecurity(content);
+  } else if (activePage === "account-sessions") {
+    renderServiceAccountSessions(content);
   } else if (activePage === "backup") {
     renderBackupPage(content);
   } else if (activePage === "tools") {
@@ -1744,6 +1768,310 @@ function renderPublicShareSetting(content, config) {
   content.append(box);
 }
 
+async function appAccountApi(pathname, { method = "GET", body } = {}) {
+  const config = loadSyncConfig();
+  if (!config.url || !config.token) {
+    throw new Error("Connect a server in Settings > Server first");
+  }
+  const response = await fetch(`${config.url.replace(/\/+$/, "")}${pathname}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${config.token}`,
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  if (!response.ok) {
+    const error = new Error(parsed?.error || `Account request failed (${response.status})`);
+    error.code = parsed?.code;
+    throw error;
+  }
+  return parsed;
+}
+
+function renderAccountConnectionPrompt(content, message) {
+  const note = document.createElement("p");
+  note.className = "mn-prefs-note";
+  note.textContent = message || "Connect a server in Settings > Server to manage this account.";
+  content.append(note);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "mn-btn mn-btn-primary";
+  button.textContent = "Change connection";
+  button.addEventListener("click", () => {
+    closeSettingsPage();
+    openSyncDialog();
+  });
+  content.append(button);
+}
+
+function accountField(labelText, input) {
+  const label = document.createElement("label");
+  label.className = "mn-account-field";
+  const span = document.createElement("span");
+  span.textContent = labelText;
+  label.append(span, input);
+  return label;
+}
+
+async function renderServiceAccountProfile(content) {
+  content.append(heading("Profile"));
+  const intro = document.createElement("p");
+  intro.className = "mn-prefs-note";
+  intro.textContent = "The account and public identity used by this service connection.";
+  content.append(intro);
+  let data;
+  try {
+    data = await appAccountApi("/api/v1/app/account/profile");
+  } catch (error) {
+    renderAccountConnectionPrompt(content, error.message);
+    return;
+  }
+  const user = data.user || {};
+  const form = document.createElement("form");
+  form.className = "mn-account-form-grid";
+  const username = document.createElement("input");
+  username.className = "ky-input";
+  username.name = "username";
+  username.maxLength = 32;
+  username.value = user.username || "";
+  const displayName = document.createElement("input");
+  displayName.className = "ky-input";
+  displayName.name = "displayName";
+  displayName.maxLength = 120;
+  displayName.value = user.displayName || "";
+  const firstName = document.createElement("input");
+  firstName.className = "ky-input";
+  firstName.name = "firstName";
+  firstName.maxLength = 80;
+  firstName.value = user.firstName || "";
+  const lastName = document.createElement("input");
+  lastName.className = "ky-input";
+  lastName.name = "lastName";
+  lastName.maxLength = 80;
+  lastName.value = user.lastName || "";
+  const avatarColor = document.createElement("input");
+  avatarColor.className = "mn-account-color";
+  avatarColor.type = "color";
+  avatarColor.name = "avatarColor";
+  avatarColor.value = /^#[0-9a-f]{6}$/i.test(user.avatarColor || "") ? user.avatarColor : "#8b5cf6";
+  form.append(
+    accountField("Username", username),
+    accountField("Display name", displayName),
+    accountField("First name", firstName),
+    accountField("Last name", lastName),
+    accountField("Avatar color", avatarColor)
+  );
+  const meta = document.createElement("p");
+  meta.className = "mn-prefs-note";
+  meta.textContent = `${user.email || "No email"} · ${user.role || "member"}`;
+  form.append(meta);
+  const status = document.createElement("p");
+  status.className = "mn-prefs-inline-status";
+  status.dataset.role = "inline-status";
+  const save = document.createElement("button");
+  save.type = "submit";
+  save.className = "mn-btn mn-btn-primary";
+  save.textContent = "Save profile";
+  form.append(save, status);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    save.disabled = true;
+    status.textContent = "Saving...";
+    status.classList.remove("is-error");
+    try {
+      const updated = await appAccountApi("/api/v1/app/account/profile", {
+        method: "PATCH",
+        body: {
+          username: username.value.trim(),
+          displayName: displayName.value.trim(),
+          firstName: firstName.value.trim(),
+          lastName: lastName.value.trim(),
+          avatarColor: avatarColor.value,
+        },
+      });
+      status.textContent = "Profile saved.";
+      notify("Profile saved");
+      username.value = updated.user?.username || username.value;
+      displayName.value = updated.user?.displayName || displayName.value;
+    } catch (error) {
+      status.textContent = error.message;
+      status.classList.add("is-error");
+    } finally {
+      save.disabled = false;
+    }
+  });
+  content.append(form);
+}
+
+async function renderServiceAccountSecurity(content) {
+  content.append(heading("Security"));
+  const intro = document.createElement("p");
+  intro.className = "mn-prefs-note";
+  intro.textContent = "Password and second-factor status for the signed-in service account.";
+  content.append(intro);
+  let data;
+  try {
+    data = await appAccountApi("/api/v1/app/account/profile");
+  } catch (error) {
+    renderAccountConnectionPrompt(content, error.message);
+    return;
+  }
+  const security = data.security || {};
+  const status = document.createElement("div");
+  status.className = "mn-account-status";
+  for (const [label, value] of [
+    ["Two-factor authentication", security.totpEnabled ? "Enabled" : "Disabled"],
+    ["Backup codes remaining", String(security.recoveryCodes ?? 0)],
+    ["Passkeys", String(security.passkeys ?? 0)],
+  ]) {
+    const row = document.createElement("div");
+    row.className = "mn-account-server";
+    row.textContent = `${label}: ${value}`;
+    status.append(row);
+  }
+  content.append(status);
+  const manage = document.createElement("button");
+  manage.type = "button";
+  manage.className = "mn-btn";
+  manage.textContent = "Manage two-factor authentication on the server";
+  manage.addEventListener("click", () => bridge.openExternal(`${serviceBase()}/admin`));
+  content.append(manage);
+  const form = document.createElement("form");
+  form.className = "mn-account-form-grid";
+  const current = document.createElement("input");
+  current.className = "ky-input";
+  current.type = "password";
+  current.autocomplete = "current-password";
+  const next = document.createElement("input");
+  next.className = "ky-input";
+  next.type = "password";
+  next.autocomplete = "new-password";
+  const confirm = document.createElement("input");
+  confirm.className = "ky-input";
+  confirm.type = "password";
+  confirm.autocomplete = "new-password";
+  form.append(
+    accountField("Current password", current),
+    accountField("New password", next),
+    accountField("Confirm new password", confirm)
+  );
+  const button = document.createElement("button");
+  button.type = "submit";
+  button.className = "mn-btn mn-btn-primary";
+  button.textContent = "Change password";
+  const message = document.createElement("p");
+  message.className = "mn-prefs-inline-status";
+  message.dataset.role = "inline-status";
+  form.append(button, message);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (next.value !== confirm.value) {
+      message.textContent = "The passwords do not match.";
+      message.classList.add("is-error");
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Updating...";
+    message.classList.remove("is-error");
+    try {
+      await appAccountApi("/api/v1/app/account/password", {
+        method: "POST",
+        body: { currentPassword: current.value, newPassword: next.value },
+      });
+      form.reset();
+      message.textContent = "Password changed. Other browser sessions were revoked.";
+      notify("Password changed");
+    } catch (error) {
+      message.textContent = error.message;
+      message.classList.add("is-error");
+    } finally {
+      button.disabled = false;
+    }
+  });
+  content.append(form);
+}
+
+async function renderServiceAccountSessions(content) {
+  content.append(heading("Login sessions"));
+  const intro = document.createElement("p");
+  intro.className = "mn-prefs-note";
+  intro.textContent = "Browser sessions signed in to this service account.";
+  content.append(intro);
+  let data;
+  try {
+    data = await appAccountApi("/api/v1/app/account/sessions");
+  } catch (error) {
+    renderAccountConnectionPrompt(content, error.message);
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "mn-account-session-list";
+  for (const session of data.sessions || []) {
+    const row = document.createElement("div");
+    row.className = "mn-account-session";
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = session.device || "Browser session";
+    const meta = document.createElement("small");
+    meta.textContent = `Created ${new Date(Number(session.createdAt)).toLocaleString()} · last seen ${new Date(
+      Number(session.lastSeenAt)
+    ).toLocaleString()}`;
+    copy.append(title, meta);
+    row.append(copy);
+    if (!session.revoked) {
+      const revoke = document.createElement("button");
+      revoke.type = "button";
+      revoke.className = "mn-btn mn-btn-quiet";
+      revoke.textContent = "Revoke";
+      revoke.addEventListener("click", async () => {
+        revoke.disabled = true;
+        try {
+          await appAccountApi(`/api/v1/app/account/sessions/${encodeURIComponent(session.id)}`, {
+            method: "DELETE",
+          });
+          await renderContent();
+        } catch (error) {
+          notify(error.message);
+          revoke.disabled = false;
+        }
+      });
+      row.append(revoke);
+    }
+    list.append(row);
+  }
+  if (!list.children.length) {
+    const note = document.createElement("p");
+    note.className = "mn-prefs-note";
+    note.textContent = "No active login sessions.";
+    list.append(note);
+  }
+  content.append(list);
+  const revokeAll = document.createElement("button");
+  revokeAll.type = "button";
+  revokeAll.className = "mn-btn mn-btn-danger-outline";
+  revokeAll.textContent = "Revoke all sessions";
+  revokeAll.addEventListener("click", async () => {
+    revokeAll.disabled = true;
+    try {
+      await appAccountApi("/api/v1/app/account/sessions/revoke-all", { method: "POST" });
+      notify("All login sessions revoked");
+      await renderContent();
+    } catch (error) {
+      notify(error.message);
+      revokeAll.disabled = false;
+    }
+  });
+  content.append(revokeAll);
+}
+
 function renderServerPage(content) {
   content.append(heading("Server"));
   const config = loadSyncConfig();
@@ -1753,7 +2081,6 @@ function renderServerPage(content) {
     "Connection details for this computer and the optional self-hosted service.";
   content.append(intro);
   renderServerRuntime(content);
-  renderPublicShareSetting(content, config);
   const status = document.createElement("div");
   status.className = "mn-account-status";
   const server = document.createElement("div");
@@ -1792,6 +2119,7 @@ function renderServerPage(content) {
     card.append(headingEl, text, button);
     return card;
   };
+  grid.classList.add("is-single");
   grid.append(
     addActionCard(
       "Open account",
@@ -1799,12 +2127,6 @@ function renderServerPage(content) {
       "/admin"
     )
   );
-  const shareCard = addActionCard(
-    "Sharing",
-    "Create and revoke public board or card links.",
-    "/shares"
-  );
-  grid.append(shareCard);
   content.append(grid);
 
   // Passkeys can be switched off by the service operator; hide the entry instead of opening a 404.
@@ -1818,9 +2140,8 @@ function renderServerPage(content) {
       if (!response.ok) return;
       const features = await response.json();
       if (!features.passkeysEnabled) return;
-      grid.insertBefore(
-        addActionCard("Passkeys", "Register or use a WebAuthn passkey.", "/passkeys", "passkeys"),
-        shareCard
+      grid.append(
+        addActionCard("Passkeys", "Register or use a WebAuthn passkey.", "/passkeys", "passkeys")
       );
     } catch {
       /* feature endpoint unreachable: keep passkeys hidden */
@@ -1830,7 +2151,7 @@ function renderServerPage(content) {
   const connect = document.createElement("button");
   connect.type = "button";
   connect.className = "mn-btn mn-btn-primary";
-  connect.textContent = config.token ? "Account or change server" : "Sign in or change server";
+  connect.textContent = "Change connection";
   connect.addEventListener("click", () => {
     closeSettingsPage();
     openSyncDialog();
@@ -1849,19 +2170,6 @@ function renderServerPage(content) {
   });
   content.append(recheck);
 
-  if (config.token) {
-    const out = document.createElement("button");
-    out.type = "button";
-    out.className = "mn-btn mn-btn-quiet";
-    out.textContent = "Sign out";
-    out.addEventListener("click", () => {
-      signOut();
-      closeSettingsPage();
-      openSettingsPage();
-      setStatus("Signed out of the sync server");
-    });
-    content.append(out);
-  }
 
   const docs = document.createElement("button");
   docs.type = "button";

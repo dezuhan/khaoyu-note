@@ -5,6 +5,17 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Settings now has service-account tabs for **Profile**, **Security** and **Login sessions** below
+  Server. They use scoped app-token endpoints to edit username/profile, change the password, show
+  2FA/backup-code/passkey status and list or revoke active sessions. The sidebar order is now
+  Server, Profile, Security, Login sessions, General, Backup, Appearance, Tools, Board templates,
+  Performance, MCP, About.
+- Settings > Server is simplified: the public-share-link field and Sharing card are gone, Open
+  account spans the row, the primary action is **Change connection**, Check connection stays, and
+  Sign out was removed.
+- Connecting a server through Add Server now also updates the sync/share token. The Share panel
+  can auto-connect the current board to the server, and workspace admins can disable board sharing
+  for the whole workspace (which revokes existing links and is enforced by the service).
 - Desktop OIDC sign-in now opens the user's default browser instead of an embedded webview or
   pop-up. The Tauri app starts a one-shot loopback listener, opens the provider through
   `open_external`, and receives the scoped app-sync token back on `127.0.0.1`; the service only

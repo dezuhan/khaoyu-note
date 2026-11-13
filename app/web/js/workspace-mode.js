@@ -486,7 +486,13 @@ async function openWorkspaceMembers(server, workspace) {
       );
       const members = data.members || [];
       const canManage = ["owner", "admin"].includes(data.role);
-      body.innerHTML = `<p class="mn-workspace-form-note">${members.length} member${members.length === 1 ? "" : "s"} in this workspace.</p><div data-role="member-list">${members
+      body.innerHTML = `${
+        canManage
+          ? `<label class="mn-workspace-sharing-policy"><input type="checkbox" data-role="workspace-sharing" ${
+              data.sharingEnabled === false ? "" : "checked"
+            } /><span><strong>Allow public board sharing</strong><small>Workspace members can create share links. Turning this off revokes existing links.</small></span></label>`
+          : ""
+      }<p class="mn-workspace-form-note">${members.length} member${members.length === 1 ? "" : "s"} in this workspace.</p><div data-role="member-list">${members
         .map((member) => {
           const managed = canManage && member.role !== "owner";
           const controls = managed
@@ -497,6 +503,30 @@ async function openWorkspaceMembers(server, workspace) {
           )}</small></div>${controls}</div>`;
         })
         .join("")}</div><p class="mn-workspace-form-error" data-role="error" role="status"></p>`;
+      body.querySelector('[data-role="workspace-sharing"]')?.addEventListener("change", async (event) => {
+        const checkbox = event.currentTarget;
+        const error = body.querySelector('[data-role="error"]');
+        checkbox.disabled = true;
+        try {
+          await jsonFetch(
+            `${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/policy`,
+            { method: "PATCH", body: { sharingEnabled: checkbox.checked } },
+            server.token
+          );
+          error.textContent = "";
+          window.dispatchEvent(
+            new CustomEvent("mn:toast", {
+              detail: { message: checkbox.checked ? "Board sharing enabled" : "Board sharing disabled" },
+            })
+          );
+        } catch (failure) {
+          checkbox.checked = !checkbox.checked;
+          error.textContent = failure.message || "Could not update the sharing policy.";
+        } finally {
+          checkbox.disabled = false;
+        }
+      });
+
       body.querySelectorAll("[data-member-role]").forEach((select) => {
         select.addEventListener("change", async () => {
           const error = body.querySelector('[data-role="error"]');
@@ -739,6 +769,18 @@ function saveServerConnection(url, email, token) {
   const entries = servers().filter((entry) => entry.url !== url);
   entries.unshift({ url, name: new URL(url).host, email, token });
   saveServers(entries);
+  // Connecting a server must also establish the sync/share connection used by the current board;
+  // otherwise the Share panel sees a stale token and refuses to create links.
+  void import("./sync.js").then((sync) => {
+    const current = sync.loadSyncConfig();
+    sync.saveSyncConfig({
+      url,
+      email,
+      token,
+      publicShareUrl: current.publicShareUrl || "",
+    });
+    window.dispatchEvent(new CustomEvent("mn:sync-changed"));
+  });
 }
 
 const OIDC_ERROR_TEXT = {

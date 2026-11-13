@@ -589,7 +589,7 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal(signed.status, 201, JSON.stringify(signed.body));
     assert.equal(signed.body.email, email);
     assert.ok(String(signed.body.token).startsWith("khn_"));
-    assert.deepEqual(signed.body.scopes, ["projects:read", "projects:write"]);
+    assert.deepEqual(signed.body.scopes, ["projects:read", "projects:write", "account:read", "account:write"]);
 
     const token = signed.body.token;
     const projects = await api.call("/api/v1/projects", {
@@ -2271,4 +2271,29 @@ test("a backup code completes a challenge from the password step", async (t) => 
   });
   assert.equal(sync.status, 200, JSON.stringify(sync.body));
   assert.match(sync.body.token, /^khn_/);
+});
+
+test("app-sync tokens can manage the account profile and sessions", async (t) => {
+  const api = await start();
+  t.after(() => api.close());
+  const user = await api.account(`app-account-${crypto.randomUUID()}@example.com`);
+  const sync = await api.call("/api/v1/auth/sync-token", {
+    method: "POST",
+    body: { email: user.email, password: user.password },
+  });
+  assert.equal(sync.status, 201, JSON.stringify(sync.body));
+  const headers = { authorization: `Bearer ${sync.body.token}` };
+  const profile = await api.call("/api/v1/app/account/profile", { headers });
+  assert.equal(profile.status, 200, JSON.stringify(profile.body));
+  assert.equal(profile.body.user.email, user.email);
+  const sessions = await api.call("/api/v1/app/account/sessions", { headers });
+  assert.equal(sessions.status, 200, JSON.stringify(sessions.body));
+  assert.ok(Array.isArray(sessions.body.sessions));
+  const renamed = await api.call("/api/v1/app/account/profile", {
+    method: "PATCH",
+    headers,
+    body: { username: `app_${crypto.randomUUID().slice(0, 8)}`, displayName: "App Renamed" },
+  });
+  assert.equal(renamed.status, 200, JSON.stringify(renamed.body));
+  assert.equal(renamed.body.user.displayName, "App Renamed");
 });
