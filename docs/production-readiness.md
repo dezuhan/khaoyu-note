@@ -143,7 +143,7 @@ scan used Podman and Trivy.
 | Rust tests | **21 library tests and 2 MCP unit tests pass**, including the legacy migration test |
 | `cargo clippy --all-targets -- -D warnings` | pass |
 | Service image build (Podman) | pass |
-| Linux packages (0.36.0) | `.deb` 7.95 MiB, AppImage 87.08 MiB, portable `.tar.gz` 7.81 MiB built and checksummed; runtime launch on X11/Wayland pending |
+| Linux packages (0.36.0) | `.deb` 6.28 MiB, AppImage 87.07 MiB, portable `.tar.gz` 7.83 MiB rebuilt from the current binaries and checksummed; an 8-second X11/Wayland launch smoke test passed (window stayed up, no stderr) |
 | Trivy image scan (CRITICAL, ignore-unfixed) | **0 findings** |
 | `npm audit --omit=dev` for service | 0 vulnerabilities |
 

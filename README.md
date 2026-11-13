@@ -519,10 +519,10 @@ branch:
 
 | File | Size | Purpose |
 | --- | --- | --- |
-| `Khaoyu-Note_0.36.0_amd64.deb` | 7.95 MiB | Debian/Ubuntu installer |
-| `Khaoyu-Note_0.36.0_amd64.AppImage` | 87.08 MiB | portable AppImage |
-| `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz` | 7.81 MiB | portable archive with the desktop and MCP binaries, README, changelog and license |
-| `khaoyu-note-mcp` (Linux) | 4.5 MiB | standalone MCP server, also included in the archive |
+| `Khaoyu-Note_0.36.0_amd64.deb` | 6.28 MiB | Debian/Ubuntu installer |
+| `Khaoyu-Note_0.36.0_amd64.AppImage` | 87.07 MiB | portable AppImage |
+| `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz` | 7.83 MiB | portable archive with the desktop and MCP binaries, README, changelog and license |
+| `khaoyu-note-mcp` (Linux) | 4.44 MiB | standalone MCP server, also included in the archive |
 
 Windows installers are produced by the release workflow as `Khaoyu Note_0.36.0_x64-setup.exe`,
 `Khaoyu Note_0.36.0_x64_en-US.msi`, the portable `KhaoyuNote.exe` and `khaoyu-note-mcp.exe`. macOS

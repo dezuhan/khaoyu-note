@@ -57,9 +57,9 @@ open-with-default-app behaviour before release.
 
 Final local 0.36.0 rebuild evidence (2026-11-12 20:33, Linux x86_64, Ubuntu 26.04 container):
 
-- `Khaoyu-Note_0.36.0_amd64.deb` (7.95 MiB) built with Tauri;
-- `Khaoyu-Note_0.36.0_amd64.AppImage` (87.08 MiB) bundled with the Tauri appimage bundler;
-- `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz` (7.81 MiB) contains the desktop and release MCP binaries,
+- `Khaoyu-Note_0.36.0_amd64.deb` (6.28 MiB) built from the release binaries with Debian package metadata;
+- `Khaoyu-Note_0.36.0_amd64.AppImage` (87.07 MiB) repacked from the bundled AppDir with the release binaries;
+- `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz` (7.83 MiB) contains the desktop and release MCP binaries,
   README, changelog and license;
 - checksums are written to `dist/linux/SHA256SUMS.txt` and verified with `sha256sum -c`;
 - the rebuild includes the final live-refresh, viewport and share-viewer web assets;
