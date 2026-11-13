@@ -387,20 +387,36 @@ function credentialsFor(serverUrl) {
 async function api(pathname, { method = "GET", body, serverUrl = "", timeoutMs = 20000 } = {}) {
   const config = credentialsFor(serverUrl);
   let response;
+  let timer = 0;
   try {
-    response = await fetch(config.url + pathname, {
-      method,
-      headers: {
-        authorization: `Bearer ${config.token}`,
-        ...(body === undefined ? {} : { "content-type": "application/json" }),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
+    // AbortSignal.timeout alone is not enough on some WebKitGTK builds: a stalled request can keep
+    // the sync queue in "syncing" forever. Race the fetch against a hard deadline as well.
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const offline = new Error("offline");
+        offline.offline = true;
+        reject(offline);
+      }, timeoutMs + 1000);
     });
-  } catch {
+    response = await Promise.race([
+      fetch(config.url + pathname, {
+        method,
+        headers: {
+          authorization: `Bearer ${config.token}`,
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      }),
+      deadline,
+    ]);
+  } catch (error) {
+    if (error?.offline) throw error;
     const offline = new Error("offline");
     offline.offline = true;
     throw offline;
+  } finally {
+    clearTimeout(timer);
   }
   const text = await response.text();
   let parsed = null;
@@ -847,7 +863,7 @@ async function markFailed(record, message) {
 async function postOperations(record, batch) {
   return api(`/api/v1/projects/${record.projectId}/ops`, {
     serverUrl: record.serverUrl,
-    timeoutMs: 30000,
+    timeoutMs: 15000,
     method: "POST",
     body: {
       baseSeq: Number(record.lastSeq || 0),
@@ -1200,7 +1216,11 @@ async function handleFlushFailure(record, error, replays) {
 }
 
 function flushRecord(record) {
-  if (record.inFlight) return record.inFlight;
+  if (record.inFlight) {
+    // A request that never settles must not pin the queue to "syncing" forever.
+    if (Date.now() - Number(record.inFlightSince || 0) < 45000) return record.inFlight;
+    record.inFlight = null;
+  }
   clearTimeout(record.flushTimer);
   record.flushTimer = 0;
   clearTimeout(record.retryTimer);
@@ -1258,7 +1278,16 @@ function flushRecord(record) {
     }
   })();
   record.inFlight = run;
+  record.inFlightSince = Date.now();
   emitStatus(record);
+  void run.then(
+    () => {
+      record.inFlightSince = 0;
+    },
+    () => {
+      record.inFlightSince = 0;
+    }
+  );
   return run;
 }
 

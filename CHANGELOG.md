@@ -5,6 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Remote sync no longer stays on "Syncing N changes..." indefinitely: operation requests now have a
+  hard deadline in addition to `AbortSignal.timeout` (16 seconds for a batch, 15s API timeout), and a
+  stale in-flight request is cleared after 45 seconds so the queue can retry. This addresses
+  WebKitGTK/network stalls that previously pinned the queue in the syncing state.
 - Settings > Server now reports **Local storage** when a local board is active instead of showing the
   saved service connection as connected. A server connection is shown only while a server board is
   open.
