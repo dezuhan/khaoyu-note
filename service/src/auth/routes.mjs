@@ -6,6 +6,17 @@ import { bearerToken, hashToken, parseCookies, randomToken, serializeCookie } fr
 import { createTotpSecret, generateTotp, totpUri, verifyTotp } from "./totp.mjs";
 import { clearLoginFailures, createRateLimiter, loginBlocked, recordLoginAttempt } from "./throttle.mjs";
 import {
+  STATE_COOKIE,
+  STATE_TTL_MS,
+  authorizationUrl,
+  enabledProviders,
+  finishAuthorization,
+  providerFor,
+  sanitizeRedirect,
+  signState,
+  verifyState,
+} from "./oidc.mjs";
+import {
   authenticationOptions,
   deletePasskey,
   listPasskeys,
@@ -409,6 +420,8 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
   const accountSecurityRate = createRateLimiter({ windowMs: rateWindowMs, max: 10 });
   const accountPasswordRate = createRateLimiter({ windowMs: rateWindowMs, max: 5 });
   const passwordResetConfirmRate = createRateLimiter({ windowMs: rateWindowMs, max: 10 });
+  const oidcStartRate = createRateLimiter({ windowMs: rateWindowMs, max: 60 });
+  const oidcCallbackRate = createRateLimiter({ windowMs: rateWindowMs, max: 60 });
   const accountExportRate = createRateLimiter({ windowMs: 60 * 60_000, max: 10 });
   const accountDestructiveRate = createRateLimiter({ windowMs: 60 * 60_000, max: 5 });
   const accountKey = (auth, ipHash) => `${auth.account.id}:${ipHash}`;
@@ -422,6 +435,27 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         "Retry-After": String(result.retryAfter),
       });
     }
+  }
+
+
+  function oidcStateCookie(value, config) {
+    return serializeCookie(STATE_COOKIE, value, {
+      maxAge: value ? Math.floor(STATE_TTL_MS / 1000) : 0,
+      path: "/api/v1/auth/oidc",
+      secure: config.cookieSecure,
+      sameSite: "Lax",
+    });
+  }
+
+  function sendRedirect(response, config, location, cookies = []) {
+    for (const cookie of cookies) appendCookie(response, cookie);
+    applySecurityHeaders(response, config);
+    response.writeHead(302, { Location: location, "Cache-Control": "no-store" });
+    response.end();
+  }
+
+  function oidcFailed(response, config, code, cookies = []) {
+    sendRedirect(response, config, `/login?error=${encodeURIComponent(code)}`, cookies);
   }
 
   async function broadcastPresence(projectId) {
@@ -1665,10 +1699,189 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         return true;
       }
 
+      const oidcStartMatch = url.pathname.match(/^\/api\/v1\/auth\/oidc\/([a-z0-9_-]+)\/start$/);
+      if (method === "GET" && oidcStartMatch) {
+        enforceRate(oidcStartRate, ipHash);
+        const provider = providerFor(config, oidcStartMatch[1]);
+        if (!provider) {
+          oidcFailed(response, config, "provider_unavailable");
+          return true;
+        }
+        const state = randomToken(24);
+        const nonce = provider.kind === "oidc" ? randomToken(24) : "";
+        const verifier = randomToken(48);
+        const redirect = sanitizeRedirect(url.searchParams.get("redirect"));
+        const cookie = oidcStateCookie(
+          signState({ provider: provider.id, state, nonce, verifier, redirect }, config.secret),
+          config
+        );
+        try {
+          const location = await authorizationUrl(provider, {
+            state,
+            nonce,
+            verifier,
+            redirectUri: provider.redirectUrl,
+          });
+          sendRedirect(response, config, location, [cookie]);
+        } catch (error) {
+          logger.warn("auth.oidc_start_failed", { provider: provider.id, message: error.message });
+          oidcFailed(response, config, "provider_unavailable");
+        }
+        return true;
+      }
+
+      const oidcCallbackMatch = url.pathname.match(/^\/api\/v1\/auth\/oidc\/([a-z0-9_-]+)\/callback$/);
+      if (method === "GET" && oidcCallbackMatch) {
+        enforceRate(oidcCallbackRate, ipHash);
+        const provider = providerFor(config, oidcCallbackMatch[1]);
+        const clearState = oidcStateCookie("", config);
+        if (!provider) {
+          oidcFailed(response, config, "provider_unavailable", [clearState]);
+          return true;
+        }
+        if (url.searchParams.get("error")) {
+          oidcFailed(response, config, "access_denied", [clearState]);
+          return true;
+        }
+        const stateCookie = verifyState(
+          parseCookies(request.headers.cookie)[STATE_COOKIE],
+          config.secret
+        );
+        if (
+          !stateCookie ||
+          stateCookie.provider !== provider.id ||
+          url.searchParams.get("state") !== stateCookie.state
+        ) {
+          oidcFailed(response, config, "invalid_state", [clearState]);
+          return true;
+        }
+        const code = url.searchParams.get("code") || "";
+        let identity;
+        try {
+          identity = await finishAuthorization(provider, {
+            code,
+            nonce: stateCookie.nonce,
+            verifier: stateCookie.verifier,
+            redirectUri: provider.redirectUrl,
+          });
+        } catch (error) {
+          logger.warn("auth.oidc_callback_failed", { provider: provider.id, message: error.message });
+          const code = /verified email/i.test(error.message) ? "email_unverified" : "provider_failed";
+          oidcFailed(response, config, code, [clearState]);
+          return true;
+        }
+
+        let email;
+        try {
+          email = normalizeEmail(identity.email);
+        } catch {
+          oidcFailed(response, config, "email_unverified", [clearState]);
+          return true;
+        }
+        const domain = email.split("@")[1] || "";
+        const allowedDomains = provider.allowedDomains || [];
+        if (allowedDomains.length && !allowedDomains.includes(domain)) {
+          oidcFailed(response, config, "domain_not_allowed", [clearState]);
+          return true;
+        }
+
+        let account = null;
+        const linked = await db.get(
+          "SELECT * FROM oauth_identities WHERE provider = ? AND subject = ?",
+          [provider.id, identity.subject]
+        );
+        if (linked) account = await accountById(db, linked.account_id);
+        if (!account) {
+          account = await db.get("SELECT * FROM accounts WHERE email = ?", [email]);
+          if (account) {
+            await db.run(
+              "INSERT OR IGNORE INTO oauth_identities (provider, subject, account_id, email, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)",
+              [provider.id, identity.subject, account.id, email, now(), now()]
+            );
+          } else if (!provider.autoCreate) {
+            oidcFailed(response, config, "account_missing", [clearState]);
+            return true;
+          } else {
+            const accountId = crypto.randomUUID();
+            const firstAccount =
+              Number((await db.get("SELECT COUNT(*) AS count FROM accounts", [])).count) === 0;
+            const mode = await registrationMode(db);
+            const approvedAt = firstAccount || mode === "public" ? now() : null;
+            const displayName = String(identity.displayName || email.split("@")[0]).slice(0, 80);
+            try {
+              await db.transaction(async (tx) => {
+                await tx.run(
+                  "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, avatar_url, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)",
+                  [
+                    accountId,
+                    email,
+                    displayName,
+                    now(),
+                    firstAccount ? "admin" : "member",
+                    approvedAt,
+                    identity.avatarUrl || "",
+                    now(),
+                    now(),
+                  ]
+                );
+                await tx.run(
+                  "INSERT INTO oauth_identities (provider, subject, account_id, email, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)",
+                  [provider.id, identity.subject, accountId, email, now(), now()]
+                );
+              });
+              account = await accountById(db, accountId);
+              if (approvedAt !== null) await addWorkspaceViewersForAccount(db, accountId);
+            } catch (error) {
+              if (!/UNIQUE/.test(error.message)) throw error;
+              account = await db.get("SELECT * FROM accounts WHERE email = ?", [email]);
+              if (!account) throw error;
+              await db.run(
+                "INSERT OR IGNORE INTO oauth_identities (provider, subject, account_id, email, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)",
+                [provider.id, identity.subject, account.id, email, now(), now()]
+              );
+            }
+          }
+        }
+
+        if (!account || account.deleted_at || account.status !== "active") {
+          oidcFailed(response, config, "account_disabled", [clearState]);
+          return true;
+        }
+        if (!accountApproved(account)) {
+          oidcFailed(response, config, "account_pending", [clearState]);
+          return true;
+        }
+
+        const session = await startSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        await db.run(
+          "UPDATE oauth_identities SET email = ?, last_login_at = ? WHERE provider = ? AND subject = ?",
+          [email, now(), provider.id, identity.subject]
+        );
+        await writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.login_oidc",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          metadata: { provider: provider.id },
+          ip,
+          secret: config.secret,
+        });
+        sendRedirect(response, config, sanitizeRedirect(stateCookie.redirect), [clearState]);
+        return true;
+      }
+
       if (method === "GET" && url.pathname === "/api/v1/auth/features") {
         sendJson(response, 200, {
           passkeysEnabled: Boolean(config.passkeysEnabled),
           registrationMode: await registrationMode(db),
+          oidcProviders: enabledProviders(config).map((provider) => ({
+            id: provider.id,
+            name: provider.name,
+          })),
         }, config);
         return true;
       }

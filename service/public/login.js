@@ -61,6 +61,21 @@ async function applyAuthFeatures() {
     const response = await fetch("/api/v1/auth/features", { credentials: "same-origin" });
     if (!response.ok) return;
     const features = await response.json();
+    const providers = Array.isArray(features.oidcProviders) ? features.oidcProviders : [];
+    const oidc = document.getElementById("oidc-providers");
+    const oidcOr = document.getElementById("oidc-or");
+    if (oidc && providers.length) {
+      oidc.replaceChildren();
+      for (const provider of providers) {
+        const link = document.createElement("a");
+        link.className = "auth-oidc-button";
+        link.href = `/api/v1/auth/oidc/${encodeURIComponent(provider.id)}/start`;
+        link.textContent = `Continue with ${provider.name}`;
+        oidc.append(link);
+      }
+      oidc.hidden = false;
+      if (oidcOr) oidcOr.hidden = false;
+    }
     if (!features.passkeysEnabled) {
       const link = document.getElementById("passkey-login-link");
       const separator = document.getElementById("passkey-login-separator");

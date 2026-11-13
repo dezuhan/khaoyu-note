@@ -118,6 +118,75 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     }
   }
 
+  // Optional OIDC (Google) and OAuth 2.0 (GitHub) sign-in. Both are disabled by default and fail
+  // closed when half configured. Tests may inject config.oidcProviders directly.
+  const oidcProviders = [];
+  const oidcRedirect = (id) => {
+    try {
+      return new URL(`/api/v1/auth/oidc/${id}/callback`, publicUrl).toString();
+    } catch {
+      return "";
+    }
+  };
+  const allowedDomains = (value) =>
+    String(value || "")
+      .split(",")
+      .map((domain) => domain.trim().toLowerCase())
+      .filter(Boolean);
+  const addProvider = (provider) => {
+    if (!provider.clientId || !provider.clientSecret) {
+      throw new Error(
+        `${provider.name} sign-in requires KHAOYU_SERVICE_${provider.id.toUpperCase()}_CLIENT_ID and KHAOYU_SERVICE_${provider.id.toUpperCase()}_CLIENT_SECRET`
+      );
+    }
+    if (!provider.redirectUrl) {
+      throw new Error(`${provider.name} sign-in requires a redirect URL`);
+    }
+    let parsed;
+    try {
+      parsed = new URL(provider.redirectUrl);
+    } catch {
+      throw new Error(`${provider.name} redirect URL is invalid`);
+    }
+    if (!["https:", "http:"].includes(parsed.protocol)) {
+      throw new Error(`${provider.name} redirect URL must be http(s)`);
+    }
+    oidcProviders.push(Object.freeze(provider));
+  };
+  if (boolean(env.KHAOYU_SERVICE_GOOGLE_OIDC_ENABLED, false) || env.KHAOYU_SERVICE_GOOGLE_CLIENT_ID) {
+    addProvider({
+      id: "google",
+      kind: "oidc",
+      name: "Google",
+      clientId: env.KHAOYU_SERVICE_GOOGLE_CLIENT_ID || "",
+      clientSecret: env.KHAOYU_SERVICE_GOOGLE_CLIENT_SECRET || "",
+      redirectUrl: env.KHAOYU_SERVICE_GOOGLE_REDIRECT_URL || oidcRedirect("google"),
+      issuer: "https://accounts.google.com",
+      discoveryUrl: "https://accounts.google.com/.well-known/openid-configuration",
+      scopes: ["openid", "email", "profile"],
+      autoCreate: boolean(env.KHAOYU_SERVICE_GOOGLE_AUTO_CREATE, false),
+      allowedDomains: allowedDomains(env.KHAOYU_SERVICE_GOOGLE_ALLOWED_DOMAINS),
+      enabled: true,
+    });
+  }
+  if (boolean(env.KHAOYU_SERVICE_GITHUB_OAUTH_ENABLED, false) || env.KHAOYU_SERVICE_GITHUB_CLIENT_ID) {
+    addProvider({
+      id: "github",
+      kind: "github",
+      name: "GitHub",
+      clientId: env.KHAOYU_SERVICE_GITHUB_CLIENT_ID || "",
+      clientSecret: env.KHAOYU_SERVICE_GITHUB_CLIENT_SECRET || "",
+      redirectUrl: env.KHAOYU_SERVICE_GITHUB_REDIRECT_URL || oidcRedirect("github"),
+      authorizationEndpoint: "https://github.com/login/oauth/authorize",
+      tokenEndpoint: "https://github.com/login/oauth/access_token",
+      userApi: "https://api.github.com",
+      scopes: ["read:user", "user:email"],
+      autoCreate: boolean(env.KHAOYU_SERVICE_GITHUB_AUTO_CREATE, false),
+      allowedDomains: allowedDomains(env.KHAOYU_SERVICE_GITHUB_ALLOWED_DOMAINS),
+      enabled: true,
+    });
+  }
+
   const passkeysEnabled = boolean(env.KHAOYU_SERVICE_PASSKEYS_ENABLED, true);
   const rpId = (env.KHAOYU_SERVICE_RP_ID || new URL(publicUrl).hostname).toLowerCase();
   if (!/^[a-z0-9.-]+$/.test(rpId)) {
@@ -159,6 +228,7 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     ssoHeader,
     ssoNameHeader,
     ssoAutoCreate: boolean(env.KHAOYU_SERVICE_SSO_AUTO_CREATE, false),
+    oidcProviders: Object.freeze(oidcProviders),
     passkeysEnabled,
     rpId,
     publicSharingEnabled: boolean(env.KHAOYU_SERVICE_PUBLIC_SHARING, true),

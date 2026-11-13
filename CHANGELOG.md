@@ -5,6 +5,13 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- The self-hosted service can now sign in with **Google OpenID Connect** and **GitHub OAuth 2.0**
+  behind per-provider operator flags. Google uses discovery, PKCE S256, JWKS `id_token` verification
+  and nonce checks; GitHub reads `/user` and `/user/emails` and requires a verified primary email.
+  Both flows use a signed HttpOnly state cookie, link existing accounts only by verified email,
+  honour `registration_mode`/approval for auto-created accounts, support allowed-domain filters and
+  same-site redirect validation, emit `auth.login_oidc` audit events and are covered by a mock
+  provider test suite (9 checks).
 - Local storage keys moved from the `mn.` namespace to `ky.` (boards, settings, theme, servers,
   workspace cache, sync queue, templates, views, assets and update cache). A one-time migration
   copies legacy `mn.*` values to `ky.*` and removes the old keys, so existing browser data survives.

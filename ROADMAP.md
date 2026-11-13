@@ -35,8 +35,9 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
 
 - [x] 1. Keep the local-first desktop experience fully usable without a server.
 - [~] 2. Offer an optional self-hosted server for teams that want accounts and sharing. (`service/`
-  implements this; production readiness is still pending OIDC, load tests, penetration testing and a
-  guided team onboarding, see `docs/production-readiness.md`.)
+  implements this with password, passkey and optional Google/GitHub sign-in; production readiness is
+  still pending live provider verification, load tests, penetration testing and a guided team
+  onboarding, see `docs/production-readiness.md`.)
 - [x] 3. Support login and roles, but never make login mandatory for local boards. (Local-first guest
   mode does this; the service requires accounts only for synced projects.)
 - [x] 4. Share a whole project, a single card, or a column without exposing the rest of the board.
@@ -85,7 +86,9 @@ Verification note: checkboxes were reconciled with the 0.36.0 code and test evid
 - [x] Unique, case-normalised email addresses; display name separate from email.
 - [x] Account deletion request with a grace period, export before deletion.
 - [x] Optional second factor: TOTP first, passkeys later (TOTP and WebAuthn passkeys are implemented, with QR setup and passkey readiness in the account security page).
-- [x] Optional SSO for self-hosted enterprise deployments, behind an operator flag (trusted-proxy header SSO with HMAC; OIDC discovery is not included).
+- [x] Optional SSO for self-hosted enterprise deployments: trusted-proxy header SSO with HMAC,
+  plus optional Google OIDC (discovery, PKCE, JWKS) and GitHub OAuth sign-in behind per-provider
+  flags. Group-to-role mapping remains out of scope.
 
 ### Authentication
 

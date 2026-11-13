@@ -145,7 +145,7 @@ compaction is still limited to the existing version history rather than an op-co
    lock conflict and readiness passed.
 4. [done] Desktop/web client writes granular operations and applies remote ops from the realtime stream.
 5. [done] Cursor/selection presence, hard locks, granular per-card operation writes and team
-   Docker deployment; OIDC onboarding/hardening remains.
+   Docker deployment; OIDC group-to-role mapping and live provider hardening remain.
 
 ## Verification note (2026-11-12)
 

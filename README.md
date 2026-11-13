@@ -258,7 +258,8 @@ SQLite schema for accounts, sessions, projects, memberships, snapshots and audit
 storage, a maintenance worker, reversible migrations, backup and restore, and a minimal health
 endpoint. The account core includes Argon2id passwords, rotating refresh tokens
 with reuse detection, session management, password reset, TOTP, email one-time codes, WebAuthn
-passkeys, account deletion grace, project role checks and scoped API tokens. Project assets have
+passkeys, optional Google OIDC and GitHub OAuth sign-in, account deletion grace, project role checks and
+scoped API tokens. Project assets have
 authenticated upload, member-only download and share download enforcement.
 
 ```powershell

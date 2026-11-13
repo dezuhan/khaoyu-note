@@ -77,4 +77,4 @@ approved by migration. **Public** mode marks new accounts approved immediately, 
 viewers offer a Create an account link. The policy is stored in `service_meta.registration_mode`
 and changed through `GET/PATCH /api/v1/admin/settings`.
 
-OIDC is not implemented; the optional SSO path remains a trusted-proxy HMAC header integration.
+Google OIDC and GitHub OAuth sign-in are implemented behind operator flags (`KHAOYU_SERVICE_GOOGLE_*`, `KHAOYU_SERVICE_GITHUB_*`). They use a signed state cookie, PKCE S256 (Google), JWKS id_token verification (Google) and verified-email linking. The trusted-proxy HMAC header SSO remains available separately.

@@ -295,6 +295,18 @@ The existing single-user `docker-compose.yml` remains unchanged for local SQLite
 | `KHAOYU_SERVICE_SSO_HEADER` | `x-auth-request-email` | Header containing the authenticated email. |
 | `KHAOYU_SERVICE_SSO_NAME_HEADER` | `x-auth-request-name` | Optional display-name header. |
 | `KHAOYU_SERVICE_SSO_AUTO_CREATE` | `false` | Create a verified account for an unknown SSO email. |
+| `KHAOYU_SERVICE_GOOGLE_OIDC_ENABLED` | `false` | Enable Google OpenID Connect sign-in. Enabling requires client id, secret and redirect URL. |
+| `KHAOYU_SERVICE_GOOGLE_CLIENT_ID` | empty | Google OAuth client id. |
+| `KHAOYU_SERVICE_GOOGLE_CLIENT_SECRET` | empty | Google OAuth client secret. |
+| `KHAOYU_SERVICE_GOOGLE_REDIRECT_URL` | `<public URL>/api/v1/auth/oidc/google/callback` | Exact Google redirect URI. |
+| `KHAOYU_SERVICE_GOOGLE_AUTO_CREATE` | `false` | Create a verified account for an unknown Google email (still subject to registration mode/approval). |
+| `KHAOYU_SERVICE_GOOGLE_ALLOWED_DOMAINS` | empty | Comma-separated email domains allowed to sign in with Google. |
+| `KHAOYU_SERVICE_GITHUB_OAUTH_ENABLED` | `false` | Enable GitHub OAuth sign-in. |
+| `KHAOYU_SERVICE_GITHUB_CLIENT_ID` | empty | GitHub OAuth App client id. |
+| `KHAOYU_SERVICE_GITHUB_CLIENT_SECRET` | empty | GitHub OAuth App client secret. |
+| `KHAOYU_SERVICE_GITHUB_REDIRECT_URL` | `<public URL>/api/v1/auth/oidc/github/callback` | Exact GitHub callback URL. |
+| `KHAOYU_SERVICE_GITHUB_AUTO_CREATE` | `false` | Create a verified account for an unknown GitHub email. |
+| `KHAOYU_SERVICE_GITHUB_ALLOWED_DOMAINS` | empty | Comma-separated email domains allowed to sign in with GitHub. |
 | `KHAOYU_SERVICE_REQUIRE_HTTPS` | `false` | Reject plain HTTP unless a trusted proxy reports `x-forwarded-proto: https`. Requires an HTTPS public URL. |
 | `KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND` | empty | Optional scanner executable receiving the temporary upload path; non-zero exit rejects the asset. |
 | `KHAOYU_SERVICE_PASSKEYS_ENABLED` | `true` | Enable WebAuthn passkey registration and login. Set `false` to temporarily hide the passkey UI and return 404 from passkey endpoints. |
@@ -577,6 +589,32 @@ An existing account is matched by email. With auto-create disabled an unknown em
 with auto-create enabled a verified account is created without a local password. SSO sessions are
 audited as `auth.login_sso` and TOTP is not required because the external IdP is the second factor.
 This is forward-auth integration, not OIDC discovery.
+
+
+## Google and GitHub sign-in
+
+Google uses OpenID Connect; GitHub uses OAuth 2.0 because it does not issue an OIDC `id_token`.
+Both are optional, disabled by default and fail startup when only half configured. The sign-in page
+shows a button for each enabled provider.
+
+Set `KHAOYU_SERVICE_GOOGLE_CLIENT_ID`, `KHAOYU_SERVICE_GOOGLE_CLIENT_SECRET` and, if the default is
+not correct, `KHAOYU_SERVICE_GOOGLE_REDIRECT_URL`. The redirect URI must be registered exactly in
+Google Cloud Console and must be the public HTTPS URL ending in
+`/api/v1/auth/oidc/google/callback`. Google endpoints come from discovery
+(`https://accounts.google.com/.well-known/openid-configuration`); the callback verifies the
+`id_token` signature against JWKS, then checks `iss`, `aud`, `exp` and `nonce`, and only accepts a
+verified email.
+
+GitHub uses an OAuth App with callback `/api/v1/auth/oidc/github/callback`, scopes
+`read:user user:email`, and `KHAOYU_SERVICE_GITHUB_CLIENT_ID`/`_CLIENT_SECRET`. After the code
+exchange the service reads `/user` and `/user/emails` and requires the primary verified email.
+
+Both flows use a signed, HttpOnly state cookie (10 minutes) with an unpredictable `state`; PKCE S256
+is used for Google. An existing account is linked by verified email. Unknown emails are rejected
+unless `autoCreate` is enabled; auto-created accounts still follow `registration_mode` (public means
+approved, private means pending administrator approval) and `allowedDomains` when configured. Every
+successful login is audited as `auth.login_oidc` with the provider in the metadata. Redirect
+destinations are limited to same-site paths, so `redirect=//evil.example` falls back to `/admin`.
 
 ## Sharing and membership
 

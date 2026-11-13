@@ -37,7 +37,8 @@ host.
 | Supply chain | `npm audit`, Dependabot and Trivy image scanning in CI. | No reproducible binary signing or third-party review. |
 | Operator mistakes | Fail-closed config, migrations, backup/restore, release checklist. | No automated restore drill. |
 | Insider access | Least-privilege project roles, audit log, admin token separation. | SQLite file access is operator-level. |
-| SSO header spoofing | HMAC-signed proxy email, trust-proxy requirement, proxy must strip client headers. | Custom reverse-proxy signing is operator responsibility; OIDC is not built in. |
+| SSO header spoofing | HMAC-signed proxy email, trust-proxy requirement, proxy must strip client headers. | Custom reverse-proxy signing is operator responsibility. |
+| OIDC account takeover | State + nonce + PKCE S256, JWKS signature/issuer/audience checks, verified-email-only linking, signed state cookie. | Provider-side consent configuration and email ownership remain trust anchors. |
 
 ## Assumptions
 

@@ -101,3 +101,45 @@ test("team profile is accepted by the shared configuration", () => {
   assert.equal(config.databaseUrl, "postgres://khaoyu:secret@127.0.0.1:5432/khaoyu");
   assert.equal(config.redisUrl, "redis://127.0.0.1:6379");
 });
+
+test("OIDC providers are parsed only when fully configured", () => {
+  const config = loadConfig({
+    KHAOYU_SERVICE_SECRET: SECRET,
+    KHAOYU_SERVICE_GOOGLE_CLIENT_ID: "google-client",
+    KHAOYU_SERVICE_GOOGLE_CLIENT_SECRET: "google-secret",
+    KHAOYU_SERVICE_GOOGLE_AUTO_CREATE: "true",
+    KHAOYU_SERVICE_GOOGLE_ALLOWED_DOMAINS: "example.com, Example.org",
+    KHAOYU_SERVICE_GITHUB_CLIENT_ID: "github-client",
+    KHAOYU_SERVICE_GITHUB_CLIENT_SECRET: "github-secret",
+  });
+  assert.equal(config.oidcProviders.length, 2);
+  const google = config.oidcProviders.find((provider) => provider.id === "google");
+  assert.equal(google.kind, "oidc");
+  assert.equal(google.autoCreate, true);
+  assert.deepEqual(google.allowedDomains, ["example.com", "example.org"]);
+  assert.match(google.redirectUrl, /\/api\/v1\/auth\/oidc\/google\/callback$/);
+  const github = config.oidcProviders.find((provider) => provider.id === "github");
+  assert.equal(github.kind, "github");
+  assert.equal(github.autoCreate, false);
+});
+
+test("half-configured OIDC providers fail closed", () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        KHAOYU_SERVICE_SECRET: SECRET,
+        KHAOYU_SERVICE_GOOGLE_CLIENT_ID: "google-client",
+      }),
+    /GOOGLE_CLIENT_SECRET/
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        KHAOYU_SERVICE_SECRET: SECRET,
+        KHAOYU_SERVICE_GITHUB_CLIENT_ID: "github-client",
+        KHAOYU_SERVICE_GITHUB_CLIENT_SECRET: "github-secret",
+        KHAOYU_SERVICE_GITHUB_REDIRECT_URL: "javascript:alert(1)",
+      }),
+    /redirect URL must be http/
+  );
+});

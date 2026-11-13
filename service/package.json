@@ -17,7 +17,7 @@
     "bootstrap": "node src/cli.mjs bootstrap",
     "backup": "node src/cli.mjs backup",
     "restore": "node src/cli.mjs restore",
-    "test": "node --test --test-concurrency=1 test/service.test.mjs test/auth.test.mjs test/admin.test.mjs test/storage.test.mjs test/storage-migrations.test.mjs test/postgres-runtime.test.mjs test/redis-bus.test.mjs test/config.test.mjs"
+    "test": "node --test --test-concurrency=1 test/service.test.mjs test/auth.test.mjs test/admin.test.mjs test/storage.test.mjs test/storage-migrations.test.mjs test/postgres-runtime.test.mjs test/redis-bus.test.mjs test/config.test.mjs test/oidc.test.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.3",

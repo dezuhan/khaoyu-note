@@ -33,8 +33,9 @@ Not ready for a production team deployment:
 1. The setup wizard’s Collaboration option now opens the Server sync flow, and the admin dashboard
    covers accounts, boards, security and sessions. Team onboarding still needs a guided service
    connection and role walkthrough before it is production-polished.
-2. OIDC is not implemented; the current SSO path is a trusted-proxy header mode. A real OIDC
-   discovery/callback flow is still required for normal deployments.
+2. Google OIDC and GitHub OAuth sign-in are implemented and covered by mock-provider tests, but a
+   live production login with real Google/GitHub credentials, consent-screen verification and
+   operator runbooks still needs to be performed.
 3. External penetration testing and production-scale load tests are outstanding.
 4. [verified 2026-11-12] Two-instance PostgreSQL 18 + Redis validation passed for ticket-authenticated
    SSE, global presence, operation propagation/replay, cross-instance lock conflict and readiness.
@@ -113,7 +114,7 @@ Backup and the export action are preparation only, not a migration implementatio
 - [ ] production-scale load test for login, shares and uploads;
 - [x] two-instance PostgreSQL + Redis validation;
 - [x] one-command team Docker stack and exhaustive local test pass (2026-11-12);
-- [ ] OIDC implementation and test;
+- [x] OIDC implementation and mock-provider test (Google OIDC + GitHub OAuth); live provider verification still pending;
 - [ ] object storage plan for service assets;
 - [ ] Turso adapter, token storage and migration tests, or the option hidden;
 - [ ] release signing and version freeze.

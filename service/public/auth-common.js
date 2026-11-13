@@ -90,6 +90,19 @@ export function queryMessage() {
   if (params.get("signedout") === "1") {
     return { message: "You have signed out.", kind: "" };
   }
+  const oidcErrors = {
+    invalid_state: "That sign-in attempt expired or was tampered with. Please try again.",
+    provider_unavailable: "This sign-in provider is not configured on this server.",
+    provider_failed: "The provider could not complete sign-in. Please try again.",
+    access_denied: "Sign-in was cancelled.",
+    email_unverified: "The provider did not return a verified email address.",
+    domain_not_allowed: "That email domain is not allowed to sign in to this server.",
+    account_missing: "No account exists for that email. Ask an administrator for an invitation.",
+    account_pending: "Your account is waiting for administrator approval.",
+    account_disabled: "That account is disabled.",
+  };
+  const oidcError = oidcErrors[params.get("error") || ""];
+  if (oidcError) return { message: oidcError, kind: "error" };
   return null;
 }
 
