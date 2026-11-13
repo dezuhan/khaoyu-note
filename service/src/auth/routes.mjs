@@ -224,6 +224,21 @@ async function requireAuth(request, response, db, config) {
   return { ...auth, cookies };
 }
 
+function shareAppBase(config) {
+  const publicUrl = (config.publicUrl || "").replace(/\/+$/, "");
+  const shareUrl = (config.sharePublicUrl || "").replace(/\/+$/, "");
+  if (shareUrl && shareUrl !== publicUrl) return shareUrl;
+  return (config.mainAppUrl || "").replace(/\/+$/, "");
+}
+
+function publicShareUrl(config, token) {
+  const base = shareAppBase(config);
+  if (base) {
+    return `${base}/?share=${encodeURIComponent(token)}&server=${encodeURIComponent(base)}`;
+  }
+  return `${(config.sharePublicUrl || config.publicUrl).replace(/\/+$/, "")}/s/${encodeURIComponent(token)}`;
+}
+
 async function requireSessionAuth(request, response, db, config) {
   const auth = await requireAuth(request, response, db, config);
   if (auth.method === "api") {
@@ -3383,9 +3398,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         sendJson(response, 201, {
           id: created.id,
           token: created.token,
-          url: config.mainAppUrl
-            ? `${config.mainAppUrl}/?share=${encodeURIComponent(created.token)}&server=${encodeURIComponent(config.publicUrl)}`
-            : `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(created.token)}`,
+          url: publicShareUrl(config, created.token),
           scope,
           permission,
           expiresAt,
@@ -3428,9 +3441,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         });
         sendJson(response, 200, {
           token,
-          url: config.mainAppUrl
-            ? `${config.mainAppUrl}/?share=${encodeURIComponent(token)}&server=${encodeURIComponent(config.publicUrl)}`
-            : `${config.sharePublicUrl || config.publicUrl}/s/${encodeURIComponent(token)}`,
+          url: publicShareUrl(config, token),
         }, config);
         return true;
       }

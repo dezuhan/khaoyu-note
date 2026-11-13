@@ -5,6 +5,8 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Generated share links now honor an explicit `KHAOYU_SERVICE_SHARE_PUBLIC_URL`; `/s/:token` redirects
+  and the embedded `server` parameter use that public share origin instead of the admin `MAIN_APP_URL`.
 - OIDC connections and generated share links now keep the server origin the user entered instead of
   the service's `publicUrl`/`mainAppUrl`, which can be loopback addresses behind a reverse proxy.
   Reconnecting also removes older entries for the same account/loopback URL, so a domain connection

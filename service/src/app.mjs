@@ -6,6 +6,16 @@ import { MIGRATIONS_DIR, POSTGRES_MIGRATIONS_DIR } from "./db.mjs";
 import { migrationStatus } from "./storage/migrations.mjs";
 import { applySecurityHeaders, sendJson } from "./http.mjs";
 
+// Public share links can live on a different origin than the admin/service. Prefer an explicitly
+// configured SHARE_PUBLIC_URL; otherwise fall back to the main board app. An unset custom share URL
+// keeps the service's own /s/:token page.
+function shareAppBase(config) {
+  const publicUrl = (config.publicUrl || "").replace(/\/+$/, "");
+  const shareUrl = (config.sharePublicUrl || "").replace(/\/+$/, "");
+  if (shareUrl && shareUrl !== publicUrl) return shareUrl;
+  return (config.mainAppUrl || "").replace(/\/+$/, "");
+}
+
 const PUBLIC_DIR = path.join(import.meta.dirname, "..", "public");
 const AUTH_PAGES = {
   "/passkeys": ["passkeys.html", "text/html; charset=utf-8"],
@@ -80,9 +90,10 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
       return;
     }
     const sharePath = url.pathname.match(/^\/s\/([^/]+)$/);
-    if (request.method === "GET" && sharePath && config.mainAppUrl) {
+    const shareBase = shareAppBase(config);
+    if (request.method === "GET" && sharePath && shareBase) {
       response.writeHead(302, {
-        Location: `${config.mainAppUrl}/?share=${encodeURIComponent(decodeURIComponent(sharePath[1]))}&server=${encodeURIComponent(config.publicUrl)}`,
+        Location: `${shareBase}/?share=${encodeURIComponent(decodeURIComponent(sharePath[1]))}&server=${encodeURIComponent(shareBase)}`,
       });
       response.end();
       return;
