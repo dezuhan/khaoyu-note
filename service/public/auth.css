@@ -299,8 +299,8 @@ body.auth-body {
 
 .auth-oidc {
   display: grid;
-  gap: 8px;
-  margin: 0 0 16px;
+  gap: var(--ky-space-8);
+  margin: 0 0 var(--ky-space-16);
 }
 
 .auth-oidc-button {
@@ -308,12 +308,12 @@ body.auth-body {
   align-items: center;
   justify-content: center;
   min-height: 42px;
-  padding: 0 16px;
+  padding: 0 var(--ky-space-16);
   border: 1px solid var(--ky-line);
-  border-radius: 10px;
+  border-radius: var(--ky-radius-lg);
   background: var(--ky-control);
   color: var(--ky-text);
-  font-size: 14px;
+  font-size: var(--ky-text-xl);
   font-weight: 550;
   text-decoration: none;
 }
@@ -337,7 +337,7 @@ body.auth-body {
 .auth-link {
   display: block;
   width: 100%;
-  margin-top: 10px;
+  margin-top: var(--ky-space-10);
   border: 0;
   background: transparent;
   color: var(--ky-muted);
