@@ -108,7 +108,7 @@ test("OIDC providers are parsed only when fully configured", () => {
     KHAOYU_SERVICE_GOOGLE_CLIENT_ID: "google-client",
     KHAOYU_SERVICE_GOOGLE_CLIENT_SECRET: "google-secret",
     KHAOYU_SERVICE_GOOGLE_AUTO_CREATE: "true",
-    KHAOYU_SERVICE_GOOGLE_ALLOWED_DOMAINS: "example.com, Example.org",
+    KHAOYU_SERVICE_GOOGLE_ALLOWED_DOMAINS: "example.com, Example.org, https://docs.example.net/team",
     KHAOYU_SERVICE_GITHUB_CLIENT_ID: "github-client",
     KHAOYU_SERVICE_GITHUB_CLIENT_SECRET: "github-secret",
   });
@@ -116,7 +116,7 @@ test("OIDC providers are parsed only when fully configured", () => {
   const google = config.oidcProviders.find((provider) => provider.id === "google");
   assert.equal(google.kind, "oidc");
   assert.equal(google.autoCreate, true);
-  assert.deepEqual(google.allowedDomains, ["example.com", "example.org"]);
+  assert.deepEqual(google.allowedDomains, ["example.com", "example.org", "docs.example.net"]);
   assert.match(google.redirectUrl, /\/api\/v1\/auth\/oidc\/google\/callback$/);
   const github = config.oidcProviders.find((provider) => provider.id === "github");
   assert.equal(github.kind, "github");

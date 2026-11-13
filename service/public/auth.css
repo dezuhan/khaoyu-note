@@ -326,3 +326,9 @@ body.auth-body {
   outline: 2px solid var(--ky-accent);
   outline-offset: 2px;
 }
+
+
+.auth-oidc[hidden],
+.auth-or[hidden] {
+  display: none;
+}

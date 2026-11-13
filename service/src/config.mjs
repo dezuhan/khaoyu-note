@@ -128,10 +128,19 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
       return "";
     }
   };
+  // Operators often paste a URL (or @domain) instead of a bare domain; normalise it so an allowed
+  // value such as https://example.com never silently fails to match the email domain.
   const allowedDomains = (value) =>
     String(value || "")
       .split(",")
-      .map((domain) => domain.trim().toLowerCase())
+      .map((entry) =>
+        entry
+          .trim()
+          .toLowerCase()
+          .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+          .replace(/^@/, "")
+          .split("/")[0]
+      )
       .filter(Boolean);
   const addProvider = (provider) => {
     if (!provider.clientId || !provider.clientSecret) {
