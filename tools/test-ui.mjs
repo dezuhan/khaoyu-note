@@ -379,9 +379,39 @@ check(
     !columnTransition.includes("0s"),
   columnTransition
 );
+const rowWidthsBeforeColumn = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const { columnChildren } = await import("/js/model.js");
+  const children = columnChildren(state.board, columnId);
+  return { widest: Math.max(0, ...children.map((child) => child.w)), rowWidth: state.board.cards.find((card) => card.id === columnId).w };
+}, firstColumnId);
 await openColumnContextMenu();
 await page.locator(".mn-menu-item", { hasText: "Convert to column" }).click();
 await page.waitForTimeout(450);
+const columnAfterRow = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const { columnChildren, MIN_SIZES } = await import("/js/model.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  return {
+    width: column.w,
+    expected: Math.max(MIN_SIZES.column[0], 28 + Math.max(0, ...columnChildren(state.board, columnId).map((child) => child.w))),
+    childWidths: columnChildren(state.board, columnId).map((child) => child.w),
+    childShouldBe: column.w - 28,
+  };
+}, firstColumnId);
+const expectedColumnWidth = Math.max(220, 28 + rowWidthsBeforeColumn.widest);
+check(
+  "Converting a row back to a column fits the column to its widest child",
+  columnAfterRow.width === expectedColumnWidth &&
+    columnAfterRow.width < rowWidthsBeforeColumn.rowWidth - 100 &&
+    columnAfterRow.childWidths.every((width) => Math.abs(width - columnAfterRow.childShouldBe) <= 1),
+  JSON.stringify({
+    ...columnAfterRow,
+    expected: expectedColumnWidth,
+    rowWidth: rowWidthsBeforeColumn.rowWidth,
+    widest: rowWidthsBeforeColumn.widest,
+  })
+);
 const columnChildrenAfter = await page.locator(".mn-card.is-child").evaluateAll((els) =>
   els.map((el) => ({ x: el.offsetLeft, y: el.offsetTop }))
 );

@@ -60,7 +60,9 @@ project uses Semantic Versioning.
   ignored. Resizing a row scales its child widths proportionally (nested image/color cards follow
   their aspect ratio), while resizing a vertical column changes the child width and reflows them.
   Every non-section card is horizontal-only too; image, sketch and color stay at their aspect ratio.
-  Sections keep their eight independent handles.
+  Converting a row back to a column now fits the column width to the widest child instead of keeping
+  the row's total width, so the column no longer becomes a wide empty container. Sections keep their
+  eight independent handles.
 - The top bar shows up to three avatars of other people currently viewing a synced board, with a +N
   badge for the rest. Presence comes from the existing project SSE roster, excludes the current
   account, dedupes multiple tabs per account and uses a deterministic avatar colour.

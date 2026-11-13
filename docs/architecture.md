@@ -147,7 +147,8 @@ Board document:
 A column is a card of type `column`. Cards whose `parentId` equals the column id are laid out by
 `layoutColumn` in `model.js`: padding 14, gap 10, header 64. The layout writes child `x`, `y` and
 `w`, then derives the column height from the children (header + child heights + gaps + padding); no
-`extraHeight` empty space is kept. A vertical column's width drives the child width, and resized
+`extraHeight` empty space is kept. Converting a row back to a column sets the column width to the
+widest child (plus padding) before laying out, rather than keeping the row's total width. A vertical column's width drives the child width, and resized
 aspect-ratio children (image, sketch, color) recompute their height. A row (`direction: "row"`)
 derives its width from its children; dragging its corner grip scales every child width by the same
 factor, so a row of kanban columns or a row of cards grows and shrinks together, and its height is

@@ -3,7 +3,7 @@
 import * as bridge from "./bridge.js";
 import { isBlockedUpload, isTemporarilyDisabledType, MAX_UPLOAD_BYTES, reportUploadProblem } from "./limits.js";
 import { refreshCard } from "./render.js";
-import { createCard, columnChildren, getCard, layoutColumns, maxZ, newBoardDoc, uid } from "./model.js";
+import { createCard, columnChildren, getCard, layoutColumns, maxZ, MIN_SIZES, newBoardDoc, uid } from "./model.js";
 import {
   checkpoint,
   markDirty,
@@ -644,6 +644,15 @@ export function setColumnDirection(cardId, direction) {
     card.w = Math.max(card.w, 28 + count * 220 + Math.max(0, count - 1) * 10);
   } else {
     delete card.kanban;
+    // A row's width is the sum of its children, which would leave a huge empty column after
+    // conversion. Fit the vertical column to the widest child instead, then let layoutColumn
+    // stretch every child to that width.
+    const children = columnChildren(state.board, card.id);
+    const widest = children.reduce(
+      (width, child) => Math.max(width, Math.max(120, Number(child.w) || 120)),
+      0
+    );
+    card.w = Math.max(MIN_SIZES.column[0], 28 + widest);
   }
   layoutColumns(state.board);
   markDirty("board");
