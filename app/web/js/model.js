@@ -286,23 +286,30 @@ export function layoutColumn(board, column) {
     return;
   }
   if (column.direction === "row") {
+    // A row behaves like `display: flex` with `flex: 1` on every child: the container width is the
+    // basis and the children split it equally. Heights still come from each child (content-driven
+    // or aspect-ratio), so the row height is the tallest child plus the header.
+    const count = children.length;
+    const minimum = Math.max(220, padding * 2 + count * 120 + gap * Math.max(0, count - 1));
+    column.w = Math.max(minimum, Number(column.w) || 280);
+    const available = Math.max(0, column.w - padding * 2 - gap * Math.max(0, count - 1));
+    const childWidth = Math.max(120, Math.floor(available / count));
     let x = column.x + padding;
     let maxH = 0;
     for (const child of children) {
       child.x = x;
       child.y = column.y + header;
-      child.w = Math.max(120, Number(child.w) || 120);
+      child.w = childWidth;
       if (child.type === "column") {
         layoutColumn(board, child);
       } else {
         if (CARD_ASPECTS[child.type] || child.aspect) child.h = cardHeightFor(child);
-        const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
-        if (child.h < minimum) child.h = minimum;
+        const childMinimum = child.type === "audio" ? AUDIO_CARD_H : 56;
+        if (child.h < childMinimum) child.h = childMinimum;
       }
       x += child.w + gap;
       maxH = Math.max(maxH, child.h);
     }
-    column.w = Math.max(160, padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1));
     column.h = header + maxH + padding;
     return;
   }

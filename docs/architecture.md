@@ -149,11 +149,11 @@ A column is a card of type `column`. Cards whose `parentId` equals the column id
 `w`, then derives the column height from the children (header + child heights + gaps + padding); no
 `extraHeight` empty space is kept. Converting a row back to a column sets the column width to the
 widest child (plus padding) before laying out, rather than keeping the row's total width. A vertical column's width drives the child width, and resized
-aspect-ratio children (image, sketch, color) recompute their height. A row (`direction: "row"`)
-derives its width from its children; dragging its corner grip scales every child width by the same
-factor from the pointer-down widths (so the row tracks the pointer instead of compounding the
-factor on each move), so a row of kanban columns or a row of cards grows and shrinks together, and
-its height is always the tallest child plus the header. Children are still independent cards in the same DOM layer,
+aspect-ratio children (image, sketch, color) recompute their height. A row (`direction: "row"`) uses
+its own width as the flex basis and splits the available space equally among the children, like
+`display: flex` with `flex: 1` on every child; heights still follow each child (content-driven or
+aspect-ratio), so the row height is the tallest child plus the header. Dragging the row's corner grip
+changes that basis directly, so the row tracks the pointer and every child width changes together. Children are still independent cards in the same DOM layer,
 painted above the column through the z-index scale. Their `.mn-resize` grip is hidden and
 `onPointerDown` ignores the resize role for any card with a `parentId`, because the column owns their
 width.

@@ -283,12 +283,21 @@ const rowAutoMetrics = await page.evaluate(async (columnId) => {
   const column = state.board.cards.find((card) => card.id === columnId);
   const children = columnChildren(state.board, columnId);
   const expected = 28 + children.reduce((sum, child) => sum + child.w, 0) + 10 * (children.length - 1);
-  return { width: column.w, expected, count: children.length };
+  return {
+    width: column.w,
+    expected,
+    count: children.length,
+    childWidths: children.map((child) => child.w),
+  };
 }, firstColumnId);
+const initialRowWidthsEqual =
+  Math.max(...rowAutoMetrics.childWidths) - Math.min(...rowAutoMetrics.childWidths) <= 1;
 check(
-  "Row width follows its cards instead of stretching them",
-  rowAutoMetrics.count === 2 && Math.abs(rowAutoMetrics.width - rowAutoMetrics.expected) <= 2,
-  `${rowAutoMetrics.width} vs ${rowAutoMetrics.expected}`
+  "A row splits its width equally among the children",
+  rowAutoMetrics.count === 2 &&
+    initialRowWidthsEqual &&
+    Math.abs(rowAutoMetrics.width - rowAutoMetrics.expected) <= 2,
+  `${rowAutoMetrics.width} vs ${rowAutoMetrics.expected}, widths ${rowAutoMetrics.childWidths.join("/")}`
 );
 const columnTransition = await firstColumnCard.evaluate((el) => {
   const style = getComputedStyle(el);
@@ -321,14 +330,18 @@ const rowResizedMetrics = await page.evaluate(async (columnId) => {
   };
 }, firstColumnId);
 const rowWidthGain = rowResizedMetrics.width - rowResizeMetrics.width;
+const equalRowWidths =
+  rowResizedMetrics.childWidths.length > 1 &&
+  Math.max(...rowResizedMetrics.childWidths) - Math.min(...rowResizedMetrics.childWidths) <= 1;
 check(
-  "Resizing a row follows the pointer and scales child widths proportionally",
+  "Resizing a row follows the pointer and keeps child widths equal",
   rowWidthGain >= 60 &&
     rowWidthGain <= 110 &&
     !rowResizedMetrics.fitChildren &&
+    equalRowWidths &&
     rowResizedMetrics.childWidths[0] > rowResizeMetrics.childWidths[0] + 20 &&
     rowResizedMetrics.childWidths[1] > rowResizeMetrics.childWidths[1] + 20,
-  `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)} (+${Math.round(rowWidthGain)})`
+  `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)} (+${Math.round(rowWidthGain)}), widths ${rowResizedMetrics.childWidths.join("/")}`
 );
 const rowHeightBefore = await page.evaluate(async (columnId) => {
   const { state } = await import("/js/store.js");

@@ -443,13 +443,6 @@ function beginResize(card, event) {
       card.type === "table" && Array.isArray(card.colWidths)
         ? [...card.colWidths]
         : null,
-    // Row resizing scales every child from the widths captured at pointer down. Using the live
-    // widths would re-apply the factor on every pointermove and make the row explode away from
-    // the pointer.
-    childWidths:
-      card.type === "column" && card.direction === "row"
-        ? columnChildren(state.board, card.id).map((child) => ({ id: child.id, w: child.w }))
-        : null,
   };
   viewportEl.classList.add("is-resizing");
 }
@@ -700,30 +693,10 @@ function onPointerMove(event) {
         card.x = x;
         card.y = y;
         if (card.type === "column") {
-          // Columns are horizontal-only containers: their height always follows the children. For
-          // a row, scale the children proportionally instead of adding width the container would
-          // keep as empty space.
-          const target = Math.max(gesture.minW, width);
-          if (card.direction === "row") {
-            const children = columnChildren(state.board, card.id);
-            if (children.length) {
-              const factor = target / Math.max(1, gesture.startW);
-              const startWidths = new Map(
-                (gesture.childWidths || []).map((entry) => [entry.id, entry.w])
-              );
-              for (const child of children) {
-                const baseWidth = startWidths.get(child.id) ?? child.w;
-                child.w = Math.max(120, Math.round(baseWidth * factor));
-                if (child.type !== "column" && (CARD_ASPECTS[child.type] || child.aspect)) {
-                  child.h = cardHeightFor(child);
-                }
-              }
-            } else {
-              card.w = target;
-            }
-          } else {
-            card.w = target;
-          }
+          // Columns are horizontal-only containers: their height always follows the children. A
+          // row's width is the flex basis for equal child widths, so set it directly; layoutColumn
+          // splits the available width equally and derives the height from the tallest child.
+          card.w = Math.max(gesture.minW, width);
           layoutColumns(state.board);
         } else {
           card.w = Math.max(gesture.minW, width);
