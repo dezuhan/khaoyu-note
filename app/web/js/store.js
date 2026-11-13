@@ -21,6 +21,7 @@ export const state = {
   baseUpdatedAt: null,
   loaded: false,
   remote: false,
+  readOnly: false,
 };
 
 function viewStorageKey(boardId) {
@@ -155,7 +156,7 @@ const REMOTE_SAVE_MS = 120;
 const MAX_RETRY_DELAY = 30000;
 
 export function markDirty(kind = "board") {
-  if (!state.board) return;
+  if (!state.board || state.readOnly) return;
   state.board.updatedAt = Date.now();
   state.dirty = true;
   scheduleSave();
@@ -163,7 +164,7 @@ export function markDirty(kind = "board") {
 }
 
 export function scheduleSave() {
-  if (resetInProgress || !state.board) return;
+  if (resetInProgress || !state.board || state.readOnly) return;
   state.dirty = true;
   if (!autoSaveEnabled()) {
     state.saveState = "unsaved";
@@ -238,7 +239,7 @@ export function prepareForReset() {
 }
 
 export async function saveNow() {
-  if (resetInProgress || !state.board) return;
+  if (resetInProgress || !state.board || state.readOnly) return;
   if (state.conflict) {
     // Keep asking the user to resolve the conflict instead of overwriting either version.
     // A pan or zoom alone must not interrupt them with a dialog; that view is simply not saved.
@@ -392,6 +393,29 @@ export function setTheme(theme) {
   applyTheme(theme);
 }
 
+export function openSharedBoard(doc) {
+  if (!doc || !doc.id) throw new Error("The shared board is missing its document");
+  if (!Array.isArray(doc.trash)) doc.trash = [];
+  layoutColumns(doc);
+  state.board = doc;
+  state.remote = false;
+  state.readOnly = true;
+  state.selection = new Set();
+  state.editing = null;
+  state.loaded = true;
+  state.dirty = false;
+  state.viewDirty = false;
+  state.saveState = "saved";
+  state.conflict = null;
+  state.view = { x: 0, y: 0, zoom: 1 };
+  clearTimeout(saveTimer);
+  saveTimer = 0;
+  notify("board");
+  notify("view");
+  notify("history");
+  return doc;
+}
+
 export async function openBoard(id, { flush = true } = {}) {
   if (state.conflict) {
     // A conflict is unresolved; do not abandon the unsaved local version silently.
@@ -447,6 +471,7 @@ export async function openBoard(id, { flush = true } = {}) {
   }
   state.board = doc;
   state.remote = false;
+  state.readOnly = false;
   // Legacy builds stored a theme per board. Ignore it: the global preference above wins, so a
   // board saved in the past cannot flip the theme when it is opened.
   layoutColumns(doc);
@@ -597,6 +622,7 @@ export async function openRemoteBoard(doc, syncInfo) {
   if (state.remote && state.board?.id && state.board.id !== doc.id) await flushRemoteBoard();
   state.board = doc;
   state.board.sync = { ...syncInfo };
+  state.readOnly = false;
   layoutColumns(doc);
   state.view = readStoredView(doc.id) || doc.view || { x: 0, y: 0, zoom: 1 };
   state.selection = new Set();

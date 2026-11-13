@@ -235,6 +235,13 @@ function onViewportMouseDown(event) {
 
 function onPointerDown(event) {
   if (!state.board) return;
+  if (state.readOnly) {
+    if (event.button === 1 || (event.button === 0 && spaceHeld)) {
+      event.preventDefault();
+      beginPan(event);
+    }
+    return;
+  }
   if (event.target.closest(".mn-zoom")) return;
   if (pointerOnScrollbar(event)) return;
   // Overlay scrollbars (WebView2) do not take layout space, so reserve the edge strip for them
@@ -1436,6 +1443,7 @@ function onWheel(event) {
 // ------------------------------------------------------------------ dblclick
 
 function onViewportDblClick(event) {
+  if (state.readOnly) return;
   if (!state.board) return;
   if (event.target.closest(".mn-zoom")) return;
   if (event.target.closest(".mn-card")) return;
@@ -1444,6 +1452,7 @@ function onViewportDblClick(event) {
 }
 
 function onCardDblClick(event) {
+  if (state.readOnly) return;
   const cardEl = event.target.closest(".mn-card");
   if (!cardEl || !state.board) return;
   const card = getCard(state.board, cardEl.dataset.id);
@@ -1904,6 +1913,7 @@ function onImageLoad(event) {
 // ------------------------------------------------------------------ inputs
 
 function onInput(event) {
+  if (state.readOnly) return;
   const target = event.target;
   const card = cardOfTarget(target);
   if (!card || !state.board) return;
@@ -2014,6 +2024,7 @@ function updateWordCount(target, text) {
 }
 
 function onChange(event) {
+  if (state.readOnly) return;
   const target = event.target;
   const card = cardOfTarget(target);
   if (!card) return;
@@ -2081,6 +2092,7 @@ function normalizeLink(card) {
 // ------------------------------------------------------------------ clicks
 
 function onClick(event) {
+  if (state.readOnly) return;
   // A click that follows a drag must not trigger card actions (for example opening a board card).
   if (Date.now() - dragEndedAt < 250) return;
   const actionEl = event.target.closest("[data-action]");
@@ -2383,6 +2395,7 @@ function onClick(event) {
 // ------------------------------------------------------------------ keyboard
 
 function onCardKeyDown(event) {
+  if (state.readOnly) return;
   const target = event.target;
   if (event.key === "Escape") {
     target.blur();
@@ -2402,6 +2415,7 @@ function onCardKeyDown(event) {
 }
 
 function onFocusOut(event) {
+  if (state.readOnly) return;
   const target = event.target;
   if (target.isContentEditable) {
     setEditable(target, false);
@@ -2429,6 +2443,7 @@ function onFocusOut(event) {
 }
 
 function onWindowKeyDown(event) {
+  if (state.readOnly) return;
   if (event.code === "Space" && !isTypingTarget(document.activeElement)) {
     if (!spaceHeld) {
       spaceHeld = true;

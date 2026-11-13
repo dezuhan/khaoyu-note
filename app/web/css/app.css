@@ -7777,3 +7777,40 @@ html[data-performance="true"] *::after {
 .mn-account-grid.is-single {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* Public share viewer: the normal full-page board, but read-only. */
+html[data-read-only="true"] #app.is-read-only .mn-toolrail {
+  display: none;
+}
+
+#app.is-read-only #undo-btn,
+#app.is-read-only #redo-btn,
+#app.is-read-only #share-btn,
+#app.is-read-only #sync-state,
+#app.is-read-only #account-btn,
+#app.is-read-only #settings-btn,
+#app.is-read-only #template-btn,
+#app.is-read-only #home-btn,
+#app.is-read-only #notification-btn,
+#app.is-read-only #comment-count,
+#app.is-read-only #presence {
+  display: none;
+}
+
+#app.is-read-only .mn-menubar {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+#app.is-read-only .mn-card,
+#app.is-read-only .mn-card * {
+  cursor: default;
+}
+
+#app.is-read-only .mn-card [contenteditable],
+#app.is-read-only .mn-card input,
+#app.is-read-only .mn-card textarea,
+#app.is-read-only .mn-card button,
+#app.is-read-only .mn-card select {
+  pointer-events: none;
+}

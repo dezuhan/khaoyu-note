@@ -1511,25 +1511,24 @@ export async function openShareFromQuery() {
   const token = params.get("share");
   if (!token) return false;
   const server = normalizeUrl(params.get("server") || "");
-  const view = ensureBoardOverlay();
-  view.querySelector('[data-role="title"]').textContent = "Shared board";
-  const content = view.querySelector('[data-role="content"]');
-  if (!server) {
-    content.innerHTML = `<p class="mn-server-empty">This share link is missing its server URL.</p>`;
-    return true;
-  }
-  content.innerHTML = `<p class="mn-server-empty">Opening shared board...</p>`;
-  try {
-    const data = await jsonFetch(`${server}/api/v1/share/${encodeURIComponent(token)}/access`, {
-      method: "POST",
-      body: {},
-    });
-    renderBoard(content, data.doc || {});
-    content.insertAdjacentHTML("afterbegin", `<p class="mn-server-note">Shared read-only view · do not forward this link to people who should not have access.</p>`);
-  } catch (error) {
-    content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message || "This share link is invalid or expired.")}</p>`;
-  }
+  if (!server) throw new Error("This share link is missing its server URL.");
+  const data = await jsonFetch(`${server}/api/v1/share/${encodeURIComponent(token)}/access`, {
+    method: "POST",
+    body: {},
+  });
+  const store = await import("./store.js");
+  store.openSharedBoard(data.doc || {});
   return true;
+}
+
+export function applyReadOnlyViewer() {
+  document.documentElement.dataset.readOnly = "true";
+  document.getElementById("app")?.classList.add("is-read-only");
+  const saveState = document.getElementById("save-state");
+  if (saveState) saveState.textContent = "Read-only";
+  void import("./store.js").then(({ state }) => {
+    if (state.board) document.title = `${state.board.title || "Shared board"} · Khaoyu Note`;
+  });
 }
 
 

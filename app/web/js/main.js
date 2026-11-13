@@ -7,7 +7,7 @@ import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initLiveBoard } from "./live-board.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
-import { openShareFromQuery, openWorkspaceFromQuery, takeOidcReturn } from "./workspace-mode.js";
+import { applyReadOnlyViewer, openShareFromQuery, openWorkspaceFromQuery, takeOidcReturn } from "./workspace-mode.js";
 import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
 import {
@@ -81,6 +81,22 @@ function syncBoardUrl() {
   }
 }
 
+function showShareBootError(error) {
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.dataset.role = "share-error";
+  overlay.innerHTML = `<section class="mn-modal" role="dialog" aria-modal="true" aria-label="Share link">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Shared board</h2></header>
+    <div class="mn-modal-body"><p>${String(error?.message || "This share link is invalid or expired.")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")}</p></div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="share-error-close">Close</button></footer>
+  </section>`;
+  document.body.append(overlay);
+  overlay.querySelector('[data-role="share-error-close"]').addEventListener("click", () => overlay.remove());
+}
+
 async function boot() {
   initTheme();
   initLanguage();
@@ -90,17 +106,32 @@ async function boot() {
     document.getElementById("boot")?.remove();
     return;
   }
-  if (await openShareFromQuery()) {
-    document.getElementById("boot")?.remove();
-    return;
+  const shareToken = new URLSearchParams(window.location.search).get("share") || "";
+  if (!shareToken) {
+    // After a reset, choose the storage direction before any board or setting is read.
+    await initSetupGate();
+    await initAuth();
   }
-  // After a reset, choose the storage direction before any board or setting is read.
-  await initSetupGate();
-  await initAuth();
   await initSettings();
   initRender(refs);
   initInteractions(refs);
   initUI(uiRefs);
+
+  if (shareToken) {
+    // A public share is a full-page read-only board, not a separate server preview. The normal
+    // chrome stays visible while tools, mutations and shortcuts are disabled.
+    try {
+      await openShareFromQuery();
+      applyReadOnlyViewer();
+      render("board");
+      renderView();
+    } catch (error) {
+      showShareBootError(error);
+    }
+    document.getElementById("boot")?.remove();
+    return;
+  }
+
   initSyncUI(uiRefs);
   initLiveBoard();
   initShareUI(uiRefs);
