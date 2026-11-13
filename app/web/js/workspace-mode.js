@@ -842,6 +842,7 @@ async function checkWatchedServer() {
 }
 
 async function handleServerUnreachable(url, message) {
+  if (typeof window !== "undefined" && window.KY_DISABLE_OFFLINE_FALLBACK === true) return;
   if (fallbackRunning || offlineNoticeShown) return;
   let store;
   try {
@@ -858,6 +859,7 @@ async function handleServerUnreachable(url, message) {
 }
 
 async function forceLocalMode(message = "The server connection was lost.") {
+  if (typeof window !== "undefined" && window.KY_DISABLE_OFFLINE_FALLBACK === true) return;
   if (fallbackRunning) return;
   fallbackRunning = true;
   stopServerWatch();

@@ -107,6 +107,7 @@ try {
   await context.addInitScript(
     ({ config, servers }) => {
       window.KY_BACKEND_ENABLED = true;
+      window.KY_DISABLE_OFFLINE_FALLBACK = true;
       localStorage.setItem("ky.sync.config", JSON.stringify(config));
       localStorage.setItem("ky.servers", JSON.stringify(servers));
     },
