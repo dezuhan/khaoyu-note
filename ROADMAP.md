@@ -8,8 +8,10 @@ Status: `[x]` means done and verified in this repository. `[ ]` means planned, o
 remaining work named in the item. See `docs/production-readiness.md` for the current collaboration and
 Turso release verdict.
 
-Where the plan stands: Milestones 1 to 5 are implemented in `service/` and the desktop sync client
-and are recorded in `CHANGELOG.md` from 0.2.0 onward. Milestone 6 is mostly done, with the external
+Where the plan stands: 0.36.0 is a local-first release; the backend, sync and sharing work in
+Milestones 1 to 5 is implemented in `service/` but disabled in that build and tracked under
+`[Unreleased]` in `CHANGELOG.md`. The next-release priorities below turn that deferred work into an
+ordered backend release plan. Milestone 6 is mostly done, with the external
 penetration test and production-scale load testing still open. Milestone 7 is limited by external
 credentials and native runners, not by missing code. Milestone 8, the AI assistant, has not been
 started and needs its own consent, tool-gateway and prompt-injection design first. Milestone 11,
@@ -19,7 +21,63 @@ surface and parts of the chrome, and the service/admin pages are English-only.
 Verification note: checkboxes were reconciled with the 0.36.0 code and test evidence on 2026-11-12.
 `docs/production-readiness.md` carries the current release verdict.
 
+## Next release priorities (from Unreleased)
+
+0.36.0 shipped as a local-first build: backend UI, sync and sharing are hidden behind
+`window.KY_BACKEND_ENABLED` and the service is stopped. The next release should re-enable the backend
+in stages, in this order. The source material is the `[Unreleased]` section of
+[CHANGELOG.md](CHANGELOG.md).
+
+### P0 — blockers before re-enabling the backend
+
+- [ ] **Backend feature gate and onboarding.** Re-enable Add Server, Settings > Server, Sync and Share,
+  and add a guided first-run/team connection flow. Keep Local storage as the default and never make
+  the service mandatory.
+- [ ] **Sync reliability.** Finish validation of the durable per-board/per-tab queue: hard request
+  deadlines, stale in-flight recovery, retry/backoff, sequence conflicts, idempotent replay and
+  offline reload. Add a CI test for a stalled request, not just the fake-service unit test.
+- [ ] **Sharing safety.** Re-enable the Share UI only after workspace-admin policy, link expiry,
+  passwords, revocation and the read-only viewer all pass end to end. Verify the split between the
+  board origin (`note`/`SHARE_PUBLIC_URL`) and the API origin (`app`/`PUBLIC_URL`) plus CORS.
+- [ ] **Accounts and auth.** Two-step login with TOTP/backup codes, Add Server 2FA, unique usernames,
+  invite by username/email, passkeys and session revocation. Run one live Google/GitHub OIDC sign-in
+  with real credentials and a consent-screen review.
+- [ ] **Service release gate.** Build and test the PostgreSQL + Redis stack, migrations, backup and
+  restore, public URL/CORS configuration, rate limits and CSRF. Run the full service and browser
+  suites in CI; 0.36.0's tag CI must be green before a backend release is announced.
+- [ ] **Team workspace flow.** Members, roles, invitations, ownership and workspace sharing policy
+  verified from the board UI and the service admin dashboard.
+
+### P1 — complete the collaboration release
+
+- [ ] Account Profile/Security/Login sessions in desktop Settings (currently backend-deferred).
+- [ ] Live collaboration polish: presence, remote cursors, SSE tickets, hard card locks and
+  reconnect behaviour across two instances.
+- [ ] Admin dashboard completeness: account detail, boards, sharing, activity/audit filters.
+- [ ] Share management: list/revoke/rotate links, watermark and download caps in both board and admin
+  UI; restore the temporarily disabled sharing controls.
+- [ ] Team onboarding documentation and operator runbooks for OIDC, SMTP, reverse proxy and backups.
+
+### P2 — polish after the backend beta
+
+- [ ] Full-page read-only share viewer on the public board origin, including invalid/expired and
+  password-protected states.
+- [ ] Friendly offline/connection-lost recovery and clear queue/conflict status in the sync dialog.
+- [ ] Service account profile/security endpoints and scoped app-token permissions hardened.
+- [ ] Notification/email flows and activity retention behind the team release.
+- [ ] Localisation of the service and admin pages (Milestone 11) once the backend UI is stable.
+- [ ] Packaging and signing gates (Milestone 7) for a public backend release.
+
+### Definition of done for the next backend release
+
+- [ ] Local-first behaviour is unchanged: a local board opens without login and no backend is required.
+- [ ] Backend disabled is still a supported build, not just a hidden flag.
+- [ ] The full CI matrix, share-viewer E2E, remote sync integration and service tests pass.
+- [ ] Migrations, backup/restore and upgrade from 0.36.0 are verified on PostgreSQL.
+- [ ] No backend connection/secret file is tracked by git.
+
 ## Current state
+
 
 - [x] Desktop app: Tauri v2, vanilla ES modules, local SQLite.
 - [x] Localhost web host serves the same frontend against the same SQLite database and assets.
