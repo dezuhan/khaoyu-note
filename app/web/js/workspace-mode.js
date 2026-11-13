@@ -441,6 +441,168 @@ async function loadWorkspaceBoards(server, workspace, root, view) {
   }
 }
 
+async function openWorkspaceMembers(server, workspace) {
+  closePopover();
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.innerHTML = `<section class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Workspace members">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Members · ${escapeText(workspace.name || "Workspace")}</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+    <div class="mn-modal-body mn-workspace-form"><p class="mn-workspace-note">Loading members...</p></div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Close</button></footer>
+  </section>`;
+  document.body.append(overlay);
+  const body = overlay.querySelector(".mn-modal-body");
+  const close = () => {
+    overlay.remove();
+    void openWorkspacePopover(document.getElementById("template-btn"));
+  };
+  overlay.querySelector(".mn-modal-close").addEventListener("click", close);
+  overlay.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  overlay.addEventListener("pointerdown", (event) => {
+    if (event.target === overlay) close();
+  });
+  const load = async () => {
+    try {
+      const data = await withTimeout(
+        jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/members`, {}, server.token)
+      );
+      const members = data.members || [];
+      const canManage = ["owner", "admin"].includes(data.role);
+      body.innerHTML = `<p class="mn-workspace-form-note">${members.length} member${members.length === 1 ? "" : "s"} in this workspace.</p><div data-role="member-list">${members
+        .map((member) => {
+          const managed = canManage && member.role !== "owner";
+          const controls = managed
+            ? `<span class="mn-workspace-member-controls"><select class="ky-input" data-member-role="${escapeText(member.id)}"><option value="member"${member.role === "member" ? " selected" : ""}>Member</option><option value="admin"${member.role === "admin" ? " selected" : ""}>Admin</option></select><button type="button" class="mn-btn" data-remove-member="${escapeText(member.id)}">Remove</button></span>`
+            : `<span class="mn-workspace-member-role">${escapeText(member.role)}</span>`;
+          return `<div class="mn-workspace-member"><div><strong>${escapeText(member.display_name || member.email || "Member")}</strong><small>${escapeText(member.email || "")}</small></div>${controls}</div>`;
+        })
+        .join("")}</div><p class="mn-workspace-form-error" data-role="error" role="status"></p>`;
+      body.querySelectorAll("[data-member-role]").forEach((select) => {
+        select.addEventListener("change", async () => {
+          const error = body.querySelector('[data-role="error"]');
+          try {
+            await jsonFetch(
+              `${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/members/${encodeURIComponent(select.dataset.memberRole)}`,
+              { method: "PATCH", body: { role: select.value } },
+              server.token
+            );
+            error.textContent = "";
+            window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Member role updated" } }));
+          } catch (failure) {
+            error.textContent = failure.message || "Could not update the member.";
+            await load();
+          }
+        });
+      });
+      body.querySelectorAll("[data-remove-member]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const ui = await import("./ui.js");
+          const confirmed = await ui.confirmAction({
+            title: "Remove workspace member?",
+            message: "They will lose access to this workspace and its boards.",
+            confirmLabel: "Remove",
+          });
+          if (!confirmed) return;
+          const error = body.querySelector('[data-role="error"]');
+          try {
+            await jsonFetch(
+              `${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/members/${encodeURIComponent(button.dataset.removeMember)}`,
+              { method: "DELETE" },
+              server.token
+            );
+            await load();
+            window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Member removed" } }));
+          } catch (failure) {
+            error.textContent = failure.message || "Could not remove the member.";
+          }
+        });
+      });
+    } catch (error) {
+      body.innerHTML = `<p class="mn-workspace-form-error" role="status">${escapeText(error.message || "Could not load members.")}</p>`;
+    }
+  };
+  await load();
+}
+
+async function openWorkspaceInvite(server, workspace) {
+  closePopover();
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Invite to workspace">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Invite · ${escapeText(workspace.name || "Workspace")}</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+    <div class="mn-modal-body mn-workspace-form">
+      <p class="mn-workspace-form-note">Invite an existing account by email. The invitation expires after seven days.</p>
+      <label>Email<input class="ky-input" name="email" type="email" autocomplete="email" placeholder="member@example.com" required /></label>
+      <label>Role<select class="ky-input" name="role"><option value="member">Member</option><option value="admin">Admin</option></select></label>
+      <p class="mn-workspace-form-error" data-role="error" role="status"></p>
+      <div data-role="invite-list"></div>
+    </div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Send invite</button></footer>
+  </form>`;
+  document.body.append(overlay);
+  const form = overlay.querySelector("form");
+  const error = form.querySelector('[data-role="error"]');
+  const inviteList = form.querySelector('[data-role="invite-list"]');
+  const close = () => {
+    overlay.remove();
+    void openWorkspacePopover(document.getElementById("template-btn"));
+  };
+  form.querySelector(".mn-modal-close").addEventListener("click", close);
+  form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  overlay.addEventListener("pointerdown", (event) => {
+    if (event.target === overlay) close();
+  });
+  const loadInvites = async () => {
+    try {
+      const data = await withTimeout(
+        jsonFetch(`${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/invitations`, {}, server.token)
+      );
+      const pending = (data.invitations || []).filter((invite) => invite.status === "pending");
+      inviteList.innerHTML = pending.length
+        ? `<div class="mn-workspace-invites"><strong>Pending invitations</strong>${pending
+            .map(
+              (invite) =>
+                `<div class="mn-workspace-invite"><span>${escapeText(invite.normalized_email || "")}</span><small>${escapeText(
+                  invite.requested_role || "member"
+                )}</small></div>`
+            )
+            .join("")}</div>`
+        : "";
+    } catch {
+      inviteList.innerHTML = "";
+    }
+  };
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    error.textContent = "";
+    try {
+      await withTimeout(
+        jsonFetch(
+          `${server.url}/api/v1/workspaces/${encodeURIComponent(workspace.id)}/invitations`,
+          {
+            method: "POST",
+            body: {
+              email: form.elements.namedItem("email").value.trim(),
+              role: form.elements.namedItem("role").value,
+            },
+          },
+          server.token
+        )
+      );
+      form.reset();
+      error.textContent = "Invitation sent.";
+      await loadInvites();
+    } catch (failure) {
+      error.textContent = failure.message || "Could not send the invitation.";
+    } finally {
+      submit.disabled = false;
+    }
+  });
+  void loadInvites();
+}
+
 function openCreateWorkspaceBoardDialog(server, workspace, root, view) {
   const overlay = document.createElement("div");
   overlay.className = "mn-overlay";

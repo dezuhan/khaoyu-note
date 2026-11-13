@@ -3256,7 +3256,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             [id, name, auth.account.id, now(), now()]
           );
           await tx.run(
-            "INSERT INTO workspace_access_policies (workspace_id, visibility, sharing_enabled, member_default_board_role, created_at, updated_at) VALUES (?, 'private', 1, 'viewer', ?, ?)",
+            "INSERT INTO workspace_access_policies (workspace_id, visibility, sharing_enabled, member_default_board_role, created_at, updated_at) VALUES (?, 'private', TRUE, 'viewer', ?, ?)",
             [id, now(), now()]
           );
           await tx.run(

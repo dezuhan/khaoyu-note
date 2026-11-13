@@ -5,6 +5,11 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Workspace **Members** and **Invite** now work: the member dialog lists accounts with role controls
+  and removal, and the invite dialog sends an email invitation with a role and shows pending
+  invitations. The workspace popover closes while a dialog is open and reopens afterwards.
+- Creating a workspace no longer returns 500 on PostgreSQL: `workspace_access_policies.sharing_enabled`
+  is a boolean there, so the insert now uses `TRUE` instead of the integer `1`.
 - Link hero images now also fetch on the localhost web host: `bridge.fetchLinkPreview` calls the
   existing `/api/invoke` preview command instead of returning null outside Tauri, pasted URLs trigger
   the automatic preview, and opening a board backfills up to eight existing link cards that still

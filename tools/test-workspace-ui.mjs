@@ -135,6 +135,37 @@ try {
   const teamWorkspaceActive = state.activeWorkspace === "workspace_default";
   check("the seeded default workspace is not auto-selected", teamWorkspaceActive === false);
 
+  // Members opens the server-backed member list.
+  await page.click('[data-role="workspace-members"]');
+  await page.waitForSelector(".mn-modal");
+  await page.waitForSelector(".mn-workspace-member", { timeout: 10000 });
+  const memberText = await page.locator(".mn-modal").innerText();
+  check("Members lists the workspace members", memberText.includes(email), memberText.replace(/\s+/g, " ").slice(0, 160));
+  await page.click(".mn-modal .mn-modal-close");
+  await page.waitForSelector(".mn-modal", { state: "detached" });
+  await page.waitForSelector(".mn-workspace-popover");
+
+  // Invite sends an invitation through the workspace API.
+  const invitedEmail = `invite-${crypto.randomUUID()}@example.com`;
+  await page.click('[data-role="workspace-invite"]');
+  await page.waitForSelector(".mn-modal");
+  await page.fill('.mn-modal input[name="email"]', invitedEmail);
+  await page.click('.mn-modal button[type="submit"]');
+  await page.waitForFunction(
+    () => document.querySelector('.mn-modal [data-role="error"]')?.textContent.includes("Invitation sent."),
+    null,
+    { timeout: 10000 }
+  );
+  const invitations = await (await fetch(`${base}/api/v1/workspaces/${workspace.id}/invitations`, { headers })).json();
+  check(
+    "Invite creates a pending workspace invitation",
+    (invitations.invitations || []).some((entry) => entry.normalized_email === invitedEmail),
+    invitedEmail
+  );
+  await page.click(".mn-modal .mn-modal-close");
+  await page.waitForSelector(".mn-modal", { state: "detached" });
+  await page.waitForSelector(".mn-workspace-popover");
+
   // Add Server first asks for the endpoint, probes its auth features, then shows the login options.
   mockAuthServer = http.createServer((request, response) => {
     if (request.url === "/api/v1/auth/features") {
