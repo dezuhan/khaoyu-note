@@ -524,6 +524,27 @@ test("an allowed app origin receives a scoped sync token instead of a browser se
   assert.equal(token.revoked_at, null);
 });
 
+test("a desktop loopback origin receives the token in the query string", async (t) => {
+  const mock = await mockProvider();
+  const app = await start({ provider: providerFor(mock.base, "oidc", "google") });
+  t.after(async () => {
+    await app.close();
+    mock.server.close();
+  });
+  const origin = "http://127.0.0.1:43123";
+  const flow = await begin(
+    app.base,
+    "google",
+    `?mode=login&origin=${encodeURIComponent(origin)}&desktop=1`
+  );
+  mock.state.nonce = flow.nonce;
+  const done = await callback(app.base, "google", { state: flow.state, cookie: flow.cookie });
+  const location = new URL(done.headers.get("location"));
+  assert.equal(location.origin, origin);
+  assert.ok(location.searchParams.get("oidc"), "desktop token is in the query");
+  assert.equal(location.hash, "");
+});
+
 test("an unconfigured app origin is rejected before the provider redirect", async (t) => {
   const mock = await mockProvider();
   const app = await start({ provider: providerFor(mock.base, "oidc", "google") });

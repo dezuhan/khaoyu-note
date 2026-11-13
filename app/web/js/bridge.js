@@ -184,6 +184,16 @@ export async function openExternal(url) {
   return null;
 }
 
+export function oidcStartListener() {
+  if (!hasTauri) return Promise.resolve(null);
+  return invoke("start_oidc_listener");
+}
+
+export function oidcPollLogin(port) {
+  if (!hasTauri) return Promise.resolve(null);
+  return invoke("poll_oidc_login", { port });
+}
+
 export async function openPath(path) {
   if (hasTauri) return invoke("open_path", { path });
   if (path) window.open("file://" + path, "_blank");

@@ -892,19 +892,49 @@ function openAddServerDialog(anchor) {
       }
     });
     for (const button of form.querySelectorAll("[data-oidc-provider]")) {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", async () => {
         const provider = button.dataset.oidcProvider;
-        const url = `${selectedUrl}/api/v1/auth/oidc/${encodeURIComponent(
-          provider
-        )}/start?mode=login&origin=${encodeURIComponent(location.origin)}`;
-        const popup = window.open(url, "khaoyu-oidc", "width=520,height=720");
-        if (!popup) {
-          form.querySelector('[data-role="error"]').textContent =
-            "Allow pop-ups to sign in with this provider.";
-          return;
+        const errorEl = form.querySelector('[data-role="error"]');
+        button.disabled = true;
+        errorEl.textContent = "Opening your default browser...";
+        try {
+          const bridge = await import("./bridge.js");
+          if (bridge.hasTauri && !bridge.hasWeb) {
+            // Desktop: use the system browser and a temporary loopback listener. Embedded webviews
+            // and pop-ups are blocked by the providers (and by Google user-agent policy).
+            const port = await bridge.oidcStartListener();
+            if (!port) throw new Error("Could not start the browser sign-in listener.");
+            const origin = `http://127.0.0.1:${port}`;
+            const url = `${selectedUrl}/api/v1/auth/oidc/${encodeURIComponent(
+              provider
+            )}/start?mode=login&origin=${encodeURIComponent(origin)}&desktop=1`;
+            await bridge.openExternal(url);
+            errorEl.textContent = "Complete sign-in in your default browser. This window will update.";
+            for (let attempt = 0; attempt < 240; attempt += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              const result = await bridge.oidcPollLogin(port);
+              if (!result) continue;
+              if (result.error) {
+                throw new Error(OIDC_ERROR_TEXT[result.error] || result.error || "Sign-in failed.");
+              }
+              if (!result.token) throw new Error("The browser did not return a sign-in token.");
+              finishSyncLogin(result.token, result.email || loginEmail);
+              return;
+            }
+            throw new Error("Sign-in timed out. Try again.");
+          }
+          const url = `${selectedUrl}/api/v1/auth/oidc/${encodeURIComponent(
+            provider
+          )}/start?mode=login&origin=${encodeURIComponent(location.origin)}`;
+          const popup = window.open(url, "khaoyu-oidc", "width=520,height=720");
+          if (!popup) {
+            throw new Error("Allow pop-ups to sign in with this provider.");
+          }
+          errorEl.textContent = "Complete the sign-in in the opened window.";
+        } catch (error) {
+          errorEl.textContent = error.message || "Could not start the sign-in.";
+          button.disabled = false;
         }
-        form.querySelector('[data-role="error"]').textContent =
-          "Complete the sign-in in the opened window.";
       });
     }
   }

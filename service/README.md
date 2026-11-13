@@ -663,7 +663,9 @@ place on the sign-in page and the `or` separator only appears when at least one 
 The local web host's **Add Server** dialog probes `/api/v1/auth/features`, then shows the
 email/password form plus every enabled provider. An OIDC sign-in there runs in a popup and returns a
 scoped `app-sync` API token in the URL fragment to a loopback or configured app origin; the dialog
-stores that token in `ky.servers`. If the account has 2FA enabled, the dialog shows the
+stores that token in `ky.servers`. In the desktop app the OIDC button opens the default system
+browser and a temporary `127.0.0.1` listener receives the token; the browser web host keeps the
+popup flow. If the account has 2FA enabled, the dialog shows the
 authenticator-code step with a **Use a backup code instead** page, using the same signed challenge
 and one-time backup-code rules as the browser login. Only loopback (`http://127.0.0.1:*`/`http://localhost:*`),
 `KHAOYU_SERVICE_MAIN_APP_URL` and `KHAOYU_SERVICE_CORS_ORIGINS` origins are accepted (and the

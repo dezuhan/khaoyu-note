@@ -3,6 +3,14 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+## [Unreleased]
+
+- Desktop OIDC sign-in now opens the user's default browser instead of an embedded webview or
+  pop-up. The Tauri app starts a one-shot loopback listener, opens the provider through
+  `open_external`, and receives the scoped app-sync token back on `127.0.0.1`; the service only
+  accepts this desktop handoff for a loopback origin. The browser web host keeps the popup/app-origin
+  flow.
+
 ## [0.36.0] - 2026-11-14
 
 - Blurred modal/backdrop layers now sit above the floating tool rail (z-index 1600 vs 1000):

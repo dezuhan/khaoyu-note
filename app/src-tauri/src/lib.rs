@@ -4,8 +4,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Manager, State};
 
@@ -2831,6 +2833,138 @@ fn is_hex_color(value: &str) -> bool {
         && value[1..].chars().all(|ch| ch.is_ascii_hexdigit())
 }
 
+#[derive(Clone, Serialize)]
+pub struct OidcLoginResult {
+    token: String,
+    email: String,
+    error: String,
+}
+
+fn oidc_results() -> &'static Mutex<HashMap<u16, Option<OidcLoginResult>>> {
+    static RESULTS: OnceLock<Mutex<HashMap<u16, Option<OidcLoginResult>>>> = OnceLock::new();
+    RESULTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'+' => {
+                out.push(b' ');
+                index += 1;
+            }
+            b'%' if index + 2 < bytes.len() => {
+                let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).unwrap_or("");
+                match u8::from_str_radix(hex, 16) {
+                    Ok(byte) => {
+                        out.push(byte);
+                        index += 3;
+                    }
+                    Err(_) => {
+                        out.push(bytes[index]);
+                        index += 1;
+                    }
+                }
+            }
+            byte => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).to_string()
+}
+
+fn query_value(target: &str, key: &str) -> Option<String> {
+    let query = target.split_once('?')?.1;
+    for pair in query.split('&') {
+        let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+        if name == key {
+            return Some(percent_decode(value));
+        }
+    }
+    None
+}
+
+// Start a one-shot loopback listener for desktop OIDC. The frontend opens the provider URL in the
+// user's default browser with this origin; the service redirects the app-sync token back here.
+#[tauri::command]
+fn start_oidc_listener() -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    oidc_results()
+        .lock()
+        .map_err(|_| "OIDC state is unavailable".to_string())?
+        .insert(port, None);
+    std::thread::spawn(move || {
+        let mut result: Option<OidcLoginResult> = None;
+        for _ in 0..1800 {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+                    let mut buffer = [0u8; 8192];
+                    let read = stream.read(&mut buffer).unwrap_or(0);
+                    let request = String::from_utf8_lossy(&buffer[..read]);
+                    let target = request
+                        .lines()
+                        .next()
+                        .and_then(|line| line.split_whitespace().nth(1))
+                        .unwrap_or("/");
+                    if !target.contains("oidc=") && !target.contains("oidc_error=") {
+                        let _ = stream.write_all(
+                            b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                        );
+                        continue;
+                    }
+                    let body = "<!doctype html><meta charset=utf-8><title>Khaoyu Note</title><p>Sign-in complete. You can close this window and return to Khaoyu Note.</p>";
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = stream.write_all(response.as_bytes());
+                    let _ = stream.flush();
+                    result = Some(OidcLoginResult {
+                        token: query_value(target, "oidc").unwrap_or_default(),
+                        email: query_value(target, "email").unwrap_or_default(),
+                        error: query_value(target, "oidc_error").unwrap_or_default(),
+                    });
+                    break;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                Err(_) => break,
+            }
+        }
+        let result = result.unwrap_or_else(|| OidcLoginResult {
+            token: String::new(),
+            email: String::new(),
+            error: "Sign-in timed out".to_string(),
+        });
+        if let Ok(mut results) = oidc_results().lock() {
+            if let Some(slot) = results.get_mut(&port) {
+                *slot = Some(result);
+            }
+        }
+    });
+    Ok(port)
+}
+
+#[tauri::command]
+fn poll_oidc_login(port: u16) -> Option<OidcLoginResult> {
+    let mut results = oidc_results().lock().ok()?;
+    let ready = matches!(results.get(&port), Some(Some(_)));
+    if ready {
+        results.remove(&port).flatten()
+    } else {
+        None
+    }
+}
+
 #[tauri::command]
 fn open_external(url: String) -> Result<(), String> {
     let lower = url.to_lowercase();
@@ -3113,6 +3247,8 @@ pub fn run() {
             auth_restore_session,
             auth_log_activity,
             open_external,
+            start_oidc_listener,
+            poll_oidc_login,
             fetch_link_preview,
             open_path,
             download_asset,

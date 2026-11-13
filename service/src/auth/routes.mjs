@@ -559,6 +559,22 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
     sendRedirect(response, config, `${base}?error=${encodeURIComponent(code)}`, cookies);
   }
 
+  // Desktop login returns the app-sync token to a temporary loopback listener started by the Tauri
+  // app, so it can use the system browser instead of an embedded webview/pop-up.
+  function isLoopbackAppOrigin(value) {
+    try {
+      const url = new URL(value);
+      return (
+        url.protocol === "http:" &&
+        ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) &&
+        !url.username &&
+        !url.password
+      );
+    } catch {
+      return false;
+    }
+  }
+
   // A browser login may hand the resulting app-sync token back to the local web app. Only
   // same-origin/configured app origins and loopback hosts are accepted; never an arbitrary URL.
   function allowedAppOrigin(value, config) {
@@ -1870,9 +1886,14 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           oidcFailed(response, config, "invalid_app_origin");
           return true;
         }
+        const desktop = url.searchParams.get("desktop") === "1";
+        if (desktop && !isLoopbackAppOrigin(appRedirect)) {
+          oidcFailed(response, config, "invalid_app_origin");
+          return true;
+        }
         const cookie = oidcStateCookie(
           signState(
-            { provider: provider.id, state, nonce, verifier, redirect, mode, appRedirect },
+            { provider: provider.id, state, nonce, verifier, redirect, mode, appRedirect, desktop },
             config.secret
           ),
           config
@@ -1919,12 +1940,15 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         const registerIntent = stateCookie.mode === "register";
         const appRedirect = stateCookie.appRedirect || "";
+        const desktopHandoff = Boolean(stateCookie.desktop);
         const failure = (code) => {
           if (appRedirect) {
             sendRedirect(
               response,
               config,
-              `${appRedirect}/#oidc_error=${encodeURIComponent(code)}`,
+              desktopHandoff
+                ? `${appRedirect}/?oidc_error=${encodeURIComponent(code)}`
+                : `${appRedirect}/#oidc_error=${encodeURIComponent(code)}`,
               [clearState]
             );
             return;
@@ -2061,12 +2085,17 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             ip,
             secret: config.secret,
           });
-          const fragment = new URLSearchParams({
+          const handoff = new URLSearchParams({
             oidc: created.token,
             email,
             server: config.publicUrl,
           }).toString();
-          sendRedirect(response, config, `${appRedirect}/#${fragment}`, [clearState]);
+          sendRedirect(
+            response,
+            config,
+            desktopHandoff ? `${appRedirect}/?${handoff}` : `${appRedirect}/#${handoff}`,
+            [clearState]
+          );
           return true;
         }
         const session = await startSession(db, config, account, {
