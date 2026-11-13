@@ -253,13 +253,18 @@ export function loadConfig(env = process.env, cwd = process.cwd()) {
     requireHttps,
     uploadScanCommand: env.KHAOYU_SERVICE_UPLOAD_SCAN_COMMAND || "",
     alertWebhook,
-    corsOrigins: (
-      env.KHAOYU_SERVICE_CORS_ORIGINS ||
-      "tauri://localhost,http://tauri.localhost,http://127.0.0.1:1430,http://localhost:1430"
-    )
-      .split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean),
+    corsOrigins: [
+      ...new Set(
+        (
+          env.KHAOYU_SERVICE_CORS_ORIGINS ||
+          "tauri://localhost,http://tauri.localhost,http://127.0.0.1:1430,http://localhost:1430"
+        )
+          .split(",")
+          .map((origin) => origin.trim())
+          .filter(Boolean)
+          .concat([mainAppUrl, sharePublicUrl].filter(Boolean))
+      ),
+    ],
     smtp: Object.freeze({
       host: smtpHost,
       port: integer(env.KHAOYU_SERVICE_SMTP_PORT, 587, 1, 65535, "KHAOYU_SERVICE_SMTP_PORT"),

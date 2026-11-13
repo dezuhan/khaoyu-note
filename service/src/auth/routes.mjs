@@ -234,7 +234,8 @@ function shareAppBase(config) {
 function publicShareUrl(config, token) {
   const base = shareAppBase(config);
   if (base) {
-    return `${base}/?share=${encodeURIComponent(token)}&server=${encodeURIComponent(base)}`;
+    // The board UI can live on the share domain, but its API stays on the service public URL.
+    return `${base}/?share=${encodeURIComponent(token)}&server=${encodeURIComponent(config.publicUrl)}`;
   }
   return `${(config.sharePublicUrl || config.publicUrl).replace(/\/+$/, "")}/s/${encodeURIComponent(token)}`;
 }

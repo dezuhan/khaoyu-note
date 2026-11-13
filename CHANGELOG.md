@@ -5,8 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
-- Generated share links now honor an explicit `KHAOYU_SERVICE_SHARE_PUBLIC_URL`; `/s/:token` redirects
-  and the embedded `server` parameter use that public share origin instead of the admin `MAIN_APP_URL`.
+- Generated share links now use an explicit `KHAOYU_SERVICE_SHARE_PUBLIC_URL` for the board viewer
+  origin while keeping the service `PUBLIC_URL` in the embedded `server` parameter. The service also
+  adds its main-app and share origins to the CORS allowlist, so a viewer on note.dezuhan.my.id can
+  call the API on app.dezuhan.my.id.
 - OIDC connections and generated share links now keep the server origin the user entered instead of
   the service's `publicUrl`/`mainAppUrl`, which can be loopback addresses behind a reverse proxy.
   Reconnecting also removes older entries for the same account/loopback URL, so a domain connection

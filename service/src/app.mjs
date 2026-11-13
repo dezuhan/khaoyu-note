@@ -93,7 +93,7 @@ export function createServiceHandler({ config, db, logger, mailer, events, coord
     const shareBase = shareAppBase(config);
     if (request.method === "GET" && sharePath && shareBase) {
       response.writeHead(302, {
-        Location: `${shareBase}/?share=${encodeURIComponent(decodeURIComponent(sharePath[1]))}&server=${encodeURIComponent(shareBase)}`,
+        Location: `${shareBase}/?share=${encodeURIComponent(decodeURIComponent(sharePath[1]))}&server=${encodeURIComponent(config.publicUrl)}`,
       });
       response.end();
       return;
