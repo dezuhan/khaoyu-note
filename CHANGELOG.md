@@ -3,7 +3,7 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
-## [Unreleased]
+## [0.36.0] - 2026-11-14
 
 - Blurred modal/backdrop layers now sit above the floating tool rail (z-index 1600 vs 1000):
   generic modals, Settings, Sync, Share, Onboarding/setup, image crop, the command palette, the
@@ -124,7 +124,6 @@ project uses Semantic Versioning.
   automatically while another workspace exists. A workspace detail now offers **New board**, which
   creates the board inside that workspace (the service accepts `workspaceId` on project creation for
   workspace owners and admins).
-## [0.36.0] - 2026-11-12
 
 ### Added
 
