@@ -500,3 +500,42 @@ test("register intent creates an account even when auto-create is disabled", asy
     1
   );
 });
+
+test("an allowed app origin receives a scoped sync token instead of a browser session", async (t) => {
+  const mock = await mockProvider();
+  const app = await start({ provider: providerFor(mock.base, "oidc", "google") });
+  t.after(async () => {
+    await app.close();
+    mock.server.close();
+  });
+  const origin = "http://127.0.0.1:1430";
+  const flow = await begin(app.base, "google", `?mode=login&origin=${encodeURIComponent(origin)}`);
+  mock.state.nonce = flow.nonce;
+  const done = await callback(app.base, "google", { state: flow.state, cookie: flow.cookie });
+  assert.equal(done.status, 302);
+  const location = new URL(done.headers.get("location"));
+  assert.equal(location.origin, origin);
+  const params = new URLSearchParams(location.hash.slice(1));
+  assert.ok(params.get("oidc"), "app token is returned in the fragment");
+  assert.equal(params.get("email"), "oidc-user@example.com");
+  assert.equal(sessionCookie(done), "");
+  const token = app.db.prepare("SELECT * FROM api_tokens WHERE name = 'app-sync'").get();
+  assert.ok(token);
+  assert.equal(token.revoked_at, null);
+});
+
+test("an unconfigured app origin is rejected before the provider redirect", async (t) => {
+  const mock = await mockProvider();
+  const app = await start({ provider: providerFor(mock.base, "oidc", "google") });
+  t.after(async () => {
+    await app.close();
+    mock.server.close();
+  });
+  const rejected = await fetch(
+    `${app.base}/api/v1/auth/oidc/google/start?origin=${encodeURIComponent("https://evil.example")}`,
+    { redirect: "manual" }
+  );
+  assert.equal(rejected.status, 302);
+  assert.match(rejected.headers.get("location"), /\/login\?error=invalid_app_origin/);
+  assert.equal(cookieValue(rejected, "khaoyu_oidc_state"), "");
+});

@@ -549,55 +549,245 @@ function openCreateWorkspaceDialog(serversList, anchor) {
   });
 }
 
+function saveServerConnection(url, email, token) {
+  const entries = servers().filter((entry) => entry.url !== url);
+  entries.unshift({ url, name: new URL(url).host, email, token });
+  saveServers(entries);
+}
+
+const OIDC_ERROR_TEXT = {
+  invalid_app_origin: "This app origin is not allowed by the server.",
+  account_missing: "No account exists for that email. Ask an administrator for an invitation.",
+  account_pending: "Your account is waiting for administrator approval.",
+  account_disabled: "That account is disabled.",
+  domain_not_allowed: "That email domain is not allowed by the server.",
+  email_unverified: "The provider did not return a verified email address.",
+  provider_failed: "The provider could not complete sign-in. Please try again.",
+  access_denied: "Sign-in was cancelled.",
+  invalid_state: "The sign-in attempt expired. Please try again.",
+  provider_unavailable: "This sign-in provider is not available on the server.",
+};
+
 function openAddServerDialog(anchor) {
   closePopover();
   const overlay = document.createElement("div");
   overlay.className = "mn-overlay";
-  overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Add server">
-    <header class="mn-modal-head"><h2 class="mn-modal-title">Add Server</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
-    <div class="mn-modal-body mn-workspace-form">
-      <label>Server URL<input class="ky-input" name="url" placeholder="https://admin.example.com" autocomplete="url" required /></label>
-      <label>Account email<input class="ky-input" name="email" type="email" autocomplete="email" required /></label>
-      <label>Password<input class="ky-input" name="password" type="password" autocomplete="current-password" required /></label>
-      <p class="mn-workspace-form-error" data-role="error" role="status"></p>
-    </div>
-    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Connect server</button></footer>
-  </form>`;
   document.body.append(overlay);
-  const form = overlay.querySelector("form");
-  const errorEl = form.querySelector('[data-role="error"]');
-  const close = () => overlay.remove();
-  form.querySelector(".mn-modal-close").addEventListener("click", close);
-  form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+  const close = () => {
+    window.removeEventListener("message", onOidcMessage);
+    window.removeEventListener("storage", onServerStorage);
+    overlay.remove();
+  };
+  let selectedUrl = "";
+  let features = null;
+  let errorText = "";
+  const knownServers = new Map(servers().map((entry) => [entry.url, entry.token]));
+  function onServerStorage(event) {
+    if (event.key !== SERVERS_KEY || !event.newValue) return;
+    let entries;
+    try {
+      entries = JSON.parse(event.newValue);
+    } catch {
+      return;
+    }
+    if (!Array.isArray(entries)) return;
+    const added = entries.find((entry) => entry?.url && knownServers.get(entry.url) !== entry.token);
+    if (!added) return;
+    close();
+    void openWorkspacePopover(anchor);
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", { detail: { message: "Server connected with OIDC" } })
+    );
+  }
+  window.addEventListener("storage", onServerStorage);
+
+  function focusError() {
+    overlay.querySelector('[data-role="error"]')?.focus?.();
+  }
+
+  function renderStep1() {
+    selectedUrl = "";
+    features = null;
+    overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Add server">
+      <header class="mn-modal-head"><h2 class="mn-modal-title">Add Server</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+      <div class="mn-modal-body mn-workspace-form">
+        <p class="mn-workspace-form-note">Enter the Khaoyu service address first. The next step lists the sign-in methods that server supports.</p>
+        <label>Server URL<input class="ky-input" name="url" placeholder="https://admin.example.com" autocomplete="url" required /></label>
+        <p class="mn-workspace-form-error" data-role="error" role="status">${escapeText(errorText)}</p>
+      </div>
+      <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="cancel">Cancel</button><button type="submit" class="mn-btn mn-btn-primary">Continue</button></footer>
+    </form>`;
+    const form = overlay.querySelector("form");
+    form.querySelector(".mn-modal-close").addEventListener("click", close);
+    form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const url = normalizeUrl(form.url.value);
+      if (!url) {
+        errorText = "Enter a valid server URL.";
+        form.querySelector('[data-role="error"]').textContent = errorText;
+        return;
+      }
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      form.querySelector('[data-role="error"]').textContent = "Checking server sign-in options...";
+      try {
+        const data = await withTimeout(jsonFetch(`${url}/api/v1/auth/features`), 8000);
+        if (!data || typeof data !== "object") throw new Error("The server did not return sign-in options.");
+        selectedUrl = url;
+        features = data;
+        renderStep2();
+      } catch (error) {
+        errorText = error.message || "Could not reach the server.";
+        renderStep1();
+        focusError();
+      }
+    });
+  }
+
+  function renderStep2() {
+    const providers = Array.isArray(features?.oidcProviders) ? features.oidcProviders : [];
+    const oidcMarkup = providers.length
+      ? `<div class="mn-workspace-or"><span>or</span></div>
+         <div class="mn-workspace-oidc${providers.length > 1 ? " is-row" : ""}" data-role="oidc">
+           ${providers
+             .map(
+               (provider) =>
+                 `<button type="button" class="mn-btn mn-workspace-oidc-btn" data-oidc-provider="${escapeText(
+                   provider.id
+                 )}">Continue with ${escapeText(provider.name || provider.id)}</button>`
+             )
+             .join("")}
+         </div>`
+      : "";
+    overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="Sign in">
+      <header class="mn-modal-head"><h2 class="mn-modal-title">Sign in</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+      <div class="mn-modal-body mn-workspace-form">
+        <p class="mn-workspace-form-note">Connected to <strong>${escapeText(new URL(selectedUrl).host)}</strong>.</p>
+        <label>Email<input class="ky-input" name="email" type="email" autocomplete="email" required /></label>
+        <label>Password<input class="ky-input" name="password" type="password" autocomplete="current-password" required /></label>
+        <p class="mn-workspace-form-error" data-role="error" role="status">${escapeText(errorText)}</p>
+        <button type="submit" class="mn-btn mn-btn-primary mn-workspace-signin">Sign in</button>
+        ${oidcMarkup}
+      </div>
+      <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="back">Back</button><button type="button" class="mn-btn" data-role="cancel">Cancel</button></footer>
+    </form>`;
+    errorText = "";
+    const form = overlay.querySelector("form");
+    form.querySelector(".mn-modal-close").addEventListener("click", close);
+    form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+    form.querySelector('[data-role="back"]').addEventListener("click", () => {
+      errorText = "";
+      renderStep1();
+    });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      form.querySelector('[data-role="error"]').textContent = "Signing in...";
+      try {
+        const data = await jsonFetch(`${selectedUrl}/api/v1/auth/sync-token`, {
+          method: "POST",
+          body: { email: form.email.value.trim(), password: form.password.value },
+        });
+        if (!data.token) throw new Error("The server did not return a sync token.");
+        saveServerConnection(selectedUrl, form.email.value.trim(), data.token);
+        close();
+        await openWorkspacePopover(anchor);
+      } catch (error) {
+        form.querySelector('[data-role="error"]').textContent = error.message || "Could not sign in.";
+        submit.disabled = false;
+      }
+    });
+    for (const button of form.querySelectorAll("[data-oidc-provider]")) {
+      button.addEventListener("click", () => {
+        const provider = button.dataset.oidcProvider;
+        const url = `${selectedUrl}/api/v1/auth/oidc/${encodeURIComponent(
+          provider
+        )}/start?mode=login&origin=${encodeURIComponent(location.origin)}`;
+        const popup = window.open(url, "khaoyu-oidc", "width=520,height=720");
+        if (!popup) {
+          form.querySelector('[data-role="error"]').textContent =
+            "Allow pop-ups to sign in with this provider.";
+          return;
+        }
+        form.querySelector('[data-role="error"]').textContent =
+          "Complete the sign-in in the opened window.";
+      });
+    }
+  }
+
+  function onOidcMessage(event) {
+    if (event.origin !== location.origin || !event.data || event.data.type !== "khaoyu-oidc") return;
+    const data = event.data;
+    if (data.error) {
+      errorText = OIDC_ERROR_TEXT[data.error] || "Could not sign in with that provider.";
+      const errorEl = overlay.querySelector('[data-role="error"]');
+      if (errorEl) errorEl.textContent = errorText;
+      return;
+    }
+    if (!data.token) return;
+    const url = normalizeUrl(data.server || selectedUrl);
+    saveServerConnection(url, data.email || "", data.token);
+    close();
+    void openWorkspacePopover(anchor);
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", { detail: { message: "Server connected with OIDC" } })
+    );
+  }
+
+  window.addEventListener("message", onOidcMessage);
   overlay.addEventListener("pointerdown", (event) => {
     if (event.target === overlay) close();
   });
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const url = normalizeUrl(form.url.value);
-    if (!url) {
-      errorEl.textContent = "Enter a valid server URL.";
-      return;
-    }
-    const submit = form.querySelector('button[type="submit"]');
-    submit.disabled = true;
-    errorEl.textContent = "Connecting...";
+  renderStep1();
+}
+
+// The OIDC popup redirects back to this app with a short-lived fragment. When it was opened from
+// the Add Server dialog, hand the token to the opener and close; otherwise store it locally.
+export function takeOidcReturn() {
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const token = params.get("oidc") || "";
+  const error = params.get("oidc_error") || "";
+  if (!token && !error) return false;
+  const payload = {
+    type: "khaoyu-oidc",
+    token,
+    error,
+    email: params.get("email") || "",
+    server: params.get("server") || "",
+  };
+  window.history.replaceState(null, "", location.pathname + location.search);
+  if (window.opener && window.opener !== window && !window.opener.closed) {
     try {
-      const data = await jsonFetch(`${url}/api/v1/auth/sync-token`, {
-        method: "POST",
-        body: { email: form.email.value.trim(), password: form.password.value },
-      });
-      if (!data.token) throw new Error("The server did not return a sync token.");
-      const entries = servers().filter((entry) => entry.url !== url);
-      entries.unshift({ url, name: new URL(url).host, email: form.email.value.trim(), token: data.token });
-      saveServers(entries);
-      close();
-      await openWorkspacePopover(anchor);
-    } catch (error) {
-      errorEl.textContent = error.message || "Could not connect the server.";
-      submit.disabled = false;
+      window.opener.postMessage(payload, location.origin);
+    } catch {
+      /* the opener may have navigated away */
     }
-  });
+    window.close();
+    return true;
+  }
+  if (token && payload.server) {
+    const url = normalizeUrl(payload.server);
+    if (url) {
+      saveServerConnection(url, payload.email, token);
+      setTimeout(
+        () =>
+          window.dispatchEvent(
+            new CustomEvent("mn:toast", { detail: { message: "Server connected with OIDC" } })
+          ),
+        0
+      );
+    }
+  }
+  // The popup may lose its opener reference across the provider redirect. It still carries the
+  // window name assigned by window.open, so close it and let the opener's storage listener or
+  // the local connection pick up the new server.
+  if (window.name === "khaoyu-oidc") {
+    window.close();
+    return true;
+  }
+  return false;
 }
 
 function ensureBoardOverlay() {

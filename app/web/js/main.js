@@ -7,7 +7,7 @@ import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initLiveBoard } from "./live-board.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
-import { openShareFromQuery, openWorkspaceFromQuery } from "./workspace-mode.js";
+import { openShareFromQuery, openWorkspaceFromQuery, takeOidcReturn } from "./workspace-mode.js";
 import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
 import {
@@ -83,6 +83,12 @@ function syncBoardUrl() {
 async function boot() {
   initTheme();
   initLanguage();
+  // The OIDC popup redirects here with a token fragment; hand it to the opener and close before
+  // the normal board UI boots.
+  if (takeOidcReturn()) {
+    document.getElementById("boot")?.remove();
+    return;
+  }
   if (await openShareFromQuery()) {
     document.getElementById("boot")?.remove();
     return;

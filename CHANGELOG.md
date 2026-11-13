@@ -5,6 +5,12 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- The Add Server dialog is now a two-step flow: ask for the server URL, probe `/api/v1/auth/features`,
+  then show email/password sign-in plus the server's enabled OIDC providers with an `or` separator
+  (two providers render side by side). OIDC login opens a popup, returns a scoped app-sync token to
+  an allowed loopback/configured origin in the URL fragment, and the dialog connects the server
+  without exposing the browser session cookies. The old direct email/password fields were removed
+  from the first step.
 - Middle-click no longer pastes the X11/Wayland primary selection into note, document, comment or
   other editable fields on Ubuntu/WebKitGTK. Middle drag still pans the canvas; the paste default is
   suppressed only while the pointer is over an editable field.

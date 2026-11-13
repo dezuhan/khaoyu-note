@@ -424,3 +424,39 @@
 .mn-workspace-server-menu-item.is-danger {
   color: var(--ky-danger, #d14343);
 }
+
+.mn-workspace-form .mn-workspace-signin {
+  width: 100%;
+  justify-content: center;
+}
+
+.mn-workspace-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ky-muted);
+  font-size: var(--ky-text-xs);
+}
+
+.mn-workspace-or::before,
+.mn-workspace-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--ky-line);
+}
+
+.mn-workspace-oidc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.mn-workspace-oidc.is-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mn-workspace-oidc .mn-workspace-oidc-btn {
+  width: 100%;
+  justify-content: center;
+}

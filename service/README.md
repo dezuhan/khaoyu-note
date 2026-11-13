@@ -643,6 +643,13 @@ place on the sign-in page and the `or` separator only appears when at least one 
 3. Open `/login`; buttons appear for providers whose `*_ENABLED` flag is true and whose required
    values are complete. A half-configured provider makes the service fail closed at startup.
 
+The local web host's **Add Server** dialog probes `/api/v1/auth/features`, then shows the
+email/password form plus every enabled provider. An OIDC sign-in there runs in a popup and returns a
+scoped `app-sync` API token in the URL fragment to a loopback or configured app origin; the dialog
+stores that token in `ky.servers`. Only loopback (`http://127.0.0.1:*`/`http://localhost:*`),
+`KHAOYU_SERVICE_MAIN_APP_URL` and `KHAOYU_SERVICE_CORS_ORIGINS` origins are accepted (and the
+fragment is cleared by the receiving app), so an arbitrary `origin` cannot steal the token.
+
 ## Sharing and membership
 
 Public sharing is disabled per project until the owner enables it. Share links are bearer tokens

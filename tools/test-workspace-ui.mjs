@@ -4,6 +4,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -24,6 +25,7 @@ const env = {
 };
 const server = spawn(process.execPath, ["service/src/server.mjs"], { cwd: root, env, stdio: "ignore" });
 let browser;
+let mockAuthServer = null;
 let failures = 0;
 
 function check(name, ok, detail = "") {
@@ -133,6 +135,70 @@ try {
   const teamWorkspaceActive = state.activeWorkspace === "workspace_default";
   check("the seeded default workspace is not auto-selected", teamWorkspaceActive === false);
 
+  // Add Server first asks for the endpoint, probes its auth features, then shows the login options.
+  mockAuthServer = http.createServer((request, response) => {
+    if (request.url === "/api/v1/auth/features") {
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "access-control-allow-origin": "*",
+      });
+      response.end(
+        JSON.stringify({
+          passkeysEnabled: false,
+          registrationMode: "public",
+          oidcProviders: [
+            { id: "google", name: "Google" },
+            { id: "github", name: "GitHub" },
+          ],
+        })
+      );
+      return;
+    }
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end("{}");
+  });
+  await new Promise((resolve) => mockAuthServer.listen(0, "127.0.0.1", resolve));
+  const mockBase = `http://127.0.0.1:${mockAuthServer.address().port}`;
+  await page.click('[data-add-server]');
+  await page.waitForSelector(".mn-modal");
+  const addServerStep1 = await page.evaluate(() => ({
+    urlFields: document.querySelectorAll('form input[name="url"]').length,
+    emailFields: document.querySelectorAll('form input[name="email"]').length,
+    passwordFields: document.querySelectorAll('form input[name="password"]').length,
+  }));
+  check(
+    "Add Server starts with the server URL only",
+    addServerStep1.urlFields === 1 && addServerStep1.emailFields === 0 && addServerStep1.passwordFields === 0,
+    JSON.stringify(addServerStep1)
+  );
+  await page.fill('form input[name="url"]', mockBase);
+  await page.click('form button[type="submit"]');
+  await page.waitForSelector(".mn-workspace-oidc", { timeout: 10000 });
+  const addServerStep2 = await page.evaluate(() => ({
+    emailFields: document.querySelectorAll('form input[name="email"]').length,
+    passwordFields: document.querySelectorAll('form input[name="password"]').length,
+    signInButton: Boolean(document.querySelector("form .mn-workspace-signin")),
+    orVisible: Boolean(document.querySelector(".mn-workspace-or")),
+    rowLayout: document.querySelector(".mn-workspace-oidc")?.classList.contains("is-row") || false,
+    providers: [...document.querySelectorAll("[data-oidc-provider]")].map((button) => button.textContent.trim()),
+  }));
+  check(
+    "Add Server then shows email, password, sign in and the OIDC options",
+    addServerStep2.emailFields === 1 &&
+      addServerStep2.passwordFields === 1 &&
+      addServerStep2.signInButton &&
+      addServerStep2.orVisible &&
+      addServerStep2.rowLayout &&
+      addServerStep2.providers.length === 2,
+    JSON.stringify(addServerStep2)
+  );
+  await page.click('[data-role="back"]');
+  await page.waitForSelector('form input[name="url"]');
+  await page.click('[data-role="cancel"]');
+  await page.waitForSelector(".mn-modal", { state: "detached" });
+  await page.click("#template-btn");
+  await page.waitForSelector(".mn-workspace-popover");
+
   // Opening a stale/missing board id must not create a phantom "Untitled board" in the local list.
   const phantomGuard = await page.evaluate(async () => {
     const store = await import("/js/store.js");
@@ -175,6 +241,7 @@ try {
   failures += 1;
 } finally {
   await browser?.close().catch(() => {});
+  mockAuthServer?.close();
   server.kill();
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log(failures === 0 ? "ALL WORKSPACE CHECKS PASSED" : `${failures} WORKSPACE CHECK(S) FAILED`);

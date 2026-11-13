@@ -458,6 +458,39 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
     sendRedirect(response, config, `${base}?error=${encodeURIComponent(code)}`, cookies);
   }
 
+  // A browser login may hand the resulting app-sync token back to the local web app. Only
+  // same-origin/configured app origins and loopback hosts are accepted; never an arbitrary URL.
+  function allowedAppOrigin(value, config) {
+    if (!value) return "";
+    let url;
+    try {
+      url = new URL(value);
+    } catch {
+      return "";
+    }
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return "";
+    const loopback =
+      url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+    const configured = (config.corsOrigins || []).some((origin) => {
+      try {
+        return new URL(origin).origin === url.origin;
+      } catch {
+        return false;
+      }
+    });
+    const mainApp = config.mainAppUrl
+      ? (() => {
+          try {
+            return new URL(config.mainAppUrl).origin;
+          } catch {
+            return "";
+          }
+        })()
+      : "";
+    return loopback || configured || (mainApp && mainApp === url.origin) ? url.origin : "";
+  }
+
   async function broadcastPresence(projectId) {
     const users = await collab.presenceState(projectId);
     events.publish(projectId, {
@@ -1712,9 +1745,15 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const verifier = randomToken(48);
         const redirect = sanitizeRedirect(url.searchParams.get("redirect"));
         const mode = url.searchParams.get("mode") === "register" ? "register" : "login";
+        const requestedApp = url.searchParams.get("origin") || "";
+        const appRedirect = allowedAppOrigin(requestedApp, config);
+        if (requestedApp && !appRedirect) {
+          oidcFailed(response, config, "invalid_app_origin");
+          return true;
+        }
         const cookie = oidcStateCookie(
           signState(
-            { provider: provider.id, state, nonce, verifier, redirect, mode },
+            { provider: provider.id, state, nonce, verifier, redirect, mode, appRedirect },
             config.secret
           ),
           config
@@ -1760,8 +1799,19 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           return true;
         }
         const registerIntent = stateCookie.mode === "register";
-        const failure = (code) =>
+        const appRedirect = stateCookie.appRedirect || "";
+        const failure = (code) => {
+          if (appRedirect) {
+            sendRedirect(
+              response,
+              config,
+              `${appRedirect}/#oidc_error=${encodeURIComponent(code)}`,
+              [clearState]
+            );
+            return;
+          }
           oidcFailed(response, config, code, [clearState], registerIntent ? "/register" : "/login");
+        };
         const code = url.searchParams.get("code") || "";
         let identity;
         try {
@@ -1863,15 +1913,46 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           return true;
         }
 
+        await db.run(
+          "UPDATE oauth_identities SET email = ?, last_login_at = ? WHERE provider = ? AND subject = ?",
+          [email, now(), provider.id, identity.subject]
+        );
+        if (appRedirect) {
+          // The desktop/web host cannot read the browser's session cookie, so hand it a scoped
+          // app-sync token in the fragment. The fragment is never sent to a server or logged.
+          const scopes = ["projects:read", "projects:write"];
+          const expiresAt = now() + 365 * 86_400_000;
+          await db.run(
+            "UPDATE api_tokens SET revoked_at = ? WHERE account_id = ? AND name = ? AND revoked_at IS NULL",
+            [now(), account.id, "app-sync"]
+          );
+          const created = await createApiToken(db, account.id, {
+            name: "app-sync",
+            scopes,
+            expiresAt,
+          });
+          await writeAudit(db, {
+            actorAccountId: account.id,
+            action: "auth.sync_token_issued",
+            resourceType: "account",
+            resourceId: account.id,
+            metadata: { provider: provider.id, method: "oidc" },
+            ip,
+            secret: config.secret,
+          });
+          const fragment = new URLSearchParams({
+            oidc: created.token,
+            email,
+            server: config.publicUrl,
+          }).toString();
+          sendRedirect(response, config, `${appRedirect}/#${fragment}`, [clearState]);
+          return true;
+        }
         const session = await startSession(db, config, account, {
           ipHash,
           userAgent: request.headers["user-agent"],
         });
         setSessionCookies(response, config, session);
-        await db.run(
-          "UPDATE oauth_identities SET email = ?, last_login_at = ? WHERE provider = ? AND subject = ?",
-          [email, now(), provider.id, identity.subject]
-        );
         await writeAudit(db, {
           actorAccountId: account.id,
           action: "auth.login_oidc",
