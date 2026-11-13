@@ -2243,9 +2243,9 @@ check(
   `top ${Math.round(settingsGeometry.top)}, bottom ${Math.round(settingsGeometry.bottom)}, viewport ${settingsGeometry.viewportHeight}`
 );
 check(
-  "Settings > Server restores the service connection details",
-  (await page.locator('[data-role="account-connection"]').isVisible()) &&
-    (await page.locator('[data-role="account-connection"]').innerText()).includes("Status:")
+  "Settings > Server reports Local storage while a local board is active",
+  (await page.locator('[data-role="content"]').innerText()).includes("Mode: Local storage") &&
+    (await page.locator('[data-role="content"]').innerText()).includes("Server: not connected")
 );
 check(
   "Settings > Server no longer exposes the public share URL field",
@@ -2278,13 +2278,13 @@ check(
 await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
 await page.waitForTimeout(300);
 check(
-  "Server page shows local runtime details and service connection options",
+  "Server page shows local runtime details and the Local storage mode",
   (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
     (await page.locator('[data-role="content"]').innerText()).includes("Connection details for this computer") &&
-    (await page.locator(".mn-account-card").count()) === 1 &&
+    (await page.locator('[data-role="content"]').innerText()).includes("Mode: Local storage") &&
+    (await page.locator(".mn-account-card").count()) === 0 &&
     !(await page.locator('[data-role="content"]').innerText()).includes("Change connection") &&
-    !(await page.locator('[data-role="content"]').innerText()).includes("Account or change server") &&
-    (await page.locator('.mn-account-card[data-action="passkeys"]').count()) === 0
+    !(await page.locator('[data-role="content"]').innerText()).includes("Account or change server")
 );
 check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
 await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();

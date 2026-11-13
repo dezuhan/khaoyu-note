@@ -172,9 +172,17 @@ async function renderLocalWorkspaces(view) {
   if (!target) return;
   try {
     const bridge = await import("./bridge.js");
-    const boards = (await bridge.listBoards())
+    let boards = (await bridge.listBoards())
       .filter((board) => !board.parentId && !board.archivedAt && !board.trashedAt)
       .slice(0, 8);
+    if (!boards.length) {
+      // Local storage is a default workspace and must always contain at least one board.
+      const store = await import("./store.js");
+      await store.createBoard("Home", { withWelcome: true });
+      boards = (await bridge.listBoards())
+        .filter((board) => !board.parentId && !board.archivedAt && !board.trashedAt)
+        .slice(0, 8);
+    }
     target.innerHTML = boards.length
       ? boards
           .map(
@@ -183,11 +191,15 @@ async function renderLocalWorkspaces(view) {
                 !currentBoard.remote && board.id === currentBoard.id ? " is-active" : ""
               }" data-local-board="${escapeText(
                 board.id
-              )}"><strong>${escapeText(board.title || "Untitled")}</strong><span>local board</span></button><button type="button" class="mn-icon-btn mn-workspace-local-remove" data-local-remove="${escapeText(
-                board.id
-              )}" title="Remove local board" aria-label="Remove ${escapeText(
-                board.title || "local board"
-              )}">${icon("close", 12)}</button></div>`
+              )}"><strong>${escapeText(board.title || "Untitled")}</strong><span>local board</span></button>${
+                boards.length > 1
+                  ? `<button type="button" class="mn-icon-btn mn-workspace-local-remove" data-local-remove="${escapeText(
+                      board.id
+                    )}" title="Remove local board" aria-label="Remove ${escapeText(
+                      board.title || "local board"
+                    )}">${icon("close", 12)}</button>`
+                  : ""
+              }</div>`
           )
           .join("")
       : `<p class="mn-server-note" style="padding:8px">No local workspaces yet.</p>`;
@@ -291,13 +303,21 @@ export async function openWorkspacePopover(anchor) {
   const current = servers();
   view.innerHTML = `
     <div class="mn-workspace-popover-head"><span>Workspace</span><span>${escapeText(location.host)}</span></div>
-    <button type="button" class="mn-workspace-popover-row is-active" data-local="1">${icon("database", 16)}<span><strong>Local storage</strong><small>This browser’s boards</small></span></button>
+    <div class="mn-workspace-local-head">
+      <button type="button" class="mn-workspace-popover-row is-active" data-local="1">${icon("database", 16)}<span><strong>Local storage</strong><small>Default local workspace</small></span></button>
+      <button type="button" class="mn-btn mn-workspace-new-board" data-local-new-board="1">New Board</button>
+    </div>
     <div class="mn-workspace-popover-boards" data-role="local-workspaces"><p class="mn-server-note" style="padding:8px">Loading local workspaces...</p></div>
     <div class="mn-workspace-popover-sep"></div>
     <div data-role="server-sections"></div>
     <div class="mn-workspace-popover-sep"></div>
     <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>`;
   view.querySelector('[data-local]').addEventListener("click", closePopover);
+  view.querySelector('[data-local-new-board]').addEventListener("click", async () => {
+    closePopover();
+    const store = await import("./store.js");
+    await store.createBoard("New board");
+  });
   view.querySelector('[data-add-server]').addEventListener("click", () => openAddServerDialog(anchor));
   void renderLocalWorkspaces(view);
   const sections = view.querySelector('[data-role="server-sections"]');

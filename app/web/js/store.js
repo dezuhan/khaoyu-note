@@ -545,6 +545,17 @@ export async function createBoard(title = "Untitled board", { withWelcome = fals
 
 export async function removeBoard(id, options = {}) {
   const { openNext = true } = options;
+  const remainingRoots = state.boards.filter(
+    (board) => board.id !== id && !board.parentId && !board.trashedAt && !board.archivedAt
+  );
+  if (!remainingRoots.length) {
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", {
+        detail: { message: "Keep at least one local board in Local storage" },
+      })
+    );
+    return;
+  }
   const wasOpen = state.board && state.board.id === id;
   if (wasOpen && state.conflict) {
     dispatchConflict(state.conflict);

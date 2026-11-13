@@ -1761,6 +1761,36 @@ function renderServerPage(content) {
     "Connection details for this computer and the optional self-hosted service.";
   content.append(intro);
   renderServerRuntime(content);
+  if (!state.remote) {
+    const localStatus = document.createElement("div");
+    localStatus.className = "mn-account-status";
+    for (const line of [
+      "Mode: Local storage",
+      "Server: not connected for this board",
+      "Account: no server account active in this workspace",
+    ]) {
+      const row = document.createElement("div");
+      row.className = "mn-account-server";
+      row.textContent = line;
+      localStatus.append(row);
+    }
+    content.append(localStatus);
+    const localNote = document.createElement("p");
+    localNote.className = "mn-prefs-note";
+    localNote.textContent =
+      "This board is stored in the local SQLite database. Open a server board from the Workspace menu to see its account and connection details here.";
+    content.append(localNote);
+    const docs = document.createElement("button");
+    docs.type = "button";
+    docs.className = "mn-btn mn-btn-quiet";
+    docs.textContent = "Open documentation";
+    docs.addEventListener("click", () => {
+      closeSettingsPage();
+      window.dispatchEvent(new CustomEvent("mn:open-docs"));
+    });
+    content.append(docs);
+    return;
+  }
   const status = document.createElement("div");
   status.className = "mn-account-status";
   const server = document.createElement("div");

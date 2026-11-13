@@ -5,6 +5,12 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Settings > Server now reports **Local storage** when a local board is active instead of showing the
+  saved service connection as connected. A server connection is shown only while a server board is
+  open.
+- Local storage is treated as the default local workspace: it always seeds one Home board when empty,
+  exposes a **New Board** action in the Workspace popover, and the last remaining local board has no
+  delete button (the store also refuses to delete it).
 - Sharing is temporarily disabled in the UI: the top-right Share button in the board app is disabled
   with a "Sharing is temporarily unavailable" tooltip, and the admin dashboard disables **Enable
   public sharing** and **Create share link** while keeping existing links reviewable/revocable.

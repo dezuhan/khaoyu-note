@@ -555,3 +555,20 @@
   color: var(--ky-muted);
   font-size: var(--ky-text-2xs);
 }
+
+.mn-workspace-local-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mn-workspace-local-head .mn-workspace-popover-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.mn-workspace-new-board {
+  flex: none;
+  margin-right: 6px;
+  white-space: nowrap;
+}
