@@ -147,12 +147,15 @@ export async function storeAssetFromPath(path) {
 }
 
 export async function fetchLinkPreview(url) {
-  if (!hasTauri) return null;
   try {
-    return await invoke("fetch_link_preview", { url });
+    if (hasTauri) return await invoke("fetch_link_preview", { url });
+    // The local web host serves the same command through its /api/invoke endpoint; the static
+    // browser preview has no backend and cannot read cross-origin page metadata.
+    if (hasWeb) return await web.invoke("fetch_link_preview", { url });
   } catch {
     return null;
   }
+  return null;
 }
 
 export async function appDataDir() {

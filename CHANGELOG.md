@@ -5,6 +5,11 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Link hero images now also fetch on the localhost web host: `bridge.fetchLinkPreview` calls the
+  existing `/api/invoke` preview command instead of returning null outside Tauri, pasted URLs trigger
+  the automatic preview, and opening a board backfills up to eight existing link cards that still
+  show the globe. The static `tools/serve.mjs` browser preview has no backend and keeps the globe
+  fallback.
 - The workspace popover now matches the reference layout more closely: a single workspace is shown
   directly without a redundant workspace selector row, the New board/Members/Invite actions share
   the row equally, board rows have more breathing room, the Import workspace placeholder is gone,

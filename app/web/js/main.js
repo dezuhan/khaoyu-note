@@ -20,6 +20,7 @@ import {
   subscribe,
 } from "./store.js";
 import { initContextMenu, initUI } from "./ui.js";
+import { backfillLinkHeaders } from "./actions.js";
 import { initSetupGate } from "./setup.js";
 import { initLanguage } from "./i18n.js";
 
@@ -110,7 +111,10 @@ async function boot() {
     else if (kind === "view") renderView();
     else if (kind === "selection") renderSelection();
     if (kind === "board" || kind === "save" || kind === "history") refreshSync();
-    if (kind === "board") syncBoardUrl();
+    if (kind === "board") {
+      syncBoardUrl();
+      setTimeout(() => void backfillLinkHeaders(), 400);
+    }
   });
 
   await refreshBoards();

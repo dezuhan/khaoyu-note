@@ -20,6 +20,7 @@ import {
   removeLinkHeader,
   applyLinkHeaderCrop,
   applyImageCrop,
+  maybeAutoLinkHeader,
   assetPathForCard,
   bringToFront,
   canWrapInColumn,
@@ -1743,6 +1744,7 @@ async function onPaste(event) {
         /* ignore */
       }
       notify("board");
+      void maybeAutoLinkHeader(card.id);
     }
   }
 }

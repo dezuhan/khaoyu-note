@@ -769,6 +769,29 @@ export function removeLinkHeader(cardId) {
 }
 
 const autoHeaderFetches = new Set();
+const backfilledBoards = new Set();
+
+// Existing link cards created before the web-host preview command was wired up (or while the
+// network was unavailable) still show the globe. Try them once per board/session, sequentially and
+// capped, so opening a board can repair old links without flooding the network.
+export async function backfillLinkHeaders() {
+  const board = state.board;
+  if (!board || backfilledBoards.has(board.id)) return;
+  backfilledBoards.add(board.id);
+  const pending = board.cards
+    .filter(
+      (card) =>
+        card.type === "link" &&
+        !card.headerImage &&
+        typeof card.url === "string" &&
+        /^https?:\/\//i.test(card.url)
+    )
+    .slice(0, 8);
+  for (const card of pending) {
+    await maybeAutoLinkHeader(card.id);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+}
 
 export async function maybeAutoLinkHeader(cardId) {
   const card = getCard(state.board, cardId);
