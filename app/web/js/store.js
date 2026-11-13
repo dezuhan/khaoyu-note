@@ -463,6 +463,7 @@ export async function openBoard(id, { flush = true } = {}) {
   clearTimeout(saveTimer);
   saveTimer = 0;
   localStorage.setItem("ky.lastBoard", doc.id);
+  localStorage.setItem("ky.lastLocalBoard", doc.id);
   notify("board");
   notify("view");
   notify("history");
