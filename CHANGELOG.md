@@ -5,6 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Sharing is temporarily disabled in the UI: the top-right Share button in the board app is disabled
+  with a "Sharing is temporarily unavailable" tooltip, and the admin dashboard disables **Enable
+  public sharing** and **Create share link** while keeping existing links reviewable/revocable.
+  Re-enable by setting `window.KY_SHARING_UI_ENABLED = true` before boot.
 - Generated share links now use an explicit `KHAOYU_SERVICE_SHARE_PUBLIC_URL` for the board viewer
   origin while keeping the service `PUBLIC_URL` in the embedded `server` parameter. The service also
   adds its main-app and share origins to the CORS allowlist, so a viewer on note.dezuhan.my.id can
