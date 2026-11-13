@@ -5,6 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- OIDC connections now keep the server origin the user entered instead of the service's
+  `publicUrl`, which can be a loopback address behind a reverse proxy. Reconnecting also removes
+  older entries holding the same rotated app token, so a domain connection no longer appears as
+  `127.0.0.1`.
 - Remote boards now fall back to Local storage when the server is unreachable. A 10-second health
   check, the device `offline` event, and failed workspace requests trigger the fallback: the app
   opens the most recent local board, closes the stale server view, and shows a **Connection lost**

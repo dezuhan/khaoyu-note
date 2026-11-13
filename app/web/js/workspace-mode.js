@@ -896,7 +896,9 @@ async function fetchAccountProfile(url, token) {
 async function saveServerConnection(url, email, token) {
   const profile = await fetchAccountProfile(url, token);
   const previous = servers().find((entry) => entry.url === url);
-  const entries = servers().filter((entry) => entry.url !== url);
+  // A rotated app token makes older entries for the same account unusable; drop them so a previous
+  // loopback/public-URL mix-up does not leave a second server section behind.
+  const entries = servers().filter((entry) => entry.url !== url && entry.token !== token);
   entries.unshift({
     url,
     name: new URL(url).host,
@@ -1200,7 +1202,9 @@ function openAddServerDialog(anchor) {
       return;
     }
     if (!data.token) return;
-    const url = normalizeUrl(data.server || selectedUrl);
+    // Prefer the address the user entered. The service also returns config.publicUrl, which can be
+    // a loopback address behind a reverse proxy; showing that would replace the user's domain.
+    const url = normalizeUrl(selectedUrl || data.server);
     await saveServerConnection(url, data.email || "", data.token);
     close();
     void openWorkspacePopover(anchor);
