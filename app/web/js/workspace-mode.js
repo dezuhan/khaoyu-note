@@ -8,6 +8,7 @@ const WORKSPACE_CACHE_KEY = "ky.workspaceCache";
 let popover = null;
 let boardOverlay = null;
 let activeServer = null;
+let currentBoard = { id: "", projectId: "", remote: false };
 
 function escapeText(value) {
   return String(value ?? "")
@@ -165,7 +166,9 @@ async function renderLocalWorkspaces(view) {
       ? boards
           .map(
             (board) =>
-              `<div class="mn-workspace-local-row"><button type="button" class="mn-workspace-popover-board" data-local-board="${escapeText(
+              `<div class="mn-workspace-local-row"><button type="button" class="mn-workspace-popover-board${
+                !currentBoard.remote && board.id === currentBoard.id ? " is-active" : ""
+              }" data-local-board="${escapeText(
                 board.id
               )}"><strong>${escapeText(board.title || "Untitled")}</strong><span>local board</span></button><button type="button" class="mn-icon-btn mn-workspace-local-remove" data-local-remove="${escapeText(
                 board.id
@@ -261,6 +264,16 @@ function openServerMenu(server, section, button) {
 }
 
 export async function openWorkspacePopover(anchor) {
+  try {
+    const { state } = await import("./store.js");
+    currentBoard = {
+      id: state.board?.id || "",
+      projectId: state.board?.sync?.projectId || "",
+      remote: Boolean(state.remote),
+    };
+  } catch {
+    currentBoard = { id: "", projectId: "", remote: false };
+  }
   const view = ensurePopover(anchor);
   const current = servers();
   view.innerHTML = `
@@ -390,7 +403,12 @@ function renderProjectRows(target, server, workspace, projects, root, view, { st
       ? projects
           .map(
             (project) =>
-              `<button type="button" class="mn-workspace-popover-board" data-project="${escapeText(
+              `<button type="button" class="mn-workspace-popover-board${
+                currentBoard.remote &&
+                (project.id === currentBoard.projectId || project.id === currentBoard.id)
+                  ? " is-active"
+                  : ""
+              }" data-project="${escapeText(
                 project.id
               )}"><strong>${escapeText(project.name || "Untitled board")}</strong><span>${escapeText(
                 project.role || "viewer"

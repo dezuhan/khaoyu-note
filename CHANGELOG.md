@@ -5,6 +5,9 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- The workspace popover now marks the board that is currently open, for both local boards and server
+  projects, with the active background. Hovering the active row darkens its highlight so it stays
+  distinguishable from ordinary hover feedback.
 - Adding a server now handles accounts with 2FA: the password step calls the new
   `/auth/sync-token/begin` endpoint, the Add Server dialog switches to an authenticator-code page,
   and a **Use a backup code instead** page completes the connection with a one-time backup code.

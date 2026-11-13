@@ -112,7 +112,9 @@ try {
   await page.waitForSelector('[data-role="workspace-detail"] [data-project]', { timeout: 10000 }).catch(() => {});
 
   const state = await page.evaluate(({ workspaceId, boardId }) => {
-    const activeWorkspace = document.querySelector(".mn-workspace-popover-board.is-active");
+    const activeWorkspace = document.querySelector(
+      ".mn-workspace-popover-board[data-workspace].is-active"
+    );
     const detail = document.querySelector('[data-role="workspace-detail"]');
     return {
       activeWorkspace: activeWorkspace?.dataset.workspace || "",
@@ -134,6 +136,33 @@ try {
   );
   const teamWorkspaceActive = state.activeWorkspace === "workspace_default";
   check("the seeded default workspace is not auto-selected", teamWorkspaceActive === false);
+
+  const activeLocalBoard = await page.evaluate(async () => {
+    const { state } = await import("/js/store.js");
+    return {
+      openBoardId: state.board?.id || "",
+      markedBoardId: document.querySelector("[data-local-board].is-active")?.dataset.localBoard || "",
+    };
+  });
+  check(
+    "the currently open local board is highlighted in the workspace popover",
+    activeLocalBoard.openBoardId && activeLocalBoard.openBoardId === activeLocalBoard.markedBoardId,
+    JSON.stringify(activeLocalBoard)
+  );
+  const activeBeforeHover = await page.evaluate(() => {
+    const button = document.querySelector("[data-local-board].is-active");
+    return button ? getComputedStyle(button).backgroundColor : "";
+  });
+  await page.hover("[data-local-board].is-active");
+  const activeAfterHover = await page.evaluate(() => {
+    const button = document.querySelector("[data-local-board].is-active");
+    return button ? getComputedStyle(button).backgroundColor : "";
+  });
+  check(
+    "hovering the active board makes its highlight darker",
+    activeBeforeHover && activeAfterHover && activeBeforeHover !== activeAfterHover,
+    `${activeBeforeHover} -> ${activeAfterHover}`
+  );
 
   // Members opens the server-backed member list.
   await page.click('[data-role="workspace-members"]');

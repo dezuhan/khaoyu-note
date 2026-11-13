@@ -271,6 +271,10 @@
   background: var(--ky-control-active);
 }
 
+.mn-workspace-popover-board.is-active:hover {
+  background: color-mix(in srgb, var(--ky-control-active) 88%, #000 12%);
+}
+
 .mn-workspace-popover-board span {
   display: block;
   color: var(--ky-muted);
