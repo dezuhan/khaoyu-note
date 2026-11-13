@@ -67,6 +67,9 @@ async function main() {
   const backendUrl = `http://${host}:${backendPort}`;
   if (!process.env.KHAOYU_SERVICE_PUBLIC_URL) {
     config.publicUrl = frontendUrl;
+    // sharePublicUrl was derived from the pre-port publicUrl at config load time. When the
+    // service picks random ports, keep the default share origin on the actual frontend URL.
+    if (!process.env.KHAOYU_SERVICE_SHARE_PUBLIC_URL) config.sharePublicUrl = frontendUrl;
   }
   config.port = backendPort;
   config.corsOrigins = [

@@ -5,6 +5,8 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Fixed the default single-user service share page when listeners use random ports: an implicit
+  `SHARE_PUBLIC_URL` now follows the chosen frontend URL instead of staying on port 8080.
 - 0.36.0 now ships as a local-first build: backend UI is gated behind
   `window.KY_BACKEND_ENABLED = true`, so Sync, Share, Add Server and remote workspace sections are
   hidden. Local storage keeps multi-board support, auto-seeds a default Home board, and the Workspace
