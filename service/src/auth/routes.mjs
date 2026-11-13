@@ -454,8 +454,8 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
     response.end();
   }
 
-  function oidcFailed(response, config, code, cookies = []) {
-    sendRedirect(response, config, `/login?error=${encodeURIComponent(code)}`, cookies);
+  function oidcFailed(response, config, code, cookies = [], base = "/login") {
+    sendRedirect(response, config, `${base}?error=${encodeURIComponent(code)}`, cookies);
   }
 
   async function broadcastPresence(projectId) {
@@ -1711,8 +1711,12 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const nonce = provider.kind === "oidc" ? randomToken(24) : "";
         const verifier = randomToken(48);
         const redirect = sanitizeRedirect(url.searchParams.get("redirect"));
+        const mode = url.searchParams.get("mode") === "register" ? "register" : "login";
         const cookie = oidcStateCookie(
-          signState({ provider: provider.id, state, nonce, verifier, redirect }, config.secret),
+          signState(
+            { provider: provider.id, state, nonce, verifier, redirect, mode },
+            config.secret
+          ),
           config
         );
         try {
@@ -1755,6 +1759,9 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           oidcFailed(response, config, "invalid_state", [clearState]);
           return true;
         }
+        const registerIntent = stateCookie.mode === "register";
+        const failure = (code) =>
+          oidcFailed(response, config, code, [clearState], registerIntent ? "/register" : "/login");
         const code = url.searchParams.get("code") || "";
         let identity;
         try {
@@ -1775,13 +1782,13 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         try {
           email = normalizeEmail(identity.email);
         } catch {
-          oidcFailed(response, config, "email_unverified", [clearState]);
+          failure("email_unverified");
           return true;
         }
         const domain = email.split("@")[1] || "";
         const allowedDomains = provider.allowedDomains || [];
         if (allowedDomains.length && !allowedDomains.includes(domain)) {
-          oidcFailed(response, config, "domain_not_allowed", [clearState]);
+          failure("domain_not_allowed");
           return true;
         }
 
@@ -1798,8 +1805,8 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
               "INSERT OR IGNORE INTO oauth_identities (provider, subject, account_id, email, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)",
               [provider.id, identity.subject, account.id, email, now(), now()]
             );
-          } else if (!provider.autoCreate) {
-            oidcFailed(response, config, "account_missing", [clearState]);
+          } else if (!provider.autoCreate && !registerIntent) {
+            failure("account_missing");
             return true;
           } else {
             const accountId = crypto.randomUUID();
@@ -1844,11 +1851,15 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
 
         if (!account || account.deleted_at || account.status !== "active") {
-          oidcFailed(response, config, "account_disabled", [clearState]);
+          failure("account_disabled");
           return true;
         }
         if (!accountApproved(account)) {
-          oidcFailed(response, config, "account_pending", [clearState]);
+          if (registerIntent) {
+            sendRedirect(response, config, "/login?pending=1", [clearState]);
+          } else {
+            failure("account_pending");
+          }
           return true;
         }
 
@@ -1866,7 +1877,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           action: "auth.login_oidc",
           resourceType: "session",
           resourceId: session.sessionId,
-          metadata: { provider: provider.id },
+          metadata: { provider: provider.id, mode: registerIntent ? "register" : "login" },
           ip,
           secret: config.secret,
         });

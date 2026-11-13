@@ -466,3 +466,37 @@ test("OIDC discovery resolves the authorization, token and JWKS endpoints", asyn
   assert.equal(done.headers.get("location"), "/admin");
   assert.match(sessionCookie(done), /khaoyu_access=/);
 });
+
+test("register intent creates an account even when auto-create is disabled", async (t) => {
+  const mock = await mockProvider();
+  const app = await start({
+    registrationMode: "private",
+    provider: providerFor(mock.base, "github", "github", { autoCreate: false }),
+  });
+  t.after(async () => {
+    await app.close();
+    mock.server.close();
+  });
+  const first = await fetch(`${app.base}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "first@example.com", password: PASSWORD, displayName: "First" }),
+  });
+  assert.equal(first.status, 202);
+  const flow = await begin(app.base, "github", "?mode=register");
+  mock.state.email = "new-github@example.com";
+  mock.state.nonce = flow.nonce;
+  const done = await callback(app.base, "github", { state: flow.state, cookie: flow.cookie });
+  assert.equal(done.headers.get("location"), "/login?pending=1");
+  assert.equal(sessionCookie(done), "");
+  const account = app.db
+    .prepare("SELECT * FROM accounts WHERE email = ?")
+    .get("new-github@example.com");
+  assert.ok(account);
+  assert.equal(account.approved_at, null);
+  assert.equal(
+    app.db.prepare("SELECT COUNT(*) AS count FROM oauth_identities WHERE provider = 'github'").get()
+      .count,
+    1
+  );
+});

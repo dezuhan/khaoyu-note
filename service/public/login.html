@@ -22,9 +22,6 @@
         <p class="auth-sub">Sign in to your Khaoyu Note service.</p>
       </div>
 
-      <div class="auth-oidc" id="oidc-providers" hidden></div>
-      <div class="auth-or" id="oidc-or" hidden>or</div>
-
       <form class="auth-form" id="login-form" novalidate>
         <label class="auth-field">
           <span>Email</span>
@@ -48,8 +45,10 @@
         <button class="auth-submit" id="login-submit" type="submit">Sign in</button>
       </form>
 
-      <div class="auth-or" id="passkey-login-separator">or</div>
-      <a class="auth-secondary" id="passkey-login-link" href="/passkeys">Use a passkey</a>
+      <div class="auth-or" id="oidc-or" hidden>or</div>
+      <div class="auth-oidc" id="oidc-providers" hidden></div>
+      <div class="auth-or" id="passkey-login-separator" hidden>or</div>
+      <a class="auth-secondary" id="passkey-login-link" href="/passkeys" hidden>Use a passkey</a>
 
       <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
       <p class="auth-switch"><a href="/reset">Reset password</a></p>

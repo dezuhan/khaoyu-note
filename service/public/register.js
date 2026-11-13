@@ -3,12 +3,40 @@ import {
   api,
   initTheme,
   isEmail,
+  queryMessage,
   redirectIfSignedIn,
   setBusy,
   setStatus,
 } from "./auth-common.js";
 
 initTheme();
+const notice = queryMessage();
+if (notice) setStatus(notice.message, notice.kind);
+
+async function applyAuthFeatures() {
+  try {
+    const response = await fetch("/api/v1/auth/features", { credentials: "same-origin" });
+    if (!response.ok) return;
+    const features = await response.json();
+    const providers = Array.isArray(features.oidcProviders) ? features.oidcProviders : [];
+    const oidc = document.getElementById("oidc-providers");
+    const separator = document.getElementById("oidc-or");
+    if (!oidc || !providers.length) return;
+    oidc.replaceChildren();
+    for (const provider of providers) {
+      const link = document.createElement("a");
+      link.className = "auth-oidc-button";
+      link.href = `/api/v1/auth/oidc/${encodeURIComponent(provider.id)}/start?mode=register`;
+      link.textContent = `Sign up with ${provider.name}`;
+      oidc.append(link);
+    }
+    oidc.hidden = false;
+    if (separator) separator.hidden = false;
+  } catch {
+    /* keep the email form if the features endpoint is unavailable */
+  }
+}
+
 const form = $("register-form");
 const submit = $("register-submit");
 
@@ -48,4 +76,5 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+void applyAuthFeatures();
 void redirectIfSignedIn();

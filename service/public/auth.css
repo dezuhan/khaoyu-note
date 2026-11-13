@@ -329,6 +329,7 @@ body.auth-body {
 
 
 .auth-oidc[hidden],
-.auth-or[hidden] {
+.auth-or[hidden],
+.auth-secondary[hidden] {
   display: none;
 }

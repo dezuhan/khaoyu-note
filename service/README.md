@@ -616,6 +616,16 @@ approved, private means pending administrator approval) and `allowedDomains` whe
 successful login is audited as `auth.login_oidc` with the provider in the metadata. Redirect
 destinations are limited to same-site paths, so `redirect=//evil.example` falls back to `/admin`.
 
+The sign-in page uses `mode=login`; its button only appears when a provider is configured and an
+existing/linked account can use it. The **Create account** page has a separate “Sign up with …”
+button that starts the flow with `mode=register`. Registration intent creates the account even when
+`autoCreate` is disabled, but still obeys `registration_mode`: public accounts are approved and
+signed in immediately, private accounts are created pending and redirected to
+`/login?pending=1` for administrator approval. A provider-flow error returns to `/login` (or
+`/register` for registration intent) with a readable message. Passkey sign-in can be hidden and
+disabled independently with `KHAOYU_SERVICE_PASSKEYS_ENABLED=false`; the social buttons occupy that
+place on the sign-in page and the `or` separator only appears when at least one provider is enabled.
+
 ### Enabling social sign-in on an existing Docker install
 
 1. Add the provider variables to the env file used by the stack (`.env` for

@@ -69,19 +69,18 @@ async function applyAuthFeatures() {
       for (const provider of providers) {
         const link = document.createElement("a");
         link.className = "auth-oidc-button";
-        link.href = `/api/v1/auth/oidc/${encodeURIComponent(provider.id)}/start`;
+        link.href = `/api/v1/auth/oidc/${encodeURIComponent(provider.id)}/start?mode=login`;
         link.textContent = `Continue with ${provider.name}`;
         oidc.append(link);
       }
       oidc.hidden = false;
       if (oidcOr) oidcOr.hidden = false;
     }
-    if (!features.passkeysEnabled) {
-      const link = document.getElementById("passkey-login-link");
-      const separator = document.getElementById("passkey-login-separator");
-      if (link) link.style.display = "none";
-      if (separator) separator.style.display = "none";
-    }
+    const passkeyLink = document.getElementById("passkey-login-link");
+    const passkeySeparator = document.getElementById("passkey-login-separator");
+    const passkeysEnabled = features.passkeysEnabled === true;
+    if (passkeyLink) passkeyLink.hidden = !passkeysEnabled;
+    if (passkeySeparator) passkeySeparator.hidden = !passkeysEnabled;
   } catch {
     /* keep the link if the feature endpoint is unavailable */
   }
