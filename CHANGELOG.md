@@ -52,10 +52,10 @@ project uses Semantic Versioning.
   notification target or an old URL) no longer creates a phantom "Untitled board" in the local
   workspace list. The app shows a toast and falls back to another local board (or the welcome board).
 - Local boards in the workspace chooser can be removed with the hover × action and a confirmation.
-- Rows and columns now expose edge resize handles (top, bottom, left, right plus the bottom-right
-  corner), so a row can be resized vertically as well as horizontally. Dragging the bottom edge adds
-  extra height while the automatic height still follows the content; clicking a column raises it to
-  the front so its handles stay reachable.
+- Rows and columns keep the single bottom-right corner grip instead of four edge handles. Dragging
+  the grip resizes width and height together (vertical drag still adds `extraHeight` while the
+  automatic height follows the content), matching the pre-0.36 behaviour; sections keep their eight
+  independent handles.
 - The top bar shows up to three avatars of other people currently viewing a synced board, with a +N
   badge for the rest. Presence comes from the existing project SSE roster, excludes the current
   account, dedupes multiple tabs per account and uses a deterministic avatar colour.

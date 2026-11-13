@@ -288,7 +288,7 @@ const rowResizeMetrics = await page.evaluate(async (columnId) => {
     childWidths: columnChildren(state.board, columnId).map((child) => child.w),
   };
 }, firstColumnId);
-const rowResizeHandle = await firstColumnCard.locator(".mn-resize-se").boundingBox();
+const rowResizeHandle = await firstColumnCard.locator(".mn-resize").first().boundingBox();
 await page.mouse.move(rowResizeHandle.x + 4, rowResizeHandle.y + 4);
 await page.mouse.down();
 await page.mouse.move(rowResizeHandle.x + 84, rowResizeHandle.y + 4, { steps: 8 });
@@ -317,12 +317,13 @@ const rowHeightBefore = await page.evaluate(async (columnId) => {
   return { height: column.h, extraHeight: Number(column.extraHeight || 0) };
 }, firstColumnId);
 await firstColumnCard.hover();
-const rowBottomHandle = await firstColumnCard.locator(".mn-resize-s").boundingBox();
+const rowCornerHandles = await firstColumnCard.locator(".mn-resize").count();
 check(
-  "A row exposes a vertical edge handle",
-  Boolean(rowBottomHandle) && Number.isFinite(rowBottomHandle.y),
-  rowBottomHandle ? `${Math.round(rowBottomHandle.x)},${Math.round(rowBottomHandle.y)}` : "missing"
+  "A column exposes only the bottom-right corner grip",
+  rowCornerHandles === 1,
+  `${rowCornerHandles} handles`
 );
+const rowBottomHandle = await firstColumnCard.locator(".mn-resize").first().boundingBox();
 await page.mouse.move(rowBottomHandle.x + 5, rowBottomHandle.y + 5);
 await page.mouse.down();
 await page.mouse.move(rowBottomHandle.x + 5, rowBottomHandle.y + 95, { steps: 8 });
@@ -334,7 +335,7 @@ const rowHeightAfter = await page.evaluate(async (columnId) => {
   return { height: column.h, extraHeight: Number(column.extraHeight || 0) };
 }, firstColumnId);
 check(
-  "Dragging the bottom edge resizes a row downward",
+  "Dragging the corner grip resizes a row vertically",
   rowHeightAfter.height > rowHeightBefore.height + 60 &&
     rowHeightAfter.extraHeight > rowHeightBefore.extraHeight + 60,
   `${Math.round(rowHeightBefore.height)} -> ${Math.round(rowHeightAfter.height)}, extra ${Math.round(rowHeightAfter.extraHeight)}`

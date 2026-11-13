@@ -821,14 +821,7 @@ export function buildCard(card) {
               `<div class="mn-resize mn-resize-${handle}" data-role="resize" data-handle="${handle}" title="Resize"></div>`
           )
           .join("")
-      : card.type === "column"
-        ? ["n", "e", "s", "w", "se"]
-            .map(
-              (handle) =>
-                `<div class="mn-resize mn-resize-${handle}" data-role="resize" data-handle="${handle}" title="Resize"></div>`
-            )
-            .join("")
-        : `<div class="mn-resize" data-role="resize" title="Resize"></div>`);
+      : `<div class="mn-resize" data-role="resize" title="Resize"></div>`);
   if (card.type === "sketch") paintSketch(el, card);
   return el;
 }

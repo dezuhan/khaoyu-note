@@ -282,7 +282,6 @@ function onPointerDown(event) {
   }
 
   if (card) {
-    if (card.type === "column" && !card.parentId && !card.locked) raiseColumnToFront(card);
     const isResize =
       !card.parentId &&
       card.type !== "drawing" &&
@@ -752,16 +751,6 @@ function applyCardGeometry(card) {
   el.style.width = `${card.w}px`;
   if (card.type === "column") el.style.height = `${card.h}px`;
   el.style.zIndex = String(zIndexFor(card));
-}
-
-function raiseColumnToFront(column) {
-  if (!column || column.type !== "column" || column.parentId) return;
-  const top = Math.max(...state.board.cards.map((item) => item.z || 1)) + 1;
-  if (Number(column.z) === top) return;
-  column.z = top;
-  const el = cardElement(column.id);
-  if (el) el.style.zIndex = String(top * 1000);
-  syncColumnStack(column);
 }
 
 function syncColumnStack(column) {
