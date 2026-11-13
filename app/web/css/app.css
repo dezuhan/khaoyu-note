@@ -7820,3 +7820,9 @@ html[data-read-only="true"] #app.is-read-only .mn-toolrail {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Local-first 0.36.0 build: backend controls are not shown. */
+#app.is-local-only #sync-state,
+#app.is-local-only #share-btn {
+  display: none;
+}

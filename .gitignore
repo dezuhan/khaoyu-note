@@ -8,10 +8,19 @@ coverage/
 playwright-report/
 test-results/
 
-# Local runtime data, databases and sessions
+# Local runtime data, backend connections, databases and sessions
 .env
+.env.*
+!.env.example
 service/.env
-service/.env.team
+service/.env.*
+!service/.env.example
+!service/.env.team.example
+service/runtime.json
+service/**/runtime.json
+service/data/
+service/backups/
+service/outbox/
 .khaoyu-service-data/
 service/.khaoyu-service-data/
 service/.tmp-*

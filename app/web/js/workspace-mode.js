@@ -2,6 +2,7 @@
 // frontend only owns accounts and administration.
 
 import { icon } from "./icons.js";
+import { BACKEND_ENABLED } from "./features.js";
 
 const SERVERS_KEY = "ky.servers";
 const WORKSPACE_CACHE_KEY = "ky.workspaceCache";
@@ -300,7 +301,7 @@ export async function openWorkspacePopover(anchor) {
     currentBoard = { id: "", projectId: "", remote: false };
   }
   const view = ensurePopover(anchor);
-  const current = servers();
+  const current = BACKEND_ENABLED ? servers() : [];
   view.innerHTML = `
     <div class="mn-workspace-popover-head"><span>Workspace</span><span>${escapeText(location.host)}</span></div>
     <div class="mn-workspace-local-head">
@@ -308,18 +309,23 @@ export async function openWorkspacePopover(anchor) {
       <button type="button" class="mn-btn mn-workspace-new-board" data-local-new-board="1">New Board</button>
     </div>
     <div class="mn-workspace-popover-boards" data-role="local-workspaces"><p class="mn-server-note" style="padding:8px">Loading local workspaces...</p></div>
-    <div class="mn-workspace-popover-sep"></div>
+    ${
+      BACKEND_ENABLED
+        ? `<div class="mn-workspace-popover-sep"></div>
     <div data-role="server-sections"></div>
     <div class="mn-workspace-popover-sep"></div>
-    <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>`;
+    <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>`
+        : ""
+    }`;
   view.querySelector('[data-local]').addEventListener("click", closePopover);
   view.querySelector('[data-local-new-board]').addEventListener("click", async () => {
     closePopover();
     const store = await import("./store.js");
     await store.createBoard("New board");
   });
-  view.querySelector('[data-add-server]').addEventListener("click", () => openAddServerDialog(anchor));
+  view.querySelector('[data-add-server]')?.addEventListener("click", () => openAddServerDialog(anchor));
   void renderLocalWorkspaces(view);
+  if (!BACKEND_ENABLED) return;
   const sections = view.querySelector('[data-role="server-sections"]');
   if (!current.length) {
     sections.innerHTML = `<p class="mn-server-note" style="padding:8px">No remote server connected.</p>`;
@@ -970,6 +976,7 @@ const OIDC_ERROR_TEXT = {
 };
 
 function openAddServerDialog(anchor) {
+  if (!BACKEND_ENABLED) return;
   closePopover();
   const overlay = document.createElement("div");
   overlay.className = "mn-overlay";
@@ -1471,7 +1478,7 @@ async function openEditableBoard(server, project, token) {
 
 // Reopen the last remote workspace board after a reload, using the durable local mirror offline.
 export async function openCachedBoard(boardId) {
-  if (!boardId) return false;
+  if (!BACKEND_ENABLED || !boardId) return false;
   let syncStore;
   try {
     syncStore = await import("./sync-store.js");
@@ -1527,6 +1534,7 @@ export async function openWorkspaceFromQuery() {
 }
 
 export async function openShareFromQuery() {
+  if (!BACKEND_ENABLED) return false;
   const params = new URLSearchParams(location.search);
   const token = params.get("share");
   if (!token) return false;

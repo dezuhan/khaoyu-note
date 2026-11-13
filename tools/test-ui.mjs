@@ -557,9 +557,9 @@ check(
     (await page.locator("#command-search-btn").isVisible())
 );
 check(
-  "Share, Sync and Account controls are visible in the header",
-  (await page.locator("#share-btn").isVisible()) &&
-    (await page.locator("#sync-state").isVisible()) &&
+  "Local-first build hides Share and Sync but keeps Account in the header",
+  !(await page.locator("#share-btn").isVisible()) &&
+    !(await page.locator("#sync-state").isVisible()) &&
     (await page.locator("#account-btn").isVisible())
 );
 const menuGroups = await page.locator(".mn-menubar-btn").allInnerTexts();
@@ -2749,7 +2749,10 @@ const persisted = await page.evaluate(() => {
 });
 check("Board persists card edits", persisted.max >= 15, JSON.stringify(persisted));
 check("Single-file header keeps the workspace menu visible", await page.locator("#template-btn").isVisible());
-check("Sync and Share remain visible from the header", (await page.locator("#sync-state").isVisible()) && (await page.locator("#share-btn").isVisible()));
+check(
+  "Sync and Share stay hidden in the local-first build",
+  !(await page.locator("#sync-state").isVisible()) && !(await page.locator("#share-btn").isVisible())
+);
 await page.locator(".mn-menubar-btn", { hasText: "Help" }).click();
 await page.waitForTimeout(200);
 const documentationItem = page.locator(".mn-menu-item", { hasText: "Documentation" });

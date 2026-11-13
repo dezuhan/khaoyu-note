@@ -4,6 +4,11 @@ A local-first visual workspace for thinking, planning and writing. Khaoyu Note r
 desktop app or a local browser host, stores every board in SQLite, and works without an account or
 network. An optional self-hosted service adds team accounts, sync and sharing when you need them.
 
+> **0.36.0 local-first release:** backend controls are temporarily disabled in the app. Sync,
+> Share, Add Server and the remote workspace sections are hidden; Local storage supports multiple
+> boards, with **New Board** in the Workspace popover. The service source remains in `service/` for a
+> later release, and backend connection files are gitignored.
+
 ![Khaoyu Note board](shots/board-light.png)
 
 ## About

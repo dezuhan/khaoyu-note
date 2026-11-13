@@ -23,6 +23,7 @@ import { initContextMenu, initUI } from "./ui.js";
 import { backfillLinkHeaders } from "./actions.js";
 import { initSetupGate } from "./setup.js";
 import { initLanguage } from "./i18n.js";
+import { BACKEND_ENABLED } from "./features.js";
 
 const refs = {
   viewport: document.getElementById("viewport"),
@@ -106,7 +107,9 @@ async function boot() {
     document.getElementById("boot")?.remove();
     return;
   }
-  const shareToken = new URLSearchParams(window.location.search).get("share") || "";
+  const shareToken = BACKEND_ENABLED
+    ? new URLSearchParams(window.location.search).get("share") || ""
+    : "";
   if (!shareToken) {
     // After a reset, choose the storage direction before any board or setting is read.
     await initSetupGate();
@@ -116,6 +119,7 @@ async function boot() {
   initRender(refs);
   initInteractions(refs);
   initUI(uiRefs);
+  if (!BACKEND_ENABLED) document.getElementById("app")?.classList.add("is-local-only");
 
   if (shareToken) {
     // A public share is a full-page read-only board, not a separate server preview. The normal
@@ -132,9 +136,11 @@ async function boot() {
     return;
   }
 
-  initSyncUI(uiRefs);
-  initLiveBoard();
-  initShareUI(uiRefs);
+  if (BACKEND_ENABLED) {
+    initSyncUI(uiRefs);
+    initLiveBoard();
+    initShareUI(uiRefs);
+  }
   initContextMenu();
 
   subscribe((kind) => {
@@ -170,7 +176,7 @@ async function boot() {
   }
   // A remote workspace board has no SQLite row, so reopen it from the durable local mirror. This
   // also works offline; queued changes stay in the sync queue until the server is reachable.
-  const preferredRemote = requested || last;
+  const preferredRemote = BACKEND_ENABLED ? requested || last : "";
   if (preferredRemote && !state.boards.some((board) => board.id === preferredRemote)) {
     const { openCachedBoard } = await import("./workspace-mode.js");
     await openCachedBoard(preferredRemote);

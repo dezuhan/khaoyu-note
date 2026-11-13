@@ -558,7 +558,7 @@
 
 .mn-workspace-local-head {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
 }
 
@@ -568,7 +568,11 @@
 }
 
 .mn-workspace-new-board {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
   flex: none;
+  height: auto;
   margin-right: 6px;
   white-space: nowrap;
 }

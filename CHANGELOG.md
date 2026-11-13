@@ -5,6 +5,12 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- 0.36.0 now ships as a local-first build: backend UI is gated behind
+  `window.KY_BACKEND_ENABLED = true`, so Sync, Share, Add Server and remote workspace sections are
+  hidden. Local storage keeps multi-board support, auto-seeds a default Home board, and the Workspace
+  popover exposes a full-height **New Board** button.
+- Backend connection files (`.env.*`, `service/.env*`, runtime files, data/backups/outbox folders) are
+  explicitly gitignored; only the example environment files stay tracked.
 - Remote sync no longer stays on "Syncing N changes..." indefinitely: operation requests now have a
   hard deadline in addition to `AbortSignal.timeout` (16 seconds for a batch, 15s API timeout), and a
   stale in-flight request is cleared after 45 seconds so the queue can retry. This addresses
