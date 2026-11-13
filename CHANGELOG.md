@@ -5,6 +5,11 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Blurred modal/backdrop layers now sit above the floating tool rail (z-index 1600 vs 1000):
+  generic modals, Settings, Sync, Share, Onboarding/setup, image crop, the command palette, the
+  document/drawing editors and the file-drop overlay. The rail no longer stays sharp and visible
+  through a confirm dialog or other blurred overlay. Menus (1200) and the workspace popover (1300)
+  remain below dialogs, and the dedicated server view (2000) stays above them.
 - The workspace popover now marks the board that is currently open, for both local boards and server
   projects, with the active background. Hovering the active row darkens its highlight so it stays
   distinguishable from ordinary hover feedback.

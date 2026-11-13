@@ -164,6 +164,36 @@ try {
     `${activeBeforeHover} -> ${activeAfterHover}`
   );
 
+  // Blurred modal overlays must sit above the floating tool rail.
+  romeHere: {
+    const activeRow = page
+      .locator(".mn-workspace-local-row")
+      .filter({ has: page.locator("[data-local-board].is-active") });
+    await activeRow.locator("[data-local-remove]").click({ force: true });
+    await page.waitForSelector(".mn-overlay");
+    const layering = await page.evaluate(() => {
+      const rail = document.querySelector(".mn-toolrail");
+      const overlay = document.querySelector(".mn-overlay");
+      if (!rail || !overlay) return null;
+      const rect = rail.getBoundingClientRect();
+      const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return {
+        overlayZ: Number(getComputedStyle(overlay).zIndex),
+        railZ: Number(getComputedStyle(rail).zIndex),
+        coversRail: top === overlay || overlay.contains(top),
+      };
+    });
+    check(
+      "blurred modal overlays cover the floating tool rail",
+      layering && layering.overlayZ > layering.railZ && layering.coversRail,
+      JSON.stringify(layering)
+    );
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.waitForSelector(".mn-overlay", { state: "detached" });
+    await page.click("#template-btn");
+    await page.waitForSelector(".mn-workspace-popover");
+  }
+
   // Members opens the server-backed member list.
   await page.click('[data-role="workspace-members"]');
   await page.waitForSelector(".mn-modal");

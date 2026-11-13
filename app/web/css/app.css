@@ -1671,7 +1671,7 @@ html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
 .mn-overlay {
   position: fixed;
   inset: 0;
-  z-index: 600;
+  z-index: 1600;
   display: grid;
   place-items: center;
   background: var(--ky-palette-black-0, rgba(0, 0, 0, 0.4));
@@ -2468,7 +2468,7 @@ html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
 .mn-doc-overlay {
   position: fixed;
   inset: 0;
-  z-index: 150;
+  z-index: 1600;
   display: grid;
   place-items: center;
   padding: 28px 22px;
@@ -2694,7 +2694,7 @@ html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
 .mn-draw-overlay {
   position: fixed;
   inset: 0;
-  z-index: 150;
+  z-index: 1600;
   display: grid;
   place-items: center;
   padding: 26px;
@@ -2785,7 +2785,7 @@ html[data-reduce-motion="true"] .mn-cards * {
 .mn-prefs-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1100;
+  z-index: 1600;
   display: grid;
   place-items: center;
   padding: 56px 16px 24px;
@@ -5460,7 +5460,7 @@ html[data-ky-theme="dark"] .mn-section-swatch span {
 .mn-file-drop-overlay {
   position: fixed;
   inset: 10px;
-  z-index: 400;
+  z-index: 1600;
   display: grid;
   place-items: center;
   border: 2px dashed var(--ky-accent);
@@ -5662,7 +5662,7 @@ html[data-ky-theme="dark"] .mn-section-swatch span {
 .mn-palette-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: 1600;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -5905,7 +5905,7 @@ html[data-performance="true"] *::after {
 .mn-sync-overlay {
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: 1600;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, #000 42%, transparent);
@@ -6144,7 +6144,7 @@ html[data-performance="true"] *::after {
 .mn-share-overlay {
   position: fixed;
   inset: 0;
-  z-index: 320;
+  z-index: 1600;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, #000 42%, transparent);
@@ -6325,7 +6325,7 @@ html[data-performance="true"] *::after {
 .mn-onboard-overlay {
   position: fixed;
   inset: 0;
-  z-index: 340;
+  z-index: 1600;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, #000 48%, transparent);
@@ -6605,7 +6605,7 @@ html[data-performance="true"] *::after {
 .mn-crop-overlay {
   position: fixed;
   inset: 0;
-  z-index: 360;
+  z-index: 1600;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -7562,7 +7562,7 @@ html[data-performance="true"] *::after {
 
 /* Reset onboarding: choose a storage direction before a fresh board is created. */
 .mn-setup-overlay {
-  z-index: 700;
+  z-index: 1600;
 }
 
 .mn-setup-modal {
