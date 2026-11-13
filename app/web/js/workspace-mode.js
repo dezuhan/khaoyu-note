@@ -765,22 +765,43 @@ function openCreateWorkspaceDialog(serversList, anchor) {
   });
 }
 
-function saveServerConnection(url, email, token) {
+async function fetchAccountProfile(url, token) {
+  try {
+    const response = await fetch(`${url.replace(/\/+$/, "")}/api/v1/app/account/profile`, {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.user || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveServerConnection(url, email, token) {
+  const profile = await fetchAccountProfile(url, token);
+  const previous = servers().find((entry) => entry.url === url);
   const entries = servers().filter((entry) => entry.url !== url);
-  entries.unshift({ url, name: new URL(url).host, email, token });
+  entries.unshift({
+    url,
+    name: new URL(url).host,
+    email,
+    token,
+    profile: profile || previous?.profile || null,
+  });
   saveServers(entries);
   // Connecting a server must also establish the sync/share connection used by the current board;
   // otherwise the Share panel sees a stale token and refuses to create links.
-  void import("./sync.js").then((sync) => {
-    const current = sync.loadSyncConfig();
-    sync.saveSyncConfig({
-      url,
-      email,
-      token,
-      publicShareUrl: current.publicShareUrl || "",
-    });
-    window.dispatchEvent(new CustomEvent("mn:sync-changed"));
+  const sync = await import("./sync.js");
+  const current = sync.loadSyncConfig();
+  sync.saveSyncConfig({
+    url,
+    email,
+    token,
+    publicShareUrl: current.publicShareUrl || "",
   });
+  window.dispatchEvent(new CustomEvent("mn:sync-changed"));
 }
 
 const OIDC_ERROR_TEXT = {
@@ -927,7 +948,7 @@ function openAddServerDialog(anchor) {
           return;
         }
         if (!data.token) throw new Error("The server did not return a sync token.");
-        finishSyncLogin(data.token, data.email || loginEmail);
+        await finishSyncLogin(data.token, data.email || loginEmail);
       } catch (error) {
         form.querySelector('[data-role="error"]').textContent = error.message || "Could not sign in.";
         submit.disabled = false;
@@ -960,7 +981,7 @@ function openAddServerDialog(anchor) {
                 throw new Error(OIDC_ERROR_TEXT[result.error] || result.error || "Sign-in failed.");
               }
               if (!result.token) throw new Error("The browser did not return a sign-in token.");
-              finishSyncLogin(result.token, result.email || loginEmail);
+              await finishSyncLogin(result.token, result.email || loginEmail);
               return;
             }
             throw new Error("Sign-in timed out. Try again.");
@@ -981,8 +1002,8 @@ function openAddServerDialog(anchor) {
     }
   }
 
-  function finishSyncLogin(token, email) {
-    saveServerConnection(selectedUrl, email || loginEmail, token);
+  async function finishSyncLogin(token, email) {
+    await saveServerConnection(selectedUrl, email || loginEmail, token);
     close();
     void openWorkspacePopover(anchor);
     window.dispatchEvent(
@@ -1041,7 +1062,7 @@ function openAddServerDialog(anchor) {
           { method: "POST", body: { challenge, code: form.elements.namedItem("code").value.trim() } }
         );
         if (!data.token) throw new Error("The server did not return a sync token.");
-        finishSyncLogin(data.token, data.email || loginEmail);
+        await finishSyncLogin(data.token, data.email || loginEmail);
       } catch (error) {
         if (/expired/i.test(String(error.message || ""))) {
           errorText = "Your sign-in attempt expired. Enter your password again.";
@@ -1055,7 +1076,7 @@ function openAddServerDialog(anchor) {
     });
   }
 
-  function onOidcMessage(event) {
+  async function onOidcMessage(event) {
     if (event.origin !== location.origin || !event.data || event.data.type !== "khaoyu-oidc") return;
     const data = event.data;
     if (data.error) {
@@ -1066,7 +1087,7 @@ function openAddServerDialog(anchor) {
     }
     if (!data.token) return;
     const url = normalizeUrl(data.server || selectedUrl);
-    saveServerConnection(url, data.email || "", data.token);
+    await saveServerConnection(url, data.email || "", data.token);
     close();
     void openWorkspacePopover(anchor);
     window.dispatchEvent(
@@ -1074,7 +1095,7 @@ function openAddServerDialog(anchor) {
     );
   }
 
-  window.addEventListener("message", onOidcMessage);
+  window.addEventListener("message", (event) => void onOidcMessage(event));
   overlay.addEventListener("pointerdown", (event) => {
     if (event.target === overlay) close();
   });
@@ -1108,13 +1129,10 @@ export function takeOidcReturn() {
   if (token && payload.server) {
     const url = normalizeUrl(payload.server);
     if (url) {
-      saveServerConnection(url, payload.email, token);
-      setTimeout(
-        () =>
-          window.dispatchEvent(
-            new CustomEvent("mn:toast", { detail: { message: "Server connected with OIDC" } })
-          ),
-        0
+      void saveServerConnection(url, payload.email, token).then(() =>
+        window.dispatchEvent(
+          new CustomEvent("mn:toast", { detail: { message: "Server connected with OIDC" } })
+        )
       );
     }
   }

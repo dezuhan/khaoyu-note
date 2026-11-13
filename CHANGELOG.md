@@ -5,11 +5,11 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
-- Settings now has service-account tabs for **Profile**, **Security** and **Login sessions** below
-  Server. They use scoped app-token endpoints to edit username/profile, change the password, show
-  2FA/backup-code/passkey status and list or revoke active sessions. The sidebar order is now
-  Server, Profile, Security, Login sessions, General, Backup, Appearance, Tools, Board templates,
-  Performance, MCP, About.
+- Settings keeps a single **Server** entry for the service connection; the separate Profile,
+  Security and Login sessions tabs were removed. Adding a server fetches the signed-in account
+  profile once and stores it next to the server in local JSON (`ky.servers`), so Settings > Server
+  shows username, display name, names, email and role from the login. There is no Change connection
+  button; reconnect through Add Server when needed.
 - Settings > Server is simplified: the public-share-link field and Sharing card are gone, Open
   account spans the row, the primary action is **Change connection**, Check connection stays, and
   Sign out was removed.
