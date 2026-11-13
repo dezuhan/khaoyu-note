@@ -232,6 +232,22 @@ check(
     .evaluate((el) => getComputedStyle(el).display)) === "none"
 );
 const firstColumnId = await firstColumnCard.getAttribute("data-id");
+const columnFit = await page.evaluate(async (columnId) => {
+  const { state } = await import("/js/store.js");
+  const { columnChildren } = await import("/js/model.js");
+  const column = state.board.cards.find((card) => card.id === columnId);
+  const children = columnChildren(state.board, columnId);
+  return {
+    height: column.h,
+    expected: 64 + children.reduce((sum, child) => sum + child.h, 0) + 10 * Math.max(0, children.length - 1) + 14,
+    extraHeight: Number(column.extraHeight || 0),
+  };
+}, firstColumnId);
+check(
+  "A column height fits its children without empty stretch space",
+  Math.abs(columnFit.height - columnFit.expected) <= 2 && columnFit.extraHeight === 0,
+  `${columnFit.height} vs ${columnFit.expected}, extra ${columnFit.extraHeight}`
+);
 async function openColumnContextMenu() {
   await page.evaluate((id) => {
     const el = document.querySelector(`.mn-card[data-id="${id}"]`);
@@ -305,10 +321,11 @@ const rowResizedMetrics = await page.evaluate(async (columnId) => {
   };
 }, firstColumnId);
 check(
-  "Resizing a row switches it from auto-size to stretched child widths",
+  "Resizing a row scales its child widths proportionally",
   rowResizedMetrics.width > rowResizeMetrics.width + 60 &&
-    rowResizedMetrics.fitChildren &&
-    JSON.stringify(rowResizedMetrics.childWidths) !== JSON.stringify(rowResizeMetrics.childWidths),
+    !rowResizedMetrics.fitChildren &&
+    rowResizedMetrics.childWidths[0] > rowResizeMetrics.childWidths[0] + 20 &&
+    rowResizedMetrics.childWidths[1] > rowResizeMetrics.childWidths[1] + 20,
   `${Math.round(rowResizeMetrics.width)} -> ${Math.round(rowResizedMetrics.width)}`
 );
 const rowHeightBefore = await page.evaluate(async (columnId) => {
@@ -316,7 +333,7 @@ const rowHeightBefore = await page.evaluate(async (columnId) => {
   const column = state.board.cards.find((card) => card.id === columnId);
   return { height: column.h, extraHeight: Number(column.extraHeight || 0) };
 }, firstColumnId);
-await firstColumnCard.hover();
+await firstColumnCard.hover({ position: { x: 8, y: 8 } });
 const rowCornerHandles = await firstColumnCard.locator(".mn-resize").count();
 check(
   "A column exposes only the bottom-right corner grip",
@@ -335,10 +352,10 @@ const rowHeightAfter = await page.evaluate(async (columnId) => {
   return { height: column.h, extraHeight: Number(column.extraHeight || 0) };
 }, firstColumnId);
 check(
-  "Dragging the corner grip resizes a row vertically",
-  rowHeightAfter.height > rowHeightBefore.height + 60 &&
-    rowHeightAfter.extraHeight > rowHeightBefore.extraHeight + 60,
-  `${Math.round(rowHeightBefore.height)} -> ${Math.round(rowHeightAfter.height)}, extra ${Math.round(rowHeightAfter.extraHeight)}`
+  "Dragging the corner grip does not stretch a row vertically",
+  Math.abs(rowHeightAfter.height - rowHeightBefore.height) < 12 &&
+    Number(rowHeightAfter.extraHeight || 0) === 0,
+  `${Math.round(rowHeightBefore.height)} -> ${Math.round(rowHeightAfter.height)}, extra ${Number(rowHeightAfter.extraHeight || 0)}`
 );
 
 const rowFitReset = await page.evaluate(async (columnId) => {

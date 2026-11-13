@@ -55,10 +55,12 @@ project uses Semantic Versioning.
   notification target or an old URL) no longer creates a phantom "Untitled board" in the local
   workspace list. The app shows a toast and falls back to another local board (or the welcome board).
 - Local boards in the workspace chooser can be removed with the hover × action and a confirmation.
-- Rows and columns keep the single bottom-right corner grip instead of four edge handles. Dragging
-  the grip resizes width and height together (vertical drag still adds `extraHeight` while the
-  automatic height follows the content), matching the pre-0.36 behaviour; sections keep their eight
-  independent handles.
+- Rows and columns are fixed to their content: the single corner grip now resizes width only,
+  height is always derived from the children, and the old `extraWidth`/`extraHeight` stretch space is
+  ignored. Resizing a row scales its child widths proportionally (nested image/color cards follow
+  their aspect ratio), while resizing a vertical column changes the child width and reflows them.
+  Every non-section card is horizontal-only too; image, sketch and color stay at their aspect ratio.
+  Sections keep their eight independent handles.
 - The top bar shows up to three avatars of other people currently viewing a synced board, with a +N
   badge for the rest. Presence comes from the existing project SSE roster, excludes the current
   account, dedupes multiple tabs per account and uses a deterministic avatar colour.

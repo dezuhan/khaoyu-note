@@ -118,7 +118,7 @@ To-do items carry a burger handle beside the remove button; pointer drag reorder
 
 Card deletion keeps a per-board `trash` array. `moveCardsToTrash` groups a column with its children, stores deep copies of those cards and any connections touching them, removes the cards/connections from the live board, and checkpoints; `restoreTrashEntry` re-adds the group (detaching a child only if its column was permanently removed) and `emptyTrashEntries` clears the list. The Trash tool deletes the current selection when there is one, otherwise it opens a modal listing every deleted group with Restore and Delete plus an Empty trash confirmation. The array is stored in a `trash` TEXT column on `boards`; `write_doc` preserves it when a stale document omits the field.
 
-Auto height: `measureHeights` re-measures every card whose height is content driven (note, heading, link, todo, document, comment, table, board, audio, file) and `applyGeometry` leaves their CSS height unset so the DOM content decides it. Fixed-height types (image, video, sketch, map, color, column) use `CARD_ASPECTS` or their stored height instead. Mutations that change content without a full board re-render (adding or removing a todo item, sending a comment, editing a field) call `syncCardHeight`/`syncAutoHeight`, which also re-lays out a containing column so a growing child never overlaps the next card.
+Auto height: `measureHeights` re-measures every card whose height is content driven (note, heading, link, todo, document, comment, table, board, audio, video, map, file) and `applyGeometry` leaves their CSS height unset so the DOM content decides it. Aspect-ratio types (image, sketch, color) use `CARD_ASPECTS` (or an image crop ratio), so widening them scales their height; column heights are computed by `layoutColumn`. All non-section cards expose a horizontal-only corner grip; vertical drag does not change their height. Mutations that change content without a full board re-render (adding or removing a todo item, sending a comment, editing a field) call `syncCardHeight`/`syncAutoHeight`, which also re-lays out a containing column so a growing child never overlaps the next card.
 
 While a table card is selected or focused, `render.js` overlays a spreadsheet header: a grid of A/B/C column letters above the grid (with AA, AB, ... after Z) and one number per row on the left, both generated from the current row and column counts and rebuilt on every add-row/add-column render. The labels are non-interactive and sit outside the card, so they never change the table layout. A right-edge handle (`data-sheet-add-column`) adds one empty column for every 80 px dragged to the right and removes columns when dragged left, while a bottom handle (`data-sheet-add-row`) adds one empty row for every 28 px dragged down and removes rows when dragged up. Removal checks the affected cells, and when any contain text `confirmAction` opens a modal before the mutation; all paths use `checkpoint()`/`markDirty("board")`. The corner resize grip resizes the sheet width and scales existing column widths proportionally. The divider between each pair of header labels is itself the drag target (`data-col-resize`), centred on the header border with a transparent 9 px hit area and an accent line on hover (its pointer events are enabled only while the sheet is selected or focused): dragging it updates one entry in `card.colWidths`, keeps the other columns at their stored pixel widths, and grows or shrinks `card.w` to the new sum. The `<colgroup>` and the header grid use the same pixel widths, so columns stay aligned.
 
@@ -145,9 +145,16 @@ Board document:
 ## Columns
 
 A column is a card of type `column`. Cards whose `parentId` equals the column id are laid out by
-`layoutColumn` in `model.js`: padding 14, gap 10, header 64. When a column is clicked or dragged, its z-index is raised to the front; the same gesture also re-applies each child z-index so the column background never covers its children. The layout writes child `x`, `y` and
-`w`, then grows the column height to fit. Children are still independent cards in the same DOM layer,
-painted above the column through the z-index scale. Their `.mn-resize` grip is hidden and `onPointerDown` ignores the resize role for any card with a `parentId`, because the column owns their width.
+`layoutColumn` in `model.js`: padding 14, gap 10, header 64. The layout writes child `x`, `y` and
+`w`, then derives the column height from the children (header + child heights + gaps + padding); no
+`extraHeight` empty space is kept. A vertical column's width drives the child width, and resized
+aspect-ratio children (image, sketch, color) recompute their height. A row (`direction: "row"`)
+derives its width from its children; dragging its corner grip scales every child width by the same
+factor, so a row of kanban columns or a row of cards grows and shrinks together, and its height is
+always the tallest child plus the header. Children are still independent cards in the same DOM layer,
+painted above the column through the z-index scale. Their `.mn-resize` grip is hidden and
+`onPointerDown` ignores the resize role for any card with a `parentId`, because the column owns their
+width.
 
 Columns also store a `collapsed` flag. When set, `layoutColumn` skips child positioning and clamps the
 height to 96 px, and `applyGeometry` hides every child whose parent is collapsed. The small header

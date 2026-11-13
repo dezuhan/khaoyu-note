@@ -441,7 +441,7 @@ body.ky-scope {
   z-index: 2;
   width: 14px;
   height: 14px;
-  cursor: nwse-resize;
+  cursor: ew-resize;
   opacity: 0;
   background:
     linear-gradient(135deg, transparent 45%, var(--ky-muted) 45%, var(--ky-muted) 55%, transparent 55%) bottom right / 10px 10px no-repeat;
@@ -2012,7 +2012,7 @@ html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
   width: 16px;
   height: 16px;
   border-radius: 0 0 7px 0;
-  cursor: nwse-resize;
+  cursor: ew-resize;
   background:
     linear-gradient(135deg, transparent 45%, var(--ky-muted) 45%, var(--ky-muted) 55%, transparent 55%) bottom right / 10px 10px no-repeat;
 }

@@ -20,7 +20,6 @@ import {
   CARD_ASPECTS,
   cardHeightFor,
   columnChildren,
-  columnContentHeight,
   getCard,
   layoutColumns,
   MIN_SIZES,
@@ -421,9 +420,14 @@ function beginDrag(card, event) {
 function beginResize(card, event) {
   checkpoint();
   const handle = event.target.closest('[data-role="resize"]')?.dataset.handle || "se";
-  const vertical = handle.includes("n") || handle.includes("s");
-  const horizontal = handle.includes("e") || handle.includes("w");
-  viewportEl.style.cursor = vertical && horizontal ? "nwse-resize" : vertical ? "ns-resize" : "ew-resize";
+  if (card.type === "section") {
+    const vertical = handle.includes("n") || handle.includes("s");
+    const horizontal = handle.includes("e") || handle.includes("w");
+    viewportEl.style.cursor = vertical && horizontal ? "nwse-resize" : vertical ? "ns-resize" : "ew-resize";
+  } else {
+    // Every other card, including rows and columns, only resizes horizontally.
+    viewportEl.style.cursor = "ew-resize";
+  }
   gesture = {
     type: "resize",
     id: card.id,
@@ -689,24 +693,31 @@ function onPointerMove(event) {
         card.x = x;
         card.y = y;
         if (card.type === "column") {
-          // Rows default to their content width; keep a manual extra only for the axes the resize
-          // handle actually changed, so new items still grow the auto dimension.
-          if (card.direction === "row" && (handle.includes("e") || handle.includes("w"))) {
-            const count = Math.max(1, columnChildren(state.board, card.id).length);
-            const minimum = 28 + 120 * count + 10 * Math.max(0, count - 1);
-            card.fitChildren = true;
-            card.extraWidth = 0;
-            width = Math.max(minimum, width);
+          // Columns are horizontal-only containers: their height always follows the children. For
+          // a row, scale the children proportionally instead of adding width the container would
+          // keep as empty space.
+          const target = Math.max(gesture.minW, width);
+          if (card.direction === "row") {
+            const children = columnChildren(state.board, card.id);
+            if (children.length) {
+              const factor = target / Math.max(1, gesture.startW);
+              for (const child of children) {
+                child.w = Math.max(120, Math.round(child.w * factor));
+                if (child.type !== "column" && (CARD_ASPECTS[child.type] || child.aspect)) {
+                  child.h = cardHeightFor(child);
+                }
+              }
+            } else {
+              card.w = target;
+            }
+          } else {
+            card.w = target;
           }
-          if (handle.includes("n") || handle.includes("s")) {
-            const autoHeight = columnContentHeight(state.board, card);
-            card.extraHeight = Math.max(0, height - autoHeight);
-            height = autoHeight + card.extraHeight;
-          }
+          layoutColumns(state.board);
+        } else {
+          card.w = Math.max(gesture.minW, width);
+          card.h = Math.max(gesture.minH, height);
         }
-        card.w = Math.max(gesture.minW, width);
-        card.h = Math.max(gesture.minH, height);
-        if (card.type === "column") layoutColumns(state.board);
       } else {
         card.w = Math.max(gesture.minW, width);
         if (card.aspect || card.type === "image" || card.type === "sketch" || card.type === "video" || card.type === "map" || card.type === "color") {

@@ -247,9 +247,8 @@ function columnContentChildren(board, column) {
   );
 }
 
-// Natural row width/column height before a manual extra size is added. `extraWidth` and
-// `extraHeight` keep a resized container larger than its content while still allowing new items to
-// grow the auto-sized dimension.
+// Natural content width/height, used by the fit action and tests. Containers are always laid out at
+// this size; legacy `extraWidth`/`extraHeight` values are ignored.
 export function columnContentWidth(board, column) {
   const children = columnContentChildren(board, column);
   if (!children.length) return 0;
@@ -268,6 +267,9 @@ export function columnContentHeight(board, column) {
   );
 }
 
+// Containers always take the size their children need. A vertical column lets its width drive the
+// child width; a row derives its width from the scaled child widths. `extraWidth`/`extraHeight`/
+// `fitChildren` from older boards are intentionally ignored so no empty stretch space survives.
 export function layoutColumn(board, column) {
   const padding = 14;
   const gap = 10;
@@ -279,54 +281,46 @@ export function layoutColumn(board, column) {
   const children = columnChildren(board, column.id).filter(
     (card) => !isTemporarilyDisabledType(card.type)
   );
+  if (!children.length) {
+    column.h = Math.max(column.minHeight || 160, 160);
+    return;
+  }
   if (column.direction === "row") {
-    // Default: the row follows its cards. After the operator resizes the row, fitChildren switches
-    // to the old stretch mode: every card follows the row width again.
-    const fitted = Boolean(column.fitChildren) && children.length > 0;
-    const available = Math.max(160, Number(column.w) - padding * 2 - gap * Math.max(0, children.length - 1));
-    const fittedWidth = fitted ? Math.max(120, Math.floor(available / children.length)) : null;
     let x = column.x + padding;
     let maxH = 0;
     for (const child of children) {
       child.x = x;
       child.y = column.y + header;
-      child.w = fitted ? fittedWidth : Math.max(120, Number(child.w) || 120);
+      child.w = Math.max(120, Number(child.w) || 120);
       if (child.type === "column") {
         layoutColumn(board, child);
       } else {
+        if (CARD_ASPECTS[child.type] || child.aspect) child.h = cardHeightFor(child);
         const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
         if (child.h < minimum) child.h = minimum;
       }
       x += child.w + gap;
       maxH = Math.max(maxH, child.h);
     }
-    if (children.length) {
-      if (!fitted) {
-        const contentWidth = padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1);
-        column.w = Math.max(160, contentWidth + Math.max(0, Number(column.extraWidth) || 0));
-      }
-      column.h =
-        Math.max(column.minHeight || 160, header + maxH + padding) +
-        Math.max(0, Number(column.extraHeight) || 0);
-    }
+    column.w = Math.max(160, padding * 2 + children.reduce((sum, child) => sum + child.w, 0) + gap * (children.length - 1));
+    column.h = header + maxH + padding;
     return;
   }
   let y = column.y + header;
   for (const child of children) {
     child.x = column.x + padding;
     child.y = y;
-    child.w = column.w - padding * 2;
+    child.w = Math.max(120, column.w - padding * 2);
     if (child.type === "column") {
       layoutColumn(board, child);
     } else {
+      if (CARD_ASPECTS[child.type] || child.aspect) child.h = cardHeightFor(child);
       const minimum = child.type === "audio" ? AUDIO_CARD_H : 56;
       if (child.h < minimum) child.h = minimum;
     }
     y += child.h + gap;
   }
-  column.h =
-    Math.max(column.minHeight || 160, y - column.y - gap + padding) +
-    Math.max(0, Number(column.extraHeight) || 0);
+  column.h = y - column.y - gap + padding;
 }
 
 export function layoutColumns(board) {
