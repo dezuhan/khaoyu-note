@@ -82,6 +82,35 @@ function isLoopbackUrl(value) {
   }
 }
 
+function connectedShareUrl(created) {
+  const sync = loadSyncConfig();
+  if (!sync.url) return created?.url || "";
+  let candidate;
+  try {
+    candidate = new URL(created?.url || sync.url);
+  } catch {
+    return created?.url || "";
+  }
+  try {
+    const server = new URL(sync.url);
+    // The service can be configured with a loopback main-app/public URL behind a reverse proxy.
+    // The connected server origin is the address the user actually entered, so prefer it.
+    if (isLoopbackUrl(candidate.origin) && !isLoopbackUrl(server.origin)) {
+      candidate = new URL(candidate.pathname + candidate.search + candidate.hash, server.origin);
+    }
+    const embedded = candidate.searchParams.get("server");
+    if (embedded) {
+      const embeddedUrl = new URL(embedded);
+      if (isLoopbackUrl(embeddedUrl.origin) && !isLoopbackUrl(server.origin)) {
+        candidate.searchParams.set("server", server.origin);
+      }
+    }
+    return candidate.toString();
+  } catch {
+    return created?.url || "";
+  }
+}
+
 async function boardShareUrl() {
   if (!bridge.hasWeb || !state.board) return "";
   const info = await bridge.shareInfo();
@@ -319,8 +348,7 @@ async function renderPanel() {
           expiresInDays: expiry.value ? Number(expiry.value) : undefined,
           downloadAllowed: download.checked,
         });
-        const url =
-          loadSyncConfig().publicShareUrl || created.url || sharing.shareUrl(created.token);
+        const url = connectedShareUrl(created) || sharing.shareUrl(created.token);
         tokenOutput.textContent = url;
         tokenOutput.dataset.url = url;
         toast("Share link created. Copy it now.");
