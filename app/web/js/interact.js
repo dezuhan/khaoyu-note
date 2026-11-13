@@ -443,6 +443,13 @@ function beginResize(card, event) {
       card.type === "table" && Array.isArray(card.colWidths)
         ? [...card.colWidths]
         : null,
+    // Row resizing scales every child from the widths captured at pointer down. Using the live
+    // widths would re-apply the factor on every pointermove and make the row explode away from
+    // the pointer.
+    childWidths:
+      card.type === "column" && card.direction === "row"
+        ? columnChildren(state.board, card.id).map((child) => ({ id: child.id, w: child.w }))
+        : null,
   };
   viewportEl.classList.add("is-resizing");
 }
@@ -701,8 +708,12 @@ function onPointerMove(event) {
             const children = columnChildren(state.board, card.id);
             if (children.length) {
               const factor = target / Math.max(1, gesture.startW);
+              const startWidths = new Map(
+                (gesture.childWidths || []).map((entry) => [entry.id, entry.w])
+              );
               for (const child of children) {
-                child.w = Math.max(120, Math.round(child.w * factor));
+                const baseWidth = startWidths.get(child.id) ?? child.w;
+                child.w = Math.max(120, Math.round(baseWidth * factor));
                 if (child.type !== "column" && (CARD_ASPECTS[child.type] || child.aspect)) {
                   child.h = cardHeightFor(child);
                 }

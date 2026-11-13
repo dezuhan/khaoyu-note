@@ -57,8 +57,9 @@ project uses Semantic Versioning.
 - Local boards in the workspace chooser can be removed with the hover × action and a confirmation.
 - Rows and columns are fixed to their content: the single corner grip now resizes width only,
   height is always derived from the children, and the old `extraWidth`/`extraHeight` stretch space is
-  ignored. Resizing a row scales its child widths proportionally (nested image/color cards follow
-  their aspect ratio), while resizing a vertical column changes the child width and reflows them.
+  ignored. Resizing a row scales its child widths proportionally from the widths captured at pointer down,
+  so the container follows the pointer 1:1 instead of compounding on every move (nested image/color
+  cards follow their aspect ratio); resizing a vertical column changes the child width and reflows them.
   Every non-section card is horizontal-only too; image, sketch and color stay at their aspect ratio.
   Converting a row back to a column now fits the column width to the widest child instead of keeping
   the row's total width, so the column no longer becomes a wide empty container. Sections keep their
