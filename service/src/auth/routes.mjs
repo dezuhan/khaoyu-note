@@ -413,6 +413,25 @@ async function startSession(db, config, account, options) {
   return createSession(db, config, account, options);
 }
 
+async function issueAppSyncToken(db, config, account, { ip }) {
+  const scopes = ["projects:read", "projects:write"];
+  const expiresAt = now() + 365 * 86_400_000;
+  (await db.run(
+    "UPDATE api_tokens SET revoked_at = ? WHERE account_id = ? AND name = ? AND revoked_at IS NULL",
+    [now(), account.id, "app-sync"]
+  ));
+  const created = await createApiToken(db, account.id, { name: "app-sync", scopes, expiresAt });
+  await writeAudit(db, {
+    actorAccountId: account.id,
+    action: "auth.sync_token_issued",
+    resourceType: "account",
+    resourceId: account.id,
+    ip,
+    secret: config.secret,
+  });
+  return { token: created.token, email: account.email };
+}
+
 function validateAdminAvatar(value) {
   if (value === null || value === undefined || value === "") return "";
   const text = String(value);
@@ -2564,6 +2583,112 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           },
           config
         );
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/sync-token/begin") {
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const password = typeof body.password === "string" ? body.password : "";
+        if (!password || password.length > 200) {
+          throw new HttpError(400, "password is required", "invalid_input");
+        }
+        const throttle = await loginBlocked(db, { email, ip, config });
+        if (throttle.blocked) {
+          await recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const account = await db.get("SELECT * FROM accounts WHERE email = ?", [email]);
+        const valid = await verifyPassword(
+          password,
+          account?.password_hash || DUMMY_PASSWORD_HASH
+        );
+        if (!valid || !account || account.deleted_at || account.status === "disabled") {
+          await recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or password" }, config);
+          return true;
+        }
+        requireApproved(account);
+        if (account.totp_enabled_at) {
+          sendJson(
+            response,
+            200,
+            {
+              totpRequired: true,
+              challenge: signLoginChallenge(config, account.id),
+              expiresAt: now() + LOGIN_CHALLENGE_TTL_MS,
+            },
+            config
+          );
+          return true;
+        }
+        await clearLoginFailures(db, { email, ip, secret: config.secret });
+        sendJson(response, 200, await issueAppSyncToken(db, config, account, { ip }), config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/sync-token/totp") {
+        const body = await readJson(request);
+        const accountId = verifyLoginChallenge(config, body.challenge);
+        if (!accountId) {
+          throw new HttpError(401, "This sign-in attempt has expired", "invalid_challenge");
+        }
+        const account = await accountById(db, accountId);
+        if (!account || account.deleted_at || account.status === "disabled") {
+          throw new HttpError(401, "Invalid authentication code", "invalid_credentials");
+        }
+        requireApproved(account);
+        const throttle = await loginBlocked(db, { email: account.email, ip, config });
+        if (throttle.blocked) {
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        if (!verifyTotp(account.totp_secret, body.code)) {
+          await recordLoginAttempt(db, { email: account.email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid authentication code", code: "invalid_totp" }, config);
+          return true;
+        }
+        await clearLoginFailures(db, { email: account.email, ip, secret: config.secret });
+        sendJson(response, 200, await issueAppSyncToken(db, config, account, { ip }), config);
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/sync-token/backup") {
+        const body = await readJson(request);
+        const accountId = verifyLoginChallenge(config, body.challenge);
+        const code = normalizeRecoveryCode(body.code);
+        if (!accountId || code.length !== 10) {
+          throw new HttpError(401, "This sign-in attempt has expired", "invalid_challenge");
+        }
+        const account = await accountById(db, accountId);
+        if (!account || account.deleted_at || account.status === "disabled") {
+          throw new HttpError(401, "Invalid backup code", "invalid_credentials");
+        }
+        requireApproved(account);
+        const throttle = await loginBlocked(db, { email: account.email, ip, config });
+        if (throttle.blocked) {
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const recovery = (await db.get(
+          "SELECT id FROM recovery_codes WHERE account_id = ? AND code_hash = ? AND used_at IS NULL",
+          [account.id, hashToken(code)]
+        ));
+        if (!recovery) {
+          await recordLoginAttempt(db, { email: account.email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid backup code", code: "invalid_recovery" }, config);
+          return true;
+        }
+        (await db.run("UPDATE recovery_codes SET used_at = ? WHERE id = ?", [now(), recovery.id]));
+        await clearLoginFailures(db, { email: account.email, ip, secret: config.secret });
+        sendJson(response, 200, await issueAppSyncToken(db, config, account, { ip }), config);
         return true;
       }
 

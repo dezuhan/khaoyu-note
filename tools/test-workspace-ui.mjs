@@ -180,11 +180,18 @@ try {
 
   // Add Server first asks for the endpoint, probes its auth features, then shows the login options.
   mockAuthServer = http.createServer((request, response) => {
+    const cors = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "content-type",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+    };
+    if (request.method === "OPTIONS") {
+      response.writeHead(204, cors);
+      response.end();
+      return;
+    }
     if (request.url === "/api/v1/auth/features") {
-      response.writeHead(200, {
-        "content-type": "application/json",
-        "access-control-allow-origin": "*",
-      });
+      response.writeHead(200, { "content-type": "application/json", ...cors });
       response.end(
         JSON.stringify({
           passkeysEnabled: false,
@@ -197,7 +204,12 @@ try {
       );
       return;
     }
-    response.writeHead(404, { "content-type": "application/json" });
+    if (request.url === "/api/v1/auth/sync-token/begin") {
+      response.writeHead(200, { "content-type": "application/json", ...cors });
+      response.end(JSON.stringify({ totpRequired: true, challenge: "test-challenge" }));
+      return;
+    }
+    response.writeHead(404, { "content-type": "application/json", ...cors });
     response.end("{}");
   });
   await new Promise((resolve) => mockAuthServer.listen(0, "127.0.0.1", resolve));
@@ -235,9 +247,28 @@ try {
       addServerStep2.providers.length === 2,
     JSON.stringify(addServerStep2)
   );
-  await page.click('[data-role="back"]');
-  await page.waitForSelector('form input[name="url"]');
-  await page.click('[data-role="cancel"]');
+  await page.fill('.mn-modal input[name="email"]', "member@example.com");
+  await page.fill('.mn-modal input[name="password"]', "password-123");
+  await page.click('.mn-modal button[type="submit"]');
+  await page.waitForSelector('[data-role="switch"]', { timeout: 10000 });
+  const challengeTitle = await page.locator(".mn-modal").innerText();
+  check(
+    "Add Server asks for the 2FA code when the account has it enabled",
+    challengeTitle.includes("Two-factor authentication") &&
+      challengeTitle.includes("Use a backup code instead"),
+    challengeTitle.replace(/\s+/g, " ").slice(0, 180)
+  );
+  await page.click('[data-role="switch"]');
+  await page.waitForTimeout(200);
+  const backupTitle = await page.locator(".mn-modal").innerText();
+  check(
+    "Add Server offers the backup-code page",
+    backupTitle.includes("Use a backup code") &&
+      backupTitle.includes("Sign in with backup code") &&
+      backupTitle.includes("Use an authenticator code instead"),
+    backupTitle.replace(/\s+/g, " ").slice(0, 180)
+  );
+  await page.click(".mn-modal [data-role=cancel]");
   await page.waitForSelector(".mn-modal", { state: "detached" });
   await page.click("#template-btn");
   await page.waitForSelector(".mn-workspace-popover");

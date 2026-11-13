@@ -749,6 +749,8 @@ function openAddServerDialog(anchor) {
   let selectedUrl = "";
   let features = null;
   let errorText = "";
+  let challenge = "";
+  let loginEmail = "";
   const knownServers = new Map(servers().map((entry) => [entry.url, entry.token]));
   function onServerStorage(event) {
     if (event.key !== SERVERS_KEY || !event.newValue) return;
@@ -832,7 +834,7 @@ function openAddServerDialog(anchor) {
       <header class="mn-modal-head"><h2 class="mn-modal-title">Sign in</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
       <div class="mn-modal-body mn-workspace-form">
         <p class="mn-workspace-form-note">Connected to <strong>${escapeText(new URL(selectedUrl).host)}</strong>.</p>
-        <label>Email<input class="ky-input" name="email" type="email" autocomplete="email" required /></label>
+        <label>Email<input class="ky-input" name="email" type="email" autocomplete="email" value="${escapeText(loginEmail)}" required /></label>
         <label>Password<input class="ky-input" name="password" type="password" autocomplete="current-password" required /></label>
         <p class="mn-workspace-form-error" data-role="error" role="status">${escapeText(errorText)}</p>
         <button type="submit" class="mn-btn mn-btn-primary mn-workspace-signin">Sign in</button>
@@ -854,14 +856,18 @@ function openAddServerDialog(anchor) {
       submit.disabled = true;
       form.querySelector('[data-role="error"]').textContent = "Signing in...";
       try {
-        const data = await jsonFetch(`${selectedUrl}/api/v1/auth/sync-token`, {
+        loginEmail = form.email.value.trim();
+        const data = await jsonFetch(`${selectedUrl}/api/v1/auth/sync-token/begin`, {
           method: "POST",
-          body: { email: form.email.value.trim(), password: form.password.value },
+          body: { email: loginEmail, password: form.password.value },
         });
+        if (data.totpRequired) {
+          challenge = data.challenge;
+          renderSyncChallenge("totp");
+          return;
+        }
         if (!data.token) throw new Error("The server did not return a sync token.");
-        saveServerConnection(selectedUrl, form.email.value.trim(), data.token);
-        close();
-        await openWorkspacePopover(anchor);
+        finishSyncLogin(data.token, data.email || loginEmail);
       } catch (error) {
         form.querySelector('[data-role="error"]').textContent = error.message || "Could not sign in.";
         submit.disabled = false;
@@ -883,6 +889,80 @@ function openAddServerDialog(anchor) {
           "Complete the sign-in in the opened window.";
       });
     }
+  }
+
+  function finishSyncLogin(token, email) {
+    saveServerConnection(selectedUrl, email || loginEmail, token);
+    close();
+    void openWorkspacePopover(anchor);
+    window.dispatchEvent(
+      new CustomEvent("mn:toast", { detail: { message: "Server connected" } })
+    );
+  }
+
+  function renderSyncChallenge(kind) {
+    const backup = kind === "backup";
+    overlay.innerHTML = `<form class="mn-modal mn-workspace-form" role="dialog" aria-modal="true" aria-label="${
+      backup ? "Use a backup code" : "Two-factor authentication"
+    }">
+      <header class="mn-modal-head"><h2 class="mn-modal-title">${
+        backup ? "Use a backup code" : "Two-factor authentication"
+      }</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
+      <div class="mn-modal-body mn-workspace-form">
+        <p class="mn-workspace-form-note">${
+          backup
+            ? "Enter one of the backup codes you saved when setting up two-factor authentication."
+            : `Enter the 6-digit code from your authenticator app for ${escapeText(loginEmail)}.`
+        }</p>
+        <label>${backup ? "Backup code" : "Authentication code"}<input class="ky-input" name="code" ${
+          backup ? 'autocomplete="one-time-code" placeholder="XXXXX-XXXXX"' : 'inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="6"'
+        } required /></label>
+        <p class="mn-workspace-form-error" data-role="error" role="status">${escapeText(errorText)}</p>
+        <button type="submit" class="mn-btn mn-btn-primary mn-workspace-signin">${
+          backup ? "Sign in with backup code" : "Verify"
+        }</button>
+        <button type="button" class="auth-link mn-workspace-challenge-link" data-role="switch">${
+          backup ? "Use an authenticator code instead" : "Use a backup code instead"
+        }</button>
+      </div>
+      <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="back">Back</button><button type="button" class="mn-btn" data-role="cancel">Cancel</button></footer>
+    </form>`;
+    errorText = "";
+    const form = overlay.querySelector("form");
+    form.querySelector(".mn-modal-close").addEventListener("click", close);
+    form.querySelector('[data-role="cancel"]').addEventListener("click", close);
+    form.querySelector('[data-role="back"]').addEventListener("click", () => {
+      errorText = "Enter your password again.";
+      renderStep2();
+    });
+    form.querySelector('[data-role="switch"]').addEventListener("click", () => {
+      errorText = "";
+      renderSyncChallenge(backup ? "totp" : "backup");
+    });
+    form.querySelector("input[name=code]").focus();
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      form.querySelector('[data-role="error"]').textContent = backup ? "Signing in..." : "Verifying...";
+      try {
+        const data = await jsonFetch(
+          `${selectedUrl}/api/v1/auth/sync-token/${backup ? "backup" : "totp"}`,
+          { method: "POST", body: { challenge, code: form.elements.namedItem("code").value.trim() } }
+        );
+        if (!data.token) throw new Error("The server did not return a sync token.");
+        finishSyncLogin(data.token, data.email || loginEmail);
+      } catch (error) {
+        if (/expired/i.test(String(error.message || ""))) {
+          errorText = "Your sign-in attempt expired. Enter your password again.";
+          renderStep2();
+          return;
+        }
+        form.querySelector('[data-role="error"]').textContent =
+          error.message || "Could not complete two-factor authentication.";
+        submit.disabled = false;
+      }
+    });
   }
 
   function onOidcMessage(event) {

@@ -1917,6 +1917,21 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     });
     assert.equal(verified.status, 200, JSON.stringify(verified.body));
     assert.ok(challengeJar.khaoyu_access);
+
+    // The app sync flow uses the same challenge but returns a scoped token instead of cookies.
+    await api.call("/api/v1/auth/logout", { method: "POST", jar: challengeJar });
+    const syncBegin = await api.call("/api/v1/auth/sync-token/begin", {
+      method: "POST",
+      body: { email: user.email, password: user.password },
+    });
+    assert.equal(syncBegin.status, 200, JSON.stringify(syncBegin.body));
+    assert.equal(syncBegin.body.totpRequired, true);
+    const syncVerified = await api.call("/api/v1/auth/sync-token/totp", {
+      method: "POST",
+      body: { challenge: syncBegin.body.challenge, code: generateTotp(setup.body.secret) },
+    });
+    assert.equal(syncVerified.status, 200, JSON.stringify(syncVerified.body));
+    assert.match(syncVerified.body.token, /^khn_/);
   });
 
   await t.test("members can read and update their own profile", async () => {
@@ -2244,4 +2259,16 @@ test("a backup code completes a challenge from the password step", async (t) => 
     body: { challenge: begin.body.challenge, code: created.body.codes[0] },
   });
   assert.equal(reuse.status, 401);
+  const syncBegin = await api.call("/api/v1/auth/sync-token/begin", {
+    method: "POST",
+    body: { email: user.email, password: user.password },
+  });
+  assert.equal(syncBegin.status, 200, JSON.stringify(syncBegin.body));
+  assert.equal(syncBegin.body.totpRequired, true);
+  const sync = await api.call("/api/v1/auth/sync-token/backup", {
+    method: "POST",
+    body: { challenge: syncBegin.body.challenge, code: created.body.codes[1] },
+  });
+  assert.equal(sync.status, 200, JSON.stringify(sync.body));
+  assert.match(sync.body.token, /^khn_/);
 });

@@ -5,6 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Adding a server now handles accounts with 2FA: the password step calls the new
+  `/auth/sync-token/begin` endpoint, the Add Server dialog switches to an authenticator-code page,
+  and a **Use a backup code instead** page completes the connection with a one-time backup code.
+  The result is still a scoped app-sync token (the dialog never gets browser session cookies).
 - The service sign-in page is now a two-step flow. The first page asks only for email and password;
   if the account has 2FA enabled the app shows an authenticator-code page, with a compact
   **Use a backup code instead** link to a dedicated backup-code page. The old authenticator/backup

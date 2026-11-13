@@ -430,6 +430,9 @@ Neither endpoint returns a version, database path, configuration or error detail
 | `POST` | `/api/v1/auth/login/totp` | Complete a challenge with a 6-digit authenticator code; sets session cookies. |
 | `POST` | `/api/v1/auth/login/backup` | Complete a challenge with an unused backup code; sets session cookies. |
 | `POST` | `/api/v1/auth/sync-token` | Exchange email and password for a scoped project token for desktop sync; each sign-in revokes the previous app-sync token. |
+| `POST` | `/api/v1/auth/sync-token/begin` | App-token password step; returns `{totpRequired, challenge}` when the account has 2FA. |
+| `POST` | `/api/v1/auth/sync-token/totp` | Complete an app-token challenge with an authenticator code. |
+| `POST` | `/api/v1/auth/sync-token/backup` | Complete an app-token challenge with an unused backup code. |
 | `POST` | `/api/v1/auth/otp/request` | Queue a one-time login code by email. |
 | `POST` | `/api/v1/auth/otp/login` | Login with a one-time code; TOTP still applies. |
 | `POST` | `/api/v1/auth/recovery-codes` | Generate ten one-time backup codes for the signed-in account; replaces previous codes. |
@@ -660,7 +663,9 @@ place on the sign-in page and the `or` separator only appears when at least one 
 The local web host's **Add Server** dialog probes `/api/v1/auth/features`, then shows the
 email/password form plus every enabled provider. An OIDC sign-in there runs in a popup and returns a
 scoped `app-sync` API token in the URL fragment to a loopback or configured app origin; the dialog
-stores that token in `ky.servers`. Only loopback (`http://127.0.0.1:*`/`http://localhost:*`),
+stores that token in `ky.servers`. If the account has 2FA enabled, the dialog shows the
+authenticator-code step with a **Use a backup code instead** page, using the same signed challenge
+and one-time backup-code rules as the browser login. Only loopback (`http://127.0.0.1:*`/`http://localhost:*`),
 `KHAOYU_SERVICE_MAIN_APP_URL` and `KHAOYU_SERVICE_CORS_ORIGINS` origins are accepted (and the
 fragment is cleared by the receiving app), so an arbitrary `origin` cannot steal the token.
 

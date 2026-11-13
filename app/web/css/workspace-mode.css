@@ -517,3 +517,19 @@
   color: var(--ky-muted);
   text-transform: capitalize;
 }
+
+.mn-workspace-challenge-link {
+  width: 100%;
+  margin-top: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ky-muted);
+  font: inherit;
+  font-size: var(--ky-text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.mn-workspace-challenge-link:hover {
+  color: var(--ky-text);
+}
