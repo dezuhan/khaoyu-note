@@ -333,3 +333,26 @@ body.auth-body {
 .auth-secondary[hidden] {
   display: none;
 }
+
+.auth-link {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ky-muted);
+  font: inherit;
+  font-size: var(--ky-text-sm);
+  text-align: center;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  color: var(--ky-text);
+}
+
+.auth-form[hidden],
+#login-step[hidden] {
+  display: none;
+}

@@ -425,7 +425,10 @@ Neither endpoint returns a version, database path, configuration or error detail
 | --- | --- | --- |
 | `POST` | `/api/v1/auth/register` | Create an immediately usable account (no email verification). |
 | `POST` | `/api/v1/auth/verify-email` | Disabled; returns 410 `verification_disabled`. |
-| `POST` | `/api/v1/auth/login` | Password login, optional TOTP, sets session cookies. |
+| `POST` | `/api/v1/auth/login` | Legacy single-request password login with optional TOTP; sets session cookies. |
+| `POST` | `/api/v1/auth/login/begin` | Interactive password step: signs in directly without 2FA, otherwise returns `{totpRequired, challenge}`. |
+| `POST` | `/api/v1/auth/login/totp` | Complete a challenge with a 6-digit authenticator code; sets session cookies. |
+| `POST` | `/api/v1/auth/login/backup` | Complete a challenge with an unused backup code; sets session cookies. |
 | `POST` | `/api/v1/auth/sync-token` | Exchange email and password for a scoped project token for desktop sync; each sign-in revokes the previous app-sync token. |
 | `POST` | `/api/v1/auth/otp/request` | Queue a one-time login code by email. |
 | `POST` | `/api/v1/auth/otp/login` | Login with a one-time code; TOTP still applies. |
@@ -568,6 +571,11 @@ login and registration. All pages use the same cookie and CSRF rules as the API 
 strict self-only CSP.
 
 ## Passkeys
+
+The sign-in page is a two-step flow: it asks for email and password first, then shows the
+authenticator-code page only when the account has 2FA enabled. A link below the verify button opens
+the backup-code page; the backup code is exchanged against the same short-lived signed challenge, so
+the password step cannot be skipped. The passkey and OIDC buttons remain on the first step.
 
 `/passkeys` is a small browser page for password login, passkey registration, passkey login,
 listing the account's credentials and generating one-time backup codes. Registering a passkey

@@ -604,6 +604,13 @@ test("browser pages and assets are served from the public directory", async () =
   assert.equal(account.status, 200);
   assert.match(account.headers.get("content-type"), /text\/html/);
   assert.ok((await account.text()).length > 0);
+  const login = await fetch(`http://127.0.0.1:${port}/login`);
+  assert.equal(login.status, 200);
+  const loginHtml = await login.text();
+  assert.match(loginHtml, /id="login-form"/);
+  assert.match(loginHtml, /id="totp-form" hidden/);
+  assert.match(loginHtml, /id="backup-form" hidden/);
+  assert.doesNotMatch(loginHtml, /Use an authenticator code<\/summary>/);
   const styles = await fetch(`http://127.0.0.1:${port}/ui.css`);
   assert.equal(styles.status, 200);
   assert.match(styles.headers.get("content-type"), /text\/css/);

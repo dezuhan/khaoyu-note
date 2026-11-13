@@ -1900,6 +1900,23 @@ test("account, login, refresh, session, reset and authorization flows", async (t
     assert.equal((await api.login(user.email, user.password)).status, 401);
     const withCode = await api.login(user.email, user.password, { totp: generateTotp(setup.body.secret) });
     assert.equal(withCode.status, 200);
+
+    // The interactive sign-in page uses the two-step challenge flow.
+    await api.call("/api/v1/auth/logout", { method: "POST", jar: withCode.jar });
+    const begin = await api.call("/api/v1/auth/login/begin", {
+      method: "POST",
+      body: { email: user.email, password: user.password },
+    });
+    assert.equal(begin.status, 200, JSON.stringify(begin.body));
+    assert.equal(begin.body.totpRequired, true);
+    const challengeJar = {};
+    const verified = await api.call("/api/v1/auth/login/totp", {
+      method: "POST",
+      jar: challengeJar,
+      body: { challenge: begin.body.challenge, code: generateTotp(setup.body.secret) },
+    });
+    assert.equal(verified.status, 200, JSON.stringify(verified.body));
+    assert.ok(challengeJar.khaoyu_access);
   });
 
   await t.test("members can read and update their own profile", async () => {
@@ -2189,4 +2206,42 @@ test("usernames are unique and can be used for workspace invitations", async (t)
   });
   assert.equal(invited.status, 201, JSON.stringify(invited.body));
   assert.equal(invited.body.email, secondEmail);
+});
+
+test("a backup code completes a challenge from the password step", async (t) => {
+  const api = await start();
+  t.after(() => api.close());
+  const user = await api.account(`challenge-backup-${crypto.randomUUID()}@example.com`);
+  const setup = await api.call("/api/v1/auth/totp/setup", { method: "POST", jar: user.jar });
+  assert.equal(setup.status, 200);
+  const enabled = await api.call("/api/v1/auth/totp/enable", {
+    method: "POST",
+    jar: user.jar,
+    body: { code: generateTotp(setup.body.secret) },
+  });
+  assert.equal(enabled.status, 204);
+  const created = await api.call("/api/v1/auth/recovery-codes", {
+    method: "POST",
+    jar: user.jar,
+    body: {},
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const begin = await api.call("/api/v1/auth/login/begin", {
+    method: "POST",
+    body: { email: user.email, password: user.password },
+  });
+  assert.equal(begin.status, 200, JSON.stringify(begin.body));
+  const jar = {};
+  const login = await api.call("/api/v1/auth/login/backup", {
+    method: "POST",
+    jar,
+    body: { challenge: begin.body.challenge, code: created.body.codes[0] },
+  });
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  assert.ok(jar.khaoyu_access);
+  const reuse = await api.call("/api/v1/auth/login/backup", {
+    method: "POST",
+    body: { challenge: begin.body.challenge, code: created.body.codes[0] },
+  });
+  assert.equal(reuse.status, 401);
 });

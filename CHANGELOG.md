@@ -5,6 +5,13 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- The service sign-in page is now a two-step flow. The first page asks only for email and password;
+  if the account has 2FA enabled the app shows an authenticator-code page, with a compact
+  **Use a backup code instead** link to a dedicated backup-code page. The old authenticator/backup
+  details are gone from the initial form. New `/auth/login/begin`, `/auth/login/totp` and
+  `/auth/login/backup` endpoints use a signed five-minute challenge bound to the password step;
+  the legacy single-request `/auth/login` remains for API compatibility. OIDC and passkey options
+  stay on the first step.
 - Accounts now have a case-insensitive unique username. Registration requires or auto-generates one,
   OIDC/admin-created accounts get a generated handle, existing accounts are backfilled by migration
   22, and Account settings can change it with a `username_taken` check. Workspace invitations accept

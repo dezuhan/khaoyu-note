@@ -250,6 +250,46 @@ function createRecoveryCode() {
   return `${raw.slice(0, 5)}-${raw.slice(5)}`;
 }
 
+const LOGIN_CHALLENGE_TTL_MS = 5 * 60_000;
+
+function signLoginChallenge(config, accountId) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      sub: accountId,
+      purpose: "login-2fa",
+      exp: now() + LOGIN_CHALLENGE_TTL_MS,
+    }),
+    "utf8"
+  ).toString("base64url");
+  const signature = crypto.createHmac("sha256", config.secret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function verifyLoginChallenge(config, token) {
+  const [payload, signature] = String(token || "").split(".");
+  if (!payload || !signature) return null;
+  const expected = crypto.createHmac("sha256", config.secret).update(payload).digest("base64url");
+  const left = Buffer.from(signature, "utf8");
+  const right = Buffer.from(expected, "utf8");
+  if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
+  let data;
+  try {
+    data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (
+    !data ||
+    data.purpose !== "login-2fa" ||
+    typeof data.sub !== "string" ||
+    !Number.isFinite(data.exp) ||
+    data.exp <= now()
+  ) {
+    return null;
+  }
+  return data.sub;
+}
+
 function normalizeRecoveryCode(value) {
   return String(value || "")
     .toUpperCase()
@@ -2291,6 +2331,173 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           csrfToken: session.csrfToken,
           accessExpiresAt: session.accessExpiresAt,
         }, config);
+        return true;
+      }
+
+      // Step one of the interactive sign-in flow: verify the password, then either create a
+      // session (no second factor) or return a short-lived challenge for the 2FA page.
+      if (method === "POST" && url.pathname === "/api/v1/auth/login/begin") {
+        const body = await readJson(request);
+        const email = normalizeEmail(body.email);
+        const throttle = await loginBlocked(db, { email, ip, config });
+        if (throttle.blocked) {
+          await recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const account = (await db.get("SELECT * FROM accounts WHERE email = ?", [email]));
+        const valid = await verifyPassword(
+          body.password,
+          account?.password_hash || DUMMY_PASSWORD_HASH
+        );
+        if (!valid || !account || account.deleted_at || account.status === "disabled") {
+          await recordLoginAttempt(db, { email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid email or password" }, config);
+          return true;
+        }
+        if (account.totp_enabled_at) {
+          sendJson(
+            response,
+            200,
+            {
+              totpRequired: true,
+              challenge: signLoginChallenge(config, account.id),
+              expiresAt: now() + LOGIN_CHALLENGE_TTL_MS,
+            },
+            config
+          );
+          return true;
+        }
+        await clearLoginFailures(db, { email, ip, secret: config.secret });
+        const session = await startSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        await writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.login",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          200,
+          {
+            account: publicAccount(account),
+            csrfToken: session.csrfToken,
+            accessExpiresAt: session.accessExpiresAt,
+          },
+          config
+        );
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/login/totp") {
+        const body = await readJson(request);
+        const accountId = verifyLoginChallenge(config, body.challenge);
+        if (!accountId) {
+          throw new HttpError(401, "This sign-in attempt has expired", "invalid_challenge");
+        }
+        const account = await accountById(db, accountId);
+        if (!account || account.deleted_at || account.status === "disabled") {
+          throw new HttpError(401, "Invalid authentication code", "invalid_credentials");
+        }
+        const throttle = await loginBlocked(db, { email: account.email, ip, config });
+        if (throttle.blocked) {
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        if (!verifyTotp(account.totp_secret, body.code)) {
+          await recordLoginAttempt(db, { email: account.email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid authentication code", code: "invalid_totp" }, config);
+          return true;
+        }
+        await clearLoginFailures(db, { email: account.email, ip, secret: config.secret });
+        const session = await startSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        await writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.login_totp",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          200,
+          {
+            account: publicAccount(account),
+            csrfToken: session.csrfToken,
+            accessExpiresAt: session.accessExpiresAt,
+          },
+          config
+        );
+        return true;
+      }
+
+      if (method === "POST" && url.pathname === "/api/v1/auth/login/backup") {
+        const body = await readJson(request);
+        const accountId = verifyLoginChallenge(config, body.challenge);
+        const code = normalizeRecoveryCode(body.code);
+        if (!accountId || code.length !== 10) {
+          throw new HttpError(401, "This sign-in attempt has expired", "invalid_challenge");
+        }
+        const account = await accountById(db, accountId);
+        if (!account || account.deleted_at || account.status === "disabled") {
+          throw new HttpError(401, "Invalid backup code", "invalid_credentials");
+        }
+        const throttle = await loginBlocked(db, { email: account.email, ip, config });
+        if (throttle.blocked) {
+          sendJson(response, 429, { error: "Too many attempts" }, config, {
+            "Retry-After": String(throttle.retryAfter),
+          });
+          return true;
+        }
+        const recovery = (await db.get(
+          "SELECT id FROM recovery_codes WHERE account_id = ? AND code_hash = ? AND used_at IS NULL",
+          [account.id, hashToken(code)]
+        ));
+        if (!recovery) {
+          await recordLoginAttempt(db, { email: account.email, ip, success: false, secret: config.secret });
+          sendJson(response, 401, { error: "Invalid backup code", code: "invalid_recovery" }, config);
+          return true;
+        }
+        (await db.run("UPDATE recovery_codes SET used_at = ? WHERE id = ?", [now(), recovery.id]));
+        await clearLoginFailures(db, { email: account.email, ip, secret: config.secret });
+        const session = await startSession(db, config, account, {
+          ipHash,
+          userAgent: request.headers["user-agent"],
+        });
+        setSessionCookies(response, config, session);
+        await writeAudit(db, {
+          actorAccountId: account.id,
+          action: "auth.login_backup",
+          resourceType: "session",
+          resourceId: session.sessionId,
+          ip,
+          secret: config.secret,
+        });
+        sendJson(
+          response,
+          200,
+          {
+            account: publicAccount(account),
+            csrfToken: session.csrfToken,
+            accessExpiresAt: session.accessExpiresAt,
+          },
+          config
+        );
         return true;
       }
 
