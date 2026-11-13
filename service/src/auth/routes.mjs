@@ -277,6 +277,48 @@ function adminAccount(row) {
   };
 }
 
+const USERNAME_PATTERN = /^[A-Za-z0-9._-]{3,32}$/;
+
+function normalizeUsername(value) {
+  const username = String(value || "").trim();
+  if (!USERNAME_PATTERN.test(username)) {
+    throw new HttpError(
+      400,
+      "username must be 3 to 32 letters, numbers, dots, dashes or underscores",
+      "invalid_username"
+    );
+  }
+  return username;
+}
+
+async function usernameTaken(db, username, exceptId = null) {
+  const row = await db.get(
+    `SELECT id FROM accounts WHERE lower(username) = lower(?) AND deleted_at IS NULL${
+      exceptId ? " AND id <> ?" : ""
+    }`,
+    exceptId ? [username, exceptId] : [username]
+  );
+  return Boolean(row);
+}
+
+function usernameSeed(email, displayName) {
+  const source = String(displayName || email.split("@")[0] || "user")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "_")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 28);
+  return source.length >= 3 ? source : `user_${source || "account"}`.slice(0, 28);
+}
+
+async function generateUsername(db, email, displayName) {
+  const base = usernameSeed(email, displayName);
+  for (let attempt = 1; attempt < 1000; attempt += 1) {
+    const candidate = attempt === 1 ? base : `${base}${attempt}`;
+    if (!(await usernameTaken(db, candidate))) return candidate.slice(0, 32);
+  }
+  throw new HttpError(409, "could not allocate a username", "username_taken");
+}
+
 const ADMIN_ACCOUNT_COLUMNS =
   "a.id, a.email, a.display_name, a.username, a.first_name, a.last_name, a.avatar_color, a.avatar_url, a.role, a.status, a.approved_at, a.created_at, a.updated_at";
 const REGISTRATION_MODE_KEY = "registration_mode";
@@ -751,14 +793,22 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         if (!["admin", "member"].includes(role)) {
           throw new HttpError(400, "role is invalid", "invalid_role");
         }
+        const requestedUsername = body.username === undefined ? "" : normalizeUsername(body.username);
+        if (requestedUsername && (await usernameTaken(db, requestedUsername))) {
+          throw new HttpError(409, "username is already taken", "username_taken");
+        }
+        const username = requestedUsername || (await generateUsername(db, email, displayName));
         const id = crypto.randomUUID();
         try {
           await db.run(
-            `INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, email, displayName, await hashPassword(password), now(), role, now(), now(), now()]
+            `INSERT INTO accounts (id, email, display_name, username, password_hash, email_verified_at, role, approved_at, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, email, displayName, username, await hashPassword(password), now(), role, now(), now(), now()]
           );
         } catch (error) {
+          if (/username/i.test(String(error.message || ""))) {
+            throw new HttpError(409, "username is already taken", "username_taken");
+          }
           if (/UNIQUE|duplicate key/i.test(String(error.message || ""))) {
             throw new HttpError(409, "email is already registered", "email_taken");
           }
@@ -894,10 +944,20 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         const avatarUrl =
           body.avatarUrl === undefined ? current.avatar_url : validateAdminAvatar(body.avatarUrl);
-        (await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, avatar_color = ?,
-             avatar_url = ?, role = ?, status = ?, approved_at = ?, updated_at = ? WHERE id = ?`, [displayName,
+        const username =
+          body.username === undefined ? current.username || "" : normalizeUsername(body.username);
+        if (
+          username &&
+          username !== current.username &&
+          (await usernameTaken(db, username, targetId))
+        ) {
+          throw new HttpError(409, "username is already taken", "username_taken");
+        }
+        (await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, username = ?,
+             avatar_color = ?, avatar_url = ?, role = ?, status = ?, approved_at = ?, updated_at = ? WHERE id = ?`, [displayName,
           firstName || null,
           lastName || null,
+          username || null,
           avatarColor || null,
           avatarUrl || null,
           role,
@@ -1865,14 +1925,16 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             const mode = await registrationMode(db);
             const approvedAt = firstAccount || mode === "public" ? now() : null;
             const displayName = String(identity.displayName || email.split("@")[0]).slice(0, 80);
+            const username = await generateUsername(db, email, displayName);
             try {
               await db.transaction(async (tx) => {
                 await tx.run(
-                  "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, avatar_url, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)",
+                  "INSERT INTO accounts (id, email, display_name, username, password_hash, email_verified_at, role, approved_at, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)",
                   [
                     accountId,
                     email,
                     displayName,
+                    username,
                     now(),
                     firstAccount ? "admin" : "member",
                     approvedAt,
@@ -1987,6 +2049,11 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           typeof body.displayName === "string" && body.displayName.trim()
             ? requireString(body.displayName, "displayName", 80)
             : email.split("@")[0];
+        const requestedUsername = body.username === undefined ? "" : normalizeUsername(body.username);
+        if (requestedUsername && (await usernameTaken(db, requestedUsername))) {
+          throw new HttpError(409, "username is already taken", "username_taken");
+        }
+        const username = requestedUsername || (await generateUsername(db, email, displayName));
         let account;
         let approvedAt = null;
         try {
@@ -2001,9 +2068,10 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           const firstAccount = Number((await db.get("SELECT COUNT(*) AS count FROM accounts", [])).count) === 0;
           const mode = await registrationMode(db);
           approvedAt = firstAccount || mode === "public" ? now() : null;
-          (await db.run("INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [account.id,
+          (await db.run("INSERT INTO accounts (id, email, display_name, username, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [account.id,
             email,
             displayName,
+            username,
             await hashPassword(password),
             now(),
             firstAccount ? "admin" : "member",
@@ -2011,7 +2079,10 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
             now(),
             now()]));
         } catch (error) {
-          if (!/UNIQUE/.test(error.message)) throw error;
+          if (/username/i.test(String(error.message || ""))) {
+            throw new HttpError(409, "username is already taken", "username_taken");
+          }
+          if (!/UNIQUE|duplicate key/i.test(String(error.message || ""))) throw error;
           const duplicateMode = await registrationMode(db);
           sendJson(response, 202, {
             status: "registered",
@@ -2631,10 +2702,20 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         }
         const avatarUrl =
           body.avatarUrl === undefined ? current.avatar_url : validateAdminAvatar(body.avatarUrl);
-        (await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, avatar_color = ?,
-             avatar_url = ?, updated_at = ? WHERE id = ?`, [displayName,
+        const username =
+          body.username === undefined ? current.username || "" : normalizeUsername(body.username);
+        if (
+          username &&
+          username !== current.username &&
+          (await usernameTaken(db, username, auth.account.id))
+        ) {
+          throw new HttpError(409, "username is already taken", "username_taken");
+        }
+        (await db.run(`UPDATE accounts SET display_name = ?, first_name = ?, last_name = ?, username = ?,
+             avatar_color = ?, avatar_url = ?, updated_at = ? WHERE id = ?`, [displayName,
           firstName || null,
           lastName || null,
+          username || null,
           avatarColor || null,
           avatarUrl || null,
           now(),
@@ -3307,7 +3388,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const member = await db.get("SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, auth.account.id]);
         if (!member) throw new HttpError(404, "workspace not found", "not_found");
         const members = await db.all(
-          `SELECT a.id, a.email, a.display_name, a.avatar_color, a.avatar_url, m.role, m.state, m.created_at
+          `SELECT a.id, a.email, a.display_name, a.username, a.avatar_color, a.avatar_url, m.role, m.state, m.created_at
            FROM workspace_members m JOIN accounts a ON a.id = m.account_id
            WHERE m.workspace_id = ? AND m.state != 'left' AND a.deleted_at IS NULL ORDER BY m.role DESC, a.display_name`,
           [workspaceId]
@@ -3346,15 +3427,36 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         const actor = await db.get("SELECT role FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, auth.account.id]);
         if (!actor || !["owner", "admin"].includes(actor.role)) throw new HttpError(403, "workspace admin required", "workspace_admin_required");
         if (method === "GET") {
-          const invitations = await db.all("SELECT id, normalized_email, requested_role, status, kind, expires_at, created_at FROM workspace_invitations WHERE workspace_id = ? ORDER BY created_at DESC LIMIT 100", [workspaceId]);
+          const invitations = await db.all(
+            `SELECT i.id, i.normalized_email, i.requested_role, i.status, i.kind, i.expires_at, i.created_at, u.username
+             FROM workspace_invitations i LEFT JOIN accounts u ON u.id = i.invitee_account_id
+             WHERE i.workspace_id = ? ORDER BY i.created_at DESC LIMIT 100`,
+            [workspaceId]
+          );
           sendJson(response, 200, { invitations }, config);
           return true;
         }
         if (method === "POST") {
           const body = await readJson(request);
-          const email = normalizeEmail(body.email);
+          const identifier = String(body.identifier ?? body.email ?? body.username ?? "").trim();
+          let account = null;
+          let email;
+          if (identifier.includes("@")) {
+            email = normalizeEmail(identifier);
+            account = await db.get(
+              "SELECT id, email FROM accounts WHERE email = ? AND deleted_at IS NULL",
+              [email]
+            );
+          } else {
+            const username = normalizeUsername(identifier);
+            account = await db.get(
+              "SELECT id, email FROM accounts WHERE lower(username) = lower(?) AND deleted_at IS NULL",
+              [username]
+            );
+            if (!account) throw new HttpError(404, "account not found", "account_not_found");
+            email = account.email;
+          }
           const role = ["admin", "member"].includes(body.role) ? body.role : "member";
-          const account = await db.get("SELECT id FROM accounts WHERE email = ? AND deleted_at IS NULL", [email]);
           if (account && (await db.get("SELECT 1 FROM workspace_members WHERE workspace_id = ? AND account_id = ? AND state = 'active'", [workspaceId, account.id]))) {
             throw new HttpError(409, "account is already a workspace member", "already_member");
           }

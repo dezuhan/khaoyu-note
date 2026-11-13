@@ -1,0 +1,2 @@
+-- The username backfill is intentionally one-way: clearing it would break invitations and logins
+-- that already reference the handle.

@@ -258,7 +258,7 @@ function accountDetailRows(data) {
       <div class="admin-account-detail-head">
         <div class="admin-user">${avatarHtml(user)}<span class="admin-user-copy"><strong>${escapeHtml(
           displayName(user)
-        )}</strong><span>${escapeHtml(user.email)}</span></span></div>
+        )}</strong><span>${escapeHtml(user.username ? `@${user.username} · ${user.email}` : user.email)}</span></span></div>
         <button class="ky-button ky-button-quiet" type="button" data-role="detail-close">Close</button>
       </div>
       <div class="admin-detail-grid">
@@ -407,6 +407,7 @@ async function renderAccounts(query = "") {
       </form>
       <form class="admin-toolbar admin-account-create" data-role="account-create">
         <input class="admin-search" name="email" type="email" placeholder="Member email" maxlength="254" required />
+        <input class="admin-search" name="username" placeholder="Username (optional)" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" />
         <input class="admin-search" name="displayName" placeholder="Display name" maxlength="120" />
         <input class="admin-search" name="password" type="password" minlength="12" maxlength="200" placeholder="Temporary password (12+ chars)" autocomplete="new-password" required />
         <select class="admin-select" name="role" aria-label="New member role">
@@ -506,6 +507,7 @@ async function renderAccounts(query = "") {
         method: "POST",
         body: {
           email: form.email.value.trim(),
+          username: form.username.value.trim() || undefined,
           displayName: form.displayName.value.trim(),
           password: form.password.value,
           role: form.role.value,
@@ -980,6 +982,7 @@ async function renderProfile() {
           <button class="ky-button ky-button-quiet" type="button" data-role="avatar-clear"${avatarData ? "" : " disabled"}>Remove picture</button>
         </div>
         <div class="admin-form-grid admin-profile-grid">
+          <label class="admin-field"><span>Username</span><input class="admin-search" name="username" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" value="${escapeHtml(account.username || "")}" /></label>
           <label class="admin-field"><span>Display name</span><input class="admin-search" name="displayName" maxlength="120" value="${escapeHtml(account.displayName || "")}" required /></label>
           <label class="admin-field"><span>First name</span><input class="admin-search" name="firstName" maxlength="80" value="${escapeHtml(account.firstName || "")}" /></label>
           <label class="admin-field"><span>Last name</span><input class="admin-search" name="lastName" maxlength="80" value="${escapeHtml(account.lastName || "")}" /></label>
@@ -1032,6 +1035,7 @@ async function renderProfile() {
       const saved = await api("/api/v1/account/profile", {
         method: "PATCH",
         body: {
+          username: form.username.value.trim() || undefined,
           displayName: form.displayName.value.trim(),
           firstName: form.firstName.value.trim(),
           lastName: form.lastName.value.trim(),

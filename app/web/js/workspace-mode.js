@@ -474,7 +474,9 @@ async function openWorkspaceMembers(server, workspace) {
           const controls = managed
             ? `<span class="mn-workspace-member-controls"><select class="ky-input" data-member-role="${escapeText(member.id)}"><option value="member"${member.role === "member" ? " selected" : ""}>Member</option><option value="admin"${member.role === "admin" ? " selected" : ""}>Admin</option></select><button type="button" class="mn-btn" data-remove-member="${escapeText(member.id)}">Remove</button></span>`
             : `<span class="mn-workspace-member-role">${escapeText(member.role)}</span>`;
-          return `<div class="mn-workspace-member"><div><strong>${escapeText(member.display_name || member.email || "Member")}</strong><small>${escapeText(member.email || "")}</small></div>${controls}</div>`;
+          return `<div class="mn-workspace-member"><div><strong>${escapeText(member.display_name || member.email || "Member")}</strong><small>${escapeText(
+            member.username ? `@${member.username} · ${member.email || ""}` : member.email || ""
+          )}</small></div>${controls}</div>`;
         })
         .join("")}</div><p class="mn-workspace-form-error" data-role="error" role="status"></p>`;
       body.querySelectorAll("[data-member-role]").forEach((select) => {
@@ -532,7 +534,7 @@ async function openWorkspaceInvite(server, workspace) {
     <header class="mn-modal-head"><h2 class="mn-modal-title">Invite · ${escapeText(workspace.name || "Workspace")}</h2><button type="button" class="mn-icon-btn mn-modal-close" aria-label="Close">×</button></header>
     <div class="mn-modal-body mn-workspace-form">
       <p class="mn-workspace-form-note">Invite an existing account by email. The invitation expires after seven days.</p>
-      <label>Email<input class="ky-input" name="email" type="email" autocomplete="email" placeholder="member@example.com" required /></label>
+      <label>Email or username<input class="ky-input" name="email" autocomplete="off" placeholder="member or member@example.com" required /></label>
       <label>Role<select class="ky-input" name="role"><option value="member">Member</option><option value="admin">Admin</option></select></label>
       <p class="mn-workspace-form-error" data-role="error" role="status"></p>
       <div data-role="invite-list"></div>
@@ -562,7 +564,9 @@ async function openWorkspaceInvite(server, workspace) {
         ? `<div class="mn-workspace-invites"><strong>Pending invitations</strong>${pending
             .map(
               (invite) =>
-                `<div class="mn-workspace-invite"><span>${escapeText(invite.normalized_email || "")}</span><small>${escapeText(
+                `<div class="mn-workspace-invite"><span>${escapeText(
+                  invite.username ? `@${invite.username}` : invite.normalized_email || ""
+                )}${invite.username ? ` · ${escapeText(invite.normalized_email || "")}` : ""}</span><small>${escapeText(
                   invite.requested_role || "member"
                 )}</small></div>`
             )
@@ -584,7 +588,7 @@ async function openWorkspaceInvite(server, workspace) {
           {
             method: "POST",
             body: {
-              email: form.elements.namedItem("email").value.trim(),
+              identifier: form.elements.namedItem("email").value.trim(),
               role: form.elements.namedItem("role").value,
             },
           },

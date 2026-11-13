@@ -145,11 +145,23 @@ try {
   await page.waitForSelector(".mn-modal", { state: "detached" });
   await page.waitForSelector(".mn-workspace-popover");
 
-  // Invite sends an invitation through the workspace API.
+  // Register a second account with a username and invite it by username.
   const invitedEmail = `invite-${crypto.randomUUID()}@example.com`;
+  const invitedUsername = `invitee-${crypto.randomUUID().slice(0, 8)}`;
+  const invited = await fetch(`${base}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: invitedEmail,
+      username: invitedUsername,
+      password: "workspace-password-456",
+      displayName: "Invited User",
+    }),
+  });
+  check("invitee account registered with a username", invited.status === 202, `status ${invited.status}`);
   await page.click('[data-role="workspace-invite"]');
   await page.waitForSelector(".mn-modal");
-  await page.fill('.mn-modal input[name="email"]', invitedEmail);
+  await page.fill('.mn-modal input[name="email"]', invitedUsername);
   await page.click('.mn-modal button[type="submit"]');
   await page.waitForFunction(
     () => document.querySelector('.mn-modal [data-role="error"]')?.textContent.includes("Invitation sent."),
@@ -158,7 +170,7 @@ try {
   );
   const invitations = await (await fetch(`${base}/api/v1/workspaces/${workspace.id}/invitations`, { headers })).json();
   check(
-    "Invite creates a pending workspace invitation",
+    "Invite by username creates a pending invitation",
     (invitations.invitations || []).some((entry) => entry.normalized_email === invitedEmail),
     invitedEmail
   );

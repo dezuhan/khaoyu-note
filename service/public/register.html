@@ -29,8 +29,12 @@
           <input id="name" name="name" type="text" autocomplete="name" placeholder="Your name" maxlength="80" />
         </label>
         <label class="auth-field">
+          <span>Username</span>
+          <input id="username" name="username" type="text" autocomplete="username" placeholder="dezuhan" pattern="[A-Za-z0-9._-]{3,32}" required />
+        </label>
+        <label class="auth-field">
           <span>Email</span>
-          <input id="email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required />
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
         </label>
         <label class="auth-field">
           <span>Password</span>

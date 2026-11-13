@@ -42,8 +42,13 @@ const submit = $("register-submit");
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const username = $("username").value.trim();
   const email = $("email").value.trim();
   const password = $("password").value;
+  if (!/^[A-Za-z0-9._-]{3,32}$/.test(username)) {
+    setStatus("Use 3 to 32 letters, numbers, dots, dashes or underscores for the username.", "error");
+    return;
+  }
   if (!isEmail(email)) {
     setStatus("Enter a valid email address.", "error");
     return;
@@ -62,6 +67,7 @@ form.addEventListener("submit", async (event) => {
     const result = await api("/api/v1/auth/register", {
       method: "POST",
       body: {
+        username,
         email,
         displayName: $("name").value.trim() || undefined,
         password,

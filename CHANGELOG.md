@@ -5,6 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Accounts now have a case-insensitive unique username. Registration requires or auto-generates one,
+  OIDC/admin-created accounts get a generated handle, existing accounts are backfilled by migration
+  22, and Account settings can change it with a `username_taken` check. Workspace invitations accept
+  either a username or an email and resolve the username to the account before inviting.
 - Workspace **Members** and **Invite** now work: the member dialog lists accounts with role controls
   and removal, and the invite dialog sends an email invitation with a role and shows pending
   invitations. The workspace popover closes while a dialog is open and reopens afterwards.

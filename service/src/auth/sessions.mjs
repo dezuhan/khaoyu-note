@@ -14,6 +14,7 @@ export function publicAccount(account) {
     id: account.id,
     email: account.email,
     displayName: account.display_name,
+    username: account.username || "",
     role: account.role || "member",
     approved: account.approved_at !== null && account.approved_at !== undefined,
     emailVerified: Boolean(account.email_verified_at),

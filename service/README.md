@@ -109,6 +109,12 @@ set, fonts and theme tokens.
 - Overview shows account, board, share-link and audit counts plus recent activity and signups.
 - Account settings (opened from the Account menu or profile button) holds the signed-in password
   form, session revocation, scoped API tokens and sign out.
+- Every account has a case-insensitive unique username (3 to 32 letters, numbers, dots, dashes or
+  underscores). Registration asks for it; OIDC and admin-created accounts get a generated unique
+  handle when one is not supplied, and existing accounts received a stable `user_…` handle in
+  migration 22. The username can be changed from Account settings with the same uniqueness check.
+- Workspace invitations accept either an email address or a username. Inviting by username resolves
+  it to that account's verified email before creating the pending invitation.
 - Registration access defaults to **Private**: new accounts are created pending and cannot sign in or
   reach boards until an admin clicks Approve. **Public** enables self-registration immediately, and
   public share links show a Create an account link. The toggle is stored in `service_meta` as

@@ -2131,3 +2131,62 @@ test("team workspace auto-grants approved members viewer access to admin boards"
   });
   assert.equal(denied.status, 403);
 });
+
+test("usernames are unique and can be used for workspace invitations", async (t) => {
+  const api = await start();
+  t.after(() => api.close());
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const firstEmail = `username-first-${suffix}@example.com`;
+  const secondEmail = `username-second-${suffix}@example.com`;
+  const firstUsername = `first_${suffix}`;
+  const secondUsername = `second_${suffix}`;
+  const password = `${PASSWORD}-name`;
+
+  const registered = await api.call("/api/v1/auth/register", {
+    method: "POST",
+    body: { email: firstEmail, username: firstUsername, password, displayName: "First" },
+  });
+  assert.equal(registered.status, 202, JSON.stringify(registered.body));
+  const duplicate = await api.call("/api/v1/auth/register", {
+    method: "POST",
+    body: { email: secondEmail, username: firstUsername, password, displayName: "Second" },
+  });
+  assert.equal(duplicate.status, 409, JSON.stringify(duplicate.body));
+  assert.equal(duplicate.body.code, "username_taken");
+
+  const second = await api.call("/api/v1/auth/register", {
+    method: "POST",
+    body: { email: secondEmail, username: secondUsername, password, displayName: "Second" },
+  });
+  assert.equal(second.status, 202, JSON.stringify(second.body));
+
+  const firstLogin = await api.login(firstEmail, password);
+  assert.equal(firstLogin.status, 200);
+  const takenProfile = await api.call("/api/v1/account/profile", {
+    method: "PATCH",
+    jar: firstLogin.jar,
+    body: { username: secondUsername },
+  });
+  assert.equal(takenProfile.status, 409, JSON.stringify(takenProfile.body));
+  const renamed = await api.call("/api/v1/account/profile", {
+    method: "PATCH",
+    jar: firstLogin.jar,
+    body: { username: `renamed_${suffix}` },
+  });
+  assert.equal(renamed.status, 200, JSON.stringify(renamed.body));
+  assert.equal(renamed.body.user.username, `renamed_${suffix}`);
+
+  const workspace = await api.call("/api/v1/workspaces", {
+    method: "POST",
+    jar: firstLogin.jar,
+    body: { name: "Username workspace" },
+  });
+  assert.equal(workspace.status, 201, JSON.stringify(workspace.body));
+  const invited = await api.call(`/api/v1/workspaces/${workspace.body.id}/invitations`, {
+    method: "POST",
+    jar: firstLogin.jar,
+    body: { identifier: secondUsername, role: "member" },
+  });
+  assert.equal(invited.status, 201, JSON.stringify(invited.body));
+  assert.equal(invited.body.email, secondEmail);
+});
