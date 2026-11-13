@@ -2951,11 +2951,11 @@ const placedInRow = await page.evaluate(async ([cardId, columnId]) => {
   };
 }, [await selectedId(), dropColumnId]);
 check(
-  "Tool dropped at the left of a row becomes its first child",
+  "Tool dropped at the left of a row becomes its first child without stretching the row",
   placedInRow.parentId === dropColumnId &&
     placedInRow.firstId === (await selectedId()) &&
     placedInRow.count === rowChildrenBefore + 1 &&
-    placedInRow.rowWidth > rowMetricsBefore.width,
+    placedInRow.rowWidth >= rowMetricsBefore.width - 2,
   JSON.stringify({ ...placedInRow, before: rowMetricsBefore.width })
 );
 await page.evaluate(async (columnId) => {

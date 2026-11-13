@@ -65,8 +65,9 @@ project uses Semantic Versioning.
   height is always derived from the children, and the old `extraWidth`/`extraHeight` stretch space is
   ignored. A row uses its width as a flex basis and splits it equally among the children, so their
   widths stay equal while each height follows its own content or aspect ratio; resizing the row
-  changes that basis directly and follows the pointer. Resizing a vertical column changes the child
-  width and reflows them.
+  changes that basis directly and follows the pointer. Converting a column to a row widens the row
+  to a readable ~220 px basis per child when the column was narrow, so the cards no longer appear
+  clipped. Resizing a vertical column changes the child width and reflows them.
   Every non-section card is horizontal-only too; image, sketch and color stay at their aspect ratio.
   Converting a row back to a column now fits the column width to the widest child instead of keeping
   the row's total width, so the column no longer becomes a wide empty container. Sections keep their

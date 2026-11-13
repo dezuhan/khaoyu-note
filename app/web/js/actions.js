@@ -641,12 +641,12 @@ export function setColumnDirection(cardId, direction) {
   card.direction = direction === "row" ? "row" : "column";
   if (card.direction === "row") {
     const count = columnChildren(state.board, card.id).length;
-    // The row width is the basis for equal child widths; keep the column width when it is wide
-    // enough, otherwise leave room for the minimum child width and gaps.
+    // The row width is the basis for equal child widths. Keep the column width when it is wide
+    // enough, otherwise widen the row so each child gets a readable ~220 px basis.
     card.w = Math.max(
       card.w,
       MIN_SIZES.column[0],
-      28 + count * 120 + Math.max(0, count - 1) * 10
+      28 + count * 220 + Math.max(0, count - 1) * 10
     );
   } else {
     delete card.kanban;
