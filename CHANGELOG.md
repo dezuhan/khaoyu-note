@@ -5,424 +5,90 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
-- Fixed the default single-user service share page when listeners use random ports: an implicit
-  `SHARE_PUBLIC_URL` now follows the chosen frontend URL instead of staying on port 8080.
-- 0.36.0 now ships as a local-first build: backend UI is gated behind
-  `window.KY_BACKEND_ENABLED = true`, so Sync, Share, Add Server and remote workspace sections are
-  hidden. Local storage keeps multi-board support, auto-seeds a default Home board, and the Workspace
-  popover exposes a full-height **New Board** button.
-- Backend connection files (`.env.*`, `service/.env*`, runtime files, data/backups/outbox folders) are
-  explicitly gitignored; only the example environment files stay tracked.
-- Remote sync no longer stays on "Syncing N changes..." indefinitely: operation requests now have a
-  hard deadline in addition to `AbortSignal.timeout` (16 seconds for a batch, 15s API timeout), and a
-  stale in-flight request is cleared after 45 seconds so the queue can retry. This addresses
-  WebKitGTK/network stalls that previously pinned the queue in the syncing state.
-- Settings > Server now reports **Local storage** when a local board is active instead of showing the
-  saved service connection as connected. A server connection is shown only while a server board is
-  open.
-- Local storage is treated as the default local workspace: it always seeds one Home board when empty,
-  exposes a **New Board** action in the Workspace popover, and the last remaining local board has no
-  delete button (the store also refuses to delete it).
-- Sharing is temporarily disabled in the UI: the top-right Share button in the board app is disabled
-  with a "Sharing is temporarily unavailable" tooltip, and the admin dashboard disables **Enable
-  public sharing** and **Create share link** while keeping existing links reviewable/revocable.
-  Re-enable by setting `window.KY_SHARING_UI_ENABLED = true` before boot.
-- Generated share links now use an explicit `KHAOYU_SERVICE_SHARE_PUBLIC_URL` for the board viewer
-  origin while keeping the service `PUBLIC_URL` in the embedded `server` parameter. The service also
-  adds its main-app and share origins to the CORS allowlist, so a viewer on note.dezuhan.my.id can
-  call the API on app.dezuhan.my.id.
-- OIDC connections and generated share links now keep the server origin the user entered instead of
-  the service's `publicUrl`/`mainAppUrl`, which can be loopback addresses behind a reverse proxy.
-  Reconnecting also removes older entries for the same account/loopback URL, so a domain connection
-  no longer appears as `127.0.0.1`.
-- Remote boards now fall back to Local storage when the server is unreachable. A 10-second health
-  check, the device `offline` event, and failed workspace requests trigger the fallback: the app
-  opens the most recent local board, closes the stale server view, and shows a **Connection lost**
-  dialog explaining that Local storage is now active and server changes remain queued. Local boards
-  stay first in the Workspace list.
-- Settings keeps a single **Server** entry for the service connection; the separate Profile,
-  Security and Login sessions tabs were removed. Adding a server fetches the signed-in account
-  profile once and stores it next to the server in local JSON (`ky.servers`), so Settings > Server
-  shows username, display name, names, email and role from the login. There is no Change connection
-  button; reconnect through Add Server when needed.
-- Settings > Server is simplified: the public-share-link field and Sharing card are gone, Open
-  account spans the row, the primary action is **Change connection**, Check connection stays, and
-  Sign out was removed.
-- Connecting a server through Add Server now also updates the sync/share token. The Share panel
-  can auto-connect the current board to the server, and workspace admins can disable board sharing
-  for the whole workspace (which revokes existing links and is enforced by the service).
-- Desktop OIDC sign-in now opens the user's default browser instead of an embedded webview or
-  pop-up. The Tauri app starts a one-shot loopback listener, opens the provider through
-  `open_external`, and receives the scoped app-sync token back on `127.0.0.1`; the service only
-  accepts this desktop handoff for a loopback origin. The browser web host keeps the popup/app-origin
-  flow.
+Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
+stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
+
+### Backend and service
+
+- Two-step service login: email/password first, then an authenticator code or a dedicated backup-code
+  page with a "Use a backup code instead" link. Signed five-minute challenges; legacy `/auth/login`
+  kept for compatibility.
+- Add Server handles 2FA accounts with `/auth/sync-token/begin`, `/totp` and `/backup`, and OIDC
+  desktop sign-in opens the default browser through a one-shot loopback listener instead of an
+  embedded webview.
+- Unique case-insensitive usernames, invite by username or email, workspace member/role management,
+  workspace access policies and the PostgreSQL workspace-creation fix.
+- Google OpenID Connect and GitHub OAuth with PKCE, state cookies, verified-email linking,
+  allowed-domain filters, passkeys, backup codes, account approval and service account settings.
+- Service admin dashboard: role-aware account management, boards, sharing, activity, security,
+  sessions and the shared app chrome.
+- Team deployment: PostgreSQL + Redis stack, setup scripts, reverse-proxy/public-URL configuration,
+  object encryption at rest, operation compaction, rate limits, CSRF enforcement and hardening.
+- Desktop Add Server now stores the signed-in profile in local JSON and updates the sync/share token;
+  Settings > Server shows that profile when a server board is active.
+- Generated share links use `SHARE_PUBLIC_URL` for the viewer and `PUBLIC_URL` for the API, with CORS
+  for the board origin; the service also fixes the implicit share origin on random ports.
+- Sharing UI is temporarily disabled: the board Share button and admin Enable/Create sharing actions
+  are disabled while existing links remain reviewable and revocable.
+
+### Sync and collaboration
+
+- Durable per-board/per-tab IndexedDB sync queue with granular operations, idempotent replay,
+  sequence conflicts, base/revision tracking and offline reload.
+- Operation log, causal clocks and field versions; concurrent field writes are reported as field
+  conflicts, disjoint text edits merge three-way, and hard per-card locks prevent conflicting edits.
+- SSE tickets, global presence, remote cursors and live refresh; a remote board reopens from its
+  cached mirror offline.
+- Remote workspaces fall back to Local storage with a Connection lost dialog when the server is
+  unreachable; queued changes remain for reconnect.
+- Sync requests have a hard deadline and stale in-flight requests are cleared so a queue cannot stay
+  on "Syncing N changes..." forever.
+- Full-page read-only public share viewer using the normal board chrome with editing, tools and
+  shortcuts disabled.
+
+### Deferred fixes
+
+- Settings > Server keeps one connection entry and no Change connection button; saved account details
+  are shown only for an active server board.
+- Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
 
 ## [0.36.0] - 2026-11-14
 
-- Blurred modal/backdrop layers now sit above the floating tool rail (z-index 1600 vs 1000):
-  generic modals, Settings, Sync, Share, Onboarding/setup, image crop, the command palette, the
-  document/drawing editors and the file-drop overlay. The rail no longer stays sharp and visible
-  through a confirm dialog or other blurred overlay. Menus (1200) and the workspace popover (1300)
-  remain below dialogs, and the dedicated server view (2000) stays above them.
-- The workspace popover now marks the board that is currently open, for both local boards and server
-  projects, with the active background. Hovering the active row darkens its highlight so it stays
-  distinguishable from ordinary hover feedback.
-- Adding a server now handles accounts with 2FA: the password step calls the new
-  `/auth/sync-token/begin` endpoint, the Add Server dialog switches to an authenticator-code page,
-  and a **Use a backup code instead** page completes the connection with a one-time backup code.
-  The result is still a scoped app-sync token (the dialog never gets browser session cookies).
-- The service sign-in page is now a two-step flow. The first page asks only for email and password;
-  if the account has 2FA enabled the app shows an authenticator-code page, with a compact
-  **Use a backup code instead** link to a dedicated backup-code page. The old authenticator/backup
-  details are gone from the initial form. New `/auth/login/begin`, `/auth/login/totp` and
-  `/auth/login/backup` endpoints use a signed five-minute challenge bound to the password step;
-  the legacy single-request `/auth/login` remains for API compatibility. OIDC and passkey options
-  stay on the first step.
-- Accounts now have a case-insensitive unique username. Registration requires or auto-generates one,
-  OIDC/admin-created accounts get a generated handle, existing accounts are backfilled by migration
-  22, and Account settings can change it with a `username_taken` check. Workspace invitations accept
-  either a username or an email and resolve the username to the account before inviting.
-- Workspace **Members** and **Invite** now work: the member dialog lists accounts with role controls
-  and removal, and the invite dialog sends an email invitation with a role and shows pending
-  invitations. The workspace popover closes while a dialog is open and reopens afterwards.
-- Creating a workspace no longer returns 500 on PostgreSQL: `workspace_access_policies.sharing_enabled`
-  is a boolean there, so the insert now uses `TRUE` instead of the integer `1`.
-- Link hero images now also fetch on the localhost web host: `bridge.fetchLinkPreview` calls the
-  existing `/api/invoke` preview command instead of returning null outside Tauri, pasted URLs trigger
-  the automatic preview, and opening a board backfills up to eight existing link cards that still
-  show the globe. The static `tools/serve.mjs` browser preview has no backend and keeps the globe
-  fallback.
-- The workspace popover now matches the reference layout more closely: a single workspace is shown
-  directly without a redundant workspace selector row, the New board/Members/Invite actions share
-  the row equally, board rows have more breathing room, the Import workspace placeholder is gone,
-  and Add Server is the last row. Create workspace moved to the server's overflow menu.
-- The Add Server dialog is now a two-step flow: ask for the server URL, probe `/api/v1/auth/features`,
-  then show email/password sign-in plus the server's enabled OIDC providers with an `or` separator
-  (two providers render side by side). OIDC login opens a popup, returns a scoped app-sync token to
-  an allowed loopback/configured origin in the URL fragment, and the dialog connects the server
-  without exposing the browser session cookies. The old direct email/password fields were removed
-  from the first step.
-- Middle-click no longer pastes the X11/Wayland primary selection into note, document, comment or
-  other editable fields on Ubuntu/WebKitGTK. Middle drag still pans the canvas; the paste default is
-  suppressed only while the pointer is over an editable field.
-- The self-hosted service can now sign in with **Google OpenID Connect** and **GitHub OAuth 2.0**
-  behind per-provider operator flags. Google uses discovery, PKCE S256, JWKS `id_token` verification
-  and nonce checks; GitHub reads `/user` and `/user/emails` and requires a verified primary email.
-  Both flows use a signed HttpOnly state cookie, link existing accounts only by verified email,
-  honour `registration_mode`/approval for auto-created accounts, support allowed-domain filters and
-  same-site redirect validation, emit `auth.login_oidc` audit events and are covered by a mock
-  provider test suite (10 checks). The sign-in page and the Create account page both offer the configured providers; registration intent works even with `autoCreate` disabled, respects `registration_mode`, and returns a pending-approval message instead of `account_missing`. Passkey sign-in is hidden when disabled and the provider buttons take its place; the `or` separator only shows when a provider is enabled. The Docker/team installation templates, `.env` examples and setup script now expose the provider settings, and the single-user Docker image runs the SQLite migration before starting so the new `oauth_identities` table is created on upgrade. Allowed-domain values are normalised, so a pasted `https://example.com/team` or `@example.com` still matches the email domain, and `[hidden]` separators stay hidden on the sign-in page.
-- Local storage keys moved from the `mn.` namespace to `ky.` (boards, settings, theme, servers,
-  workspace cache, sync queue, templates, views, assets and update cache). A one-time migration
-  copies legacy `mn.*` values to `ky.*` and removes the old keys, so existing browser data survives.
-- Server-backed boards now keep a durable local mirror and a per-operation sync queue in IndexedDB
-  (localStorage fallback). Every save is captured as granular operations before the network push, so
-  offline edits survive a reload, retry with exponential backoff and report pending, syncing, blocked
-  or failed states. A `seq_conflict` replays the remote operations and resends the local patches; a
-  whole-document replacement that races a remote change now surfaces as a conflict instead of
-  overwriting it. The last remote workspace board reopens from the mirror after a reload, including
-  offline, and the workspace popover keeps the last known board list.
-- Fixed remote workspace boards that stopped autosaving after the first save: the remote save path
-  kept its in-flight flag set, so every later save was deferred indefinitely and stayed "Saving".
-- A `seq_conflict` rebase now adopts the merged document into the open editor, so the next save cannot
-  emit inverse operations (deleting cards another client added or reverting its edits). Removed card
-  fields are sent as explicit null tombstones, a queued operation for a document that the server
-  rejects fails visibly with a **Discard queued changes** action, and `sync_required` replays pending
-  edits instead of dropping them. Queue ids fall back to a local generator because
-  `crypto.randomUUID` is unavailable on the documented plain-HTTP LAN web host.
-- The generated theme copies were re-synced from `shared/theme` after the `ky.theme` storage-key
-  migration, which fixes the `theme:check` CI drift.
-- Sync queues are now stored per board **and per tab**, so two browser tabs cannot overwrite each
-  other's pending operations; a queue left by a closed tab is drained by the next flush. Overlapping
-  `(cardId, field)` edits discovered during a rebase are reported as field conflicts while the local
-  value wins (last writer per field, server sequence as timestamp), with **Use server values** and
-  **Dismiss** actions in the Sync dialog.
-- Connection edits travel as a `connections.set` operation instead of replacing the whole board
-  document, so a connection change can no longer overwrite unrelated remote cards. Bulk operations
-  (`doc.replace`, `connections.set`) may be up to 4 MB; card operations stay at 256 KB.
-- Operations now carry a causal clock. The service stores it on `project_ops` and on a new
-  `project_field_versions` table (SQLite migration 020, PostgreSQL migration 008) and reports a
-  `fieldConflicts` entry when a field write is concurrent with the stored write, so conflicts are
-  detected even when the operation log has been pruned. Disjoint text edits on the same field are
-  three-way merged on rebase and on the live SSE path, which captures unsaved local edits before
-  adopting a remote document; rebase and live-merge are serialized per board.
-- The sync model documents the causal clocks, the three-way text merge and the remaining
-  character-level CRDT prerequisites in `docs/sync-model.md`.
-- Opening a board id that no longer exists (a board card for a deleted/missing board, a stale
-  notification target or an old URL) no longer creates a phantom "Untitled board" in the local
-  workspace list. The app shows a toast and falls back to another local board (or the welcome board).
-- Local boards in the workspace chooser can be removed with the hover × action and a confirmation.
-- Rows and columns are fixed to their content: the single corner grip now resizes width only,
-  height is always derived from the children, and the old `extraWidth`/`extraHeight` stretch space is
-  ignored. A row uses its width as a flex basis and splits it equally among the children, so their
-  widths stay equal while each height follows its own content or aspect ratio; resizing the row
-  changes that basis directly and follows the pointer. Converting a column to a row widens the row
-  to a readable ~220 px basis per child when the column was narrow, so the cards no longer appear
-  clipped. Resizing a vertical column changes the child width and reflows them.
-  Every non-section card is horizontal-only too; image, sketch and color stay at their aspect ratio.
-  Converting a row back to a column now fits the column width to the widest child instead of keeping
-  the row's total width, so the column no longer becomes a wide empty container. Sections keep their
-  eight independent handles.
-- The top bar shows up to three avatars of other people currently viewing a synced board, with a +N
-  badge for the rest. Presence comes from the existing project SSE roster, excludes the current
-  account, dedupes multiple tabs per account and uses a deterministic avatar colour.
-- The MCP server now resolves the desktop app's app-data folder on Linux and macOS as well as
-  Windows, so it opens the same database as the app instead of falling back to
-  `./com.dezuhan.khaoyunote`. Its board tools expose `archivedAt`/`trashedAt`, and `update_board`
-  can archive, trash or restore a board; comment messages carry the current `done` flag. The
-  DeepSeek Harness bundle and README use the current binary path and the smoke suite covers the
-  lifecycle flags (19 checks).
-- The colour picker no longer shows the "Drag the square or the hue bar, or type a HEX value." hint.
-- The workspace switcher remembers the last opened workspace per server and loads its board list as
-  soon as the popover opens. On a fresh profile the seeded default workspace is not selected
-  automatically while another workspace exists. A workspace detail now offers **New board**, which
-  creates the board inside that workspace (the service accepts `workspaceId` on project creation for
-  workspace owners and admins).
+0.36.0 is the **local-first release**. The self-hosted backend, sync and sharing remain in the
+source tree but are disabled in this build; the app ships local boards only.
 
 ### Added
 
-- Automatic backups now use a distinct folder prefix and keep only the newest seven copies; older
-  automatic folders are pruned after a successful backup. Manual backups and the folders imported
-  through the Backup pane are never removed automatically.
-- The Backup pane describes the retention rule in all ten UI languages.
-- The self-hosted service admin keeps the left navigation rail and adds a top menu bar in the app's
-  chrome style with the same logo asset, SVG icon set and fonts: Dashboard and Help menus, command
-  search with Ctrl+K, host badge, theme toggle and a circular account button next to it that opens
-  the Account menu (Admin dashboard, Account settings, Help, Logout). Sharing stays inside the
-  dashboard; `/shares` redirects to `/admin#sharing`.
-- The main editor tool rail is now a floating inset panel: fixed at 12 px from the left, top and
-  bottom edges, rounded and shadowed above the canvas. The canvas runs beneath it (no reserved
-  gutter), and the rail cannot be dragged.
-- The web app and every service page declare SVG and PNG favicons rendered from the shared brand
-  mark, so browser tabs and touch shortcuts show the Khaoyu icon.
-- Share links can carry an optional view watermark and a per-link download cap. The viewer overlays a
-  low-opacity project label when watermarking is enabled; asset downloads increment an atomic counter
-  and return `download_limit_reached` after the cap. Downloaded files themselves are not modified.
-- Shared rich text is sanitised on the server with an allowlist (`html`/`markdown` fields), so public
-  JSON cannot carry scripts, event handlers or unsafe URLs even when API clients render it.
-- Remote video embeds accept only the exact YouTube and Vimeo hostnames; typosquatted hosts such as
-  `evilyoutube.com` no longer render an iframe.
-- Uploaded objects can be encrypted at rest with `KHAOYU_SERVICE_OBJECT_KEY` (AES-256-GCM); existing
-  plaintext objects stay readable. The worker now revokes expired invitations and share links and
-  records `last_worker_at`/`last_worker_summary`, and `service/deploy/postgres-least-privilege.sql`
-  documents a data-only PostgreSQL role.
-- Admins can create member accounts manually from the Accounts pane (email, display name,
-  temporary password and member/admin role), with the signup password policy, duplicate-email
-  protection and `admin.user_created` audit entries. Only admin-authenticated sessions can use it.
-- Admins can rename and delete teams from the dashboard. Deleting a team soft-deletes it and its
-  child boards, disables public sharing and revokes its share links and invitations. Admins can also
-  add an existing account to a team by email with an editor, commenter or viewer role, change that
-  role and remove the member; the owner row is immutable. Every action writes an `admin.*` audit row
-  and all endpoints require the admin role and CSRF token.
-- Project sync gained an operation log: `POST /projects/:id/ops` applies idempotent operation batches
-  with per-project sequence numbers, `GET /projects/:id/ops?after=` replays or asks for a resync, and
-  worker retention keeps the log bounded.
-- The desktop/web sync client now pushes `doc.replace` operations with `baseSeq`, tracks `lastSeq`,
-  opens the ticket-authenticated SSE stream and refreshes a clean board when a remote operation or
-  snapshot arrives. The setup wizard enables the Collaboration path and hands off to Server sync.
-- The worker compacts operation rows beyond `KHAOYU_SERVICE_COMPACT_OPS` and continues to prune by
-  retention age.
-- The realtime backend now issues single-use SSE tickets, aggregates presence globally through Redis,
-  provides advisory edit locks with TTL/heartbeat, runs maintenance behind a Redis worker leader lock,
-  and reports `realtime: ok/degraded` from `/readyz`. Migration 015 / PostgreSQL 003 adds
-  `project_ops` and sequence columns.
-- `shared/theme/` is now the single source for the token stylesheet, fonts, SVG icon set, brand mark
-  and theme runtime. `npm run theme:sync` generates the app and service copies, and CI runs
-  `npm run theme:check` to fail on drift.
-- The palette token layer was renamed from `--ph-*` to `--ky-palette-*`, so colour uses one `--ky-*`
-  namespace in the app and the service. Service pages share the `khaoyu.theme` key and migrate the
-  old admin/auth keys; the app keeps `mn.theme`.
-- Geometry is now a shared token scale (`--ky-space-*`, `--ky-text-*`, `--ky-radius-*`), and
-  `shared/theme/components.css` supplies the `.ky-card`, `.ky-section` and `.ky-table` used by the
-  service pages. Every padding, margin, gap, font size and radius in `admin.css`, `auth.css` and
-  `ui.css` uses those tokens; `test:theme-css` fails if literal px values return.
+- Local storage is the default local workspace with **multiple boards**. When empty it seeds a Home
+  board; the Workspace popover exposes **New Board**, and the last remaining local board cannot be
+  deleted.
+- The **New Board** button in the Local storage row fills the full row height.
+- Settings > Server reports Local storage and "not connected" while a local board is active; server
+  account details appear only for a server board.
+- Backend UI is gated behind `window.KY_BACKEND_ENABLED`; the release hides Sync, Share, Add Server
+  and remote workspace sections and skips backend initialization.
+- Per-device viewport position/zoom, global light/dark preference, and the `ky.*` storage-key
+  migration with legacy `mn.*` cleanup.
+
+### Changed
+
+- Floating tool rail is inset; modals, blur backdrops, menus and the workspace popover stack above
+  it correctly.
+- Workspace popover layout is tighter, marks the currently open board and gives rows/columns a
+  content-derived size.
+- Row/column resizing is horizontal-only; rows split width equally, columns fit their content and
+  row-to-column conversion fits the widest child.
+- Settings is sized below the chrome; the Backup pane explains retention and the shared theme/icon
+  assets are synced.
 
 ### Fixed
 
-- Board cards are focusable groups: selecting a card inside a column now shows the accent selection
-  ring (it was hidden by the child hairline), and keyboard focus shows a 2 px accent outline.
-- The Share dialog is reorganized into clear Board link, Create a share link and Active links
-  sections: the board URL and copy action share one row, the form fields align in two columns, and
-  Create/Copy actions sit together without the previous empty vertical gaps.
-- Passkey registration now issues ten one-time **backup codes** (both in the admin Security page and
-  on `/passkeys`). Codes are hashed at rest, shown once, invalidated on regeneration, and can be used
-  with an email on the login page as a passwordless fallback. Migration 016 adds `recovery_codes`.
-- The Activity table scrolls inside its rounded section card with a sticky header, so the card outline
-  and Load more control remain visible while browsing a long audit trail.
-- Deployment-readiness pass: PostgreSQL tests now reset the schema between suites so the full
-  PostgreSQL/Redis service suite passes in one run; stale CI expectations for the enabled Share/Sync
-  controls, Account Management, preview reservation and activity layout were updated.
-- Hard per-card edit locks are acquired while an editable field has focus; the server rejects a second
-  editor's card operations with `423 card_locked`. SSE connections emit a `ready` id, clients publish
-  debounced cursor/selection state, and remote carets/selections render with the editor name.
-- Added a synthetic concurrent operation load check (`npm run test:collab-load`): six clients,
-  360 operations, consistent log/card counts, p95 8 ms locally. Production-scale load testing remains
-  a release gate.
-- Added `service/scripts/uninstall-team.sh` with a safe stop mode (volumes retained) and an explicit
-  `--purge` mode for deleting the team database, assets and environment; documented desktop/web
-  uninstall and the intentional absence of a server-wide HTTP database drop.
-- Secured the web host full-reset endpoint behind an authenticated admin session and CSRF token;
-  the destructive action remains explicit and local-only in scope.
-- Added a dedicated team Docker stack (`service/docker-compose.team.yml`), a one-command
-  `service/scripts/setup-team.sh` installer that generates secrets and bootstraps the owner, and a
-  team `.env.team.example`. PostgreSQL and Redis stay internal; migrations run on service startup and
-  Cloudflare Tunnel is an optional compose profile.
-- The localhost web host now has a session-authenticated SSE stream (`/api/events`) with a
-  1.2-second SQLite change watcher. Edits in one browser/phone/tunnel window reach other open web
-  windows without a reload; web autosave runs after two seconds idle, and the desktop app polls the
-  shared database. This is separate from service collaboration and does not require WebSocket.
-- Board viewport position and zoom are now stored per device instead of being written into the board
-  row. Opening a board from a phone/tunnel can no longer conflict with a desktop window merely
-  because one side panned or zoomed; content conflicts still use the explicit conflict dialog.
-- Added `scripts/reinstall-team.sh` for a fast uninstall + install cycle: the default keeps
-  PostgreSQL/service data and `.env.team`, while `--purge` performs a destructive fresh reinstall.
-- Desktop/web "Reset app data" now prepares the store before wiping: autosave timers and the
-  beforeunload save are suppressed, in-memory boards are detached, and a failed reset reloads the
-  existing data instead of leaving a blank session. This prevents a pending save from writing the old
-  board back after the database was cleared.
-- The installer normalizes bare domains to `https://` and validates both public URLs before
-  starting Compose, preventing a service restart loop from a URL without a scheme.
-- The team installer now accepts separate backend/admin and public-view/share domains, and writes
-  them to `KHAOYU_SERVICE_PUBLIC_URL` and `KHAOYU_SERVICE_SHARE_PUBLIC_URL` so generated share links
-  use the public-view origin.
-- Pending accounts now use an Awaiting approval badge with primary Approve and outlined Reject
-  actions. Both actions open a confirmation dialog; rejection disables the account and approval can
-  re-enable it later.
-- Workspace invitations and member management are now available through APIs and the main
-  frontend workspace popover: invite by email, list members, change member roles, and accept or
-  decline pending invitations. Board-level grants remain the existing project member overrides.
-- Added first-class workspace schema: `workspaces`, `workspace_members`,
-  `workspace_invitations`, `workspace_access_policies`, and `projects.workspace_id`. A fresh service
-  seeds a default team workspace with viewer as the member default board role; existing projects and
-  approved accounts are backfilled. Workspace APIs list/create workspaces and list boards with
-  effective roles, and the main frontend workspace popover now shows server → workspace → board.
-- Autosave is now near-realtime: web/localStorage boards persist on an 80 ms throttle while typing,
-  remote boards save at 120 ms with a 30 ms temporary-buffer write and a 60 ms service push. Desktop
-  SQLite saves use a 250 ms idle window. The autosave UI test now asserts the fast behavior.
-- Remote workspace editing now writes a durable temporary copy to `ky.remoteTemp.<boardId>` before
-  the network push. Switching boards/workspaces flushes that copy, starts the service push in the
-  background, and recovers pending edits when the board is opened again. Page hide/visibility changes
-  persist the temporary copy for recovery.
-- Remote workspace boards now autosave on a 400 ms throttle while typing and push their operation
-  diff to the service within about 120 ms after the local save, so owner/editor changes appear on the
-  team database without an explicit Save. A stale timer id from the previous local board could block
-  the remote save loop; board switches now reset it.
-- Remote workspace boards now open in the real main board editor for owner/editor roles instead of
-  the read-only preview. Remote boards use a non-persisted in-memory mode so their operation diff is
-  pushed to the service rather than mirrored into the local SQLite card table; viewer accounts still
-  get the read-only preview. The template button opens the workspace popover after normal app boot.
-- Create workspace now matches the Affine flow inside the app toolbar: “Name your workspace”,
-  workspace description, workspace name, and a workspace type selector for Local storage or any
-  connected server. Local workspaces create a local board; server workspaces use the workspace API.
-- Workspace switching now opens as an Affine-style popover from the existing template/workspace
-  button instead of a full-screen page or a separate menubar button. The server-add flow uses the
-  design-system modal (no native browser prompt), floating menus sit above the tool rail, and admin
-  workspace links have no underline.
-- The main board frontend now owns workspace switching and public board viewing. It adds a Workspace
-  menu with Local/Add Server, remote board lists, read-only share rendering via
-  `/?share=<token>&server=<origin>`, and a `?workspace=1` entry point. The service `/workspace` and
-  `/s` routes redirect to the configured main app; the backend keeps login/admin/share management.
-- The service root and login return to the admin dashboard (`/admin`). `/workspace` remains available
-  as a direct service-side fallback; the main frontend keeps its own workspace popover. Public share
-  links continue to use the main frontend.
-- Added a team workspace model and `/workspace` web prototype: approved accounts automatically get
-  viewer access to every server board (migration 18/6), with an admin able to promote per-board roles.
-  The page lists local/remote servers, supports Add Server links, and opens read-only board previews.
-- Added a Private/Public registration-access control to the admin dashboard, defaulting to Private.
-  Private registrations are pending and cannot sign in until an admin approves them; Public
-  registrations are active immediately and public share viewers show a Create an account link.
-  Existing accounts and the bootstrap owner are auto-approved by migration 17/5.
-- The public share viewer now renders the shared board as a scaled, read-only canvas preview with
-  spatial card positions and themed card styles instead of a raw type label list; column shares show
-  their scoped children and nested boards show their own previews.
-- Live collaboration is now wired end to end: local board saves push granular card/title operations
-  through the server-sequenced operation log, SSE ops events are replayed and applied to the other
-  clients, and presence reflects connected accounts. Two browser clients merge distinct card edits
-  live over SSE/Redis. Same-field concurrent text edits are last-writer-wins; character-level
-  CRDT/OT and cursor presence remain future work.
-- Sensitive account endpoints now have bounded rate limits: password change, TOTP setup/enable/
-  disable, passkey registration, backup-code generation, export and account deletion. Added a
-  self-hosted account-security readiness checklist documenting the remaining per-process limiter
-  caveat, TLS/proxy requirements and TOTP-at-rest consideration.
-- Passkeys can be temporarily switched off with `KHAOYU_SERVICE_PASSKEYS_ENABLED=false`. The login
-  link, account Security card, passkey page actions and public feature lookup all respect the switch;
-  password, TOTP and backup-code sign-in remain available.
-- The `/admin` dashboard is now role-aware: members can use Account Management (Profile, Security,
-  Login sessions) inside the same shell while all service admin navigation is hidden, and admin APIs
-  stay protected. Added `/api/v1/account/profile` for member self-profile reads/updates; `/account`
-  redirects to `/admin#profile`.
-- Login now lands by role: admins go to `/admin`, members go to `/account`. A signed-in member can no
-  longer bounce between `/login` and `/admin`; direct admin access redirects members to their security
-  page.
-- Settings now sits above the floating tool rail (z-index) so the rail is dimmed/blurred behind the
-  dialog instead of floating above it. The Settings > Server passkey action card is hidden when the
-  service feature endpoint reports passkeys disabled, or when no service is connected.
-- The admin dashboard now owns the viewport: the service sidebar and menubar stay fixed while the active
-  page scrolls inside the content pane. Account security pages use the same fixed-viewport model, so
-  long pages no longer scroll the whole document.
-- The admin dashboard now has an **Account Management** group under the service sections:
-  **Profile** (display name, names, avatar colour/picture), **Security** (password, authenticator QR
-  setup/disable, passkey registration/removal, API tokens) and **Login sessions** (device, created,
-  last seen, revoke and sign-out-all). This replaces the separate /account settings flow for admins.
-- The admin **Teams** area is now **Boards**, matching what it always listed: projects with an owner,
-  member count, revision and update time. The API accepts `/api/v1/admin/boards` (the old
-  `/admin/teams` paths remain as aliases). Accounts rows gain a Details panel with account metadata,
-  2FA/passkey state, boards and active sessions.
-- Admin writes made through the frontend listener no longer fail with `admin access required` when
-  `KHAOYU_SERVICE_PUBLIC_URL` points at a proxy: the proxy forwards the original host and the
-  same-origin check accepts it. This fixes deleting boards from the dashboard on the frontend port.
-- The Settings dialog now sizes itself below the top toolbar (`min(760px, 100vh - 96px)`), keeps its
-  content scroller bounded, and resets the content scroll position when switching pages so the first
-  section is never clipped.
-- The account security page now exposes authenticator (TOTP) setup with an inline QR code, enable
-  and disable flows, and passkey readiness/instructions. `/account` is served directly again instead
-  of redirecting to `/admin`, and the dashboard Account section links to it.
-- Share links can use a public origin: `KHAOYU_SERVICE_SHARE_PUBLIC_URL` controls the absolute URL
-  returned by the service, and **Settings > Server > Public share links** stores a client-side
-  public origin for share links and browser board links. See `docs/public-sharing.md` for port
-  forwarding, reverse-proxy and tunnel setups.
-
-
-- Dragging a tool from the rail into a column or row inserts it at the pointer position, including
-  before the first child; the drop preview line shows the target slot instead of always appending.
-- Rows now follow the width of their cards instead of stretching every card to fill the row. Columns
-  keep auto height and rows auto width after drops, with a short width/height transition so the
-  reflow is visible without delaying resize drags.
-- Rows default to the width of their cards. Manually resizing a row switches it to the previous
-  stretch mode so the cards follow the row width; the context menu action "Fit container to items"
-  restores the content-driven auto width. Auto-height columns keep their manual extra height.
-
-- While a card or rail tool hovers a column or row, the target container now reserves the insertion
-  slot live: a dashed drop placeholder appears, the column grows or the row widens, and cards after
-  the slot shift before the pointer is released. Leaving the container restores the original layout.
-- Existing cards dragged from outside a column/row now preview with their measured height and width,
-  and dropping a child outside both axes releases it from the container instead of snapping back.
-
-
-
-- Light/dark mode is now a global appearance preference. Opening or switching boards no longer
-  applies a legacy theme stored in the board document or dirties the board, so the chosen theme
-  stays the same everywhere and after a reload.
-- The Teams pane uses a responsive full-width layout and a compact creation form, and the password
-  fields keep the 24 px control height instead of stretching to the form row.
-- The admin top bar no longer repeats Dashboard and Help buttons; the logo, command palette and
-  Account menu cover both actions. The Account dropdown opens with a clear gap below the bar.
-- The Sharing pane stacks Public sharing, Create a link and Existing links with the same 14 px gap as
-  the rest of the admin dashboard; inline margin styles were replaced with geometry tokens.
-- The signed-out admin card renders "Sign in to the service" as a real primary button with the app
-  theme tokens (no underlined link) at a comfortable 32 px control height, so the label never looks
-  clipped.
-- The Account password fields use border-box sizing, so the three inputs keep their own grid columns
-  instead of overlapping into one long control.
-- Visiting the admin dashboard without a session now redirects straight to `/login` instead of showing
-  an inline sign-in card. The service login, registration and reset pages reuse the main app logo,
-  Plus Jakarta Sans / Space Mono fonts and the shared sun/moon theme icon.
-
-### Security
-
-- Logout over a cookie session now requires the double-submit CSRF header, so a cross-site form
-  cannot sign the user out.
-- Invitation creation is rate limited to 20 requests per 15-minute window per owner and IP.
+- Missing/deleted board ids fall back to another local board instead of creating a phantom board.
+- Link hero previews work on the localhost web host as well as Tauri.
+- Middle-click no longer pastes the X11/Wayland primary selection into editable fields.
+- The colour picker hint is removed, and the MCP binary resolves the app-data folder on Linux and
+  macOS as well as Windows.
+- Backend connection files are ignored by git; only environment examples remain tracked.
 
 ## [0.35.0] - 2026-11-10
 
