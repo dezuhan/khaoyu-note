@@ -9,15 +9,29 @@ let overlay = null;
 let refs = null;
 let target = null;
 
+// Temporarily disabled while the share-link flow is being stabilised. Set
+// window.KY_SHARING_UI_ENABLED = true before boot to re-enable the UI.
+const SHARING_UI_ENABLED = typeof window !== "undefined" && window.KY_SHARING_UI_ENABLED === true;
+
 export function initShareUI(uiRefs) {
   refs = uiRefs;
-  refs.shareButton?.addEventListener("click", () => openSharePanel(null));
+  if (!SHARING_UI_ENABLED && refs.shareButton) {
+    refs.shareButton.disabled = true;
+    refs.shareButton.setAttribute("aria-disabled", "true");
+    refs.shareButton.title = "Sharing is temporarily unavailable";
+  } else {
+    refs.shareButton?.addEventListener("click", () => openSharePanel(null));
+  }
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && overlay) closeSharePanel();
   });
 }
 
 export async function openSharePanel(card = null) {
+  if (!SHARING_UI_ENABLED) {
+    toast("Sharing is temporarily unavailable");
+    return;
+  }
   target = card;
   if (!state.board) return;
   if (overlay) closeSharePanel();

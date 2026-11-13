@@ -77,6 +77,10 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage();
   page.on("pageerror", (error) => console.log("PAGEERROR", error.message));
+  // The production UI has a temporary share kill switch; this suite exercises the full flow.
+  await page.addInitScript(() => {
+    window.KY_SHARING_UI_ENABLED = true;
+  });
   await page.goto(`${base}/login`, { waitUntil: "load" });
   await page.fill("#email", email);
   await page.fill("#password", password);

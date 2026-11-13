@@ -7814,3 +7814,9 @@ html[data-read-only="true"] #app.is-read-only .mn-toolrail {
 #app.is-read-only .mn-card select {
   pointer-events: none;
 }
+
+/* Temporary share-link kill switch in the desktop/web header. */
+.mn-access-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

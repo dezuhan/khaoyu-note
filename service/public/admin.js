@@ -1697,6 +1697,19 @@ async function renderSharing() {
     </div>
     <p id="status" class="admin-note" role="status"></p>`;
 
+  if (!SHARING_UI_ENABLED) {
+    const warning = document.createElement("p");
+    warning.className = "admin-warning";
+    warning.textContent =
+      "Share-link creation is temporarily disabled. Existing links can still be reviewed and revoked.";
+    pane.querySelector("#sharing-content")?.prepend(warning);
+    for (const id of ["enable-sharing", "create"]) {
+      const control = document.getElementById(id);
+      if (!control) continue;
+      control.disabled = true;
+      control.title = "Sharing is temporarily unavailable";
+    }
+  }
   const projectSelect = document.getElementById("project");
   for (const project of data.projects || []) {
     const option = document.createElement("option");
@@ -1793,6 +1806,10 @@ async function renderSharing() {
 }
 
 // ---------------------------------------------------------------- menus and commands
+
+// Temporarily disabled while the share-link flow is being stabilised.
+const SHARING_UI_ENABLED =
+  typeof window !== "undefined" && window.KY_SHARING_UI_ENABLED === true;
 
 const COMMANDS = [
   { id: "overview", adminOnly: true, label: "Go to Overview", hint: "Dashboard", run: () => void go("overview") },
