@@ -5,6 +5,11 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- Remote boards now fall back to Local storage when the server is unreachable. A 10-second health
+  check, the device `offline` event, and failed workspace requests trigger the fallback: the app
+  opens the most recent local board, closes the stale server view, and shows a **Connection lost**
+  dialog explaining that Local storage is now active and server changes remain queued. Local boards
+  stay first in the Workspace list.
 - Settings keeps a single **Server** entry for the service connection; the separate Profile,
   Security and Login sessions tabs were removed. Adding a server fetches the signed-in account
   profile once and stores it next to the server in local JSON (`ky.servers`), so Settings > Server

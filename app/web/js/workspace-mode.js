@@ -9,6 +9,10 @@ let popover = null;
 let boardOverlay = null;
 let activeServer = null;
 let currentBoard = { id: "", projectId: "", remote: false };
+let serverWatchTimer = 0;
+let serverWatchUrl = "";
+let offlineNoticeShown = false;
+let fallbackRunning = false;
 
 function escapeText(value) {
   return String(value ?? "")
@@ -324,6 +328,9 @@ async function loadServerWorkspaces(server, section, view) {
     // reload the same board list for no reason.
     if (!unchanged) renderWorkspaceRows(server, workspaces, target, view);
   } catch (error) {
+    if (!error.status || error.status >= 500) {
+      void handleServerUnreachable(server.url, "The server could not be reached.");
+    }
     if (!cached?.length) {
       target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)} <button type="button" class="mn-btn" data-role="retry">Retry</button></p>`;
       target.querySelector('[data-role="retry"]')?.addEventListener("click", () => void loadServerWorkspaces(server, section, view));
@@ -453,6 +460,9 @@ async function loadWorkspaceBoards(server, workspace, root, view) {
     writeProjectCache(server.url, workspace.id, projects);
     renderProjectRows(target, server, workspace, projects, root, view);
   } catch (error) {
+    if (!error.status || error.status >= 500) {
+      void handleServerUnreachable(server.url, "The server could not be reached.");
+    }
     if (!cached) {
       target.innerHTML = `<p class="mn-workspace-form-error" style="padding:8px">${escapeText(error.message)}</p>`;
     }
@@ -763,6 +773,110 @@ function openCreateWorkspaceDialog(serversList, anchor) {
       submit.disabled = false;
     }
   });
+}
+
+function stopServerWatch() {
+  clearInterval(serverWatchTimer);
+  serverWatchTimer = 0;
+  serverWatchUrl = "";
+}
+
+function startServerWatch(url) {
+  stopServerWatch();
+  serverWatchUrl = url;
+  offlineNoticeShown = false;
+  serverWatchTimer = setInterval(() => void checkWatchedServer(), 10000);
+  void checkWatchedServer();
+}
+
+async function checkWatchedServer() {
+  if (!serverWatchUrl) return;
+  const url = serverWatchUrl;
+  try {
+    // no-cors: /healthz does not need to send CORS headers; a resolved opaque response still
+    // proves the server (or its tunnel) is reachable, while a dead server or offline device rejects.
+    await fetch(`${url.replace(/\/+$/, "")}/healthz`, {
+      mode: "no-cors",
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    offlineNoticeShown = false;
+  } catch {
+    await handleServerUnreachable(url, "The server could not be reached.");
+  }
+}
+
+async function handleServerUnreachable(url, message) {
+  if (fallbackRunning || offlineNoticeShown) return;
+  let store;
+  try {
+    store = await import("./store.js");
+  } catch {
+    return;
+  }
+  if (!store.state.remote) {
+    // Already in Local storage mode; the Workspace list already puts local boards first.
+    return;
+  }
+  if (url && store.state.board?.sync && serverWatchUrl && url !== serverWatchUrl) return;
+  await forceLocalMode(message);
+}
+
+async function forceLocalMode(message = "The server connection was lost.") {
+  if (fallbackRunning) return;
+  fallbackRunning = true;
+  stopServerWatch();
+  try {
+    const store = await import("./store.js");
+    if (!store.state.remote) return;
+    closePopover();
+    if (boardOverlay) {
+      boardOverlay.remove();
+      boardOverlay = null;
+    }
+    const boards = (store.state.boards || []).filter(
+      (board) => !board.trashedAt && !board.archivedAt
+    );
+    const remembered = localStorage.getItem("ky.lastLocalBoard");
+    let fallback = boards.find((board) => board.id === remembered);
+    if (!fallback) fallback = boards[0];
+    if (fallback) await store.openBoard(fallback.id, { flush: false });
+    else await store.createBoard("Home", { withWelcome: true });
+    localStorage.setItem("ky.lastLocalBoard", store.state.board?.id || "");
+    offlineNoticeShown = true;
+    showConnectionLostPopup(message, store.state.board?.title || "Local board");
+  } catch {
+    /* keep the cached remote board if the local fallback cannot open */
+  } finally {
+    fallbackRunning = false;
+  }
+}
+
+function showConnectionLostPopup(reason, localTitle) {
+  if (document.querySelector('[data-role="connection-lost"]')) return;
+  const overlay = document.createElement("div");
+  overlay.className = "mn-overlay";
+  overlay.dataset.role = "connection-lost";
+  overlay.innerHTML = `<section class="mn-modal mn-connection-lost" role="dialog" aria-modal="true" aria-label="Connection lost">
+    <header class="mn-modal-head"><h2 class="mn-modal-title">Connection lost</h2></header>
+    <div class="mn-modal-body"><p>${escapeText(reason)} Khaoyu Note switched to <strong>Local storage</strong> so you can keep working. Server changes stay queued and sync again after reconnecting.</p><p class="mn-prefs-note">Now editing: ${escapeText(localTitle)}. Local boards are first in the Workspace list.</p></div>
+    <footer class="mn-modal-foot"><button type="button" class="mn-btn mn-btn-primary" data-role="connection-lost-close">Continue in Local storage</button></footer>
+  </section>`;
+  document.body.append(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('[data-role="connection-lost-close"]').addEventListener("click", close);
+  overlay.addEventListener("pointerdown", (event) => {
+    if (event.target === overlay) close();
+  });
+  document.addEventListener(
+    "keydown",
+    function onKey(event) {
+      if (event.key !== "Escape") return;
+      close();
+      document.removeEventListener("keydown", onKey, true);
+    },
+    true
+  );
 }
 
 async function fetchAccountProfile(url, token) {
@@ -1306,6 +1420,10 @@ async function openEditableBoard(server, project, token) {
         ? "Opened team board"
         : "Opened team board; changes are queued";
     window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message } }));
+    startServerWatch(server.url);
+    if (offline) {
+      void forceLocalMode("The server is unreachable or your device is offline.");
+    }
   } catch (error) {
     content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message)}</p>`;
   }
@@ -1392,4 +1510,11 @@ export async function openShareFromQuery() {
     content.innerHTML = `<p class="mn-server-empty">${escapeText(error.message || "This share link is invalid or expired.")}</p>`;
   }
   return true;
+}
+
+
+if (typeof window !== "undefined") {
+  window.addEventListener("offline", () => {
+    void handleServerUnreachable(serverWatchUrl, "Your device is offline.");
+  });
 }
