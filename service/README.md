@@ -616,6 +616,23 @@ approved, private means pending administrator approval) and `allowedDomains` whe
 successful login is audited as `auth.login_oidc` with the provider in the metadata. Redirect
 destinations are limited to same-site paths, so `redirect=//evil.example` falls back to `/admin`.
 
+### Enabling social sign-in on an existing Docker install
+
+1. Add the provider variables to the env file used by the stack (`.env` for
+   `docker-compose.yml`, `.env.team` for `docker-compose.team.yml`). Existing `.env.team` files
+   created before this feature do not contain the placeholders; append them from
+   `.env.team.example`.
+2. Rebuild the image so it contains `src/auth/oidc.mjs` and the new migration:
+   ```bash
+   docker compose up -d --build
+   # team stack:
+   docker compose --env-file .env.team -f docker-compose.team.yml up -d --build
+   ```
+   The team stack runs PostgreSQL migrations on startup; the single-user Docker image now runs the
+   SQLite migration before starting too. Bare-metal installs run `node src/cli.mjs migrate` once.
+3. Open `/login`; buttons appear for providers whose `*_ENABLED` flag is true and whose required
+   values are complete. A half-configured provider makes the service fail closed at startup.
+
 ## Sharing and membership
 
 Public sharing is disabled per project until the owner enables it. Share links are bearer tokens
@@ -788,7 +805,7 @@ Set `KHAOYU_SERVICE_PUBLIC_URL` to the public HTTPS origin after the proxy is ac
 ## Tests
 
 ```powershell
-node --test --test-concurrency=1 test/service.test.mjs test/auth.test.mjs test/admin.test.mjs test/storage.test.mjs test/storage-migrations.test.mjs test/postgres-runtime.test.mjs test/redis-bus.test.mjs test/config.test.mjs
+node --test --test-concurrency=1 test/service.test.mjs test/auth.test.mjs test/admin.test.mjs test/storage.test.mjs test/storage-migrations.test.mjs test/postgres-runtime.test.mjs test/redis-bus.test.mjs test/config.test.mjs test/oidc.test.mjs
 
 # against a running instance with a verified account; use the frontend port from startup
 node ../tools/check-service-security.mjs --base http://127.0.0.1:18080 --credentials ../target/service-dev-credentials.json

@@ -20,4 +20,4 @@ EXPOSE 18080 18081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:18080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
-CMD ["node", "src/server.mjs"]
+CMD ["sh", "-c", "node src/cli.mjs migrate && exec node src/server.mjs"]
