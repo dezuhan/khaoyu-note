@@ -218,7 +218,7 @@
 .mn-workspace-popover-board {
   display: block;
   width: 100%;
-  padding: var(--ky-space-6) var(--ky-space-8);
+  padding: var(--ky-space-8) var(--ky-space-8);
   border: 0;
   border-radius: var(--ky-radius-control);
   background: transparent;
@@ -226,6 +226,16 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.mn-workspace-popover-board strong {
+  display: block;
+  font-size: var(--ky-text-md);
+  font-weight: 600;
+}
+
+.mn-workspace-popover-board span {
+  padding-top: 2px;
 }
 
 .mn-workspace-popover-board:hover {
@@ -290,10 +300,16 @@
 }
 
 .mn-workspace-popover-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ky-space-6);
   padding: var(--ky-space-4) var(--ky-space-8);
+}
+
+.mn-workspace-popover-actions .mn-btn {
+  width: 100%;
+  min-height: 30px;
+  justify-content: center;
 }
 
 .mn-workspace-member {

@@ -5,6 +5,10 @@ project uses Semantic Versioning.
 
 ## [Unreleased]
 
+- The workspace popover now matches the reference layout more closely: a single workspace is shown
+  directly without a redundant workspace selector row, the New board/Members/Invite actions share
+  the row equally, board rows have more breathing room, the Import workspace placeholder is gone,
+  and Add Server is the last row. Create workspace moved to the server's overflow menu.
 - The Add Server dialog is now a two-step flow: ask for the server URL, probe `/api/v1/auth/features`,
   then show email/password sign-in plus the server's enabled OIDC providers with an `or` separator
   (two providers render side by side). OIDC login opens a popup, returns a scoped app-sync token to

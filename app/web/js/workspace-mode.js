@@ -240,7 +240,7 @@ function openServerMenu(server, section, button) {
   const menu = document.createElement("div");
   menu.className = "mn-workspace-server-menu";
   menu.setAttribute("role", "menu");
-  menu.innerHTML = `<button type="button" class="mn-workspace-server-menu-item is-danger" role="menuitem" data-remove-server="1">${icon("trash", 14)} Remove server</button>`;
+  menu.innerHTML = `<button type="button" class="mn-workspace-server-menu-item" role="menuitem" data-create-workspace="1">${icon("plus", 14)} Create workspace</button><button type="button" class="mn-workspace-server-menu-item is-danger" role="menuitem" data-remove-server="1">${icon("trash", 14)} Remove server</button>`;
   button.parentElement.append(menu);
   const close = () => {
     closeServerMenu();
@@ -250,6 +250,10 @@ function openServerMenu(server, section, button) {
     if (!menu.contains(event.target) && event.target !== button && !button.contains(event.target)) close();
   };
   document.addEventListener("pointerdown", outside, true);
+  menu.querySelector("[data-create-workspace]").addEventListener("click", () => {
+    close();
+    openCreateWorkspaceDialog([server], document.getElementById("template-btn"));
+  });
   menu.querySelector("[data-remove-server]").addEventListener("click", () => {
     close();
     removeServer(server);
@@ -265,18 +269,10 @@ export async function openWorkspacePopover(anchor) {
     <div class="mn-workspace-popover-boards" data-role="local-workspaces"><p class="mn-server-note" style="padding:8px">Loading local workspaces...</p></div>
     <div class="mn-workspace-popover-sep"></div>
     <div data-role="server-sections"></div>
-    <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>
     <div class="mn-workspace-popover-sep"></div>
-    <button type="button" class="mn-workspace-popover-row is-muted" data-role="import-workspace">${icon("download", 16)}<span><strong>Import workspace</strong><small>Coming soon</small></span></button>
-    <button type="button" class="mn-workspace-popover-row" data-role="create-workspace">${icon("plus", 16)}<span><strong>Create workspace</strong><small>On the connected server</small></span></button>`;
+    <button type="button" class="mn-workspace-popover-row" data-add-server="1">${icon("plus", 16)}<span><strong>Add Server</strong><small>Connect a Khaoyu service</small></span></button>`;
   view.querySelector('[data-local]').addEventListener("click", closePopover);
   view.querySelector('[data-add-server]').addEventListener("click", () => openAddServerDialog(anchor));
-  view.querySelector('[data-role="import-workspace"]').addEventListener("click", () => {
-    window.dispatchEvent(new CustomEvent("mn:toast", { detail: { message: "Workspace import is coming soon" } }));
-  });
-  view.querySelector('[data-role="create-workspace"]').addEventListener("click", () => {
-    openCreateWorkspaceDialog(current, anchor);
-  });
   void renderLocalWorkspaces(view);
   const sections = view.querySelector('[data-role="server-sections"]');
   if (!current.length) {
@@ -327,16 +323,22 @@ function renderWorkspaceRows(server, workspaces, target, view) {
     target.innerHTML = `<p class="mn-server-note" style="padding:8px">No workspace is shared with this account.</p>`;
     return;
   }
-  target.innerHTML = `<div class="mn-workspace-popover-boards">${workspaces
-    .map(
-      (workspace) =>
-        `<button type="button" class="mn-workspace-popover-board" data-workspace="${escapeText(
-          workspace.id
-        )}"><strong>${escapeText(workspace.name || "Workspace")}</strong><span>${escapeText(
-          workspace.role || "member"
-        )} · default ${escapeText(workspace.memberDefaultBoardRole || "viewer")}</span></button>`
-    )
-    .join("")}</div><div data-role="workspace-detail"></div>`;
+  // A single workspace is shown directly, like the reference design. Only show the workspace
+  // selector when there is an actual choice to make.
+  const selector =
+    workspaces.length > 1
+      ? `<div class="mn-workspace-popover-boards">${workspaces
+          .map(
+            (workspace) =>
+              `<button type="button" class="mn-workspace-popover-board" data-workspace="${escapeText(
+                workspace.id
+              )}"><strong>${escapeText(workspace.name || "Workspace")}</strong><span>${escapeText(
+                workspace.role || "member"
+              )} · default ${escapeText(workspace.memberDefaultBoardRole || "viewer")}</span></button>`
+          )
+          .join("")}</div>`
+      : "";
+  target.innerHTML = `${selector}<div data-role="workspace-detail"></div>`;
   for (const button of target.querySelectorAll("[data-workspace]")) {
     const workspace = workspaces.find((entry) => entry.id === button.dataset.workspace);
     button.addEventListener("click", () => selectWorkspace(server, workspace, target, view));
