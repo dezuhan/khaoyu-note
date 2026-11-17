@@ -6,6 +6,7 @@ import { initInteractions } from "./interact.js";
 import { initExternalLinks } from "./external-links.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
+import { initDeepLinks } from "./deep-links.js";
 import { initLiveBoard } from "./live-board.js";
 import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
 import { applyReadOnlyViewer, openShareFromQuery, openWorkspaceFromQuery, takeOidcReturn } from "./workspace-mode.js";
@@ -192,6 +193,7 @@ async function boot() {
   }
   initUpdateUI();
   initAutoBackup();
+  initDeepLinks();
   document.getElementById("boot")?.remove();
   document.fonts?.ready.then(() => {
     if (state.board) render("geometry");
