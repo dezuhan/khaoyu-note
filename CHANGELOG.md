@@ -8,14 +8,6 @@ project uses Semantic Versioning.
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
 stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
 
-### Link cards
-
-- Link cards keep custom URL schemes (for example `khaoyunote://`, `vscode://` and `mailto:`) instead of
-  prefixing `https://`, and hand the URL to the operating system's registered handler. A new scheme
-  asks for confirmation once and is then remembered in Settings > Tools > External URL schemes;
-  `javascript:`, `data:`, `vbscript:`, `blob:`, `about:`, `chrome:`, `resource:` and `moz-extension:`
-  are always blocked.
-
 ### Backend and service
 
 - Two-step service login: email/password first, then an authenticator code or a dedicated backup-code
@@ -59,6 +51,24 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
 - Settings > Server keeps one connection entry and no Change connection button; saved account details
   are shown only for an active server board.
 - Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
+
+## [0.36.1] - 2026-11-17
+
+0.36.1 is a local-first patch on top of 0.36.0. Link cards can now open custom URL schemes through
+the operating system handler; the service account UI test and the blocked-scheme check were fixed.
+
+### Added
+
+- Link cards keep custom URL schemes (for example `khaoyunote://`, `vscode://` and `mailto:`) instead
+  of prefixing `https://`, and hand the URL to the operating system's registered handler. A new
+  scheme asks for confirmation once and is then remembered in Settings > Tools > External URL
+  schemes; `javascript:`, `data:`, `vbscript:`, `blob:`, `about:`, `chrome:`, `resource:` and
+  `moz-extension:` are always blocked.
+
+### Fixed
+
+- The service account UI browser test follows the current username and two-step login flow again.
+- Blocked external schemes are matched case-insensitively.
 
 ## [0.36.0] - 2026-11-14
 
