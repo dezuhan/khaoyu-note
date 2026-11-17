@@ -3011,7 +3011,8 @@ fn external_url_scheme(url: &str) -> Option<String> {
 }
 
 fn is_blocked_external_scheme(scheme: &str) -> bool {
-    BLOCKED_EXTERNAL_SCHEMES.contains(&scheme)
+    let lowered = scheme.to_ascii_lowercase();
+    BLOCKED_EXTERNAL_SCHEMES.contains(&lowered.as_str())
 }
 
 #[tauri::command]
