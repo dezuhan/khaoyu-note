@@ -93,10 +93,15 @@ not only when a milestone or release is finished.
 - Breaking data or workflow change: major, for example `1.0.0`.
 - Documentation, tests and CI-only changes do not need a version bump.
 
-Bump all version fields together: root `package.json`, `package-lock.json`, `service/package.json`,
-`service/package-lock.json`, `app/package.json`, `app/package-lock.json`, `app/src-tauri/tauri.conf.json`,
+Create a branch named after the new version before bumping it (`git switch -c 0.36.2 stable`);
+never commit a version change directly on `stable`. Bump all version fields together: root
+`package.json`, `package-lock.json`, `service/package.json`, `service/package-lock.json`,
+`app/package.json`, `app/package-lock.json`, `app/src-tauri/tauri.conf.json`,
 `app/src-tauri/Cargo.toml`, `app/src-tauri/Cargo.lock`, the Compose image tag, the changelog and the README
 artifact table. Run `node tools/test-version.mjs`; CI runs it too.
+`khaoyu-note-mcp` is built from the same Cargo package as the desktop app, so it must report the new
+version even when the MCP code itself did not change. The release workflow rebuilds and attaches it on
+every release; `node tools/test-mcp.mjs <binary>` fails if the server reports a different version.
 Add the changelog entry in the same change, then tag the verified release:
 
 ```powershell
@@ -109,8 +114,9 @@ git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 2. Installer is rebuilt when the release includes desktop changes.
 3. `CHANGELOG.md` describes user-visible changes.
 4. Every version field agrees with the full list above; `node tools/test-version.mjs` checks them.
-5. Working tree is clean before tagging.
-6. Tag points at the release commit.
+5. MCP binary rebuilt and reports the release version (`node tools/test-mcp.mjs <binary>`).
+6. Working tree is clean before tagging.
+7. Tag points at the release commit.
 
 ## License
 
