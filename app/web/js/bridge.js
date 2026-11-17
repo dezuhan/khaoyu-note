@@ -180,7 +180,10 @@ export async function checkUpdate() {
 
 export async function openExternal(url) {
   if (hasTauri) return invoke("open_external", { url });
-  window.open(url, "_blank");
+  // The browser preview cannot reach the OS handler directly. window.open is the only available
+  // fallback; custom-scheme links work only when the browser itself hands them to the handler.
+  const opened = window.open(url, "_blank");
+  if (!opened) throw new Error("the browser blocked the link");
   return null;
 }
 

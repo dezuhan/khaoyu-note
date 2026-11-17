@@ -7826,3 +7826,10 @@ html[data-read-only="true"] #app.is-read-only .mn-toolrail {
 #app.is-local-only #share-btn {
   display: none;
 }
+
+/* Settings > Tools > External URL schemes. */
+.mn-external-scheme-input {
+  min-width: 140px;
+  max-width: 200px;
+  height: 28px;
+}

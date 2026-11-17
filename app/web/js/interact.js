@@ -13,6 +13,7 @@ import {
 import * as bridge from "./bridge.js";
 import { openColorPicker } from "./color-picker.js";
 import { colorNameForHex } from "./color-names.js";
+import { linkDisplayDomain, normalizeLinkUrl } from "./external-links.js";
 import { isTemporarilyDisabledType } from "./limits.js";
 import { confirmAction, toast } from "./ui.js";
 import { clearDropPreview, previewDrop } from "./drop-preview.js";
@@ -2077,16 +2078,8 @@ function onChange(event) {
 
 function normalizeLink(card) {
   if (!card.url) return;
-  let url = card.url.trim();
-  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-  card.url = url;
-  if (!card.title) {
-    try {
-      card.title = new URL(url).hostname.replace(/^www\./, "");
-    } catch {
-      /* keep empty */
-    }
-  }
+  card.url = normalizeLinkUrl(card.url);
+  if (!card.title) card.title = linkDisplayDomain(card.url);
 }
 
 // ------------------------------------------------------------------ clicks

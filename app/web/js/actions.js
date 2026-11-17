@@ -1,6 +1,7 @@
 // High-level board actions shared by the UI and the interaction layer.
 
 import * as bridge from "./bridge.js";
+import { openLinkUrl } from "./external-links.js";
 import { isBlockedUpload, isTemporarilyDisabledType, MAX_UPLOAD_BYTES, reportUploadProblem } from "./limits.js";
 import { refreshCard } from "./render.js";
 import { createCard, columnChildren, getCard, layoutColumns, maxZ, MIN_SIZES, newBoardDoc, uid } from "./model.js";
@@ -540,12 +541,8 @@ export function updateCard(id, patch, kind = "board") {
 }
 
 export function openLink(url) {
-  if (!url) return;
-  let target = url;
-  if (!/^https?:\/\//i.test(target)) target = "https://" + target;
-  bridge.openExternal(target).catch(() => {
-    window.open(target, "_blank");
-  });
+  if (!url) return null;
+  void openLinkUrl(url);
   return null;
 }
 

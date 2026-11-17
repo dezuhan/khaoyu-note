@@ -51,6 +51,9 @@ jobs:
       - name: Service theme CSS contract
         run: npm run test:theme-css
 
+      - name: External link scheme unit tests
+        run: node --test tools/test-external-links.test.mjs
+
       - name: Version consistency check
         run: node tools/test-version.mjs
 
@@ -156,6 +159,9 @@ jobs:
 
       - name: Share viewer suite
         run: node tools/test-share-view.mjs
+
+      - name: External link scheme suite
+        run: node tools/test-external-links.mjs http://127.0.0.1:1430/
 
       - name: Browser account suite
         run: node tools/test-account-ui.mjs

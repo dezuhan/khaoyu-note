@@ -13,6 +13,14 @@ import {
 import { AUTO_BACKUP_OPTIONS, formatLastBackup, lastBackupAt, markBackupTaken } from "./auto-backup.js";
 import { icon } from "./icons.js";
 import { LANGUAGES, getLanguage, setLanguage, t } from "./i18n.js";
+import {
+  DEFAULT_ALLOWED_SCHEMES,
+  addAllowedScheme,
+  isBlockedScheme,
+  isValidScheme,
+  loadAllowedSchemes,
+  removeAllowedScheme,
+} from "./external-links.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state, prepareForReset } from "./store.js";
 import { checkConnection, describeConnection, loadSyncConfig, saveSyncConfig } from "./sync.js";
@@ -912,6 +920,7 @@ function renderContent() {
       "Map, Video and Audio are temporarily disabled. Upload local images, audio, video and other files with the Upload tool. Link cards fetch a hero image, and YouTube links use their thumbnail directly.";
     content.append(note);
     renderToolsGrid(content);
+    renderExternalSchemes(content);
   } else if (activePage === "templates") {
     content.append(heading("Board templates"));
     renderTemplatesPage(content);
@@ -2210,6 +2219,95 @@ function renderToolsGrid(content) {
     grid.append(card);
   }
   content.append(grid);
+}
+
+function renderExternalSchemes(content) {
+  const section = document.createElement("section");
+  section.dataset.role = "external-schemes";
+  section.append(heading("External URL schemes"));
+  section.append(
+    noteEl(
+      "http, https and mailto links always open. Add a scheme such as khaoyunote or vscode so a link card can hand the link to the app registered for that scheme. A new scheme asks for confirmation once and is then remembered here."
+    )
+  );
+
+  const defaultRow = document.createElement("div");
+  defaultRow.className = "mn-prefs-row";
+  const defaultLabel = document.createElement("span");
+  defaultLabel.className = "mn-prefs-label";
+  defaultLabel.textContent = "Always allowed";
+  const defaultValue = document.createElement("span");
+  defaultValue.className = "mn-prefs-value";
+  defaultValue.textContent = DEFAULT_ALLOWED_SCHEMES.join(", ");
+  defaultRow.append(defaultLabel, defaultValue);
+  section.append(defaultRow);
+
+  const extra = loadAllowedSchemes().filter((scheme) => !DEFAULT_ALLOWED_SCHEMES.includes(scheme));
+  if (!extra.length) {
+    section.append(noteEl("No extra schemes have been added yet."));
+  }
+  for (const scheme of extra) {
+    const line = document.createElement("div");
+    line.className = "mn-prefs-row";
+    const label = document.createElement("span");
+    label.className = "mn-prefs-label";
+    label.textContent = `${scheme}:`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "mn-btn mn-btn-quiet";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => {
+      removeAllowedScheme(scheme);
+      setStatus(`${scheme}: links will ask for confirmation again`);
+      renderContent();
+    });
+    line.append(label, remove);
+    section.append(line);
+  }
+
+  const form = document.createElement("div");
+  form.className = "mn-prefs-row";
+  const formLabel = document.createElement("span");
+  formLabel.className = "mn-prefs-label";
+  formLabel.textContent = "Add a scheme";
+  const input = document.createElement("input");
+  input.className = "ky-input mn-external-scheme-input";
+  input.placeholder = "khaoyunote";
+  input.setAttribute("aria-label", "External URL scheme");
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "mn-btn mn-btn-primary";
+  add.textContent = "Add";
+  const submit = () => {
+    const scheme = input.value.trim().toLowerCase().replace(/:$/, "");
+    if (!isValidScheme(scheme)) {
+      setStatus("Enter a scheme such as khaoyunote (letters, digits, +, - and . only)");
+      return;
+    }
+    if (isBlockedScheme(scheme)) {
+      setStatus(`The ${scheme}: scheme is blocked for security reasons`);
+      return;
+    }
+    if (!DEFAULT_ALLOWED_SCHEMES.includes(scheme) && !addAllowedScheme(scheme)) {
+      setStatus("Could not save the scheme");
+      return;
+    }
+    setStatus(`${scheme}: links allowed`);
+    renderContent();
+  };
+  add.addEventListener("click", submit);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") submit();
+  });
+  form.append(formLabel, input, add);
+  section.append(form);
+
+  section.append(
+    noteEl(
+      "Blocked schemes: javascript, data, vbscript, blob, about, chrome, resource and moz-extension. The web host can only open schemes that the browser itself supports; the desktop app uses the operating system handler."
+    )
+  );
+  content.append(section);
 }
 
 function heading(text) {
