@@ -2979,7 +2979,7 @@ const BLOCKED_EXTERNAL_SCHEMES: &[&str] = &[
 /// Parse the scheme of a link the frontend asked to open. Bare hosts are normalised by the
 /// frontend before this command runs, so a value without a valid scheme is rejected here. Schemes
 /// that can execute or rewrite content are rejected separately; every other registered scheme
-/// (obsidian, vscode, mailto, file, ...) is handed to the operating system handler.
+/// (khaoyunote, vscode, mailto, file, ...) is handed to the operating system handler.
 fn external_url_scheme(url: &str) -> Option<String> {
     let trimmed = url.trim();
     if trimmed.is_empty() || trimmed.chars().any(|character| character.is_control()) {
@@ -3886,8 +3886,8 @@ mod tests {
     #[test]
     fn external_link_schemes_are_parsed_and_validated() {
         assert_eq!(
-            external_url_scheme("obsidian://open?vault=life&file=index").as_deref(),
-            Some("obsidian")
+            external_url_scheme("khaoyunote://open?board=welcome").as_deref(),
+            Some("khaoyunote")
         );
         assert_eq!(
             external_url_scheme("HTTPS://example.com/page").as_deref(),
@@ -3912,7 +3912,7 @@ mod tests {
         );
         assert!(is_blocked_external_scheme("javascript"));
         assert!(is_blocked_external_scheme("DATA"));
-        assert!(!is_blocked_external_scheme("obsidian"));
+        assert!(!is_blocked_external_scheme("khaoyunote"));
         assert_eq!(external_url_scheme("bad scheme://x"), None);
         assert_eq!(external_url_scheme("1abc://x"), None);
         assert_eq!(external_url_scheme(""), None);
