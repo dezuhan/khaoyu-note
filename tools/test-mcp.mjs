@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const packageVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
 const binaryName = process.platform === "win32" ? "khaoyu-note-mcp.exe" : "khaoyu-note-mcp";
 const candidates = [
   process.argv[2],
@@ -94,6 +95,11 @@ try {
     clientInfo: { name: "mcp-smoke-test", version: "1.0.0" },
   });
   check("initialize returns server info", init.result?.serverInfo?.name === "khaoyu-note", JSON.stringify(init.result?.serverInfo));
+  check(
+    "MCP version matches the app version",
+    init.result?.serverInfo?.version === packageVersion,
+    `${init.result?.serverInfo?.version} != ${packageVersion}`
+  );
   proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
 
   const list = await request("tools/list", {});
