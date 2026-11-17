@@ -8,6 +8,14 @@ project uses Semantic Versioning.
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
 stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
 
+### Link cards
+
+- Link cards keep custom URL schemes (for example `khaoyunote://`, `vscode://` and `mailto:`) instead of
+  prefixing `https://`, and hand the URL to the operating system's registered handler. A new scheme
+  asks for confirmation once and is then remembered in Settings > Tools > External URL schemes;
+  `javascript:`, `data:`, `vbscript:`, `blob:`, `about:`, `chrome:`, `resource:` and `moz-extension:`
+  are always blocked.
+
 ### Backend and service
 
 - Two-step service login: email/password first, then an authenticator code or a dedicated backup-code

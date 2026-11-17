@@ -2965,13 +2965,62 @@ fn poll_oidc_login(port: u16) -> Option<OidcLoginResult> {
     }
 }
 
+const BLOCKED_EXTERNAL_SCHEMES: &[&str] = &[
+    "javascript",
+    "data",
+    "vbscript",
+    "blob",
+    "about",
+    "chrome",
+    "resource",
+    "moz-extension",
+];
+
+/// Parse the scheme of a link the frontend asked to open. Bare hosts are normalised by the
+/// frontend before this command runs, so a value without a valid scheme is rejected here. Schemes
+/// that can execute or rewrite content are rejected separately; every other registered scheme
+/// (khaoyunote, vscode, mailto, file, ...) is handed to the operating system handler.
+fn external_url_scheme(url: &str) -> Option<String> {
+    let trimmed = url.trim();
+    if trimmed.is_empty() || trimmed.chars().any(|character| character.is_control()) {
+        return None;
+    }
+    let (scheme, rest) = trimmed.split_once(':')?;
+    if scheme.is_empty() || scheme.len() > 64 {
+        return None;
+    }
+    let mut characters = scheme.chars();
+    if !characters.next()?.is_ascii_alphabetic() {
+        return None;
+    }
+    if !characters
+        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '+' | '-' | '.'))
+    {
+        return None;
+    }
+    // "example.com:8080" and "localhost:3000" are host:port pairs, not schemes.
+    if rest
+        .chars()
+        .next()
+        .is_some_and(|character| character.is_ascii_digit())
+        && (scheme.contains('.') || scheme.eq_ignore_ascii_case("localhost"))
+    {
+        return None;
+    }
+    Some(scheme.to_ascii_lowercase())
+}
+
+fn is_blocked_external_scheme(scheme: &str) -> bool {
+    BLOCKED_EXTERNAL_SCHEMES.contains(&scheme)
+}
+
 #[tauri::command]
 fn open_external(url: String) -> Result<(), String> {
-    let lower = url.to_lowercase();
-    if !(lower.starts_with("http://") || lower.starts_with("https://")) {
-        return Err("only http and https links can be opened".into());
+    let scheme = external_url_scheme(&url).ok_or("that link is not a valid URL")?;
+    if is_blocked_external_scheme(&scheme) {
+        return Err(format!("the {scheme} scheme cannot be opened"));
     }
-    shell_open(&url)
+    shell_open(url.trim())
 }
 
 fn gpu_enabled(conn: &Connection) -> bool {
@@ -3832,5 +3881,40 @@ mod tests {
         assert_eq!(value["cards"][0]["createdBy"]["name"], "Alice");
         assert_eq!(value["cards"][0]["updatedBy"]["name"], "Bob");
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn external_link_schemes_are_parsed_and_validated() {
+        assert_eq!(
+            external_url_scheme("khaoyunote://open?board=welcome").as_deref(),
+            Some("khaoyunote")
+        );
+        assert_eq!(
+            external_url_scheme("HTTPS://example.com/page").as_deref(),
+            Some("https")
+        );
+        assert_eq!(
+            external_url_scheme("mailto:someone@example.com").as_deref(),
+            Some("mailto")
+        );
+        assert_eq!(
+            external_url_scheme("file:///home/user/notes.html").as_deref(),
+            Some("file")
+        );
+        // Bare hosts and host:port pairs are not schemes; the frontend adds https before calling.
+        assert_eq!(external_url_scheme("example.com"), None);
+        assert_eq!(external_url_scheme("example.com:8080/path"), None);
+        assert_eq!(external_url_scheme("localhost:3000"), None);
+        // Dangerous or malformed schemes are rejected.
+        assert_eq!(
+            external_url_scheme("javascript:alert(1)").as_deref(),
+            Some("javascript")
+        );
+        assert!(is_blocked_external_scheme("javascript"));
+        assert!(is_blocked_external_scheme("DATA"));
+        assert!(!is_blocked_external_scheme("khaoyunote"));
+        assert_eq!(external_url_scheme("bad scheme://x"), None);
+        assert_eq!(external_url_scheme("1abc://x"), None);
+        assert_eq!(external_url_scheme(""), None);
     }
 }

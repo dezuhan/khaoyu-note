@@ -1,6 +1,7 @@
 // DOM rendering for cards, sketches and connections.
 
 import * as bridge from "./bridge.js";
+import { linkDisplayDomain } from "./external-links.js";
 import { icon } from "./icons.js";
 import {
   AUTO_HEIGHT_TYPES,
@@ -184,7 +185,7 @@ function contentFor(card) {
                 : ""
             }
           </div>
-          <button class="mn-icon-btn mn-link-open" data-action="open-link" title="Open in browser">${icon(
+          <button class="mn-icon-btn mn-link-open" data-action="open-link" title="Open link">${icon(
             "arrow",
             14
           )}</button>
@@ -566,11 +567,7 @@ function contentFor(card) {
 }
 
 function domainOf(url) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
+  return linkDisplayDomain(url);
 }
 
 function mapEmbedUrl(query) {

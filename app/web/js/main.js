@@ -3,6 +3,7 @@ import * as bridge from "./bridge.js";
 import { initAutoBackup } from "./auto-backup.js";
 import { initAuth } from "./auth.js";
 import { initInteractions } from "./interact.js";
+import { initExternalLinks } from "./external-links.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initLiveBoard } from "./live-board.js";
@@ -101,6 +102,7 @@ function showShareBootError(error) {
 async function boot() {
   initTheme();
   initLanguage();
+  void initExternalLinks();
   // The OIDC popup redirects here with a token fragment; hand it to the opener and close before
   // the normal board UI boots.
   if (takeOidcReturn()) {

@@ -68,6 +68,16 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 - [ ] Localisation of the service and admin pages (Milestone 11) once the backend UI is stable.
 - [ ] Packaging and signing gates (Milestone 7) for a public backend release.
 
+### P3 — local-first UX backlog
+
+- [~] **External URL schemes in link cards.** Implemented on `0.36.1`: link cards keep custom schemes
+  such as `khaoyunote://` instead of prefixing `https://`, and hand them to the OS handler through
+  `open_external` (xdg-open / open / ShellExecuteW). A scheme outside `http, https, mailto` asks for
+  confirmation once and is then remembered in Settings > Tools > External URL schemes;
+  `javascript:`, `data:`, `vbscript:`, `blob:` and `about:` stay blocked. Covered by
+  `tools/test-external-links.test.mjs` and `tools/test-external-links.mjs`. Remaining: verify the
+  registered handler on Windows and macOS release builds.
+
 ### Definition of done for the next backend release
 
 - [ ] Local-first behaviour is unchanged: a local board opens without login and no backend is required.
@@ -411,7 +421,7 @@ These are conditional on product fit and are not part of the first stable releas
 
 - [ ] Install, first launch, create a board, upload an image, drop a file, export and reopen.
 - [x] Verify database location, migrations and backup restore (verified on Windows).
-- [ ] Verify downloads, external links and default-app opening.
+- [ ] Verify downloads, external links, custom URL schemes and default-app opening.
 - [ ] Verify update path from the previous stable version.
 - [ ] Verify uninstall leaves or removes user data according to the documented policy.
 

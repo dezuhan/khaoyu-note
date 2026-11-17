@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { generateTotp } from "../service/src/auth/totp.mjs";
 import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -107,6 +108,7 @@ try {
       !(await page.locator("body").innerText()).includes("Verify email")
   );
   await page.fill("#name", "Account Test");
+  await page.fill("#username", `account_${crypto.randomUUID().slice(0, 8)}`);
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.fill("#confirm", password);
@@ -414,7 +416,11 @@ try {
   await page.click('[data-role="totp-setup-start"]');
   await page.waitForSelector('[data-role="totp-qr"] svg', { timeout: 8000 });
   check("authenticator setup renders a local QR code", Boolean(await page.locator('[data-role="totp-qr"] svg').boundingBox()));
-  await page.click('[data-role="totp-cancel"]');
+  const totpSecret = await page.locator('[data-role="totp-secret"]').inputValue();
+  await page.fill('[data-role="totp-code"]', generateTotp(totpSecret));
+  await page.click('[data-role="totp-enable"]');
+  await page.waitForSelector('[data-role="totp-enabled"]:not([hidden])', { timeout: 15000 });
+  check("authenticator setup is enabled with a generated code", true);
   check("security page uses the shared design tokens", (await page.locator(".ky-button").count()) >= 1);
 
   await page.click('[data-role="recovery-generate"]');
@@ -461,23 +467,36 @@ try {
   await page.fill("#email", email);
   await page.fill("#password", newPassword);
   await page.click("#login-submit");
+  await page.waitForSelector("#totp-form:not([hidden])", { timeout: 15000 });
+  await page.fill("#totp-code", generateTotp(totpSecret));
+  await page.click("#totp-submit");
   await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
-  check("login with the new password", (await page.locator("#admin-email").innerText()).includes(email));
+  check(
+    "login with the new password and an authenticator code",
+    (await page.locator("#admin-email").innerText()).includes(email)
+  );
 
   await page.click('.admin-nav-item[data-page="sessions"]');
   await page.waitForSelector('[data-role="logout-all"]');
   await page.click('[data-role="logout-all"]');
   await page.waitForURL(/\/login\?signedout=1/, { timeout: 15000 });
   await page.fill("#email", email);
-  await page.locator("summary", { hasText: "Use a backup code" }).click();
-  await page.fill("#recovery-code", backupCode);
+  await page.fill("#password", newPassword);
   await page.click("#login-submit");
+  await page.waitForSelector("#totp-form:not([hidden])", { timeout: 15000 });
+  await page.click("#backup-link");
+  await page.waitForSelector("#backup-form:not([hidden])", { timeout: 15000 });
+  await page.fill("#backup-code", backupCode);
+  await page.click("#backup-submit");
   await page.waitForURL(/\/admin$/, { timeout: 15000 });
   await page.goto(`${base}/admin`, { waitUntil: "load" });
   await page.waitForSelector("#admin-identity:not([hidden])", { timeout: 15000 });
-  check("login with a backup code works without a password", (await page.locator("#admin-email").innerText()).includes(email));
+  check(
+    "login with a backup code after the password step",
+    (await page.locator("#admin-email").innerText()).includes(email)
+  );
 
   // Member login must land on /account, not loop between /login and /admin.
   await page.click('.admin-nav-item[data-page="sessions"]');
