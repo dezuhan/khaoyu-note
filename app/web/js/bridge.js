@@ -192,6 +192,12 @@ export function oidcStartListener() {
   return invoke("start_oidc_listener");
 }
 
+/// Collect a `khaoyunote://` link that the OS delivered before the webview was ready.
+export async function takePendingDeepLink() {
+  if (!hasTauri) return null;
+  return invoke("take_pending_deep_link");
+}
+
 export function oidcPollLogin(port) {
   if (!hasTauri) return Promise.resolve(null);
   return invoke("poll_oidc_login", { port });

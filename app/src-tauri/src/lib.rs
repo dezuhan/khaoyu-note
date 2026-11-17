@@ -9,7 +9,8 @@ use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
+use tauri_plugin_deep_link::DeepLinkExt;
 
 mod auth;
 
@@ -3011,7 +3012,8 @@ fn external_url_scheme(url: &str) -> Option<String> {
 }
 
 fn is_blocked_external_scheme(scheme: &str) -> bool {
-    BLOCKED_EXTERNAL_SCHEMES.contains(&scheme)
+    let lowered = scheme.to_ascii_lowercase();
+    BLOCKED_EXTERNAL_SCHEMES.contains(&lowered.as_str())
 }
 
 #[tauri::command]
@@ -3194,8 +3196,124 @@ fn graphics_info(db: State<'_, AppDb>) -> Value {
     })
 }
 
+const DEEP_LINK_SCHEME: &str = "khaoyunote";
+const DEEP_LINK_MAX_LENGTH: usize = 2048;
+
+/// Payload sent to the webview when the OS opens a `khaoyunote://` link. Only a validated board id
+/// or a human-readable error ever crosses the boundary; the raw URL is not forwarded.
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeepLinkTarget {
+    board_id: Option<String>,
+    error: Option<String>,
+}
+
+/// Holds the latest link that arrived before the webview could listen (initial launch argument or a
+/// second instance started while the first window was still booting).
+struct PendingDeepLink(Mutex<Option<DeepLinkTarget>>);
+
+fn deep_link_error(message: &str) -> DeepLinkTarget {
+    DeepLinkTarget {
+        board_id: None,
+        error: Some(message.to_string()),
+    }
+}
+
+fn valid_deep_link_board_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '_' || character == '-'
+        })
+}
+
+/// Parse `khaoyunote://open?board=<id>` and reject everything else. Deep links can never start a
+/// remote session, import a file or run a command; they only name a local board.
+fn parse_deep_link(raw: &str) -> DeepLinkTarget {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.len() > DEEP_LINK_MAX_LENGTH {
+        return deep_link_error("This Khaoyu Note link is not valid.");
+    }
+    let Ok(parsed) = url::Url::parse(trimmed) else {
+        return deep_link_error("This Khaoyu Note link is not a valid URL.");
+    };
+    if !parsed.scheme().eq_ignore_ascii_case(DEEP_LINK_SCHEME) {
+        return deep_link_error("This is not a Khaoyu Note link.");
+    }
+    if parsed.host_str() != Some("open") {
+        return deep_link_error("This Khaoyu Note link uses an unknown action.");
+    }
+    if !parsed.path().is_empty() && parsed.path() != "/" {
+        return deep_link_error("This Khaoyu Note link has an unsupported path.");
+    }
+    let mut board_id = None;
+    for (key, value) in parsed.query_pairs() {
+        if key != "board" || board_id.is_some() {
+            return deep_link_error("This Khaoyu Note link has unsupported parameters.");
+        }
+        board_id = Some(value.into_owned());
+    }
+    match board_id {
+        Some(id) if valid_deep_link_board_id(&id) => DeepLinkTarget {
+            board_id: Some(id),
+            error: None,
+        },
+        Some(_) => deep_link_error("This Khaoyu Note link has an invalid board id."),
+        None => deep_link_error("This Khaoyu Note link is missing the board id."),
+    }
+}
+
+/// Return the parsed target when a command line argument names the Khaoyu Note scheme. Bare file
+/// paths and other arguments are ignored so a normal launch never shows a deep-link error.
+fn deep_link_argument(argument: &str) -> Option<DeepLinkTarget> {
+    let trimmed = argument.trim();
+    let scheme_end = trimmed.find(':')?;
+    if !trimmed[..scheme_end].eq_ignore_ascii_case(DEEP_LINK_SCHEME) {
+        return None;
+    }
+    Some(parse_deep_link(trimmed))
+}
+
+fn focus_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+fn deliver_deep_link(app: &tauri::AppHandle, target: DeepLinkTarget) {
+    if let Some(pending) = app.try_state::<PendingDeepLink>() {
+        if let Ok(mut slot) = pending.0.lock() {
+            *slot = Some(target.clone());
+        }
+    }
+    focus_main_window(app);
+    let _ = app.emit("mn:deep-link", target);
+}
+
+#[tauri::command]
+fn take_pending_deep_link(pending: State<'_, PendingDeepLink>) -> Option<DeepLinkTarget> {
+    pending.0.lock().ok().and_then(|mut slot| slot.take())
+}
+
 pub fn run() {
     tauri::Builder::default()
+        // Single instance must be registered first: a second launch (including a `khaoyunote://`
+        // link) focuses the running window and forwards its arguments instead of starting another app.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let mut delivered = false;
+            for argument in &argv {
+                if let Some(target) = deep_link_argument(argument) {
+                    deliver_deep_link(app, target);
+                    delivered = true;
+                }
+            }
+            if !delivered {
+                focus_main_window(app);
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let new_root = app
@@ -3213,6 +3331,7 @@ pub fn run() {
             apply_linux_graphics_environment();
             app.manage(AppDb(Mutex::new(conn)));
             app.manage(AuthState(Mutex::new(None)));
+            app.manage(PendingDeepLink(Mutex::new(None)));
 
             let mut builder = tauri::WebviewWindowBuilder::new(
                 app,
@@ -3255,9 +3374,37 @@ pub fn run() {
                     }
                 });
             }
+            // A link that launched the app arrives as a command line argument before the webview
+            // boots; queue it for `take_pending_deep_link` and emit for listeners that are ready.
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                if let Some(url) = urls.into_iter().next() {
+                    deliver_deep_link(app.handle(), parse_deep_link(url.as_str()));
+                }
+            }
+            // Links delivered while the app is already running (macOS open-url event, or a second
+            // instance forwarded by the single-instance plugin on Linux/Windows).
+            let deep_link_handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                if let Some(url) = event.urls().into_iter().next() {
+                    deliver_deep_link(&deep_link_handle, parse_deep_link(url.as_str()));
+                }
+            });
+            #[cfg(debug_assertions)]
+            if std::env::var("KHAOYU_DEV_DEEP_LINK").is_ok() {
+                // Lets `cargo tauri dev` (and the browser test host) receive links without relying
+                // on an installer. Release builds never write OS configuration during dev use.
+                let _ = app.deep_link().register_all();
+            }
+            #[cfg(not(debug_assertions))]
+            if let Ok(false) = app.deep_link().is_registered(DEEP_LINK_SCHEME) {
+                // AppImage/portable installs have no package post-install hook; register the
+                // scheme on first run so the handler exists for later links.
+                let _ = app.deep_link().register(DEEP_LINK_SCHEME);
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            take_pending_deep_link,
             list_boards,
             load_board,
             save_board,
@@ -3916,5 +4063,65 @@ mod tests {
         assert_eq!(external_url_scheme("bad scheme://x"), None);
         assert_eq!(external_url_scheme("1abc://x"), None);
         assert_eq!(external_url_scheme(""), None);
+    }
+
+    #[test]
+    fn deep_links_only_accept_a_local_board_id() {
+        let valid = parse_deep_link("khaoyunote://open?board=b_vmlspxibnvr");
+        assert_eq!(valid.board_id.as_deref(), Some("b_vmlspxibnvr"));
+        assert!(valid.error.is_none());
+
+        let upper = parse_deep_link("KHAOYUNOTE://open?board=b_abc123");
+        assert_eq!(upper.board_id.as_deref(), Some("b_abc123"));
+
+        // Wrong scheme, wrong action, unknown/duplicate parameters and remote-session parameters
+        // must never reach the app as a board target.
+        assert!(parse_deep_link("https://open?board=b_abc123")
+            .board_id
+            .is_none());
+        assert!(parse_deep_link("khaoyunote://delete?board=b_abc123")
+            .board_id
+            .is_none());
+        assert!(
+            parse_deep_link("khaoyunote://open?board=b_abc123&share=token")
+                .board_id
+                .is_none()
+        );
+        assert!(
+            parse_deep_link("khaoyunote://open?board=b_abc123&board=b_abc123")
+                .board_id
+                .is_none()
+        );
+        assert!(
+            parse_deep_link("khaoyunote://open?board=b_abc123&server=https://evil.example")
+                .board_id
+                .is_none()
+        );
+        assert!(parse_deep_link("khaoyunote://open?board=")
+            .board_id
+            .is_none());
+        assert!(parse_deep_link("khaoyunote://open?board=../../etc/passwd")
+            .board_id
+            .is_none());
+        assert!(parse_deep_link("khaoyunote://open/extra?board=b_abc123")
+            .board_id
+            .is_none());
+        assert!(parse_deep_link("not a url").board_id.is_none());
+        assert!(parse_deep_link("").error.is_some());
+        let too_long = format!(
+            "khaoyunote://open?board={}",
+            "a".repeat(DEEP_LINK_MAX_LENGTH)
+        );
+        assert!(parse_deep_link(&too_long).board_id.is_none());
+
+        // Only command line arguments that name our scheme are treated as deep links.
+        assert_eq!(
+            deep_link_argument("khaoyunote://open?board=b_abc123")
+                .and_then(|target| target.board_id),
+            Some("b_abc123".to_string())
+        );
+        assert!(deep_link_argument("/usr/bin/khaoyu-note").is_none());
+        assert!(deep_link_argument("C:\\Program Files\\Khaoyu Note\\khaoyu-note.exe").is_none());
+        assert!(deep_link_argument("--flag").is_none());
     }
 }

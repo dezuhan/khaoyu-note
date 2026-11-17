@@ -163,6 +163,9 @@ jobs:
       - name: External link scheme suite
         run: node tools/test-external-links.mjs http://127.0.0.1:1430/
 
+      - name: Deep link suite
+        run: node tools/test-deep-links.mjs http://127.0.0.1:1430/
+
       - name: Browser account suite
         run: node tools/test-account-ui.mjs
 
