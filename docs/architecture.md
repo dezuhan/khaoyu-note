@@ -105,7 +105,10 @@ out of a column. Link cards open through the Rust `open_external` command, which
 scheme and hands it to the system default handler (`xdg-open` / `open` / ShellExecuteW) instead of a
 WebView2 child window. Web links open in the browser; custom schemes such as `khaoyunote://` go to the
 registered application after the first-use confirmation, and `javascript:`, `data:`, `vbscript:`,
-`blob:` and `about:` are always rejected.
+`blob:` and `about:` are always rejected. In the other direction Khaoyu Note registers itself as the
+handler for `khaoyunote://open?board=<id>`: the OS starts or focuses the app and the link opens the
+local board. The plugin setup, URL contract and per-OS registration are documented in
+[deep-links.md](deep-links.md).
 
 Kanban is no longer a card type or a tool. Select at least two top-level columns and use the
 right-click action **Wrap into kanban**; the selected columns become children of a column with

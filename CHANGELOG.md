@@ -55,10 +55,16 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
 ## [0.36.1] - 2026-11-17
 
 0.36.1 is a local-first patch on top of 0.36.0. Link cards can now open custom URL schemes through
-the operating system handler; the service account UI test and the blocked-scheme check were fixed.
+the operating system handler and Khaoyu Note registers itself as the `khaoyunote://` handler so a
+link opens the app and a local board; the service account UI test and the blocked-scheme check were
+fixed.
 
 ### Added
 
+- **Deep links:** Khaoyu Note registers itself as the handler for `khaoyunote://` on Linux, Windows
+  and macOS. Opening `khaoyunote://open?board=<id>` focuses the running window or starts the app and
+  opens that local board; unknown actions, remote `share`/`server` parameters and missing boards are
+  rejected.
 - Link cards keep custom URL schemes (for example `khaoyunote://`, `vscode://` and `mailto:`) instead
   of prefixing `https://`, and hand the URL to the operating system's registered handler. A new
   scheme asks for confirmation once and is then remembered in Settings > Tools > External URL
