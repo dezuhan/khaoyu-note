@@ -1,7 +1,8 @@
 # Deep links (`khaoyunote://`)
 
-Status: implemented on `feature/deep-link` (Rust parser, single-instance forwarding, webview bridge,
-unit and browser tests). Cross-platform artifact verification is still pending. This is the reverse
+Status: implemented and merged into the `0.36.1` release branch (Rust parser, single-instance
+forwarding, webview bridge, unit and browser tests). Cross-platform artifact verification is still
+pending. This is the reverse
 direction of the link-card work in 0.36.1: link cards now hand custom schemes to the OS; this feature
 makes Khaoyu Note itself the registered handler for `khaoyunote://` so a link can open the app and a
 board.

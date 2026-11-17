@@ -14,6 +14,9 @@ finish-args:
   - --share=network
   - --talk-name=org.freedesktop.portal.Desktop
   - --talk-name=org.freedesktop.secrets
+  # Single-instance plugin: one running app receives khaoyunote:// links via DBus.
+  - --talk-name=org.com_dezuhan_khaoyunote.SingleInstance
+  - --own-name=org.com_dezuhan_khaoyunote.SingleInstance
 
 modules:
   - name: khaoyu-note
@@ -29,6 +32,7 @@ modules:
       - install -Dm644 "appdir/usr/share/applications/Khaoyu Note.desktop" /app/share/applications/com.dezuhan.khaoyunote.desktop
       - sed -i 's/^Icon=.*/Icon=com.dezuhan.khaoyunote/' /app/share/applications/com.dezuhan.khaoyunote.desktop
       - sed -i 's/^Exec=.*/Exec=khaoyu-note/' /app/share/applications/com.dezuhan.khaoyunote.desktop
+      - grep -q '^MimeType=' /app/share/applications/com.dezuhan.khaoyunote.desktop || sed -i '/^Exec=/a MimeType=x-scheme-handler/khaoyunote;' /app/share/applications/com.dezuhan.khaoyunote.desktop
       - install -Dm644 com.dezuhan.khaoyunote.metainfo.xml /app/share/metainfo/com.dezuhan.khaoyunote.metainfo.xml
     sources:
       - type: dir
