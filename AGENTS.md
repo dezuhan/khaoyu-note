@@ -26,15 +26,40 @@ This file is for automated coding agents working on this repository. Follow it t
   root `package.json`; run it against the built binary before tagging. `tools/test-version.mjs`
   covers the static version fields.
 
+## Publishing gate (mandatory)
+
+Never publish a GitHub release or push a release tag for a fixed version without an explicit
+confirmation from the maintainer in the current conversation.
+
+- After the version branch is merged into `stable`, **create a draft release** targeting `stable`
+  first. Do not publish it and do not push the tag yet:
+
+  ```bash
+  gh release create vX.Y.Z --draft --target stable \
+    --title "Khaoyu Note X.Y.Z" --notes-file .release-notes-X.Y.Z.md
+  ```
+
+- Then **ask the maintainer with a confirmation question box** (the interactive
+  `ask_user_question` tool, not plain prose) whether to upload/publish. The question must offer at
+  least a publish/upload choice and a keep-draft/do-not-upload choice. Never treat earlier
+  conversational agreement as approval for publishing.
+- Wait for the answer. If the maintainer declines or skips the question, leave the draft unpublished,
+  report the draft URL, and do not create or push the tag.
+- Only after an explicit "publish/upload" answer: publish the draft
+  (`gh release edit vX.Y.Z --draft=false`). Publishing creates the tag and triggers the desktop
+  release workflow. Pushing the tag manually is only allowed after the same confirmation.
+
 ## Release flow (short)
 
 1. `git switch -c X.Y.Z stable`
 2. Bump the versions, changelog and README/landing versions; commit `chore(release): X.Y.Z`.
 3. Run `node tools/test-version.mjs`, the MCP suite and the test suites that match the change.
 4. Push the branch, open a pull request into `stable`, and merge it.
-5. Tag the merge commit (`vX.Y.Z`) and push the tag. The release workflow builds the installers,
-   `khaoyu-note-mcp` and `SHA256SUMS.txt`, then publishes them on the GitHub release.
-6. Verify the release page: all expected artifacts are attached and the MCP `initialize` response
+5. Create the draft GitHub release targeting `stable` (see the publishing gate above).
+6. Ask for confirmation with the question box; only publish the draft after an explicit yes. The
+   release workflow builds the installers, `khaoyu-note-mcp` and `SHA256SUMS.txt`, then attaches them
+   to the release.
+7. Verify the release page: all expected artifacts are attached and the MCP `initialize` response
    reports the same version as the app.
 
 ## Other rules

@@ -25,6 +25,13 @@ Run before tagging a release.
 - [ ] Threat model, audit and incident runbook are reviewed.
 - [ ] Security advisory policy and contact path are current.
 
+## Publish gate
+
+- [ ] Version branch is merged into `stable` and the merge commit is the release commit.
+- [ ] GitHub release is created as a **draft** targeting `stable` (not published).
+- [ ] Maintainer answered the confirmation question to upload/publish.
+- [ ] Draft is published (or the tag is pushed) only after that confirmation.
+
 ## External gates
 
 - [ ] Windows code signing certificate and installer signature.
