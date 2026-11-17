@@ -101,8 +101,11 @@ stray wheel event cannot silently scroll the canvas origin away from `view.pan`.
 Types: `note`, `heading`, `link`, `todo`, `document`, `comment`, `table`, `color`, `sketch`,
 `drawing`, `image`, `audio`, `video`, `map`, `file`, `board`, `column`. A column is a
 container whose children point at it through `parentId`; that link is cleared when a card is dragged
-out of a column. Link cards open through the Rust `open_external` command, which validates http(s)
-and launches the system default browser instead of a WebView2 child window.
+out of a column. Link cards open through the Rust `open_external` command, which validates the URL
+scheme and hands it to the system default handler (`xdg-open` / `open` / ShellExecuteW) instead of a
+WebView2 child window. Web links open in the browser; custom schemes such as `khaoyunote://` go to the
+registered application after the first-use confirmation, and `javascript:`, `data:`, `vbscript:`,
+`blob:` and `about:` are always rejected.
 
 Kanban is no longer a card type or a tool. Select at least two top-level columns and use the
 right-click action **Wrap into kanban**; the selected columns become children of a column with

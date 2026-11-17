@@ -70,19 +70,13 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 
 ### P3 — local-first UX backlog
 
-- [ ] **External URL schemes in link cards.** Link cards treat every address as a web page: a non-web
-  URL gets `https://` prepended (`app/web/js/actions.js:545`) and the native `open_external` command
-  rejects anything that is not http/https (`app/src-tauri/src/lib.rs:2969`), so
-  `obsidian://open?vault=life&file=index` becomes a broken `https://obsidian//open?...` page in the
-  browser. Parse the scheme (`^[a-zA-Z][a-zA-Z0-9+.-]*:`) before normalising, keep non-web schemes
-  unchanged, and hand them to the OS handler through the existing `shell_open` path (xdg-open / open /
-  ShellExecuteW) or Tauri's opener plugin. Gate it behind a Settings allowlist, "External URL schemes",
-  defaulting to `http, https, mailto`; adding `obsidian`, `vscode`, `zotero` and similar requires an
-  explicit first-use confirmation, while `file://`, `javascript:` and `data:` stay blocked. The web host
-  keeps its `window.open` fallback for allowed schemes and shows an actionable error when no handler is
-  registered. Acceptance: an `obsidian://` card opens the registered handler on Linux Mint (Flatpak
-  `md.obsidian.Obsidian`), Windows and macOS, the card text is never mutated, and unit tests cover
-  scheme detection, the allowlist and the blocked-scheme cases.
+- [~] **External URL schemes in link cards.** Implemented on `0.36.1`: link cards keep custom schemes
+  such as `khaoyunote://` instead of prefixing `https://`, and hand them to the OS handler through
+  `open_external` (xdg-open / open / ShellExecuteW). A scheme outside `http, https, mailto` asks for
+  confirmation once and is then remembered in Settings > Tools > External URL schemes;
+  `javascript:`, `data:`, `vbscript:`, `blob:` and `about:` stay blocked. Covered by
+  `tools/test-external-links.test.mjs` and `tools/test-external-links.mjs`. Remaining: verify the
+  registered handler on Windows and macOS release builds.
 
 ### Definition of done for the next backend release
 
