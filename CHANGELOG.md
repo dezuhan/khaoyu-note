@@ -8,6 +8,13 @@ project uses Semantic Versioning.
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
 stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
 
+### Deep links
+
+- Khaoyu Note registers itself as the handler for `khaoyunote://` on Linux, Windows and macOS
+  (`tauri-plugin-deep-link` plus a single-instance plugin). Opening
+  `khaoyunote://open?board=<id>` focuses the running window or starts the app and opens that local
+  board; unknown actions, remote `share`/`server` parameters and missing boards are rejected.
+
 ### Link cards
 
 - Link cards keep custom URL schemes (for example `khaoyunote://`, `vscode://` and `mailto:`) instead of

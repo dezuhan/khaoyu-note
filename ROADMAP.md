@@ -77,12 +77,13 @@ in stages, in this order. The source material is the `[Unreleased]` section of
   `javascript:`, `data:`, `vbscript:`, `blob:` and `about:` stay blocked. Covered by
   `tools/test-external-links.test.mjs` and `tools/test-external-links.mjs`. Remaining: verify the
   registered handler on Windows and macOS release builds.
-- [ ] **Deep links: `khaoyunote://` opens the app and a board.** Register Khaoyu Note as the handler
-  for `khaoyunote://open?board=<id>` on Linux, Windows and macOS, using `tauri-plugin-deep-link` plus
-  `tauri-plugin-single-instance` (deep-link feature) so a link starts the app or focuses the running
-  window and opens the local board. Reject unknown actions, remote `share`/`server` parameters and
-  missing boards; keep the app usable with no handler registered. Plan, security rules and per-OS
-  verification commands are in [docs/deep-links.md](docs/deep-links.md).
+- [~] **Deep links: `khaoyunote://` opens the app and a board.** Implemented on `feature/deep-link`:
+  Khaoyu Note registers as the handler for `khaoyunote://open?board=<id>` on Linux, Windows and macOS,
+  using `tauri-plugin-deep-link` plus `tauri-plugin-single-instance` so a link starts the app or
+  focuses the running window and opens the local board. Reject unknown actions, remote
+  `share`/`server` parameters and missing boards; keep the app usable with no handler registered.
+  Plan, security rules and per-OS verification commands are in [docs/deep-links.md](docs/deep-links.md).
+  Remaining: verify the registered handler on built Linux, Windows and macOS artifacts.
 
 ### Definition of done for the next backend release
 

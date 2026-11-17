@@ -1,8 +1,10 @@
 # Deep links (`khaoyunote://`)
 
-Status: planned on `feature/deep-link`, not implemented yet. This is the reverse direction of the
-link-card work in 0.36.1: link cards now hand custom schemes to the OS; this feature makes Khaoyu Note
-itself the registered handler for `khaoyunote://` so a link can open the app and a board.
+Status: implemented on `feature/deep-link` (Rust parser, single-instance forwarding, webview bridge,
+unit and browser tests). Cross-platform artifact verification is still pending. This is the reverse
+direction of the link-card work in 0.36.1: link cards now hand custom schemes to the OS; this feature
+makes Khaoyu Note itself the registered handler for `khaoyunote://` so a link can open the app and a
+board.
 
 ## Goal and success criteria
 
@@ -64,16 +66,19 @@ khaoyunote://open?board=<boardId>
    Rust-only event handling means no JS plugin package and no new capability permission unless the
    core event permission needs extending; verify `core:default` covers `event.listen` and add
    `core:event:default` only if the smoke test fails.
-6. **Development builds**: under `#[cfg(debug_assertions)]`, call the plugin's `register_all` once so
-   `cargo tauri dev` can be triggered with `xdg-open 'khaoyunote://open?board=…'`. Release builds rely
-   on installer registration (below), not on writing OS configuration at every launch.
+6. **Development builds**: under `#[cfg(debug_assertions)]`, run the plugin's `register_all` when
+   `KHAOYU_DEV_DEEP_LINK=1` is set, so `cargo tauri dev` can be triggered with
+   `xdg-open 'khaoyunote://open?board=…'` without writing OS configuration on every dev launch.
+   Release builds check `is_registered` at startup and call `register` once on Linux/Windows when the
+   scheme is missing (covers AppImage/portable installs with no post-install hook); macOS uses the
+   static `CFBundleURLTypes` entry from the plugin configuration.
 
 ## Per-platform registration
 
 | Platform | Mechanism | Verification |
 |---|---|---|
 | Linux `.deb`/`.rpm` | Tauri bundler must add `MimeType=x-scheme-handler/khaoyunote;` to the `.desktop` entry. If the bundler does not, ship a `bundle.linux.desktopTemplate` with the MimeType and run `update-desktop-database` in the package. | `grep MimeType /usr/share/applications/*khaoyu*.desktop`, `xdg-mime query default x-scheme-handler/khaoyunote`, then `xdg-open 'khaoyunote://open?board=…'` |
-| Linux AppImage | Portable bundles have no installer. v1 documents that registration needs a desktop install; a “Register link handler” Settings action is a follow-up. | unpack + inspect `.desktop`; manual note |
+| Linux AppImage | Portable bundles have no installer; the release build calls `register` on first run when `is_registered` is false, writing a handler for the AppImage executable. A “Register/unregister link handler” Settings action is a follow-up. | `xdg-mime query default x-scheme-handler/khaoyunote` after the first launch |
 | Flatpak | Desktop entry from the manifest must declare the MimeType; single-instance DBus needs `--talk-name`/`--own-name` for `org.com_dezuhan_khaoyunote.SingleInstance` in `packaging/flatpak/com.dezuhan.khaoyunote.yml`. | `flatpak run com.dezuhan.khaoyunote 'khaoyunote://…'` and `flatpak permission-show`/`gio mime` |
 | Windows MSI/NSIS | Plugin config must produce the `HKCU\Software\Classes\khaoyunote` handler; if the bundler does not, add an NSIS hook that writes `shell\open\command = "<install dir>\Khaoyu Note.exe" "%1"` and removes it on uninstall. | `reg query HKCU\Software\Classes\khaoyunote`, `start khaoyunote://open?board=…` |
 | macOS `.dmg` | Plugin config must emit `CFBundleURLTypes` in `Info.plist`; static registration only, no runtime write. Signing/notarisation gate applies. | `plutil -p "Khaoyu Note.app/Contents/Info.plist"` shows the scheme; `open 'khaoyunote://…'` |
@@ -122,6 +127,17 @@ verification command above to pass on a built artifact, not just `cargo tauri de
 - `CHANGELOG.md` `[Unreleased]`: “Deep links: `khaoyunote://open?board=` opens the app and a local board”.
 - `ROADMAP.md` P3 item updated to `[~]` while implementing, `[x]` after both desktop platforms are verified.
 - Packaging docs list which artifacts register the handler (deb/rpm/MSI/NSIS/dmg, not portable AppImage).
+
+## Implemented pieces
+
+- `app/src-tauri/src/lib.rs`: `parse_deep_link`, `deep_link_argument`, `deliver_deep_link`,
+  `take_pending_deep_link`, single-instance forwarding, `get_current` startup pickup, `on_open_url`
+  listener and the release-time registration check.
+- `app/web/js/deep-links.js`: DOM/Tauri event listener, board validation and navigation, wired from
+  `main.js` after the first board load.
+- `app/src-tauri/tauri.conf.json`: `plugins.deep-link.desktop.schemes = ["khaoyunote"]`.
+- Tests: Rust unit tests in `lib.rs` (`deep_links_only_accept_a_local_board_id`) and
+  `tools/test-deep-links.mjs` (CI web job).
 
 ## Out of scope (v1)
 
