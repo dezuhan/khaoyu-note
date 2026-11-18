@@ -28,7 +28,9 @@ Run before tagging a release.
 ## Publish gate
 
 - [ ] Version branch is merged into `stable` and the merge commit is the release commit.
-- [ ] GitHub release is created as a **draft** targeting `stable` (not published).
+- [ ] Maintainer answered the confirmation question before pushing the version branch and merging it.
+- [ ] Maintainer answered the confirmation question before creating the **draft** GitHub release
+      targeting `stable`.
 - [ ] Maintainer answered the confirmation question to upload/publish.
 - [ ] Draft is published (or the tag is pushed) only after that confirmation.
 

@@ -115,10 +115,11 @@ git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 3. `CHANGELOG.md` describes user-visible changes.
 4. Every version field agrees with the full list above; `node tools/test-version.mjs` checks them.
 5. MCP binary rebuilt and reports the release version (`node tools/test-mcp.mjs <binary>`).
-6. A **draft** GitHub release targeting `stable` exists, with the version and changelog notes.
-7. The maintainer explicitly confirmed uploading/publishing; the draft is only then published.
-8. Working tree is clean before tagging.
-9. Tag points at the release commit.
+6. The maintainer explicitly confirmed pushing the version branch and merging its pull request.
+7. The maintainer explicitly confirmed creating the **draft** GitHub release targeting `stable`.
+8. The maintainer explicitly confirmed uploading/publishing; the draft is only then published.
+9. Working tree is clean before tagging.
+10. Tag points at the release commit.
 
 ## License
 

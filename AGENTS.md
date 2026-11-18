@@ -26,13 +26,28 @@ This file is for automated coding agents working on this repository. Follow it t
   root `package.json`; run it against the built binary before tagging. `tools/test-version.mjs`
   covers the static version fields.
 
+## Remote-write gate (mandatory)
+
+Remote changes are only made after an explicit confirmation from the maintainer in the current
+conversation.
+
+- Before `git push` of any branch or tag, ask with the interactive question box
+  (`ask_user_question`) whether to push. "The work is finished" or an earlier approval of a different
+  step is not permission to push.
+- Before creating or updating a GitHub release, **including a draft release**, ask the same way.
+- Before merging a pull request into `stable`, ask the same way as well.
+- An explicit instruction in the maintainer's current message for that exact operation ("push this
+  branch", "create the draft release") counts as the confirmation for that operation only. Anything
+  else needs the question box.
+- When the answer is no or is skipped, keep the work local, report what is ready, and wait.
+
 ## Publishing gate (mandatory)
 
 Never publish a GitHub release or push a release tag for a fixed version without an explicit
 confirmation from the maintainer in the current conversation.
 
-- After the version branch is merged into `stable`, **create a draft release** targeting `stable`
-  first. Do not publish it and do not push the tag yet:
+- Ask whether to create the draft release first. Only after an explicit yes, **create a draft
+  release** targeting `stable`. Do not publish it and do not push the tag yet:
 
   ```bash
   gh release create vX.Y.Z --draft --target stable \
@@ -54,11 +69,13 @@ confirmation from the maintainer in the current conversation.
 1. `git switch -c X.Y.Z stable`
 2. Bump the versions, changelog and README/landing versions; commit `chore(release): X.Y.Z`.
 3. Run `node tools/test-version.mjs`, the MCP suite and the test suites that match the change.
-4. Push the branch, open a pull request into `stable`, and merge it.
-5. Create the draft GitHub release targeting `stable` (see the publishing gate above).
-6. Ask for confirmation with the question box; only publish the draft after an explicit yes. The
-   release workflow builds the installers, `khaoyu-note-mcp` and `SHA256SUMS.txt`, then attaches them
-   to the release.
+4. Ask before pushing; on yes push the branch, open a pull request into `stable`, and ask again
+   before merging it.
+5. Ask whether to create the draft GitHub release targeting `stable`; on yes create it (still
+   unpublished, no tag).
+6. Ask again before publishing the draft/tag; only on an explicit yes publish it. The release
+   workflow builds the installers, `khaoyu-note-mcp` and `SHA256SUMS.txt`, then attaches them to the
+   release.
 7. Verify the release page: all expected artifacts are attached and the MCP `initialize` response
    reports the same version as the app.
 
