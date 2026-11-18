@@ -52,6 +52,23 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
   are shown only for an active server board.
 - Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
 
+## [0.36.2] - 2026-11-18
+
+0.36.2 keeps the 0.36 line local-first. Link cards and `khaoyunote://` deep links are unchanged; the
+self-hosted collaboration service is now explicitly marked experimental, and the single-user service
+bootstrap documented for developers works again.
+
+### Fixed
+
+- `node src/cli.mjs bootstrap` no longer fails with `now is not defined`. The documented
+  `migrate` → `bootstrap` path is covered by `service/test/cli.test.mjs`.
+
+### Changed
+
+- The README release surface no longer advertises the self-hosted service as supported. Its quick
+  start stays in `service/README.md`, and the service is documented as experimental until the
+  collaboration architecture is decided.
+
 ## [0.36.1] - 2026-11-17
 
 0.36.1 is a local-first patch on top of 0.36.0. Link cards can now open custom URL schemes through
