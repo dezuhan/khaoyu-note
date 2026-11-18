@@ -2,20 +2,22 @@
 
 A local-first visual workspace for thinking, planning and writing. Khaoyu Note runs as a native
 desktop app or a local browser host, stores every board in SQLite, and works without an account or
-network. An optional self-hosted service adds team accounts, sync and sharing when you need them.
+network. A self-hosted collaboration service is under development in `service/`; it is experimental
+and not part of this release.
 
-> **0.36.1 local-first release:** backend controls are temporarily disabled in the app. Sync,
-> Share, Add Server and the remote workspace sections are hidden; Local storage supports multiple
-> boards, with **New Board** in the Workspace popover. The service source remains in `service/` for a
-> later release, and backend connection files are gitignored.
+> **0.36.2 local-first release:** backend controls stay disabled in the app. Sync, Share, Add Server
+> and the remote workspace sections are hidden; Local storage supports multiple boards, with **New
+> Board** in the Workspace popover. The self-hosted service in `service/` is experimental and not part
+> of this build, and backend connection files are gitignored.
 
 ## Downloads
 
-Version 0.36.1 local-first builds:
+Version 0.36.2 local-first builds:
 
-- Windows: `Khaoyu Note_0.36.1_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.1_x64_en-US.msi`
-- Linux: `Khaoyu-Note_0.36.0_amd64.deb`, `Khaoyu-Note_0.36.0_amd64.AppImage` or the portable
-  `Khaoyu-Note_0.36.0_linux-x86_64.tar.gz`
+- Windows: `Khaoyu Note_0.36.2_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.2_x64_en-US.msi`
+- Linux: `Khaoyu.Note_0.36.2_amd64.deb`, `Khaoyu.Note_0.36.2_amd64.AppImage` or
+  `Khaoyu.Note-0.36.2-1.x86_64.rpm`
+- macOS: `Khaoyu.Note_0.36.2_universal.dmg`
 
 ![Khaoyu Note board](shots/board-light.png)
 
@@ -45,62 +47,13 @@ Local use is always the default. Connecting a server is opt-in per board.
   sync, comments and public share links with expiry, passwords and download limits.
 - **MCP server** — 14 board tools over stdio for local AI agents, using the same SQLite database.
 
-## Install the server
+## Self-hosted service (experimental)
 
-The service is optional: the desktop and local web host work without it. Docker Compose with
-PostgreSQL + Redis is the recommended team deployment; Node 24 + SQLite works for a single instance.
-
-### Requirements
-
-- Docker with Compose, or Node 24 or newer with the built-in `node:sqlite` module.
-- A public URL if remote clients or share links will use the service (HTTPS recommended).
-
-### Team stack (Docker + PostgreSQL + Redis)
-
-```bash
-cd service
-./scripts/setup-team.sh
-```
-
-The installer asks for the service URL, public share URL, first owner email and optional Cloudflare
-Tunnel token. It generates `.env.team` with random secrets, starts PostgreSQL/Redis and the service,
-runs migrations, waits for `/readyz`, bootstraps the owner and prints the one-time password.
-
-Without the installer:
-
-```bash
-cd service
-cp .env.team.example .env.team
-# Edit .env.team: public URL, service secret, database/Redis passwords, owner email/password.
-docker compose --env-file .env.team -f docker-compose.team.yml up -d --build
-docker compose --env-file .env.team -f docker-compose.team.yml exec -T service \
-  node src/cli.mjs bootstrap-postgres
-```
-
-By default the frontend and API listen on `127.0.0.1:18080` and `127.0.0.1:18081`. Open
-`http://127.0.0.1:18080/admin` for the dashboard.
-
-### Single user (Node + SQLite)
-
-```bash
-cd service
-cp .env.example .env
-# Set KHAOYU_SERVICE_SECRET to: openssl rand -hex 32
-export KHAOYU_SERVICE_COOKIE_SECURE=false
-export KHAOYU_BOOTSTRAP_PASSWORD='use-a-unique-password-of-12-plus'
-node src/cli.mjs migrate
-node src/cli.mjs bootstrap
-node src/server.mjs
-```
-
-The server prints the frontend and backend URLs. Use the frontend URL for login, `/admin` and share
-links. To keep it running after the terminal closes, use `npm run start:background` (stop with
-`npm run stop`).
-
-Before exposing the server, read [service/README.md](service/README.md) for reverse-proxy examples,
-TLS, OIDC, backups, upgrades, secret requirements and the full environment reference. Security
-reports follow [SECURITY.md](SECURITY.md); production gates are in
-[docs/production-readiness.md](docs/production-readiness.md).
+The collaboration service in `service/` is under active development and **not part of this build's
+supported surface**. The desktop app, local web host and MCP server work without it, and this release
+does not require Docker, PostgreSQL, Redis, a public URL or a service account. Developers who want to
+try the experimental service should read [service/README.md](service/README.md); its account, sync and
+sharing flows are not released or production ready yet.
 
 ## MCP server
 

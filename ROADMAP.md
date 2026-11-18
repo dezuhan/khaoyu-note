@@ -18,6 +18,10 @@ started and needs its own consent, tool-gateway and prompt-injection design firs
 full localisation coverage, is planned: the current ten-language catalogue only covers the settings
 surface and parts of the chrome, and the service/admin pages are English-only.
 
+0.36.2 keeps the 0.36 line local-first: the self-hosted service in `service/` is **experimental** and
+not part of the supported release surface. The backend priorities below stay deferred until the
+collaboration architecture (embedded sidecar versus a Rust server) is decided.
+
 Verification note: checkboxes were reconciled with the 0.36.0 code and test evidence on 2026-11-12.
 `docs/production-readiness.md` carries the current release verdict.
 
