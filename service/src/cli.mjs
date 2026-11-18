@@ -67,11 +67,11 @@ async function bootstrap(config, db, password) {
   const email = (process.env.KHAOYU_BOOTSTRAP_EMAIL || "owner@localhost").trim().toLowerCase();
   const name = (process.env.KHAOYU_BOOTSTRAP_NAME || "Owner").trim();
   const projectName = (process.env.KHAOYU_BOOTSTRAP_PROJECT || "Khaoyu Note").trim();
+  const now = Date.now();
   let account = await db.get("SELECT id, email FROM accounts WHERE email = ?", [email]);
   let createdAccount = false;
   if (!account) {
     account = { id: crypto.randomUUID(), email };
-    const now = Date.now();
     await db.run(
       "INSERT INTO accounts (id, email, display_name, password_hash, email_verified_at, role, approved_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'admin', ?, ?, ?)",
       [account.id, email, name, password.hash, now, now, now, now]
@@ -101,7 +101,6 @@ async function bootstrap(config, db, password) {
   let createdProject = false;
   if (!project) {
     project = { id: crypto.randomUUID(), name: projectName };
-    const now = Date.now();
     await db.transaction(async (tx) => {
       await tx.run(
         "INSERT INTO projects (id, owner_account_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
