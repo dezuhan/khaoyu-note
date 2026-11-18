@@ -1,7 +1,8 @@
 // Browser check for the workspace switcher: it auto-loads the last (or first non-default) workspace
 // and can create a board inside that workspace.
 // node tools/test-workspace-ui.mjs http://127.0.0.1:1430/
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { startService } from "./service-runner.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
@@ -23,7 +24,7 @@ const env = {
   KHAOYU_SERVICE_COOKIE_SECURE: "false",
   KHAOYU_SERVICE_RP_ID: "localhost",
 };
-const server = spawn(process.execPath, ["service/src/server.mjs"], { cwd: root, env, stdio: "ignore" });
+const server = startService({ cwd: root, env, stdio: "ignore" });
 let browser;
 let mockAuthServer = null;
 let failures = 0;

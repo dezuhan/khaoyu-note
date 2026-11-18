@@ -1,0 +1,15 @@
+{
+  "baseSeq": 0,
+  "ops": [
+    {
+      "opId": "contract-op-1",
+      "type": "doc.title",
+      "payload": {
+        "title": "Contract"
+      },
+      "clock": {
+        "contract": 1
+      }
+    }
+  ]
+}

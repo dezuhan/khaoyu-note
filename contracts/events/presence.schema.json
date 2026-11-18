@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "required": [
+    "type",
+    "projectId",
+    "accounts",
+    "connections"
+  ],
+  "properties": {
+    "type": {
+      "const": "presence"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "accounts": {
+      "type": "integer"
+    },
+    "connections": {
+      "type": "integer"
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "global": {
+      "type": "boolean"
+    }
+  }
+}

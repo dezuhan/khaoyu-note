@@ -53,6 +53,7 @@ import {
   requireString,
   sendBinary,
   sendJson,
+  assertProtocolVersion,
   sendNoContent,
 } from "../http.mjs";
 import { ObjectStore } from "../objects.mjs";
@@ -725,7 +726,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
       response.setHeader("Vary", "Origin");
       response.setHeader(
         "Access-Control-Allow-Headers",
-        "authorization, content-type, x-csrf-token, x-file-name"
+        "authorization, content-type, x-csrf-token, x-file-name, x-khaoyu-protocol"
       );
       response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
       response.setHeader("Access-Control-Max-Age", "600");
@@ -738,6 +739,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
         response.end();
         return true;
       }
+      assertProtocolVersion(request);
       if (!["GET", "HEAD"].includes(method)) assertSameOrigin(request, config);
 
       if (method === "GET" && url.pathname === "/api/v1/admin/audit") {
@@ -4354,6 +4356,7 @@ export function createApiRouter({ db, config, logger, mailer, events: providedEv
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
           "X-Accel-Buffering": "no",
+          "X-Khaoyu-Protocol": "1",
         });
         response.flushHeaders();
         const preference = (await db.get("SELECT presence_enabled FROM email_preferences WHERE account_id = ?", [auth.account.id]));

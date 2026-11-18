@@ -52,6 +52,26 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
   are shown only for an active server board.
 - Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
 
+## [0.36.3] - 2026-11-18
+
+Phase 0 of the backend realtime collaboration plan: write the sync API contract down and keep it
+enforced before any realtime feature changes.
+
+### Added
+
+- `contracts/`: OpenAPI for the app-facing sync routes, JSON Schemas for the `ops`, `snapshot` and
+  `presence` SSE events, a stable error-code catalog and example fixtures.
+- `X-Khaoyu-Protocol: 1` on every JSON response and on the SSE stream. A client sending an unknown
+  major version receives `426 protocol_unsupported`; a missing header is treated as version 1.
+- `tools/test-contracts.mjs`, a CI gate that validates fixtures, exercises the live service, checks
+  the protocol header and verifies the app still calls the documented endpoints.
+
+### Changed
+
+- Integration browser suites start the service through `SERVICE_CMD` (`tools/service-runner.mjs`),
+  defaulting to `node service/src/server.mjs`.
+- `test-account-ui` uses a standalone RFC 6238 helper instead of importing `service/src` internals.
+
 ## [0.36.2] - 2026-11-18
 
 0.36.2 keeps the 0.36 line local-first. Link cards and `khaoyunote://` deep links are unchanged; the

@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": [
+    "type",
+    "projectId",
+    "revision"
+  ],
+  "properties": {
+    "type": {
+      "const": "snapshot"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "restoredFrom": {
+      "type": "integer"
+    },
+    "actor": {
+      "type": "string"
+    }
+  }
+}

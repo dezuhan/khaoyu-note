@@ -403,6 +403,7 @@ async function api(pathname, { method = "GET", body, serverUrl = "", timeoutMs =
         method,
         headers: {
           authorization: `Bearer ${config.token}`,
+          "x-khaoyu-protocol": "1",
           ...(body === undefined ? {} : { "content-type": "application/json" }),
         },
         body: body === undefined ? undefined : JSON.stringify(body),

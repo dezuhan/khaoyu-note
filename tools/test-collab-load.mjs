@@ -1,6 +1,7 @@
 // Synthetic concurrent operation-load check. This is not a production benchmark; it verifies the
 // service can serialize concurrent editors without corrupting the operation log.
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { startService } from "./service-runner.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -11,7 +12,7 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "khaoyu-load-"));
 const secret = crypto.randomBytes(32).toString("hex");
 const env = { ...process.env, KHAOYU_SERVICE_SECRET: secret, KHAOYU_SERVICE_DATA_DIR: dataDir, KHAOYU_SERVICE_HOST: "127.0.0.1", KHAOYU_SERVICE_COOKIE_SECURE: "false" };
 spawnSync(process.execPath, ["service/src/cli.mjs", "migrate"], { cwd: root, env, stdio: "ignore" });
-const server = spawn(process.execPath, ["service/src/server.mjs"], { cwd: root, env, stdio: "ignore" });
+const server = startService({ cwd: root, env, stdio: "ignore" });
 let base = "";
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? `  ::  ${detail}` : ""}`); if (!ok) failed++; };
@@ -59,6 +60,13 @@ try {
   const ownerJar = {};
   await request("/api/v1/auth/register", { method: "POST", body: { email: ownerEmail, password, displayName: "Load Owner" } });
   await request("/api/v1/auth/login", { method: "POST", body: { email: ownerEmail, password }, jar: ownerJar });
+  // The load test creates several accounts; open registration so they are approved immediately.
+  const registration = await request("/api/v1/admin/settings", {
+    method: "PATCH",
+    jar: ownerJar,
+    body: { registrationMode: "public" },
+  });
+  if (registration.status !== 200) throw new Error(`registration mode ${registration.status}`);
   const project = await request("/api/v1/projects", { method: "POST", jar: ownerJar, body: { title: "Load board" } });
   const projectId = project.body.id;
   const clients = ["client-0"];

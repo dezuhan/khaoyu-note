@@ -14,6 +14,7 @@ async function api(pathname, { method = "GET", body } = {}) {
     method,
     headers: {
       authorization: `Bearer ${token}`,
+      "x-khaoyu-protocol": "1",
       ...(body === undefined ? {} : { "content-type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
