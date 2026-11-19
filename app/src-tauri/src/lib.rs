@@ -2203,7 +2203,7 @@ fn capture_window(app: tauri::AppHandle) -> Result<ScreenCapture, String> {
             if copied == 0 || lines == 0 {
                 return Err("Could not capture the window".to_string());
             }
-            for pixel in buffer.chunks_exact_mut(4) {
+            for pixel in buffer.as_chunks_mut::<4>().0 {
                 pixel.swap(0, 2);
                 pixel[3] = 255;
             }
