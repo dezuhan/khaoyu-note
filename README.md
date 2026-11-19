@@ -95,6 +95,15 @@ The database directory matches the app's app-data folder:
 and `~/Library/Application Support/com.dezuhan.khaoyunote` on macOS. Set `KHAOYU_NOTE_DB_DIR` to use
 another folder.
 
+## Community
+
+Questions, feedback, board ideas and translation help are welcome on Discord:
+
+- **Discord:** <https://discord.gg/dcbpfeuWt9>
+
+Before opening a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues
+privately as described in [SECURITY.md](SECURITY.md) instead of in the community chat.
+
 ## License
 
 Khaoyu Note is open source under the

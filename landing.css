@@ -177,6 +177,19 @@ body.lp {
   padding: 0;
 }
 
+.lp-github,
+.lp-discord {
+  justify-content: center;
+  width: 30px;
+  padding: 0;
+}
+
+.lp-social-icon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
 .lp-theme-icon {
   width: 14px;
   height: 14px;
@@ -1143,7 +1156,8 @@ html[data-ky-theme="light"] .lp-theme-sun {
   .lp-menu-button {
     display: block;
   }
-  .lp-github {
+  .lp-github,
+  .lp-discord {
     display: none;
   }
   .lp-stats {
