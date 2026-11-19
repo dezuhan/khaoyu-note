@@ -1,6 +1,7 @@
 // End-to-end sharing page check.
 // node tools/test-shares-ui.mjs
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { startService } from "./service-runner.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -23,7 +24,7 @@ const env = {
 };
 
 spawnSync(process.execPath, ["service/src/cli.mjs", "migrate"], { cwd: root, env, stdio: "ignore" });
-const server = spawn(process.execPath, ["service/src/server.mjs"], { cwd: root, env, stdio: "ignore" });
+const server = startService({ cwd: root, env, stdio: "ignore" });
 let browser;
 
 function check(name, ok, detail = "") {

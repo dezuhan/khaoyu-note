@@ -1,0 +1,16 @@
+{
+  "seq": 1,
+  "lastSeq": 1,
+  "revision": 2,
+  "fieldConflicts": [],
+  "ops": [
+    {
+      "seq": 1,
+      "opId": "contract-op-1",
+      "type": "doc.title",
+      "payload": {
+        "title": "Contract"
+      }
+    }
+  ]
+}

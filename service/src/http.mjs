@@ -7,6 +7,22 @@ export class HttpError extends Error {
   }
 }
 
+export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_HEADER = "X-Khaoyu-Protocol";
+
+/// Reject a client that speaks an unknown protocol major version. A missing header means protocol 1
+/// for backwards compatibility with clients shipped before the header existed.
+export function assertProtocolVersion(request) {
+  const raw = request.headers["x-khaoyu-protocol"];
+  if (raw === undefined || raw === "") return;
+  const major = Number(String(raw).trim().split(".")[0]);
+  if (!Number.isInteger(major) || major !== PROTOCOL_VERSION) {
+    throw new HttpError(426, "unsupported protocol version", "protocol_unsupported", {
+      [PROTOCOL_HEADER]: String(PROTOCOL_VERSION),
+    });
+  }
+}
+
 const MAX_BODY = 64 * 1024;
 // When a body is over the limit the service keeps draining it (without buffering) up to this
 // ceiling before aborting. An early 413 would otherwise reset the connection while the client is
@@ -28,6 +44,7 @@ export function applySecurityHeaders(response, config) {
 export function sendJson(response, status, payload, config, headers = {}) {
   const body = JSON.stringify(payload);
   applySecurityHeaders(response, config);
+  response.setHeader(PROTOCOL_HEADER, String(PROTOCOL_VERSION));
   for (const [key, value] of Object.entries(headers)) response.setHeader(key, value);
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -38,6 +55,7 @@ export function sendJson(response, status, payload, config, headers = {}) {
 
 export function sendNoContent(response, status, config) {
   applySecurityHeaders(response, config);
+  response.setHeader(PROTOCOL_HEADER, String(PROTOCOL_VERSION));
   response.writeHead(status);
   response.end();
 }

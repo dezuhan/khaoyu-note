@@ -1,6 +1,7 @@
 // End-to-end passkey check using Chrome's virtual authenticator.
 // Requires Playwright's Chromium: node tools/test-passkeys.mjs
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { startService } from "./service-runner.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -24,7 +25,7 @@ const env = {
 };
 
 spawnSync(process.execPath, ["service/src/cli.mjs", "migrate"], { cwd: root, env, stdio: "ignore" });
-const server = spawn(process.execPath, ["service/src/server.mjs"], {
+const server = startService({
   cwd: root,
   env,
   stdio: ["ignore", "pipe", "pipe"],

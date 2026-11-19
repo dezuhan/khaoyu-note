@@ -1,7 +1,7 @@
 {
   "name": "khaoyu-note-web",
   "private": true,
-  "version": "0.36.2",
+  "version": "0.36.3",
   "type": "module",
   "description": "Local web host for Khaoyu Note, backed by the same SQLite database as the desktop app",
   "license": "AGPL-3.0-only",
@@ -49,6 +49,7 @@
     "test:external-links": "node tools/test-external-links.mjs http://127.0.0.1:1430/",
     "test:external-links-unit": "node --test tools/test-external-links.test.mjs",
     "test:deep-links": "node tools/test-deep-links.mjs http://127.0.0.1:1430/",
+    "test:contracts": "node tools/test-contracts.mjs",
     "test:theme-css": "node tools/test-theme-css.mjs",
     "test:collab-load": "node tools/test-collab-load.mjs",
     "test:web-live": "node tools/test-web-live.mjs"

@@ -5,19 +5,19 @@ desktop app or a local browser host, stores every board in SQLite, and works wit
 network. A self-hosted collaboration service is under development in `service/`; it is experimental
 and not part of this release.
 
-> **0.36.2 local-first release:** backend controls stay disabled in the app. Sync, Share, Add Server
+> **0.36.3 local-first release:** backend controls stay disabled in the app. Sync, Share, Add Server
 > and the remote workspace sections are hidden; Local storage supports multiple boards, with **New
 > Board** in the Workspace popover. The self-hosted service in `service/` is experimental and not part
 > of this build, and backend connection files are gitignored.
 
 ## Downloads
 
-Version 0.36.2 local-first builds:
+Version 0.36.3 local-first builds:
 
-- Windows: `Khaoyu Note_0.36.2_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.2_x64_en-US.msi`
-- Linux: `Khaoyu.Note_0.36.2_amd64.deb`, `Khaoyu.Note_0.36.2_amd64.AppImage` or
-  `Khaoyu.Note-0.36.2-1.x86_64.rpm`
-- macOS: `Khaoyu.Note_0.36.2_universal.dmg`
+- Windows: `Khaoyu Note_0.36.3_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.3_x64_en-US.msi`
+- Linux: `Khaoyu.Note_0.36.3_amd64.deb`, `Khaoyu.Note_0.36.3_amd64.AppImage` or
+  `Khaoyu.Note-0.36.3-1.x86_64.rpm`
+- macOS: `Khaoyu.Note_0.36.3_universal.dmg`
 
 ![Khaoyu Note board](shots/board-light.png)
 
@@ -94,6 +94,15 @@ The database directory matches the app's app-data folder:
 `$XDG_DATA_HOME/com.dezuhan.khaoyunote` (usually `~/.local/share/com.dezuhan.khaoyunote`) on Linux,
 and `~/Library/Application Support/com.dezuhan.khaoyunote` on macOS. Set `KHAOYU_NOTE_DB_DIR` to use
 another folder.
+
+## Community
+
+Questions, feedback, board ideas and translation help are welcome on Discord:
+
+- **Discord:** <https://discord.gg/dcbpfeuWt9>
+
+Before opening a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues
+privately as described in [SECURITY.md](SECURITY.md) instead of in the community chat.
 
 ## License
 

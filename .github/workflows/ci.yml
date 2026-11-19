@@ -60,6 +60,9 @@ jobs:
       - name: Translation coverage
         run: node tools/i18n-audit.mjs
 
+      - name: Sync API contracts
+        run: node tools/test-contracts.mjs
+
       - name: Start preview server
         run: |
           node tools/serve.mjs 1430 > /tmp/khaoyu-serve.log 2>&1 &

@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "note": "Stable codes for the app-facing sync routes. Existing names are kept; the plan's working names map as auth_required=authentication_required, forbidden_role=forbidden, stale_base_seq=seq_conflict.",
+  "codes": {
+    "authentication_required": "Missing or invalid credentials/session.",
+    "csrf_failed": "CSRF token missing or invalid for a cookie session.",
+    "forbidden": "The role does not allow this write.",
+    "not_found": "Project, board or resource is not visible to this account.",
+    "invalid_input": "Malformed request body or parameters.",
+    "op_invalid": "Operation type or payload is invalid.",
+    "op_too_large": "Operation batch or payload exceeds the limit.",
+    "seq_conflict": "baseSeq is stale; reload ops or the snapshot.",
+    "resync_required": "The operation log was compacted; reload the snapshot.",
+    "card_locked": "Another editor holds the card lock.",
+    "lock_conflict": "Lock is held, expired or owned by another client.",
+    "presence_expired": "The presence connection expired.",
+    "rate_limited": "Rate limit exceeded.",
+    "protocol_unsupported": "Unknown X-Khaoyu-Protocol major version.",
+    "internal_error": "Unexpected server error."
+  }
+}

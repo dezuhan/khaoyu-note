@@ -2,13 +2,14 @@
 // /account is the member security/account page; registration lives on /register, sign-in on /login, and the
 // account section (sessions, API tokens, password, sign-out) is a page inside the admin dashboard.
 // node tools/test-account-ui.mjs
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { startService } from "./service-runner.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { generateTotp } from "../service/src/auth/totp.mjs";
+import { generateTotp } from "./totp.mjs";
 import { chromium } from "playwright";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -28,7 +29,7 @@ const env = {
 };
 
 spawnSync(process.execPath, ["service/src/cli.mjs", "migrate"], { cwd: root, env, stdio: "ignore" });
-const server = spawn(process.execPath, ["service/src/server.mjs"], { cwd: root, env, stdio: "ignore" });
+const server = startService({ cwd: root, env, stdio: "ignore" });
 let browser;
 
 function check(name, ok, detail = "") {

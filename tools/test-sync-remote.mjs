@@ -1,6 +1,7 @@
 // Manual integration check for the durable remote sync queue (not part of CI).
 // Service (SQLite) + preview frontend + Playwright, with a simulated offline period and reload.
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { startService } from "./service-runner.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -23,7 +24,7 @@ const env = {
 const previewUrl = process.argv[2] || "http://127.0.0.1:1430/";
 
 spawnSync(process.execPath, ["service/src/cli.mjs", "migrate"], { cwd: root, env, stdio: "ignore" });
-const server = spawn(process.execPath, ["service/src/server.mjs"], { cwd: root, env, stdio: "ignore" });
+const server = startService({ cwd: root, env, stdio: "ignore" });
 let browser;
 let failures = 0;
 
