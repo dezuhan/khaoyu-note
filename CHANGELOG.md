@@ -14,17 +14,6 @@ from it without copying a commit list.
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
 stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
 
-### Performance
-
-- Reduced effects is now the default and keeps the dotted grid. It still turns off backdrop blur,
-  the heavy card shadows and the long animations, but the board's spatial reference, card text and
-  every tool stay exactly as they are. Modal overlays (Settings, sync, share, onboarding) and the
-  command palette keep their glass, because they open occasionally and never sit over a board that is
-  being panned or zoomed. The Performance toggle label no longer lists the grid.
-- The zoom settle no longer flashes when reduced effects are off. The swap from the composited
-  transform to the exact CSS zoom runs inside a short `document.startViewTransition()` crossfade with
-  transitions disabled for the swap frames, which hides the re-raster of every card, shadow and text.
-
 ### Backend and service
 
 - Two-step service login: email/password first, then an authenticator code or a dedicated backup-code
@@ -68,6 +57,26 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
 - Settings > Server keeps one connection entry and no Change connection button; saved account details
   are shown only for an active server board.
 - Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
+
+## [0.36.5] - 2026-11-21
+
+Performance release: reduced effects becomes the default without taking anything away, and zooming
+stops flashing. No data or workflow changes; the local-first rule and every card type are unchanged.
+
+### Performance
+
+- Reduced effects is now the default and keeps the dotted grid. It still turns off backdrop blur,
+  the heavy card shadows and the long animations, but the board's spatial reference, card text and
+  every tool stay exactly as they are. The Performance toggle label no longer lists the grid.
+- The zoom settle no longer flashes when reduced effects are off. The swap from the composited
+  transform to the exact CSS zoom runs inside a short `document.startViewTransition()` crossfade with
+  transitions disabled for the swap frames, which hides the re-raster of every card, shadow and text.
+
+### Fixes
+
+- Modal overlays (Settings, sync, share, onboarding) and the command palette keep their glass in
+  reduced effects. Only the chrome that sits over the board (toasts, menus, comment popovers) loses
+  its blur, which is where the per-frame cost lives.
 
 ## [0.36.4] - 2026-11-20
 
