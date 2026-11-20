@@ -25,6 +25,9 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
   every pointermove, so a drag no longer lays out and repaints the card, its shadow and its text each
   frame. Children of a dragged column follow with the same offset. Layout time during a 300-card drag
   dropped by about 60 percent.
+- Added a frame-cost overlay for machine-specific stutter: `Ctrl+Alt+Shift+P` (or `?perf=1`) shows
+  delivered fps, frame-time median/p90/max, frames over 25 and 50 ms, long tasks, board size and the
+  GPU renderer, and clicking it copies the report. It is off by default.
 
 ### Backend and service
 

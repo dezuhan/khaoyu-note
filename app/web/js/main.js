@@ -25,6 +25,7 @@ import { initContextMenu, initUI } from "./ui.js";
 import { backfillLinkHeaders } from "./actions.js";
 import { initSetupGate } from "./setup.js";
 import { initLanguage } from "./i18n.js";
+import { initPerfOverlay } from "./perf-overlay.js";
 import { BACKEND_ENABLED } from "./features.js";
 
 const refs = {
@@ -103,6 +104,7 @@ function showShareBootError(error) {
 async function boot() {
   initTheme();
   initLanguage();
+  initPerfOverlay();
   void initExternalLinks();
   // The OIDC popup redirects here with a token fragment; hand it to the opener and close before
   // the normal board UI boots.
