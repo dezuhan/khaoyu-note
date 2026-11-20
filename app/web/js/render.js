@@ -871,7 +871,18 @@ export function render(kind = "board") {
   if (kind === "geometry") {
     for (const card of visibleCards(state.board)) {
       const el = cardElement(card.id);
-      if (el) el.classList.toggle("is-child", Boolean(card.parentId));
+      if (!el) continue;
+      el.classList.toggle("is-child", Boolean(card.parentId));
+      // A drop changes the child count without rebuilding the column, so its header summary has to
+      // be refreshed in place; otherwise the column keeps saying "0 cards" after a card lands in it.
+      if (card.type === "column") {
+        const summary = el.querySelector(".mn-column-summary");
+        if (summary) {
+          summary.textContent = `${columnSummary(state.board, card)}${
+            card.direction === "row" ? " · row" : ""
+          }`;
+        }
+      }
     }
   }
   measureHeights();
