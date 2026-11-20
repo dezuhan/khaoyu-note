@@ -43,6 +43,20 @@ docs(roadmap): add AI chatbot milestone
 test(mcp): cover stale write rejection
 ```
 
+## Language
+
+Every artifact committed to this repository is written in **English**: documentation, `CHANGELOG.md`
+entries, commit messages, pull-request descriptions, release notes, code comments, test names and the
+user-facing source strings. Code identifiers stay English too.
+
+The only non-English text in the repository belongs to the app's multi-language feature: the locale
+data in `app/web/js/i18n.js` and anything that feature owns (locale-specific documentation templates,
+translated menus). Never hand-write a translated string for another purpose, and never leave a locale
+value in English unless it is one of the shipped languages.
+
+Conversation with the maintainer may happen in any language, including Indonesian. The rule applies to
+what lands in the repository, not to the chat around it.
+
 ## Before committing
 
 Run the checks that match the change:
