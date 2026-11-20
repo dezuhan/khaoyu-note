@@ -27,16 +27,27 @@ let connEl = null;
 let svgNs = "http://www.w3.org/2000/svg";
 let sketchRepaintTimer = 0;
 let lastPaintZoom = 1;
+// An interactive zoom keeps the board on one composited transform so every step is a GPU scale
+// instead of a full style/layout/raster pass over the whole board. The gesture ends after a short
+// idle beat and the exact CSS zoom is applied once, so text is crisp again at rest.
+let viewGestureActive = false;
+let viewSettleTimer = 0;
+let lastViewSignature = "";
+const VIEW_SETTLE_MS = 160;
 const boardPreviewCache = new Map();
 // WebKitGTK's CSS zoom scales boxes but leaves text at its original size. Chromium reflows text
-// correctly, so only the Linux/WebKit path falls back to a composited transform.
+// correctly, so only the Linux/WebKit path needs the composited transform at rest; a live zoom
+// gesture uses it on every platform so each step stays on the compositor.
 const webkitTransformZoom = (() => {
   const ua = navigator.userAgent;
   return /AppleWebKit/.test(ua) && /Linux/.test(ua) && !/Chrome|Chromium|Edg\//.test(ua);
 })();
 
+// True while the board is painted with a transform instead of the CSS zoom property. Measurements
+// that divide a client rect by the zoom (and scroll heights that CSS zoom would scale) read this to
+// stay correct in both paint modes.
 function usesTransformZoom() {
-  return webkitTransformZoom;
+  return webkitTransformZoom || viewGestureActive;
 }
 
 export function initRender(refs) {
@@ -860,7 +871,18 @@ export function render(kind = "board") {
   if (kind === "geometry") {
     for (const card of visibleCards(state.board)) {
       const el = cardElement(card.id);
-      if (el) el.classList.toggle("is-child", Boolean(card.parentId));
+      if (!el) continue;
+      el.classList.toggle("is-child", Boolean(card.parentId));
+      // A drop changes the child count without rebuilding the column, so its header summary has to
+      // be refreshed in place; otherwise the column keeps saying "0 cards" after a card lands in it.
+      if (card.type === "column") {
+        const summary = el.querySelector(".mn-column-summary");
+        if (summary) {
+          summary.textContent = `${columnSummary(state.board, card)}${
+            card.direction === "row" ? " · row" : ""
+          }`;
+        }
+      }
     }
   }
   measureHeights();
@@ -1023,12 +1045,42 @@ function rebuildCards() {
   }
 }
 
+export function beginViewGesture() {
+  viewGestureActive = true;
+  clearTimeout(viewSettleTimer);
+  viewSettleTimer = window.setTimeout(endViewGesture, VIEW_SETTLE_MS);
+}
+
+function endViewGesture() {
+  viewSettleTimer = 0;
+  if (!viewGestureActive) return;
+  viewGestureActive = false;
+  renderView();
+}
+
 export function renderView() {
   if (!worldEl) return;
+  const zoom = state.view.zoom;
+  const background = (state.board && state.board.view && state.board.view.background) || "";
+  const showGrid = !state.board || state.board.showGrid !== false;
+  const grid = (state.board && state.board.grid) || 24;
+  // notify("view") and the interaction handlers both repaint the view; skip the second pass when
+  // nothing it writes has changed. Pan and zoom run this every frame, so the early exit matters.
+  const signature = [
+    zoom,
+    state.view.x,
+    state.view.y,
+    viewGestureActive ? "gesture" : "rest",
+    background,
+    showGrid ? grid : "off",
+  ].join("|");
+  if (signature === lastViewSignature) return;
+  lastViewSignature = signature;
   // Chromium re-lays out text with CSS zoom, so cards stay sharp. WebKitGTK only scales the
   // element boxes, which leaves text at 100% and makes a 15% board look broken; use a transform
-  // there so boxes and text scale together.
-  const zoom = state.view.zoom;
+  // there so boxes and text scale together. While a zoom gesture is live, Chromium uses the same
+  // transform instead: scaling that layer is a compositor operation, while changing the CSS zoom
+  // value re-lays out and re-rasterises every card on every wheel step.
   if (usesTransformZoom()) {
     worldEl.style.zoom = "1";
     worldEl.style.transform = `translate(${state.view.x}px, ${state.view.y}px) scale(${zoom})`;
@@ -1048,11 +1100,9 @@ export function renderView() {
     }, 140);
   }
   if (viewportEl) {
-    viewportEl.style.backgroundColor = state.board?.view?.background || "";
-    const showGrid = !state.board || state.board.showGrid !== false;
+    viewportEl.style.backgroundColor = background;
     viewportEl.style.backgroundImage = showGrid ? "" : "none";
     if (showGrid) {
-      const grid = (state.board && state.board.grid) || 24;
       const size = grid * zoom;
       viewportEl.style.backgroundSize = `${size}px ${size}px`;
       viewportEl.style.backgroundPosition = `${state.view.x}px ${state.view.y}px`;

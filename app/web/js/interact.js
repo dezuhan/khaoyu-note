@@ -27,6 +27,7 @@ import {
   uid,
 } from "./model.js";
 import {
+  beginViewGesture,
   cardElement,
   connectionGeometry,
   refreshCard,
@@ -392,6 +393,14 @@ function beginDrag(card, event) {
     const target = getCard(state.board, id);
     if (target) origins.set(id, { x: target.x, y: target.y, w: target.w, h: target.h });
   }
+  // A dragged column carries its children, so their start positions are needed as well: they move
+  // with the same composited offset instead of being re-laid-out on every pointermove.
+  const descendants = dragDescendants(ids);
+  const childOrigins = new Map();
+  for (const id of descendants) {
+    const child = getCard(state.board, id);
+    if (child) childOrigins.set(id, { x: child.x, y: child.y });
+  }
   gesture = {
     type: "drag",
     id: card.id,
@@ -400,6 +409,8 @@ function beginDrag(card, event) {
     startClientX: event.clientX,
     startClientY: event.clientY,
     origins,
+    descendants,
+    childOrigins,
     moved: false,
     wasChild: card.parentId,
     dropTarget: null,
@@ -410,6 +421,8 @@ function beginDrag(card, event) {
     if (!el) continue;
     const target = getCard(state.board, id);
     el.classList.add("is-dragging");
+    // `.mn-card.is-dragging` disables transitions while the gesture lasts, so a leftover settle
+    // transition cannot animate the first pointermove.
     // A Section is a background wrapper even while selected or moved.
     el.style.zIndex = String(
       target?.type === "section" ? zIndexFor(target) : DRAG_Z_INDEX
@@ -535,7 +548,7 @@ function onPointerMove(event) {
           card.x = snap(card.x);
           card.y = snap(card.y);
         }
-        applyCardGeometry(card);
+        applyDragOffset(card, origin);
       }
       syncColumnChildren();
       updateDragIndicators(world);
@@ -773,6 +786,34 @@ function applyCardGeometry(card) {
   el.style.zIndex = String(zIndexFor(card));
 }
 
+// While a card is dragged its element keeps the position it had when the gesture started and the
+// movement is applied as a composited transform. Writing left/top every pointermove forces a layout
+// and repaint of the card, its shadow and its text on every frame; a translate stays on the GPU.
+function applyDragOffset(card, origin) {
+  const el = cardElement(card.id);
+  if (!el || !origin) return;
+  el.style.transform = `translate(${card.x - origin.x}px, ${card.y - origin.y}px)`;
+}
+
+function clearDragOffset(id) {
+  const el = cardElement(id);
+  if (el) el.style.transform = "";
+}
+
+function dragDescendants(ids) {
+  const found = new Set();
+  const queue = [...ids];
+  while (queue.length) {
+    const parent = queue.shift();
+    for (const child of columnChildren(state.board, parent)) {
+      if (found.has(child.id)) continue;
+      found.add(child.id);
+      queue.push(child.id);
+    }
+  }
+  return found;
+}
+
 function syncColumnStack(column) {
   if (!column || column.type !== "column") return;
   for (const child of columnChildren(state.board, column.id)) {
@@ -784,20 +825,32 @@ function syncColumnStack(column) {
 
 function syncColumnChildren() {
   if (!state.board) return;
+  const dragging = gesture && gesture.type === "drag" ? gesture : null;
   layoutColumns(state.board);
   // While dragging, column children must be able to leave the column horizontally; after the layout
   // snaps them back, restore the dragged cards to their pointer-following position.
-  if (gesture && gesture.type === "drag" && gesture.moved) {
-    for (const id of gesture.ids) {
+  if (dragging && dragging.moved) {
+    for (const id of dragging.ids) {
       const card = getCard(state.board, id);
-      const origin = gesture.origins.get(id);
+      const origin = dragging.origins.get(id);
       if (!card || !origin || !card.parentId) continue;
-      card.x = origin.x + (gesture.lastDx || 0);
-      card.y = origin.y + (gesture.lastDy || 0);
+      card.x = origin.x + (dragging.lastDx || 0);
+      card.y = origin.y + (dragging.lastDy || 0);
     }
   }
   for (const card of state.board.cards) {
-    if (card.parentId) applyCardGeometry(card);
+    if (!card.parentId) continue;
+    if (dragging && dragging.ids.includes(card.id)) {
+      // The drag itself already positioned this card with a transform; applying geometry here would
+      // snap it back to the column slot and fight the gesture.
+      applyDragOffset(card, dragging.origins.get(card.id));
+      continue;
+    }
+    if (dragging && dragging.descendants.has(card.id)) {
+      applyDragOffset(card, dragging.childOrigins.get(card.id));
+      continue;
+    }
+    applyCardGeometry(card);
   }
   // Keep the card being dragged inside a column above its siblings while it moves.
   if (gesture && gesture.type === "drag") {
@@ -850,6 +903,7 @@ function onPointerUp(event) {
       // A click selects without moving. Restore the computed stacking so a Section cannot stay
       // above the board after being clicked.
       for (const id of current.ids) {
+        clearDragOffset(id);
         const card = getCard(state.board, id);
         const el = cardElement(id);
         if (card && el) {
@@ -920,7 +974,11 @@ function onPointerUp(event) {
 
 function finishDrag(current) {
   clearDropPreview();
+  // Capture where everything is drawn while the drag offsets are still applied, then drop those
+  // offsets so the geometry pass below can write the committed left/top values.
   const before = captureRects();
+  for (const id of current.ids) clearDragOffset(id);
+  for (const id of current.descendants || []) clearDragOffset(id);
   const dragged = new Set(current.ids);
   const target = current.dropTarget;
 
@@ -987,9 +1045,11 @@ function finishDrag(current) {
     }
   }
 
+  // A drop only changes positions, parentage and column order, all of which the geometry pass
+  // applies to the existing elements. Rebuilding every card here re-created the whole board DOM
+  // (about 300 ms on a board with 18k nodes) for a change that moves a few cards.
   layoutColumns(state.board);
-  preserveMediaForNextRender();
-  markDirty("board");
+  markDirty("geometry");
   animateSettle(before);
 }
 
@@ -1410,6 +1470,13 @@ function onConnectionPointerDown(event) {
 
 // ------------------------------------------------------------------ wheel
 
+// Trackpads and high-resolution wheels emit several wheel events per frame. Accumulating them and
+// applying one view change per animation frame keeps pan and zoom at the display rate instead of
+// stacking style/layout passes on every raw event.
+let wheelFrame = 0;
+let wheelPan = null;
+let wheelZoom = null;
+
 function onWheel(event) {
   if (!state.board) return;
   const table = event.target.closest?.(".mn-table");
@@ -1422,21 +1489,38 @@ function onWheel(event) {
   event.preventDefault();
   if (event.ctrlKey || event.metaKey) {
     const rect = viewportEl.getBoundingClientRect();
-    const px = event.clientX - rect.left;
-    const py = event.clientY - rect.top;
-    const worldX = (px - state.view.x) / state.view.zoom;
-    const worldY = (py - state.view.y) / state.view.zoom;
-    const factor = Math.exp(-event.deltaY * 0.0022);
-    const zoom = Math.min(4, Math.max(0.15, state.view.zoom * factor));
-    state.view.zoom = zoom;
-    state.view.x = px - worldX * zoom;
-    state.view.y = py - worldY * zoom;
-    notify("view");
-    renderView();
-    return;
+    if (!wheelZoom) wheelZoom = { factor: 1, px: 0, py: 0 };
+    wheelZoom.factor *= Math.exp(-event.deltaY * 0.0022);
+    wheelZoom.px = event.clientX - rect.left;
+    wheelZoom.py = event.clientY - rect.top;
+  } else {
+    if (!wheelPan) wheelPan = { dx: 0, dy: 0 };
+    wheelPan.dx -= event.deltaX;
+    wheelPan.dy -= event.deltaY;
   }
-  state.view.x -= event.deltaX;
-  state.view.y -= event.deltaY;
+  if (!wheelFrame) wheelFrame = requestAnimationFrame(applyWheelView);
+}
+
+function applyWheelView() {
+  wheelFrame = 0;
+  const pan = wheelPan;
+  const zoomStep = wheelZoom;
+  wheelPan = null;
+  wheelZoom = null;
+  if (!state.board) return;
+  if (pan) {
+    state.view.x += pan.dx;
+    state.view.y += pan.dy;
+  }
+  if (zoomStep) {
+    const zoom = Math.min(4, Math.max(0.15, state.view.zoom * zoomStep.factor));
+    const worldX = (zoomStep.px - state.view.x) / state.view.zoom;
+    const worldY = (zoomStep.py - state.view.y) / state.view.zoom;
+    state.view.zoom = zoom;
+    state.view.x = zoomStep.px - worldX * zoom;
+    state.view.y = zoomStep.py - worldY * zoom;
+    beginViewGesture();
+  }
   notify("view");
   renderView();
 }

@@ -72,12 +72,24 @@ rebuild (which would destroy the caret). Structural changes call `markDirty("boa
 
 ## Coordinate system
 
-The board is an infinite world plane. Scaling uses the CSS `zoom` property (not a transform scale)
-because Chromium re-lays out and re-rasterises text at the zoomed size, so cards stay sharp up to the
-maximum 400 percent zoom. The world element gets `zoom: view.zoom` and
+The board is an infinite world plane. At rest, scaling uses the CSS `zoom` property (not a transform
+scale) because Chromium re-lays out and re-rasterises text at the zoomed size, so cards stay sharp up to
+the maximum 400 percent zoom. The world element gets `zoom: view.zoom` and
 `transform: translate(view.x / zoom, view.y / zoom)`; the divide is required because CSS zoom also
 scales the translate. The screen formula stays `screen = pan + world * zoom`, so pointer maths is
 `world = (screen - view.pan) / zoom` and wheel zoom keeps the world point under the cursor fixed.
+
+While a zoom gesture is live the world instead gets `zoom: 1` and
+`transform: translate(view.x, view.y) scale(zoom)`. Changing the CSS zoom value re-lays out and
+re-rasterises every card, which on Windows/WebView2 costs more than a 144 Hz frame even on an
+eighteen-card board and hundreds of milliseconds on a five-hundred-card board. A composited scale is a
+GPU operation, so `interact.js` accumulates wheel steps into one view update per animation frame, calls
+`beginViewGesture()` and the board stays at the display rate. `render.js` closes the gesture after
+160 ms of quiet and repaints once with the exact CSS zoom, so text is crisp at rest. Measurements that
+divide a client rect by the zoom, or read a scroll height that CSS zoom would scale, use
+`usesTransformZoom()` so they stay correct in both paint modes. Because the view is written once per
+frame, `localStorage` persistence of the view is debounced (250 ms) instead of writing on every wheel
+event.
 
 The dotted grid is a CSS radial-gradient on the viewport with `background-size = grid * zoom` and
 `background-position = view.pan`, which keeps dots aligned with world coordinates at every zoom.
@@ -101,7 +113,17 @@ stray wheel event cannot silently scroll the canvas origin away from `view.pan`.
 Types: `note`, `heading`, `link`, `todo`, `document`, `comment`, `table`, `color`, `sketch`,
 `drawing`, `image`, `audio`, `video`, `map`, `file`, `board`, `column`. A column is a
 container whose children point at it through `parentId`; that link is cleared when a card is dragged
-out of a column. Link cards open through the Rust `open_external` command, which validates the URL
+out of a column. Dropping a dragged card commits with `markDirty("geometry")`, not `"board"`: a drop
+only changes positions, parentage and column order and the geometry pass applies those to the existing
+elements, while a full `render("board")` re-created every card element (about 340 ms on a board with
+19k nodes) and reloaded embedded media for a change that moved one card.
+
+While a card is dragged, its element keeps the position it had when the gesture started and the
+movement is a `transform: translate()` offset, so a pointermove updates the compositor instead of
+running layout and paint over the card, its shadow and its text. Children of a dragged column move with
+the same offset. On release the offsets are cleared and the committed left/top values are written by the
+geometry pass; `captureRects` runs before the clear so the settle animation still starts from what the
+user saw. Link cards open through the Rust `open_external` command, which validates the URL
 scheme and hands it to the system default handler (`xdg-open` / `open` / ShellExecuteW) instead of a
 WebView2 child window. Web links open in the browser; custom schemes such as `khaoyunote://` go to the
 registered application after the first-use confirmation, and `javascript:`, `data:`, `vbscript:`,

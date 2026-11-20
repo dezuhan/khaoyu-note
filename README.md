@@ -5,19 +5,19 @@ desktop app or a local browser host, stores every board in SQLite, and works wit
 network. A self-hosted collaboration service is under development in `service/`; it is experimental
 and not part of this release.
 
-> **0.36.3 local-first release:** backend controls stay disabled in the app. Sync, Share, Add Server
+> **0.36.4 local-first release:** backend controls stay disabled in the app. Sync, Share, Add Server
 > and the remote workspace sections are hidden; Local storage supports multiple boards, with **New
 > Board** in the Workspace popover. The self-hosted service in `service/` is experimental and not part
 > of this build, and backend connection files are gitignored.
 
 ## Downloads
 
-Version 0.36.3 local-first builds:
+Version 0.36.4 local-first builds:
 
-- Windows: `Khaoyu Note_0.36.3_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.3_x64_en-US.msi`
-- Linux: `Khaoyu.Note_0.36.3_amd64.deb`, `Khaoyu.Note_0.36.3_amd64.AppImage` or
-  `Khaoyu.Note-0.36.3-1.x86_64.rpm`
-- macOS: `Khaoyu.Note_0.36.3_universal.dmg`
+- Windows: `Khaoyu Note_0.36.4_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.4_x64_en-US.msi`
+- Linux: `Khaoyu.Note_0.36.4_amd64.deb`, `Khaoyu.Note_0.36.4_amd64.AppImage` or
+  `Khaoyu.Note-0.36.4-1.x86_64.rpm`
+- macOS: `Khaoyu.Note_0.36.4_universal.dmg`
 
 ![Khaoyu Note board](shots/board-light.png)
 
