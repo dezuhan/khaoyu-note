@@ -11,17 +11,28 @@ from it without copying a commit list.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-11-21
+
+Khaoyu Note is local-first only. The optional self-hosted service and every collaboration screen that
+depended on it are gone; boards, local accounts and settings stay on this device and the app still
+works offline.
+
 ### Removed
 
-- The self-hosted server component is gone: `service/` (Node 24 server, PostgreSQL/Redis storage,
-  account and admin pages, Docker images, deploy scripts), `contracts/` (sync API schemas and
-  fixtures), the service CI job, the service-only test tools and the service documentation. The local
-  app, the local web host and the MCP server are the whole product; boards still live in the local
-  SQLite database and no request leaves the machine.
-- The collaboration client is gone with it: sync, share, remote workspace, presence and live-board
-  modules, the sync/share/presence top-bar controls, the Settings Server pane and the service
-  sections of the offline Help. Local accounts, board templates, comments, notifications, backup and
-  the MCP server stay exactly as they were.
+- The self-hosted server component: `service/` (Node 24 server, PostgreSQL/Redis storage, account
+  and admin pages, Docker images, deploy scripts), `contracts/` (sync API schemas and fixtures), the
+  service CI job, the service-only test tools and the service documentation. The local app, the local
+  web host and the MCP server are the whole product; boards still live in the local SQLite database
+  and no request leaves the machine.
+- The collaboration client: sync, share, remote workspace, presence and live-board modules, the
+  sync/share/presence top-bar controls, the Settings Server pane and the service sections of the
+  offline Help. Local accounts, board templates, comments, notifications, backup and the MCP server
+  stay exactly as they were.
+
+### Performance
+
+- Installers are built with thin LTO, one codegen unit and stripped symbols, so the app and MCP
+  binaries are smaller and the hot paths gain from cross-crate inlining.
 
 ## [0.36.5] - 2026-11-21
 
