@@ -5815,6 +5815,25 @@ html[data-performance="true"] *::after {
   backdrop-filter: none !important;
 }
 
+/* Modal overlays keep their glass. They open occasionally, so the blur cannot cost a board frame,
+   and the overlay is part of how the app looks; only the chrome that sits over the board while it is
+   being panned and zoomed loses its blur in this mode. */
+html[data-performance="true"] :is(
+  .mn-overlay,
+  .mn-prefs-overlay,
+  .mn-sync-overlay,
+  .mn-share-overlay,
+  .mn-onboard-overlay
+) {
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+html[data-performance="true"] .mn-palette-backdrop {
+  -webkit-backdrop-filter: blur(3px) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
 /* One settle swap of transform -> CSS zoom, during which nothing may animate. */
 html.is-view-settling .mn-world,
 html.is-view-settling .mn-world * {
