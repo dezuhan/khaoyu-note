@@ -187,20 +187,10 @@ export async function openExternal(url) {
   return null;
 }
 
-export function oidcStartListener() {
-  if (!hasTauri) return Promise.resolve(null);
-  return invoke("start_oidc_listener");
-}
-
 /// Collect a `khaoyunote://` link that the OS delivered before the webview was ready.
 export async function takePendingDeepLink() {
   if (!hasTauri) return null;
   return invoke("take_pending_deep_link");
-}
-
-export function oidcPollLogin(port) {
-  if (!hasTauri) return Promise.resolve(null);
-  return invoke("poll_oidc_login", { port });
 }
 
 export async function openPath(path) {
@@ -504,14 +494,3 @@ export async function resetAllData() {
   throw new Error("Reset is available in the desktop app or the local web host");
 }
 
-// Full URLs this host can be reached on. Only the browser edition has share URLs.
-export async function shareInfo() {
-  if (!hasWeb) return null;
-  try {
-    const response = await fetch("/api/share-info", { credentials: "include" });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}

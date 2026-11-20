@@ -1,29 +1,19 @@
 # Khaoyu Note Roadmap
 
-This roadmap covers the move from a local-first desktop app to an optional self-hosted service with
-accounts, sharing and collaboration, plus an optional AI assistant that can organise boards and
-research with explicit permissions.
+Khaoyu Note is a local-first desktop app: boards live in a local SQLite database, the app works
+offline, and there is no account, server or sync layer. The roadmap covers the local app, the local web
+host, the MCP server and the optional AI assistant that can organise boards with explicit permissions.
 
 Status: `[x]` means done and verified in this repository. `[ ]` means planned, or partial with the
-remaining work named in the item. See `docs/production-readiness.md` for the current collaboration and
-Turso release verdict.
+remaining work named in the item.
 
-Where the plan stands: 0.36.0 is a local-first release; the backend, sync and sharing work in
-Milestones 1 to 5 is implemented in `service/` but disabled in that build and tracked under
-`[Unreleased]` in `CHANGELOG.md`. The next-release priorities below turn that deferred work into an
-ordered backend release plan. Milestone 6 is mostly done, with the external
-penetration test and production-scale load testing still open. Milestone 7 is limited by external
-credentials and native runners, not by missing code. Milestone 8, the AI assistant, has not been
-started and needs its own consent, tool-gateway and prompt-injection design first. Milestone 11,
-full localisation coverage, is planned: the current ten-language catalogue only covers the settings
-surface and parts of the chrome, and the service/admin pages are English-only.
-
-0.36.2 keeps the 0.36 line local-first: the self-hosted service in `service/` is **experimental** and
-not part of the supported release surface. The backend priorities below stay deferred until the
-collaboration architecture (embedded sidecar versus a Rust server) is decided.
+> The milestones below were written for an optional self-hosted collaboration service. That service
+> (accounts, workspaces, sync, sharing links, the admin dashboard, email delivery and realtime events)
+> was removed after 0.36.5, so its milestones are kept only as history and are no longer planned work.
+> The local app, the local web host and the MCP server are the whole supported product.
 
 Verification note: checkboxes were reconciled with the 0.36.0 code and test evidence on 2026-11-12.
-`docs/production-readiness.md` carries the current release verdict.
+the release verdict lives in `CHANGELOG.md`.
 
 ## Next release priorities (from Unreleased)
 
@@ -108,7 +98,7 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 - [x] Boards, cards and columns are scoped to one local database.
 - [~] First-run database setup shell: single-user Local SQLite works; the collaboration choice now
   hands off to Server sync. Turso remains **not production ready**. Team onboarding still needs a
-  guided service connection in `docs/production-readiness.md`.
+  guided service connection in the release notes.
 
 ## Product goals
 
@@ -116,7 +106,7 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 - [~] 2. Offer an optional self-hosted server for teams that want accounts and sharing. (`service/`
   implements this with password, passkey and optional Google/GitHub sign-in; production readiness is
   still pending live provider verification, load tests, penetration testing and a guided team
-  onboarding, see `docs/production-readiness.md`.)
+  onboarding.)
 - [x] 3. Support login and roles, but never make login mandatory for local boards. (Local-first guest
   mode does this; the service requires accounts only for synced projects.)
 - [x] 4. Share a whole project, a single card, or a column without exposing the rest of the board.
@@ -248,7 +238,7 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 ### Input and output safety
 
 - [~] Server-side validation for every request body, parameter and upload (implemented across the
-  service routes; per-endpoint completeness is tracked in `docs/security-audit.md`).
+  service routes).
 - [x] Upload filename sanitisation, MIME sniffing, size limits and malware scanning hooks.
 - [x] Markdown and rich text sanitised on the server before rendering. Shared `html`/`markdown` fields pass an allowlist sanitizer before leaving the API.
 - [~] Stored XSS prevention through context-aware escaping and a strict CSP (CSP is enforced on every
@@ -263,7 +253,7 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 - [x] Separate database credentials per service and least-privilege database roles: `service/deploy/postgres-least-privilege.sql` creates a data-only application role; SQLite deployments use the OS file permissions/volume.
 - [x] No secret material in client bundles, crash reports or analytics.
 - [x] Structured audit logs for login, permission changes, share changes and destructive actions.
-- [x] Audit retention and export policy defined per deployment (retention and admin export are implemented; see `docs/data-residency.md`).
+- [x] Audit retention and export policy defined per deployment (retention and admin export were implemented for the removed service).
 - [x] Dependency scanning, container scanning and a documented patch cadence.
 - [x] Security headers: HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`.
 - [x] Admin endpoints separated, authenticated, rate limited and audited.
@@ -291,7 +281,7 @@ in stages, in this order. The source material is the `[Unreleased]` section of
 Migrate the self-hosted collaboration layer to a scalable real-time architecture using PostgreSQL and Redis, while preserving SQLite for single-user, zero-account offline use.
 
 Status: the service implements most of this block. Realtime transport is SSE plus HTTP operation
-batches; WebSocket remains deferred by design (`docs/backend-postgres-redis.md`). The per-item notes
+batches; WebSocket remains deferred by design (PostgreSQL and Redis design notes). The per-item notes
 record what exists and what is still partial.
 
 - [~] **Dual database strategy** (SQLite and PostgreSQL adapters, the async storage facade and paired

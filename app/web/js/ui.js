@@ -4,7 +4,6 @@ import { createDocumentation } from "./documentation.js";
 import { initAccountUI } from "./account-ui.js";
 import { openImageCrop } from "./image-crop.js";
 import { isTemporarilyDisabledType, toolDisabledReason } from "./limits.js";
-import { openSharePanel } from "./share-ui.js";
 import * as bridge from "./bridge.js";
 import { closeDocumentEditor, documentEditorOpen, openDocumentEditor } from "./document-editor.js";
 import { closeDrawingEditor, drawingEditorOpen, openDrawingEditor } from "./drawing-editor.js";
@@ -65,7 +64,6 @@ import { initFileDrop } from "./file-drop.js";
 import { initNotifications } from "./notifications.js";
 import { createTemplateFromSelection, openTemplateLibrary } from "./templates.js";
 import { icon } from "./icons.js";
-import { openWorkspacePopover } from "./workspace-mode.js";
 import { CARD_ASPECTS, columnChildren, createCard, getCard, layoutColumns, TYPE_LABELS } from "./model.js";
 import { cardElement, renderView } from "./render.js";
 import { clearDropPreview, previewDrop } from "./drop-preview.js";
@@ -1162,13 +1160,9 @@ function openLanguagePopover(button) {
 }
 
 function refreshTopbarLanguage() {
-  if (refs.shareButton) {
-    const label = refs.shareButton.querySelector(".mn-access-label");
-    if (label) label.textContent = t("topbar.share");
-  }
   if (refs.templateBtn) {
-    const label = refs.templateBtn.querySelector("span:not(.mn-tool-icon)");
-    if (label) label.textContent = "Workspace";
+    const label = refs.templateBtn.querySelector("span");
+    if (label) label.textContent = t("menu.templates");
   }
   if (refs.commandSearchBtn) {
     const label = refs.commandSearchBtn.querySelector("span");
@@ -1188,19 +1182,14 @@ function wireTopbar() {
   el.redoBtn.innerHTML = icon("redo", 16);
   el.helpBtn.innerHTML = icon("help", 16);
   el.settingsBtn.innerHTML = icon("settings", 16);
-  if (el.shareButton) {
-    el.shareButton.innerHTML = `${icon("share", 14)}<span class="mn-access-label">${t(
-      "topbar.share"
-    )}</span>`;
-  }
   el.themeBtn.innerHTML = icon("sun", 16);
   if (el.languageBtn) el.languageBtn.innerHTML = icon("globe", 16);
-  el.commentCount.innerHTML = `${icon("comment", 14)}<span>0</span>`;
   if (el.templateBtn) {
-    el.templateBtn.innerHTML = `${icon("grid", 14)}<span>Workspace</span>`;
-    el.templateBtn.title = "Workspace and servers";
-    el.templateBtn.addEventListener("click", () => openWorkspacePopover(el.templateBtn));
+    el.templateBtn.innerHTML = `${icon("grid", 14)}<span>${t("menu.templates")}</span>`;
+    el.templateBtn.title = t("menu.templates");
+    el.templateBtn.addEventListener("click", () => openTemplateLibrary());
   }
+  el.commentCount.innerHTML = `${icon("comment", 14)}<span>0</span>`;
   el.homeBtn.addEventListener("click", () => openTemplateLibrary());
   el.undoBtn.addEventListener("click", undo);
   el.redoBtn.addEventListener("click", redo);
@@ -2143,7 +2132,6 @@ window.addEventListener("mn:open-menu", (event) => {
         });
         items.push({ type: "sep" });
       }
-      items.push({ text: "Share link", onClick: () => openSharePanel(card), disabled: true });
       items.push({ type: "sep" });
       if (isBoard) {
         items.push({ text: "Open board", kbd: "Enter", onClick: () => openBoardCard(card) });

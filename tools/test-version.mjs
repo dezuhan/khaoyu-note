@@ -8,7 +8,6 @@ function jsonVersion(file) {
 
 const rootPkg = jsonVersion("package.json");
 const appPkg = jsonVersion("app/package.json");
-const servicePkg = jsonVersion("service/package.json");
 const tauri = JSON.parse(fs.readFileSync("app/src-tauri/tauri.conf.json", "utf8")).version;
 const cargo = fs
   .readFileSync("app/src-tauri/Cargo.toml", "utf8")
@@ -18,10 +17,6 @@ const cargoLock = fs
   .match(/name = "khaoyu-note"\r?\nversion = "([^"]+)"/)?.[1];
 const appLock = JSON.parse(fs.readFileSync("app/package-lock.json", "utf8")).version;
 const rootLock = JSON.parse(fs.readFileSync("package-lock.json", "utf8")).version;
-const serviceLock = JSON.parse(fs.readFileSync("service/package-lock.json", "utf8")).version;
-const docker = fs
-  .readFileSync("service/docker-compose.yml", "utf8")
-  .match(/image: khaoyu-note-service:([0-9]+\.[0-9]+\.[0-9]+)/)?.[1];
 const readme = fs.readFileSync("README.md", "utf8");
 const landing = fs.readFileSync("index.html", "utf8");
 
@@ -30,12 +25,9 @@ const versions = {
   "package-lock.json": rootLock,
   "app/package.json": appPkg,
   "app/package-lock.json": appLock,
-  "service/package.json": servicePkg,
-  "service/package-lock.json": serviceLock,
   "tauri.conf.json": tauri,
   "Cargo.toml": cargo,
   "Cargo.lock": cargoLock,
-  "docker-compose.yml": docker,
 };
 
 const expected = rootPkg;

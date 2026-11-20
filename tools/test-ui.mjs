@@ -2243,50 +2243,27 @@ check(
   `top ${Math.round(settingsGeometry.top)}, bottom ${Math.round(settingsGeometry.bottom)}, viewport ${settingsGeometry.viewportHeight}`
 );
 check(
-  "Settings > Server reports Local storage while a local board is active",
-  (await page.locator('[data-role="content"]').innerText()).includes("Mode: Local storage") &&
-    (await page.locator('[data-role="content"]').innerText()).includes("Server: not connected")
+  "Settings opens on General while a local board is active",
+  (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "General"
 );
 check(
-  "Settings > Server no longer exposes the public share URL field",
-  (await page.locator(".mn-public-share").count()) === 0
-);
-check(
-  "Topbar language button is enabled",
-  (await page.locator("#language-btn").isVisible()) && !(await page.locator("#language-btn").isDisabled())
-);
-check(
-  "Server is the first settings page",
-  (await page.locator(".mn-prefs-nav-item.is-active").innerText()).trim() === "Server"
+  "Settings no longer exposes the Server or Account pages",
+  (await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).count()) === 0 &&
+    (await page.locator(".mn-prefs-nav-item", { hasText: "Account" }).count()) === 0
 );
 const navLabels = (await page.locator(".mn-prefs-nav-item").allInnerTexts()).map((label) => label.trim());
 check(
   "Settings navigation follows the local-first order",
-  navLabels.join(",") ===
-    "Server,General,Backup,Appearance,Tools,Board templates,Performance,MCP,About",
+  navLabels.join(",") === "General,Backup,Appearance,Tools,Board templates,Performance,MCP,About",
   navLabels.join(", ")
 );
-check("Settings navigation has two dividers", (await page.locator(".mn-prefs-nav-sep").count()) === 2);
+check("Settings navigation has one divider", (await page.locator(".mn-prefs-nav-sep").count()) === 1);
 check(
-  "Settings overlay uses a blurred glass backdrop",
-  (await page.locator(".mn-prefs-overlay").evaluate((el) => getComputedStyle(el).backdropFilter)).includes("blur")
+  "Topbar no longer exposes share, sync or presence controls",
+  (await page.locator("#share-btn").count()) === 0 &&
+    (await page.locator("#sync-state").count()) === 0 &&
+    (await page.locator("#presence").count()) === 0
 );
-check(
-  "Settings no longer exposes an Account page",
-  (await page.locator(".mn-prefs-nav-item", { hasText: "Account" }).count()) === 0
-);
-await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
-await page.waitForTimeout(300);
-check(
-  "Server page shows local runtime details and the Local storage mode",
-  (await page.locator('[data-role="content"]').innerText()).includes("This computer") &&
-    (await page.locator('[data-role="content"]').innerText()).includes("Connection details for this computer") &&
-    (await page.locator('[data-role="content"]').innerText()).includes("Mode: Local storage") &&
-    (await page.locator(".mn-account-card").count()) === 0 &&
-    !(await page.locator('[data-role="content"]').innerText()).includes("Change connection") &&
-    !(await page.locator('[data-role="content"]').innerText()).includes("Account or change server")
-);
-check("Server page no longer contains account backup controls", (await page.locator(".mn-account-backup").count()) === 0);
 await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();
 await page.waitForTimeout(300);
 check(
@@ -2330,8 +2307,7 @@ check(
 );
 check(
   "Language switch updates settings labels",
-  (await page.locator(".mn-prefs-nav-item").first().innerText()).includes("Server") &&
-    (await page.locator(".mn-prefs-nav-item").nth(1).innerText()).includes("Umum"),
+  (await page.locator(".mn-prefs-nav-item").first().innerText()).includes("Umum"),
   (await page.locator(".mn-prefs-nav").innerText()).replace(/\n/g, ",")
 );
 await page.locator(".mn-prefs-select select").first().selectOption("en");
@@ -2362,7 +2338,7 @@ check(
   Math.abs(parseFloat(nestedRadius.shell) - (parseFloat(nestedRadius.dialog) - parseFloat(nestedRadius.padding))) < 0.6,
   `${nestedRadius.dialog} - ${nestedRadius.padding} = ${nestedRadius.shell}`
 );
-check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 9, String(await page.locator(".mn-prefs-nav-item").count()));
+check("Settings has only the essential categories", (await page.locator(".mn-prefs-nav-item").count()) === 8, String(await page.locator(".mn-prefs-nav-item").count()));
 check(
   "Language and Canvas are merged away",
   !navLabels.some((label) => ["Language", "Canvas", "Integrations", "History Log", "Scratch Disks", "Plug-ins", "Units & Rulers"].includes(label)),
@@ -2512,7 +2488,7 @@ check(
 await page.evaluate(() => {
   document.querySelector(".mn-prefs-content").scrollTop = 240;
 });
-await page.locator(".mn-prefs-nav-item", { hasText: "Server" }).click();
+await page.locator(".mn-prefs-nav-item", { hasText: "Backup" }).click();
 await page.waitForTimeout(200);
 const settingsScrollTop = await page.evaluate(
   () => document.querySelector(".mn-prefs-content").scrollTop

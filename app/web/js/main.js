@@ -7,10 +7,6 @@ import { initExternalLinks } from "./external-links.js";
 import { initRender, render, renderSelection, renderView } from "./render.js";
 import { initSettings } from "./settings.js";
 import { initDeepLinks } from "./deep-links.js";
-import { initLiveBoard } from "./live-board.js";
-import { initSyncUI, refresh as refreshSync } from "./sync-ui.js";
-import { applyReadOnlyViewer, openShareFromQuery, openWorkspaceFromQuery, takeOidcReturn } from "./workspace-mode.js";
-import { initShareUI } from "./share-ui.js";
 import { initUpdateUI } from "./update-ui.js";
 import {
   createBoard,
@@ -26,7 +22,6 @@ import { backfillLinkHeaders } from "./actions.js";
 import { initSetupGate } from "./setup.js";
 import { initLanguage } from "./i18n.js";
 import { initPerfOverlay } from "./perf-overlay.js";
-import { BACKEND_ENABLED } from "./features.js";
 
 const refs = {
   viewport: document.getElementById("viewport"),
@@ -44,10 +39,6 @@ const uiRefs = {
   menubar: document.getElementById("menubar"),
   commandSearchBtn: document.getElementById("command-search-btn"),
   saveState: document.getElementById("save-state"),
-  syncButton: document.getElementById("sync-state"),
-  syncState: document.getElementById("sync-state"),
-  presence: document.getElementById("presence"),
-  shareButton: document.getElementById("share-btn"),
   accountBtn: document.getElementById("account-btn"),
   undoBtn: document.getElementById("undo-btn"),
   redoBtn: document.getElementById("redo-btn"),
@@ -85,74 +76,24 @@ function syncBoardUrl() {
   }
 }
 
-function showShareBootError(error) {
-  const overlay = document.createElement("div");
-  overlay.className = "mn-overlay";
-  overlay.dataset.role = "share-error";
-  overlay.innerHTML = `<section class="mn-modal" role="dialog" aria-modal="true" aria-label="Share link">
-    <header class="mn-modal-head"><h2 class="mn-modal-title">Shared board</h2></header>
-    <div class="mn-modal-body"><p>${String(error?.message || "This share link is invalid or expired.")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")}</p></div>
-    <footer class="mn-modal-foot"><button type="button" class="mn-btn" data-role="share-error-close">Close</button></footer>
-  </section>`;
-  document.body.append(overlay);
-  overlay.querySelector('[data-role="share-error-close"]').addEventListener("click", () => overlay.remove());
-}
-
 async function boot() {
   initTheme();
   initLanguage();
   initPerfOverlay();
   void initExternalLinks();
-  // The OIDC popup redirects here with a token fragment; hand it to the opener and close before
-  // the normal board UI boots.
-  if (takeOidcReturn()) {
-    document.getElementById("boot")?.remove();
-    return;
-  }
-  const shareToken = BACKEND_ENABLED
-    ? new URLSearchParams(window.location.search).get("share") || ""
-    : "";
-  if (!shareToken) {
-    // After a reset, choose the storage direction before any board or setting is read.
-    await initSetupGate();
-    await initAuth();
-  }
+  // After a reset, choose the storage direction before any board or setting is read.
+  await initSetupGate();
+  await initAuth();
   await initSettings();
   initRender(refs);
   initInteractions(refs);
   initUI(uiRefs);
-  if (!BACKEND_ENABLED) document.getElementById("app")?.classList.add("is-local-only");
-
-  if (shareToken) {
-    // A public share is a full-page read-only board, not a separate server preview. The normal
-    // chrome stays visible while tools, mutations and shortcuts are disabled.
-    try {
-      await openShareFromQuery();
-      applyReadOnlyViewer();
-      render("board");
-      renderView();
-    } catch (error) {
-      showShareBootError(error);
-    }
-    document.getElementById("boot")?.remove();
-    return;
-  }
-
-  if (BACKEND_ENABLED) {
-    initSyncUI(uiRefs);
-    initLiveBoard();
-    initShareUI(uiRefs);
-  }
   initContextMenu();
 
   subscribe((kind) => {
     if (kind === "board" || kind === "geometry") render(kind);
     else if (kind === "view") renderView();
     else if (kind === "selection") renderSelection();
-    if (kind === "board" || kind === "save" || kind === "history") refreshSync();
     if (kind === "board") {
       syncBoardUrl();
       setTimeout(() => void backfillLinkHeaders(), 400);
@@ -179,20 +120,9 @@ async function boot() {
     if (next) await openBoard(next.id);
     else await createBoard("Home", { withWelcome: true });
   }
-  // A remote workspace board has no SQLite row, so reopen it from the durable local mirror. This
-  // also works offline; queued changes stay in the sync queue until the server is reachable.
-  const preferredRemote = BACKEND_ENABLED ? requested || last : "";
-  if (preferredRemote && !state.boards.some((board) => board.id === preferredRemote)) {
-    const { openCachedBoard } = await import("./workspace-mode.js");
-    await openCachedBoard(preferredRemote);
-  }
   syncBoardUrl();
   render("board");
   renderView();
-  refreshSync();
-  if (await openWorkspaceFromQuery()) {
-    // The local editor is still the main UI; the workspace picker is only a popover.
-  }
   initUpdateUI();
   initAutoBackup();
   initDeepLinks();

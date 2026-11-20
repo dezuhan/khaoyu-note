@@ -28,8 +28,8 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `actions.js` | user-level operations: add, delete, duplicate, clipboard, upload, export, free-spot placement |
 | `render.js` | DOM construction per card type, geometry, selection, connections, canvas painting |
 | `interact.js` | pointer, wheel and keyboard interactions; inline editing; sketch drawing |
-| `ui.js` | tool rail, top bar (including the disabled language button), breadcrumbs, zoom bar, modals, menus, toasts, shortcuts, context menu |
-| `home.js` | dormant Home gallery code; multi-project Home is disabled in the single-file UI |
+| `ui.js` | tool rail, top bar, breadcrumbs, zoom bar, modals, menus, toasts, shortcuts, context menu |
+| `home.js` | Home gallery: board list and New Board entry |
 | `file-drop.js` | native OS drag and drop: extension routing to image, audio, video or file cards, asset storage through `store_asset_from_path`, drag overlay |
 | `templates.js` | header template library: Blank, Welcome, Project plan, Kanban, Meeting notes and Moodboard starters, applied in place with undo |
 | `document-editor.js` | full page document editor: formatting toolbar with anchored insert/style menus, rich text, export |
@@ -37,16 +37,14 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `comments-panel.js` | top bar comments popup: collects threads across the board tree, navigates to cards |
 | `notifications.js` | top bar notification center: ingests comment activity, unread badge, read/unread/remove/delete-all actions, persists through app settings |
 | `context-toolbar.js` | floating bottom toolbar: markdown formatting for note/heading text, Move/Pen/Eraser for drawing |
-| `settings.js` | preferences dialog: General, Appearance, Tools, Board templates, Performance, Backup and the Account, MCP and About pages |
+| `settings.js` | preferences dialog: General, Backup, Appearance, Tools, Board templates, Performance, MCP and About |
 | `i18n.js` | ten-language settings localization, persisted in `mn.language`; board content is never translated |
-| `sync.js` / `sync-ui.js` | opt-in per-board sync client, plus its dialog and status pill |
-| `share.js` / `share-ui.js` | service sharing API client and the board or card share panel |
 | `command-palette.js` | Ctrl+K command palette with recently used commands |
 | `color-picker.js` / `color-names.js` | HSV colour picker and the named-colour lookup |
 | `image-crop.js` | crop overlay for image cards and link header images |
 | `preview.js` | mini board painter used by home cards and board cards |
 | `limits.js` | upload size cap, blocked-extension policy, and the temporarily disabled tool list |
-| `setup.js` | first-run storage setup after reset: single user, local SQLite, Turso and collaboration choices |
+| `setup.js` | clears the one-shot reset flag before the local database is opened |
 | `documentation.js` | offline Help > Documentation content |
 | `time.js` | absolute comment timestamps |
 | `icons.js` | inline SVG icon set |
@@ -444,164 +442,12 @@ host local-only.
 The browser cannot receive absolute OS drop paths or start the stdio MCP binary. Both remain
 desktop-only; the browser uses the file picker for uploads.
 
-## Self-hosted service foundation
+## Removed: self-hosted service
 
-`service/` is a standalone Node 24 process for the Milestone 1 self-hosted foundation. It loads
-configuration from `KHAOYU_SERVICE_*` environment variables, refuses to start when the secret is
-missing, short, repetitive or a placeholder, and fails when a migration is pending.
-
-The service is moving to a team backend with PostgreSQL as the system of record and Redis for
-cross-instance realtime coordination. The storage adapter, configuration and Compose services are in
-progress; the decision record and rollout phases are in
-[backend-postgres-redis.md](backend-postgres-redis.md). The desktop app and local web host stay on
-SQLite.
-
-The SQLite schema covers accounts, sessions, projects, project memberships, project snapshots, audit
-rows and content-addressed objects. Migrations live in `service/src/migrations` as paired up and down
-SQL files and are recorded in `schema_migrations`; the server never migrates automatically. Accounts
-carry a global `role` (`admin` or `member`), `status` (`active` or `disabled`), optional names and an
-avatar. Migration 13 promotes the oldest account to admin; a fresh database makes the first registered
-account or bootstrap account admin.
-
-The service now starts two listeners instead of one. A frontend listener serves the browser pages and
-proxies `/api`, `/healthz` and `/readyz` to a backend listener; the backend only answers API and health
-requests. Both ports are chosen from the free 5-digit range 20000 to 59999, are guaranteed distinct,
-can be fixed with `KHAOYU_SERVICE_FRONTEND_PORT` and `KHAOYU_SERVICE_BACKEND_PORT`, and are written to
-`<data>/runtime.json`. The frontend proxy keeps cookies, CSRF and the public URL on one browser origin.
-`npm run start:background` launches the pair detached with logs under `<data>/logs`; `npm run stop`
-uses the runtime PID.
-
-The service serves browser pages at `/login`, `/register`, `/reset`, `/passkeys`, `/s/:token` and
-`/admin`; `/shares` redirects to `/admin#sharing` because sharing is a section of the dashboard. Login, signup and reset are separate centred auth cards using `ky.css` and
-`auth.css`; reset uses the current password and has no email-token step. `/account` redirects to
-`/admin`, where the Account section handles password changes, sessions, API tokens and sign out. The
-admin page uses the normal account session, requires the global admin role and calls
-`/api/v1/admin/dashboard`, `/users`, `/teams` and `/activity`; every mutation goes through the same
-CSRF check and writes `admin.*` audit rows. The page keeps the left navigation rail and adds a top
-menu bar (Dashboard/Help, command search, theme toggle and a circular account menu) above the content
-pane, reuses the main app logo, SVG icon set and fonts, uses `ky.css` tokens for light and dark
-themes, and shows profile pictures or initials, role and status. The
-operator `KHAOYU_SERVICE_ADMIN_TOKEN` remains only for scripted access to the legacy JSON admin
-endpoints.
-
-Object storage writes `sha256` content under opaque two-level paths and deduplicates by hash. Audit
-rows store an HMAC of the IP address, never the raw address. The worker prunes old temp files and
-audit rows, creates a consistent `VACUUM INTO` backup on its interval and enforces backup retention.
-Restore verifies the manifest checksum and database integrity, keeps a `restore-previous-*` copy and
-rolls back if the replacement fails.
-
-`GET /healthz` and `GET /readyz` return only a status and no version, database path or configuration.
-The service listens on one port and binds to loopback by default. Docker Compose runs it as
-non-root, with a read-only root filesystem, no capabilities and a writable `/data` volume. Client
-sync, login and sharing are intentionally absent until Milestones 2 to 4.
-
-## Authentication and sessions
-
-`service/src/auth` implements the Milestone 2 account core. Passwords use Argon2id with a per-user
-salt. Email addresses are normalized to lowercase and unique. Registration queues a verification
-token; login is refused until the account is verified. Tokens for verification and reset are random,
-single use, short lived and stored as SHA-256 hashes.
-
-Login creates a session family with a 15 minute access token and a 7 day rotating refresh token.
-Every refresh marks the old token used and writes a replacement. Replaying an already used or
-revoked refresh token revokes the whole family. Session rows carry device, IP hash and user agent;
-access and refresh tokens are hashed at rest. Cookie authentication requires the double-submit CSRF
-header for writes, while bearer access tokens skip that check. Login failures are counted per email
-and IP with a fixed window, a progressive `Retry-After` and a structured warning event.
-
-TOTP uses a base32 secret, SHA-1 HMAC, six digits and a 30 second period with one step of clock
-skew. Scoped API tokens use the `khn_` prefix, are stored hashed, grant `projects:read` or
-`projects:write`, and cannot manage sessions or account settings. Account deletion is scheduled with
-a grace period, can be cancelled, exports account, project metadata and accessible snapshots first, and
-is purged by the worker when due. Verification and reset mail is written to a mode `0600` outbox because an SMTP
-adapter is still pending.
-
-## Sharing and membership
-
-`service/src/sharing.mjs` implements Milestone 3. A project keeps `public_sharing_enabled` off by
-default. Share links are scoped to a project, one item, or one column and store only a SHA-256 token
-hash; the raw token is returned once. Links support expiry, optional Argon2id passphrases,
-revocation, rotation and per-link/IP attempt limits. Public access returns a neutral 404 for
-invalid, expired, revoked, rotated or wrong-passphrase tokens, sets `X-Robots-Tag: noindex`, audits
-the link id and IP hash, strips local asset paths and omits the trash. Item shares contain one card and
-no project title; column shares contain the column and its current children with a notice about later
-additions.
-
-Project invitations are email-bound, single use, expiring and revocable; only an owner can create or
-revoke one. Accepting an invitation adds the account with the invited role. Members are listed with
-roles, roles can be changed by the owner, the owner cannot be removed directly, and ownership
-transfer swaps both roles in one transaction. Share-token write permissions, asset download
-watermarking and a global sharing kill switch remain pending.
-
-Share links enforce view, comment, edit and manage by rank. Comment writes append `shareComments` to
-a card inside the link scope, never to a sibling card, and edits are limited to a field allowlist
-with an optional revision check. Each write creates a revision, emits a snapshot event, audits the
-link and notifies owners.
-
-## Operator admin
-
-When `KHAOYU_SERVICE_ADMIN_TOKEN` is set, `/api/v1/admin/audit`, `/admin/abuse-reports` and
-`/admin/stats` use a separate bearer token, a 60 requests per minute per-IP limit and audited export.
-The admin token is independent from user sessions and API tokens. Unset means the routes do not
-exist.
-
-## Desktop sync
-
-`app/web/js/sync.js` keeps the local board authoritative until the user enables sync for that board.
-The sync control stores a service URL and a signed-in account, creates a server project on first
-enable, pushes snapshots with the server revision and pulls when the server is ahead. Signing in uses
-`POST /api/v1/auth/sync-token` with the account email and password; the service returns a scoped
-project token that the client stores and never shows, revoking the previous sync token on each
-sign-in. Both local and remote
-changes produce an explicit conflict with Use server and Keep local choices. Failed pushes enter a
-local queue and retry when online. Deleting or disabling a local board never deletes server data;
-there is no server project delete call in the sync client.
-
-`normalizeServerUrl` accepts a bare host or `host:port`, so a local service can be entered with its
-printed frontend port, for example `127.0.0.1:29194` or `localhost:29194`. Loopback and private
-addresses get an `http` scheme; any other
-host defaults to `https`, and credentials in the URL are rejected. `checkServerReachable` calls
-`/readyz` before credentials are sent, then `signIn` exchanges the email and password for the token,
-and `checkConnection` uses an authenticated `GET /api/v1/projects` to prove the account and the
-database round trip. The sync dialog, the first-run screen and the Account pane all render that state
-(connected, unreachable, database not ready, sign in rejected, missing project access).
-The desktop CSP allows `http://localhost:*` and `http://127.0.0.1:*` in `connect-src` for this path,
-and the service snapshot route accepts documents up to 8 MB so real boards fit, while the smaller
-account endpoints keep the 64 KB JSON body limit.
-
-`service/src/http.mjs` and the API router accept bearer-token CORS preflight only from
-`KHAOYU_SERVICE_CORS_ORIGINS`, with no credentials. The default list contains the Tauri origins and
-the local web host (`http://127.0.0.1:1430`, `http://localhost:1430`), so both the desktop app and the
-browser build can sync to a local service. The desktop token is stored in webview local
-storage, which is documented as a residual risk in the security audit.
-
-## Email delivery
-
-`service/src/auth/mailer.mjs` selects SMTP when `KHAOYU_SERVICE_SMTP_HOST` is set and otherwise writes
-mode `0600` JSON files to the outbox. SMTP uses `nodemailer`, optional username and password and
-implicit TLS. Notification email is opt-in per account, includes a signed unsubscribe link, and is
-rate limited to one per account per five minutes. Verification, reset and invitation mail remain
-transactional.
-
-## Notifications
-
-`service/src/notifications.mjs` stores per-account notifications with a resource type and id.
-Creation happens on invitation acceptance, role changes, revision restores and share reports.
-Listing joins current project membership, so access changes hide old notifications immediately.
-Share revocation and disabling project sharing remove their pending notifications. Read state is
-filtered by account id on every update. Email delivery and unsubscribe preferences are not
-implemented yet.
-
-## Revision history and realtime events
-
-Every accepted project snapshot writes a row to `project_versions`. Members can list the latest 100
-revisions; editors and owners can restore one, which creates a new revision instead of rewriting
-history. The worker trims older versions per project.
-
-`service/src/events.mjs` keeps in-memory per-project rooms. `GET /api/v1/projects/:id/events` checks
-membership before opening an SSE stream, emits presence counts and snapshot events, and sends a
-heartbeat. Events are published only to the matching project room; server shutdown closes streams
-before the listener. Offline queues and cursor or lock awareness are not implemented yet.
+The optional self-hosted service (accounts, workspaces, sync, sharing links, the admin dashboard,
+email delivery and realtime events) was removed after 0.36.5. The local app, the local web host and
+the MCP server are the whole product: every board lives in the local SQLite database, no request
+leaves the machine, and there is no account layer to configure.
 
 ## MCP server
 

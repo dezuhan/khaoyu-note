@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_THEME,
-  SERVICE_LEGACY_KEYS,
   SKINS,
   applyTheme,
   initTheme,
@@ -23,18 +22,17 @@ function memoryStorage(initial = {}) {
   };
 }
 
-test("exposes the four bundled skins and the service legacy keys", () => {
+test("exposes the four bundled skins", () => {
   assert.deepEqual(SKINS, ["light", "softLight", "softDark", "dark"]);
-  assert.deepEqual(SERVICE_LEGACY_KEYS, ["khaoyu.admin.theme", "khaoyu.auth.theme"]);
   assert.equal(isTheme("softDark"), true);
   assert.equal(isTheme("neon"), false);
 });
 
 test("reads the active key before legacy keys and migrates on set", () => {
-  const storage = memoryStorage({ "khaoyu.theme": "softDark", "khaoyu.auth.theme": "dark" });
-  assert.equal(readStoredTheme({ key: "khaoyu.theme", legacyKeys: ["khaoyu.auth.theme"], storage }), "softDark");
-  const legacy = memoryStorage({ "khaoyu.auth.theme": "dark" });
-  assert.equal(readStoredTheme({ key: "khaoyu.theme", legacyKeys: ["khaoyu.auth.theme"], storage: legacy }), "dark");
+  const storage = memoryStorage({ "khaoyu.theme": "softDark", "khaoyu.legacy.theme": "dark" });
+  assert.equal(readStoredTheme({ key: "khaoyu.theme", legacyKeys: ["khaoyu.legacy.theme"], storage }), "softDark");
+  const legacy = memoryStorage({ "khaoyu.legacy.theme": "dark" });
+  assert.equal(readStoredTheme({ key: "khaoyu.theme", legacyKeys: ["khaoyu.legacy.theme"], storage: legacy }), "dark");
   setTheme("softLight", { key: "khaoyu.theme", storage: legacy });
   assert.equal(legacy.value("khaoyu.theme"), "softLight");
 });

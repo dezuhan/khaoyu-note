@@ -2,13 +2,12 @@
 
 A local-first visual workspace for thinking, planning and writing. Khaoyu Note runs as a native
 desktop app or a local browser host, stores every board in SQLite, and works without an account or
-network. A self-hosted collaboration service is under development in `service/`; it is experimental
-and not part of this release.
+network. There is no server component: the app, the local web host and the MCP server are the whole
+product.
 
-> **0.36.5 local-first release:** backend controls stay disabled in the app. Sync, Share, Add Server
-> and the remote workspace sections are hidden; Local storage supports multiple boards, with **New
-> Board** in the Workspace popover. The self-hosted service in `service/` is experimental and not part
-> of this build, and backend connection files are gitignored.
+> **0.36.5 local-first release:** the board, the local web host and the MCP server are the supported
+> surface. Local storage supports multiple boards, with **New Board** in the Workspace popover. No
+> account, server connection, sync or share layer exists in this build.
 
 ## Downloads
 
@@ -28,13 +27,12 @@ document, so text editing, selection, accessibility and IME support come from th
 custom renderer. Nested boards keep large projects readable, and the same document can be edited in the
 desktop app or the local web host.
 
-The project is split into two parts:
+The project has two parts:
 
 - **Local app** — Tauri v2 + Rust, with a vanilla ES-module frontend and a local SQLite database.
-- **Service** — an optional self-hosted Node 24 service for accounts, workspaces, sync, share links
-  and an admin dashboard.
+- **MCP server** — a stdio server that exposes the same SQLite database to local AI agents.
 
-Local use is always the default. Connecting a server is opt-in per board.
+Local use is the only mode. Everything runs offline and no data leaves the machine.
 
 ## Core features
 
@@ -43,17 +41,7 @@ Local use is always the default. Connecting a server is opt-in per board.
 - **Boards and columns** — nested boards with live thumbnails, columns, sections and connections.
 - **Local-first storage** — SQLite database and local assets; boards open offline.
 - **Desktop and browser** — the same frontend and database in Tauri or through `node server.mjs`.
-- **Optional collaboration** — self-hosted accounts, workspaces, roles, OIDC/2FA/passkeys, durable
-  sync, comments and public share links with expiry, passwords and download limits.
 - **MCP server** — 14 board tools over stdio for local AI agents, using the same SQLite database.
-
-## Self-hosted service (experimental)
-
-The collaboration service in `service/` is under active development and **not part of this build's
-supported surface**. The desktop app, local web host and MCP server work without it, and this release
-does not require Docker, PostgreSQL, Redis, a public URL or a service account. Developers who want to
-try the experimental service should read [service/README.md](service/README.md); its account, sync and
-sharing flows are not released or production ready yet.
 
 ## MCP server
 

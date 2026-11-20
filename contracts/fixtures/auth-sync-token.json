@@ -1,9 +1,0 @@
-{
-  "token": "khn_example",
-  "email": "owner@example.com",
-  "scopes": [
-    "projects:read",
-    "projects:write"
-  ],
-  "expiresAt": 1893456000000
-}
