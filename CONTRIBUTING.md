@@ -108,15 +108,31 @@ Add the changelog entry in the same change, then tag the verified release:
 git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 ```
 
+## Release notes
+
+Draft release notes are compact. Use the version's `CHANGELOG.md` section as the source, save the body
+as `.release-notes-X.Y.Z.md`, and pass it with `--notes-file`. Keep it to:
+
+- one short paragraph saying what the release is (for example "a **stabilisation release** on the 0.36
+  line" plus the backend status), then
+- a `## Highlights` list of **three to six bullets**, one user-visible outcome each, with a number only
+  where it proves the point, then
+- the usual `## Downloads` and `## Notes` blocks and a `## Changelog` pointer.
+
+Do not paste the commit list, the pull-request "What's Changed" block or every removed quirk. A reader
+should understand the release in under a minute, and the notes should still be accurate after the
+installers are attached.
+
 ## Release checklist
 
 1. All matching test suites pass.
 2. Installer is rebuilt when the release includes desktop changes.
-3. `CHANGELOG.md` describes user-visible changes.
+3. `CHANGELOG.md` describes user-visible changes, in the compact shape above.
 4. Every version field agrees with the full list above; `node tools/test-version.mjs` checks them.
 5. MCP binary rebuilt and reports the release version (`node tools/test-mcp.mjs <binary>`).
 6. The maintainer explicitly confirmed pushing the version branch and merging its pull request.
-7. The maintainer explicitly confirmed creating the **draft** GitHub release targeting `stable`.
+7. The maintainer explicitly confirmed creating the **draft** GitHub release targeting `stable`, with
+   compact notes (summary paragraph plus three to six highlight bullets).
 8. The maintainer explicitly confirmed uploading/publishing; the draft is only then published.
 9. Working tree is clean before tagging.
 10. Tag points at the release commit.
