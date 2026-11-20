@@ -51,7 +51,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: khaoyu-note-service:0.36.4
+    image: khaoyu-note-service:0.36.5
     restart: unless-stopped
     init: true
     env_file:
