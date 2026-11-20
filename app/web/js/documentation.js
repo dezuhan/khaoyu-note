@@ -335,6 +335,9 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
       <p>GPU acceleration is stored in SQLite and applied when the window is created, so changing it
       offers a restart. The Performance pane also reports the live WebGL renderer and CPU details so the
       setting is not a blind switch.</p>
+      <p>Reduced effects is on by default: it turns off backdrop blur, the heavy card shadows and the
+      long animations, and keeps the dotted grid, card text and every tool unchanged. Turn it off under
+      Settings &gt; Performance if you prefer the full shadow and blur treatment.</p>
       <p>For a stutter that only shows on one machine, press <code>Ctrl+Alt+Shift+P</code> to show a
       frame-cost overlay (or open the app with <code>?perf=1</code>). It reports delivered frames per
       second, the frame-time median/p90/max, frames slower than 25 and 50 ms, long tasks, board size and

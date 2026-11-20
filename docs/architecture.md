@@ -85,11 +85,14 @@ re-rasterises every card, which on Windows/WebView2 costs more than a 144 Hz fra
 eighteen-card board and hundreds of milliseconds on a five-hundred-card board. A composited scale is a
 GPU operation, so `interact.js` accumulates wheel steps into one view update per animation frame, calls
 `beginViewGesture()` and the board stays at the display rate. `render.js` closes the gesture after
-160 ms of quiet and repaints once with the exact CSS zoom, so text is crisp at rest. Measurements that
-divide a client rect by the zoom, or read a scroll height that CSS zoom would scale, use
-`usesTransformZoom()` so they stay correct in both paint modes. Because the view is written once per
-frame, `localStorage` persistence of the view is debounced (250 ms) instead of writing on every wheel
-event.
+160 ms of quiet and repaints once with the exact CSS zoom, so text is crisp at rest. That single swap
+is where a compositor can show one frame with the old raster and the new zoom together, which reads as
+a flicker; when the browser supports it the swap runs inside `document.startViewTransition()` and the
+110 ms crossfade hides the re-raster, with transitions disabled for the swap frames
+(`html.is-view-settling`). Measurements that divide a client rect by the zoom, or read a scroll height
+that CSS zoom would scale, use `usesTransformZoom()` so they stay correct in both paint modes. Because
+the view is written once per frame, `localStorage` persistence of the view is debounced (250 ms)
+instead of writing on every wheel event.
 
 The dotted grid is a CSS radial-gradient on the viewport with `background-size = grid * zoom` and
 `background-position = view.pan`, which keeps dots aligned with world coordinates at every zoom.
@@ -295,6 +298,13 @@ zoom reset), Tools (show or hide rail tools), Performance (GPU acceleration), MC
 transport, database, copyable client config) and About (version, storage, data folder, board counts).
 The cosmetic options from the reference window (integrations, scratch disks, plug-ins, units,
 history log) were dropped.
+
+Reduced effects (`html[data-performance="true"]`) is on unless the user turns it off: it disables
+backdrop blur, drops card shadows to a hairline and shortens every animation and transition. It keeps
+the dotted grid, the card type, the font stack and every tool, because the grid is the board's spatial
+reference and removing it changed what the board looked like, not only how fast it ran. The zoom
+settle suppresses transitions for its two swap frames (`.is-view-settling`) in both modes, so a column
+transition cannot animate through the swap.
 
 Hiding a tool in Settings only removes its rail button: the card type stays available and existing
 cards keep rendering. That is separate from `TEMPORARILY_DISABLED_TOOLS` in `limits.js`, which
