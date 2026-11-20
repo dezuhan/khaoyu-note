@@ -83,5 +83,11 @@ confirmation from the maintainer in the current conversation.
 
 - Follow the commit format and test matrix in [CONTRIBUTING.md](CONTRIBUTING.md); update the docs
   and the matching `ROADMAP.md` checkbox in the same change.
+- Write every repository artifact in English: docs, `CHANGELOG.md`, commit messages, pull-request and
+  release notes, code comments, test names and user-facing source strings. Code identifiers are
+  English too. The only non-English text is the translation data of the multi-language feature
+  (`app/web/js/i18n.js` locales and anything that feature owns); never add a translated string for
+  any other purpose. Chat with the maintainer can be in Indonesian; what lands in the repository
+  stays English.
 - Do not commit generated artifacts (`dist/`, `target/`, `node_modules/`, `.cargo-home/`).
 - Keep a branch focused on exactly the requested work; unrelated changes go to their own branch.

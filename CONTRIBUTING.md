@@ -43,6 +43,20 @@ docs(roadmap): add AI chatbot milestone
 test(mcp): cover stale write rejection
 ```
 
+## Language
+
+Every artifact committed to this repository is written in **English**: documentation, `CHANGELOG.md`
+entries, commit messages, pull-request descriptions, release notes, code comments, test names and the
+user-facing source strings. Code identifiers stay English too.
+
+The only non-English text in the repository belongs to the app's multi-language feature: the locale
+data in `app/web/js/i18n.js` and anything that feature owns (locale-specific documentation templates,
+translated menus). Never hand-write a translated string for another purpose, and never leave a locale
+value in English unless it is one of the shipped languages.
+
+Conversation with the maintainer may happen in any language, including Indonesian. The rule applies to
+what lands in the repository, not to the chat around it.
+
 ## Before committing
 
 Run the checks that match the change:
@@ -108,15 +122,31 @@ Add the changelog entry in the same change, then tag the verified release:
 git tag -a v0.2.0 -m "Khaoyu Note 0.2.0"
 ```
 
+## Release notes
+
+Draft release notes are compact. Use the version's `CHANGELOG.md` section as the source, save the body
+as `.release-notes-X.Y.Z.md`, and pass it with `--notes-file`. Keep it to:
+
+- one short paragraph saying what the release is (for example "a **stabilisation release** on the 0.36
+  line" plus the backend status), then
+- a `## Highlights` list of **three to six bullets**, one user-visible outcome each, with a number only
+  where it proves the point, then
+- the usual `## Downloads` and `## Notes` blocks and a `## Changelog` pointer.
+
+Do not paste the commit list, the pull-request "What's Changed" block or every removed quirk. A reader
+should understand the release in under a minute, and the notes should still be accurate after the
+installers are attached.
+
 ## Release checklist
 
 1. All matching test suites pass.
 2. Installer is rebuilt when the release includes desktop changes.
-3. `CHANGELOG.md` describes user-visible changes.
+3. `CHANGELOG.md` describes user-visible changes, in the compact shape above.
 4. Every version field agrees with the full list above; `node tools/test-version.mjs` checks them.
 5. MCP binary rebuilt and reports the release version (`node tools/test-mcp.mjs <binary>`).
 6. The maintainer explicitly confirmed pushing the version branch and merging its pull request.
-7. The maintainer explicitly confirmed creating the **draft** GitHub release targeting `stable`.
+7. The maintainer explicitly confirmed creating the **draft** GitHub release targeting `stable`, with
+   compact notes (summary paragraph plus three to six highlight bullets).
 8. The maintainer explicitly confirmed uploading/publishing; the draft is only then published.
 9. Working tree is clean before tagging.
 10. Tag points at the release commit.

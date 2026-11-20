@@ -3,6 +3,12 @@
 All notable changes to Khaoyu Note are recorded here. The format follows Keep a Changelog and the
 project uses Semantic Versioning.
 
+Each released version stays compact: one or two sentences of summary, then bullets for the main points
+grouped under `Added`, `Changed`, `Fixes` or `Performance`. A bullet describes one user-visible outcome,
+not one commit; measurements belong in the bullet that needs them. `[Unreleased]` is the working log,
+and when a version ships its section is trimmed to that shape, so the draft release notes can be built
+from it without copying a commit list.
+
 ## [Unreleased]
 
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
