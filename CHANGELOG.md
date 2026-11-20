@@ -8,27 +8,6 @@ project uses Semantic Versioning.
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
 stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
 
-### Performance
-
-- Board zoom no longer re-lays out and re-rasterises every card on every wheel step. A zoom gesture
-  scales the world with a composited transform and repaints once with the exact CSS zoom when the
-  gesture settles after 160 ms. On Windows/WebView2 at 144 Hz this took wheel zoom from about 250
-  frames per 3 s to 485 on an 18-card board, and from 62 to 422 frames on a 500-card board, with the
-  p90 frame time dropping from 35 ms to 7 ms (18 cards) and from 264 ms to 7 ms (500 cards). Text is
-  still rendered with the CSS zoom at rest, so sharpness is unchanged.
-- Wheel and trackpad events are coalesced into one view update per animation frame, and the viewport
-  is written to `localStorage` once per gesture instead of on every event.
-- Dropping a dragged card now commits as a geometry update instead of rebuilding every card. The drop
-  gap went from 35 ms to 14 ms on a 500-card board and from 340 ms to 76 ms on a 19k-node board, and
-  embedded audio and video are no longer torn down and reloaded by a drop.
-- Dragging a card now moves it with a composited `transform` offset instead of rewriting `left`/`top` on
-  every pointermove, so a drag no longer lays out and repaints the card, its shadow and its text each
-  frame. Children of a dragged column follow with the same offset. Layout time during a 300-card drag
-  dropped by about 60 percent.
-- Added a frame-cost overlay for machine-specific stutter: `Ctrl+Alt+Shift+P` (or `?perf=1`) shows
-  delivered fps, frame-time median/p90/max, frames over 25 and 50 ms, long tasks, board size and the
-  GPU renderer, and clicking it copies the report. It is off by default.
-
 ### Backend and service
 
 - Two-step service login: email/password first, then an authenticator code or a dedicated backup-code
@@ -72,6 +51,36 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
 - Settings > Server keeps one connection entry and no Change connection button; saved account details
   are shown only for an active server board.
 - Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
+
+## [0.36.4] - 2026-11-20
+
+Stabilisation release: zoom, drag and drop now stay on the compositor on Windows/WebView2, and a
+frame-cost overlay makes machine-specific stutter measurable.
+
+### Added
+
+- A frame-cost overlay for machine-specific stutter: `Ctrl+Alt+Shift+P` (or `?perf=1`) shows delivered
+  fps, frame-time median/p90/max, frames over 25 and 50 ms, long tasks, board size and the GPU
+  renderer, and clicking it copies the report. It is off by default.
+
+### Performance
+
+- Board zoom no longer re-lays out and re-rasterises every card on every wheel step. A zoom gesture
+  scales the world with a composited transform and repaints once with the exact CSS zoom when the
+  gesture settles after 160 ms. On Windows/WebView2 at 144 Hz this took wheel zoom from about 250
+  frames per 3 s to 485 on an 18-card board, and from 62 to 422 frames on a 500-card board, with the
+  p90 frame time dropping from 35 ms to 7 ms (18 cards) and from 264 ms to 7 ms (500 cards). Text is
+  still rendered with the CSS zoom at rest, so sharpness is unchanged.
+- Wheel and trackpad events are coalesced into one view update per animation frame, and the viewport
+  is written to `localStorage` once per gesture instead of on every event.
+- Dropping a dragged card now commits as a geometry update instead of rebuilding every card. The drop
+  gap went from 35 ms to 14 ms on a 500-card board and from 340 ms to 76 ms on a 19k-node board, and
+  embedded audio and video are no longer torn down and reloaded by a drop. The column header keeps
+  reporting the right card count after a drop.
+- Dragging a card now moves it with a composited `transform` offset instead of rewriting `left`/`top` on
+  every pointermove, so a drag no longer lays out and repaints the card, its shadow and its text each
+  frame. Children of a dragged column follow with the same offset. Layout time during a 300-card drag
+  dropped by about 60 percent.
 
 ## [0.36.3] - 2026-11-18
 
