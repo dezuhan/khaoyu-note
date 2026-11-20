@@ -16,9 +16,11 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
 
 ### Performance
 
-- Reduced effects is now the default and keeps the dotted grid. It still turns off backdrop blur, the
-  heavy card shadows and the long animations, but the board's spatial reference, card text and every
-  tool stay exactly as they are. The Performance toggle label no longer lists the grid.
+- Reduced effects is now the default and keeps the dotted grid. It still turns off backdrop blur,
+  the heavy card shadows and the long animations, but the board's spatial reference, card text and
+  every tool stay exactly as they are. Modal overlays (Settings, sync, share, onboarding) and the
+  command palette keep their glass, because they open occasionally and never sit over a board that is
+  being panned or zoomed. The Performance toggle label no longer lists the grid.
 - The zoom settle no longer flashes when reduced effects are off. The swap from the composited
   transform to the exact CSS zoom runs inside a short `document.startViewTransition()` crossfade with
   transitions disabled for the swap frames, which hides the re-raster of every card, shadow and text.
