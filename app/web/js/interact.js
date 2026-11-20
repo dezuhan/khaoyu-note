@@ -27,6 +27,7 @@ import {
   uid,
 } from "./model.js";
 import {
+  beginViewGesture,
   cardElement,
   connectionGeometry,
   refreshCard,
@@ -1410,6 +1411,13 @@ function onConnectionPointerDown(event) {
 
 // ------------------------------------------------------------------ wheel
 
+// Trackpads and high-resolution wheels emit several wheel events per frame. Accumulating them and
+// applying one view change per animation frame keeps pan and zoom at the display rate instead of
+// stacking style/layout passes on every raw event.
+let wheelFrame = 0;
+let wheelPan = null;
+let wheelZoom = null;
+
 function onWheel(event) {
   if (!state.board) return;
   const table = event.target.closest?.(".mn-table");
@@ -1422,21 +1430,38 @@ function onWheel(event) {
   event.preventDefault();
   if (event.ctrlKey || event.metaKey) {
     const rect = viewportEl.getBoundingClientRect();
-    const px = event.clientX - rect.left;
-    const py = event.clientY - rect.top;
-    const worldX = (px - state.view.x) / state.view.zoom;
-    const worldY = (py - state.view.y) / state.view.zoom;
-    const factor = Math.exp(-event.deltaY * 0.0022);
-    const zoom = Math.min(4, Math.max(0.15, state.view.zoom * factor));
-    state.view.zoom = zoom;
-    state.view.x = px - worldX * zoom;
-    state.view.y = py - worldY * zoom;
-    notify("view");
-    renderView();
-    return;
+    if (!wheelZoom) wheelZoom = { factor: 1, px: 0, py: 0 };
+    wheelZoom.factor *= Math.exp(-event.deltaY * 0.0022);
+    wheelZoom.px = event.clientX - rect.left;
+    wheelZoom.py = event.clientY - rect.top;
+  } else {
+    if (!wheelPan) wheelPan = { dx: 0, dy: 0 };
+    wheelPan.dx -= event.deltaX;
+    wheelPan.dy -= event.deltaY;
   }
-  state.view.x -= event.deltaX;
-  state.view.y -= event.deltaY;
+  if (!wheelFrame) wheelFrame = requestAnimationFrame(applyWheelView);
+}
+
+function applyWheelView() {
+  wheelFrame = 0;
+  const pan = wheelPan;
+  const zoomStep = wheelZoom;
+  wheelPan = null;
+  wheelZoom = null;
+  if (!state.board) return;
+  if (pan) {
+    state.view.x += pan.dx;
+    state.view.y += pan.dy;
+  }
+  if (zoomStep) {
+    const zoom = Math.min(4, Math.max(0.15, state.view.zoom * zoomStep.factor));
+    const worldX = (zoomStep.px - state.view.x) / state.view.zoom;
+    const worldY = (zoomStep.py - state.view.y) / state.view.zoom;
+    state.view.zoom = zoom;
+    state.view.x = zoomStep.px - worldX * zoom;
+    state.view.y = zoomStep.py - worldY * zoom;
+    beginViewGesture();
+  }
   notify("view");
   renderView();
 }

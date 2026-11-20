@@ -8,6 +8,17 @@ project uses Semantic Versioning.
 Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
 stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
 
+### Performance
+
+- Board zoom no longer re-lays out and re-rasterises every card on every wheel step. A zoom gesture
+  scales the world with a composited transform and repaints once with the exact CSS zoom when the
+  gesture settles after 160 ms. On Windows/WebView2 at 144 Hz this took wheel zoom from about 250
+  frames per 3 s to 485 on an 18-card board, and from 62 to 422 frames on a 500-card board, with the
+  p90 frame time dropping from 35 ms to 7 ms (18 cards) and from 264 ms to 7 ms (500 cards). Text is
+  still rendered with the CSS zoom at rest, so sharpness is unchanged.
+- Wheel and trackpad events are coalesced into one view update per animation frame, and the viewport
+  is written to `localStorage` once per gesture instead of on every event.
+
 ### Backend and service
 
 - Two-step service login: email/password first, then an authenticator code or a dedicated backup-code

@@ -72,12 +72,24 @@ rebuild (which would destroy the caret). Structural changes call `markDirty("boa
 
 ## Coordinate system
 
-The board is an infinite world plane. Scaling uses the CSS `zoom` property (not a transform scale)
-because Chromium re-lays out and re-rasterises text at the zoomed size, so cards stay sharp up to the
-maximum 400 percent zoom. The world element gets `zoom: view.zoom` and
+The board is an infinite world plane. At rest, scaling uses the CSS `zoom` property (not a transform
+scale) because Chromium re-lays out and re-rasterises text at the zoomed size, so cards stay sharp up to
+the maximum 400 percent zoom. The world element gets `zoom: view.zoom` and
 `transform: translate(view.x / zoom, view.y / zoom)`; the divide is required because CSS zoom also
 scales the translate. The screen formula stays `screen = pan + world * zoom`, so pointer maths is
 `world = (screen - view.pan) / zoom` and wheel zoom keeps the world point under the cursor fixed.
+
+While a zoom gesture is live the world instead gets `zoom: 1` and
+`transform: translate(view.x, view.y) scale(zoom)`. Changing the CSS zoom value re-lays out and
+re-rasterises every card, which on Windows/WebView2 costs more than a 144 Hz frame even on an
+eighteen-card board and hundreds of milliseconds on a five-hundred-card board. A composited scale is a
+GPU operation, so `interact.js` accumulates wheel steps into one view update per animation frame, calls
+`beginViewGesture()` and the board stays at the display rate. `render.js` closes the gesture after
+160 ms of quiet and repaints once with the exact CSS zoom, so text is crisp at rest. Measurements that
+divide a client rect by the zoom, or read a scroll height that CSS zoom would scale, use
+`usesTransformZoom()` so they stay correct in both paint modes. Because the view is written once per
+frame, `localStorage` persistence of the view is debounced (250 ms) instead of writing on every wheel
+event.
 
 The dotted grid is a CSS radial-gradient on the viewport with `background-size = grid * zoom` and
 `background-position = view.pan`, which keeps dots aligned with world coordinates at every zoom.

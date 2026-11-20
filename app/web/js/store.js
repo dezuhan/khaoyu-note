@@ -49,6 +49,27 @@ function storeView(boardId, view) {
   }
 }
 
+// The viewport is written from the pan/zoom path, which runs once per frame. localStorage is a
+// synchronous write, so keep the latest view in memory and persist it once the gesture pauses.
+const VIEW_STORE_MS = 250;
+let viewStoreTimer = 0;
+let viewStorePending = null;
+
+function scheduleViewStore(boardId, view) {
+  if (!boardId || !view) return;
+  viewStorePending = { boardId, view };
+  if (viewStoreTimer) return;
+  viewStoreTimer = setTimeout(flushViewStore, VIEW_STORE_MS);
+}
+
+function flushViewStore() {
+  clearTimeout(viewStoreTimer);
+  viewStoreTimer = 0;
+  const pending = viewStorePending;
+  viewStorePending = null;
+  if (pending) storeView(pending.boardId, pending.view);
+}
+
 const subscribers = new Set();
 export function subscribe(fn) {
   subscribers.add(fn);
@@ -59,7 +80,7 @@ export function notify(kind = "board") {
   // write conflicts when the same board is open on a desktop and a phone/tunnel at once.
   if (kind === "view" && state.loaded && state.board) {
     state.viewDirty = false;
-    storeView(state.board.id, state.view);
+    scheduleViewStore(state.board.id, state.view);
   }
   for (const fn of subscribers) {
     try {
@@ -226,8 +247,11 @@ export function prepareForReset() {
   resetInProgress = true;
   clearTimeout(saveTimer);
   clearTimeout(retryTimer);
+  clearTimeout(viewStoreTimer);
   saveTimer = 0;
   retryTimer = 0;
+  viewStoreTimer = 0;
+  viewStorePending = null;
   state.dirty = false;
   state.viewDirty = false;
   state.conflict = null;
@@ -240,6 +264,7 @@ export function prepareForReset() {
 
 export async function saveNow() {
   if (resetInProgress || !state.board || state.readOnly) return;
+  flushViewStore();
   if (state.conflict) {
     // Keep asking the user to resolve the conflict instead of overwriting either version.
     // A pan or zoom alone must not interrupt them with a dialog; that view is simply not saved.
