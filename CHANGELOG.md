@@ -21,6 +21,10 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
 - Dropping a dragged card now commits as a geometry update instead of rebuilding every card. The drop
   gap went from 35 ms to 14 ms on a 500-card board and from 340 ms to 76 ms on a 19k-node board, and
   embedded audio and video are no longer torn down and reloaded by a drop.
+- Dragging a card now moves it with a composited `transform` offset instead of rewriting `left`/`top` on
+  every pointermove, so a drag no longer lays out and repaints the card, its shadow and its text each
+  frame. Children of a dragged column follow with the same offset. Layout time during a 300-card drag
+  dropped by about 60 percent.
 
 ### Backend and service
 

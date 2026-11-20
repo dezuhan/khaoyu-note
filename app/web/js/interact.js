@@ -393,6 +393,14 @@ function beginDrag(card, event) {
     const target = getCard(state.board, id);
     if (target) origins.set(id, { x: target.x, y: target.y, w: target.w, h: target.h });
   }
+  // A dragged column carries its children, so their start positions are needed as well: they move
+  // with the same composited offset instead of being re-laid-out on every pointermove.
+  const descendants = dragDescendants(ids);
+  const childOrigins = new Map();
+  for (const id of descendants) {
+    const child = getCard(state.board, id);
+    if (child) childOrigins.set(id, { x: child.x, y: child.y });
+  }
   gesture = {
     type: "drag",
     id: card.id,
@@ -401,6 +409,8 @@ function beginDrag(card, event) {
     startClientX: event.clientX,
     startClientY: event.clientY,
     origins,
+    descendants,
+    childOrigins,
     moved: false,
     wasChild: card.parentId,
     dropTarget: null,
@@ -411,6 +421,8 @@ function beginDrag(card, event) {
     if (!el) continue;
     const target = getCard(state.board, id);
     el.classList.add("is-dragging");
+    // Drop any leftover settle transition so the first pointermove is not animated.
+    el.style.transition = "none";
     // A Section is a background wrapper even while selected or moved.
     el.style.zIndex = String(
       target?.type === "section" ? zIndexFor(target) : DRAG_Z_INDEX
@@ -536,7 +548,7 @@ function onPointerMove(event) {
           card.x = snap(card.x);
           card.y = snap(card.y);
         }
-        applyCardGeometry(card);
+        applyDragOffset(card, origin);
       }
       syncColumnChildren();
       updateDragIndicators(world);
@@ -774,6 +786,34 @@ function applyCardGeometry(card) {
   el.style.zIndex = String(zIndexFor(card));
 }
 
+// While a card is dragged its element keeps the position it had when the gesture started and the
+// movement is applied as a composited transform. Writing left/top every pointermove forces a layout
+// and repaint of the card, its shadow and its text on every frame; a translate stays on the GPU.
+function applyDragOffset(card, origin) {
+  const el = cardElement(card.id);
+  if (!el || !origin) return;
+  el.style.transform = `translate(${card.x - origin.x}px, ${card.y - origin.y}px)`;
+}
+
+function clearDragOffset(id) {
+  const el = cardElement(id);
+  if (el) el.style.transform = "";
+}
+
+function dragDescendants(ids) {
+  const found = new Set();
+  const queue = [...ids];
+  while (queue.length) {
+    const parent = queue.shift();
+    for (const child of columnChildren(state.board, parent)) {
+      if (found.has(child.id)) continue;
+      found.add(child.id);
+      queue.push(child.id);
+    }
+  }
+  return found;
+}
+
 function syncColumnStack(column) {
   if (!column || column.type !== "column") return;
   for (const child of columnChildren(state.board, column.id)) {
@@ -785,20 +825,32 @@ function syncColumnStack(column) {
 
 function syncColumnChildren() {
   if (!state.board) return;
+  const dragging = gesture && gesture.type === "drag" ? gesture : null;
   layoutColumns(state.board);
   // While dragging, column children must be able to leave the column horizontally; after the layout
   // snaps them back, restore the dragged cards to their pointer-following position.
-  if (gesture && gesture.type === "drag" && gesture.moved) {
-    for (const id of gesture.ids) {
+  if (dragging && dragging.moved) {
+    for (const id of dragging.ids) {
       const card = getCard(state.board, id);
-      const origin = gesture.origins.get(id);
+      const origin = dragging.origins.get(id);
       if (!card || !origin || !card.parentId) continue;
-      card.x = origin.x + (gesture.lastDx || 0);
-      card.y = origin.y + (gesture.lastDy || 0);
+      card.x = origin.x + (dragging.lastDx || 0);
+      card.y = origin.y + (dragging.lastDy || 0);
     }
   }
   for (const card of state.board.cards) {
-    if (card.parentId) applyCardGeometry(card);
+    if (!card.parentId) continue;
+    if (dragging && dragging.ids.includes(card.id)) {
+      // The drag itself already positioned this card with a transform; applying geometry here would
+      // snap it back to the column slot and fight the gesture.
+      applyDragOffset(card, dragging.origins.get(card.id));
+      continue;
+    }
+    if (dragging && dragging.descendants.has(card.id)) {
+      applyDragOffset(card, dragging.childOrigins.get(card.id));
+      continue;
+    }
+    applyCardGeometry(card);
   }
   // Keep the card being dragged inside a column above its siblings while it moves.
   if (gesture && gesture.type === "drag") {
@@ -851,6 +903,7 @@ function onPointerUp(event) {
       // A click selects without moving. Restore the computed stacking so a Section cannot stay
       // above the board after being clicked.
       for (const id of current.ids) {
+        clearDragOffset(id);
         const card = getCard(state.board, id);
         const el = cardElement(id);
         if (card && el) {
@@ -921,7 +974,11 @@ function onPointerUp(event) {
 
 function finishDrag(current) {
   clearDropPreview();
+  // Capture where everything is drawn while the drag offsets are still applied, then drop those
+  // offsets so the geometry pass below can write the committed left/top values.
   const before = captureRects();
+  for (const id of current.ids) clearDragOffset(id);
+  for (const id of current.descendants || []) clearDragOffset(id);
   const dragged = new Set(current.ids);
   const target = current.dropTarget;
 

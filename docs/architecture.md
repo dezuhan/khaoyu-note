@@ -116,7 +116,14 @@ container whose children point at it through `parentId`; that link is cleared wh
 out of a column. Dropping a dragged card commits with `markDirty("geometry")`, not `"board"`: a drop
 only changes positions, parentage and column order and the geometry pass applies those to the existing
 elements, while a full `render("board")` re-created every card element (about 340 ms on a board with
-19k nodes) and reloaded embedded media for a change that moved one card. Link cards open through the Rust `open_external` command, which validates the URL
+19k nodes) and reloaded embedded media for a change that moved one card.
+
+While a card is dragged, its element keeps the position it had when the gesture started and the
+movement is a `transform: translate()` offset, so a pointermove updates the compositor instead of
+running layout and paint over the card, its shadow and its text. Children of a dragged column move with
+the same offset. On release the offsets are cleared and the committed left/top values are written by the
+geometry pass; `captureRects` runs before the clear so the settle animation still starts from what the
+user saw. Link cards open through the Rust `open_external` command, which validates the URL
 scheme and hands it to the system default handler (`xdg-open` / `open` / ShellExecuteW) instead of a
 WebView2 child window. Web links open in the browser; custom schemes such as `khaoyunote://` go to the
 registered application after the first-use confirmation, and `javascript:`, `data:`, `vbscript:`,

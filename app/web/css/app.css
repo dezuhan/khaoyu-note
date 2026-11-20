@@ -2227,6 +2227,8 @@ html[data-ky-theme="dark"] .mn-card-section.is-neutral-section {
 }
 
 .mn-card.is-dragging {
+  /* The drag moves the card with a composited transform; a transition would lag behind the pointer. */
+  transition: none !important;
   box-shadow:
     0 12px 28px color-mix(in srgb, var(--ky-palette-black-0, #000) 22%, transparent),
     inset 0 0 0 1px var(--ky-accent);
