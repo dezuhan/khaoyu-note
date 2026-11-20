@@ -48,3 +48,10 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+# The desktop build is shipped as an installer, so spend the build time on a smaller, better
+# optimised binary instead of the default 16 codegen units with full symbols.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
