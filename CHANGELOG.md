@@ -18,6 +18,9 @@ stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later r
   still rendered with the CSS zoom at rest, so sharpness is unchanged.
 - Wheel and trackpad events are coalesced into one view update per animation frame, and the viewport
   is written to `localStorage` once per gesture instead of on every event.
+- Dropping a dragged card now commits as a geometry update instead of rebuilding every card. The drop
+  gap went from 35 ms to 14 ms on a 500-card board and from 340 ms to 76 ms on a 19k-node board, and
+  embedded audio and video are no longer torn down and reloaded by a drop.
 
 ### Backend and service
 

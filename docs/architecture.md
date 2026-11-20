@@ -113,7 +113,10 @@ stray wheel event cannot silently scroll the canvas origin away from `view.pan`.
 Types: `note`, `heading`, `link`, `todo`, `document`, `comment`, `table`, `color`, `sketch`,
 `drawing`, `image`, `audio`, `video`, `map`, `file`, `board`, `column`. A column is a
 container whose children point at it through `parentId`; that link is cleared when a card is dragged
-out of a column. Link cards open through the Rust `open_external` command, which validates the URL
+out of a column. Dropping a dragged card commits with `markDirty("geometry")`, not `"board"`: a drop
+only changes positions, parentage and column order and the geometry pass applies those to the existing
+elements, while a full `render("board")` re-created every card element (about 340 ms on a board with
+19k nodes) and reloaded embedded media for a change that moved one card. Link cards open through the Rust `open_external` command, which validates the URL
 scheme and hands it to the system default handler (`xdg-open` / `open` / ShellExecuteW) instead of a
 WebView2 child window. Web links open in the browser; custom schemes such as `khaoyunote://` go to the
 registered application after the first-use confirmation, and `javascript:`, `data:`, `vbscript:`,
