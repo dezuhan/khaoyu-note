@@ -5,18 +5,18 @@ desktop app or a local browser host, stores every board in SQLite, and works wit
 network. There is no server component: the app, the local web host and the MCP server are the whole
 product.
 
-> **0.36.5 local-first release:** the board, the local web host and the MCP server are the supported
+> **0.37.0 local-first release:** the board, the local web host and the MCP server are the supported
 > surface. Local storage supports multiple boards, with **New Board** in the Workspace popover. No
 > account, server connection, sync or share layer exists in this build.
 
 ## Downloads
 
-Version 0.36.5 local-first builds:
+Version 0.37.0 local-first builds:
 
-- Windows: `Khaoyu Note_0.36.5_x64-setup.exe` (NSIS) or `Khaoyu Note_0.36.5_x64_en-US.msi`
-- Linux: `Khaoyu.Note_0.36.5_amd64.deb`, `Khaoyu.Note_0.36.5_amd64.AppImage` or
-  `Khaoyu.Note-0.36.5-1.x86_64.rpm`
-- macOS: `Khaoyu.Note_0.36.5_universal.dmg`
+- Windows: `Khaoyu Note_0.37.0_x64-setup.exe` (NSIS) or `Khaoyu Note_0.37.0_x64_en-US.msi`
+- Linux: `Khaoyu.Note_0.37.0_amd64.deb`, `Khaoyu.Note_0.37.0_amd64.AppImage` or
+  `Khaoyu.Note-0.37.0-1.x86_64.rpm`
+- macOS: `Khaoyu.Note_0.37.0_universal.dmg`
 
 ![Khaoyu Note board](shots/board-light.png)
 
