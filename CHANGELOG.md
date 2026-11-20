@@ -18,6 +18,10 @@ from it without copying a commit list.
   fixtures), the service CI job, the service-only test tools and the service documentation. The local
   app, the local web host and the MCP server are the whole product; boards still live in the local
   SQLite database and no request leaves the machine.
+- The collaboration client is gone with it: sync, share, remote workspace, presence and live-board
+  modules, the sync/share/presence top-bar controls, the Settings Server pane and the service
+  sections of the offline Help. Local accounts, board templates, comments, notifications, backup and
+  the MCP server stay exactly as they were.
 
 ## [0.36.5] - 2026-11-21
 

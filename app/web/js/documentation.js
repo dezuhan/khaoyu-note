@@ -6,8 +6,8 @@ export const DOCUMENTATION_SECTIONS = [
     id: "start",
     label: "Getting started",
     html: `
-      <p class="mn-docs-lead">Khaoyu Note is a local-first board app. Boards stay on this device unless
-      you explicitly enable server sync for a board.</p>
+      <p class="mn-docs-lead">Khaoyu Note is a local-first board app. Boards stay on this device: there is no server, account or
+      sync layer, and no request leaves the machine.</p>
       <ul>
         <li>On first run create the local admin account, then sign in on later launches. An account is
         required so board and account activity is attributed.</li>
@@ -50,7 +50,7 @@ export const DOCUMENTATION_SECTIONS = [
       </table>
       <h3>Editing</h3>
       <ul>
-        <li>Right-click a card for Share link, Lock position, Download asset, Cut, Copy, Paste, Duplicate and Delete.</li>
+        <li>Right-click a card for Lock position, Download asset, Cut, Copy, Paste, Duplicate and Delete.</li>
         <li>Convert a note to a document, or a column to a nested board, from the same menu.</li>
         <li>Deleting sends cards to the per-board Trash, where they can be restored or emptied.</li>
         <li>Undo and redo use whole-board snapshots, so a whole drag is one undo step.</li>
@@ -81,101 +81,22 @@ export const DOCUMENTATION_SECTIONS = [
     `,
   },
   {
-    id: "access",
-    label: "Access and sharing",
-    html: `
-      <p class="mn-docs-lead">This build is local-first. Share and Sync are disabled; boards stay in
-      the local SQLite database on this computer.</p>
-      <h3>Disabled controls</h3>
-      <ul>
-        <li>The Share and Sync buttons are hidden from the header.</li>
-        <li>There are no public links, share tokens, passkeys, invitations or account permissions.</li>
-        <li>No login, signup, password reset or account page is required or available.</li>
-        <li>Right-click Share link is disabled.</li>
-      </ul>
-      <h3>Local board URLs</h3>
-      <p>The browser edition still keeps a local board URL such as
-      <code>http://127.0.0.1:1430/?board=&lt;id&gt;</code>. It opens the board on the same machine;
-      network sharing and the self-hosted service are not part of this build.</p>
-    `,
-  },
-  {
-    id: "sync",
-    label: "Server sync",
-    dividerBefore: true,
-    html: `
-      <p class="mn-docs-lead">Sync is disabled in this local-first build. The desktop app, local web
-      host and SQLite database work entirely offline.</p>
-      <h3>What is off</h3>
-      <ul>
-        <li>The Sync button is hidden and the sync dialog is not reachable from the UI.</li>
-        <li>No server URL, account email, password or API token is requested.</li>
-        <li>Settings &gt; Server shows only local runtime details.</li>
-        <li>No background sync queue runs and no data leaves this computer.</li>
-      </ul>
-      <h3>Data</h3>
-      <p>Boards, cards, assets, settings and comments stay in the local database and asset folder.
-      Backups remain available from Settings &gt; Backup.</p>
-    `,
-  },
-  {
     id: "accounts",
     label: "Accounts and passkeys",
     html: `
-      <p class="mn-docs-lead">Accounts, passkeys, login, signup and password reset are disabled in
-      this local-first build. No account is needed to use the app.</p>
-      <h3>What is off</h3>
+      <p class="mn-docs-lead">Accounts are local to this device. The topbar avatar opens the local
+      account menu; no server, invitation, passkey or admin panel exists.</p>
+      <h3>Local account</h3>
       <ul>
-        <li>No first-run admin setup and no login gate.</li>
-        <li>The topbar account avatar is hidden and Settings has no Account page.</li>
-        <li>There is no account information, password, history or delete-account UI.</li>
+        <li>The account protects this installation. It is created and managed on this computer.</li>
+        <li>Profile, password, activity history and session controls live in the avatar menu.</li>
         <li>Comments use the local identity <strong>You</strong> without a profile picture.</li>
-        <li>Passkeys, invitations, member roles, API tokens and the admin panel are not exposed.</li>
+        <li>There are no invitations, member roles, API tokens, passkeys or admin dashboard.</li>
       </ul>
-      <h3>Existing data</h3>
-      <p>Account tables may still exist in an older local database, but this build does not read them
-      for sign-in or display. Boards and settings continue to work without an account.</p>
-      <h3>Future work</h3>
-      <p>The optional account and service code remains in the repository for a later milestone. It is
-      not part of the current local-first release.</p>
-    `,
-  },
-  {
-    id: "service",
-    label: "Self-hosted service",
-    html: `
-      <p class="mn-docs-lead">The self-hosted service is not part of this local-first build. The
-      desktop app, local web host and local database work without it. The notes below are reference
-      for a future service deployment.</p>
-      <h3>Run it locally</h3>
-      <pre class="mn-docs-code">cd service
-Copy-Item .env.example .env
-# set KHAOYU_SERVICE_SECRET, KHAOYU_SERVICE_PUBLIC_URL and KHAOYU_SERVICE_COOKIE_SECURE=false
-node src/cli.mjs migrate
-node src/cli.mjs bootstrap
-node src/server.mjs</pre>
-      <p>Docker Compose runs the same process as non-root with a read-only root filesystem and a
-      writable <code>/data</code> volume. Health checks are <code>GET /healthz</code> and
-      <code>GET /readyz</code>; both return status only.</p>
-      <h3>Configuration</h3>
-      <table>
-        <tr><th>Variable</th><th>Purpose</th></tr>
-        <tr><td><code>KHAOYU_SERVICE_SECRET</code></td><td>Required. Signs IP hashes, OTPs and unsubscribe links. Startup fails on weak or placeholder values.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_PUBLIC_URL</code></td><td>Base URL, WebAuthn origin and same-origin checks.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_DATA_DIR</code></td><td>Database, objects, temp files, backups and the mail outbox.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_COOKIE_SECURE</code></td><td>Adds Secure cookies and HSTS. Set false only for plain-HTTP local use.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_CORS_ORIGINS</code></td><td>Origins allowed to call bearer APIs. Defaults include the Tauri client and the local web host on port 1430.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_PUBLIC_SHARING</code></td><td>Global public-sharing kill switch.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_ADMIN_TOKEN</code></td><td>Enables operator admin endpoints; unset means they do not exist.</td></tr>
-        <tr><td><code>KHAOYU_SERVICE_BACKUP_PASSPHRASE</code></td><td>Encrypts backups with scrypt and AES-256-GCM.</td></tr>
-      </table>
-      <h3>Data and safety</h3>
-      <ul>
-        <li>Backups use a consistent SQLite snapshot, are verified, and keep a safety copy on restore.</li>
-        <li>Audit rows are pruned by retention; login attempts and share passphrase attempts are rate limited.</li>
-        <li>Terminate TLS at a reverse proxy and set <code>KHAOYU_SERVICE_REQUIRE_HTTPS=true</code> for production.</li>
-        <li>Operators must document their own backup location, encryption and deletion practice.</li>
-      </ul>
+      <h3>No server account</h3>
+      <p>Boards and settings work without an account, and there is no remote account to sign in to.
+      Older databases may still contain unused account tables; the app does not use them for sync,
+      sharing or a remote identity.</p>
     `,
   },
   {
@@ -223,57 +144,6 @@ cmd /c "call ""C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\
     `,
   },
   {
-    id: "api",
-    label: "HTTP API",
-    html: `
-      <p class="mn-docs-lead">This HTTP API belongs to the optional self-hosted service, which is not
-      used by the local-first app and is disabled from its UI. It is documented here for future work.</p>
-      <h3>Authentication</h3>
-      <ul>
-        <li><code>Authorization: Bearer khn_...</code> with the <code>projects:read</code> and
-        <code>projects:write</code> scopes for project and share APIs.</li>
-        <li>Cookie sessions with <code>X-CSRF-Token</code> for state-changing browser requests.</li>
-        <li><code>POST /api/v1/auth/sync-token</code> exchanges email and password for a scoped token.</li>
-        <li>Only origins in <code>KHAOYU_SERVICE_CORS_ORIGINS</code> may call bearer APIs, and
-        credentials are never allowed from those origins.</li>
-      </ul>
-      <h3>Endpoints</h3>
-      <table>
-        <tr><th>Group</th><th>Endpoints</th></tr>
-        <tr><td>Health</td><td><code>GET /healthz</code>, <code>GET /readyz</code></td></tr>
-        <tr><td>Auth</td><td><code>POST /api/v1/auth/register</code>, <code>login</code>, <code>refresh</code>, <code>logout</code>, <code>logout-all</code>, <code>sync-token</code>, <code>password-reset/request</code>, <code>password-reset/confirm</code>, <code>otp/request</code>, <code>otp/login</code>, <code>totp/setup</code>, <code>totp/enable</code>, <code>totp/disable</code>, passkey register and login</td></tr>
-        <tr><td>Account</td><td><code>GET /api/v1/auth/sessions</code>, <code>GET|POST /api/v1/account/tokens</code>, <code>DELETE /api/v1/account/tokens/:id</code>, <code>GET /api/v1/account/export</code>, <code>POST /api/v1/account/delete</code></td></tr>
-        <tr><td>Projects</td><td><code>GET|POST /api/v1/projects</code>, <code>GET /api/v1/projects/:id</code>, <code>PUT /api/v1/projects/:id/snapshot</code>, <code>GET /api/v1/projects/:id/versions</code>, <code>POST .../versions/:revision/restore</code>, <code>GET .../events</code> (SSE)</td></tr>
-        <tr><td>Assets</td><td><code>GET|POST /api/v1/projects/:id/assets</code>, <code>GET .../assets/:assetId</code></td></tr>
-        <tr><td>Sharing</td><td><code>GET|POST /api/v1/projects/:id/shares</code>, <code>DELETE /api/v1/shares/:id</code>, <code>POST /api/v1/shares/:id/rotate</code>, <code>POST /api/v1/projects/:id/public-sharing</code>, <code>POST /api/v1/share/:token/access</code></td></tr>
-        <tr><td>Admin</td><td><code>GET /api/v1/admin/audit</code>, <code>abuse-reports</code>, <code>stats</code>, with the operator token</td></tr>
-      </table>
-      <h3>Example: sign in and push a snapshot</h3>
-      <pre class="mn-docs-code">const base = "http://127.0.0.1:8080";
-const signed = await fetch(base + "/api/v1/auth/sync-token", {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({ email: "owner@example.com", password: "..." })
-}).then((response) =&gt; response.json());
-
-const headers = { authorization: "Bearer " + signed.token, "content-type": "application/json" };
-const project = await fetch(base + "/api/v1/projects", {
-  method: "POST", headers, body: JSON.stringify({ title: "Imported board" })
-}).then((response) =&gt; response.json());
-
-await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
-  method: "PUT", headers,
-  body: JSON.stringify({ doc: JSON.stringify(boardDocument), revision: 1 })
-});</pre>
-      <h3>Limits</h3>
-      <ul>
-        <li>Snapshot documents: 8 MB. Other JSON bodies: 64 KB.</li>
-        <li>Asset uploads: 100 MB, with magic-byte checks for images.</li>
-        <li>Health endpoints are unauthenticated and expose no version, path or configuration.</li>
-      </ul>
-    `,
-  },
-  {
     id: "shortcuts",
     label: "Keyboard shortcuts",
     dividerBefore: true,
@@ -303,16 +173,15 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
     label: "Settings and backup",
     html: `
       <h3>Panes</h3>
-      <p>Settings opens with Server and Backup at the top, then a divider, General,
-      Appearance, Tools and Performance, then another divider, MCP and About. Language is part of
-      General and Canvas is part of Appearance. Tools is a two-column icon grid; Map, Video and Audio
-      show a disabled status. There is no Account page in this local-first build.</p>
-      <h3>Server</h3>
+      <p>Settings opens on General, then Backup, Appearance, Tools and Board templates, a divider,
+      Performance, then a second divider, MCP and About. Language is part of General and Canvas is
+      part of Appearance. Tools is a two-column icon grid; Map, Video and Audio show a disabled
+      status.</p>
+      <h3>Local runtime</h3>
       <ul>
-        <li>Server shows only the local runtime: mode, version, database folder and, on the web host,
-        host and port.</li>
-        <li>Account, passkeys, sharing, sign-in and sync actions are removed; Share and Sync are
-        disabled in the topbar.</li>
+        <li>About shows the local runtime: mode, version, storage and, on the web host, host and
+        port.</li>
+        <li>There is no Account or Server page: the app has no server connection to configure.</li>
       </ul>
       <h3>Backup</h3>
       <ul>
@@ -377,12 +246,9 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
     label: "Privacy and safety",
     html: `
       <ul>
-        <li>Local boards do not require an account and never leave this device unless you enable sync.</li>
+        <li>Local boards do not require an account and never leave this device.</li>
         <li>Public sharing is off by default and each link is limited to its scope.</li>
-        <li>Search engines are excluded with noindex and share tokens are redacted from logs.</li>
-        <li>Audit rows store an HMAC of the IP address, never the raw address.</li>
-        <li>Deleting a local board never deletes server data.</li>
-        <li>MCP over stdio has no authentication, so any local process that can start it can read and
+        <li>Search engines are excluded with noindex and the app makes no outbound request for board data.</li>\n        <li>MCP over stdio has no authentication, so any local process that can start it can read and
         write the database. Keep the binary in a folder only you can run.</li>
       </ul>
     `,
@@ -394,26 +260,17 @@ await fetch(base + "/api/v1/projects/" + project.id + "/snapshot", {
       <ul>
         <li>If a save conflict appears, choose Load newer version or Keep my version as a copy. Never
         overwrite silently.</li>
-        <li>If sync says the server is unreachable, check the URL and that the service is running.
-        Then check Settings &gt; Account: Server, Account and Status show the exact failure.</li>
-        <li>If sync says the password is rejected, confirm the email. When an account uses TOTP,
-        sign in on the account page and create a token for scripted use instead.</li>
-        <li>If the browser build cannot reach the service, add the page origin to
-        <code>KHAOYU_SERVICE_CORS_ORIGINS</code>. The local web host on port 1430 is included by
-        default.</li>
-        <li>If a passkey cannot be created, use localhost or HTTPS and a browser with WebAuthn.</li>
         <li>If the desktop build cannot reach <code>http://localhost</code>, rebuild the app so the
         current CSP applies.</li>
+        <li>If the browser build shows the wrong database, check the <code>KHAOYU_NOTE_DB_DIR</code>
+        folder and the database path reported by /status.</li>
       </ul>
       <h3>Checks</h3>
       <pre class="mn-docs-code">node --experimental-vm-modules scripts/check-web.cjs
-node tools/test-sync.mjs
-node service/test/service.test.mjs
-node service/test/auth.test.mjs
-node tools/test-ui.mjs http://127.0.0.1:1430/</pre>
-      <p class="mn-docs-foot">Full operator documentation is in the repository: README.md,
-      service/README.md, docs/architecture.md, docs/security-audit.md, docs/packaging.md and
-      docs/blockers.md.</p>
+node tools/test-ui.mjs http://127.0.0.1:1430/
+node tools/test-web-mode.mjs</pre>
+      <p class="mn-docs-foot">Full documentation is in the repository: README.md,
+      docs/architecture.md, docs/packaging.md and docs/blockers.md.</p>
     `,
   },
 ];

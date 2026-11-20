@@ -28,8 +28,8 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `actions.js` | user-level operations: add, delete, duplicate, clipboard, upload, export, free-spot placement |
 | `render.js` | DOM construction per card type, geometry, selection, connections, canvas painting |
 | `interact.js` | pointer, wheel and keyboard interactions; inline editing; sketch drawing |
-| `ui.js` | tool rail, top bar (including the disabled language button), breadcrumbs, zoom bar, modals, menus, toasts, shortcuts, context menu |
-| `home.js` | dormant Home gallery code; multi-project Home is disabled in the single-file UI |
+| `ui.js` | tool rail, top bar, breadcrumbs, zoom bar, modals, menus, toasts, shortcuts, context menu |
+| `home.js` | Home gallery: board list and New Board entry |
 | `file-drop.js` | native OS drag and drop: extension routing to image, audio, video or file cards, asset storage through `store_asset_from_path`, drag overlay |
 | `templates.js` | header template library: Blank, Welcome, Project plan, Kanban, Meeting notes and Moodboard starters, applied in place with undo |
 | `document-editor.js` | full page document editor: formatting toolbar with anchored insert/style menus, rich text, export |
@@ -37,16 +37,14 @@ is a Canvas2D/WebGL layer for cards outside the viewport, not a rewrite.
 | `comments-panel.js` | top bar comments popup: collects threads across the board tree, navigates to cards |
 | `notifications.js` | top bar notification center: ingests comment activity, unread badge, read/unread/remove/delete-all actions, persists through app settings |
 | `context-toolbar.js` | floating bottom toolbar: markdown formatting for note/heading text, Move/Pen/Eraser for drawing |
-| `settings.js` | preferences dialog: General, Appearance, Tools, Board templates, Performance, Backup and the Account, MCP and About pages |
+| `settings.js` | preferences dialog: General, Backup, Appearance, Tools, Board templates, Performance, MCP and About |
 | `i18n.js` | ten-language settings localization, persisted in `mn.language`; board content is never translated |
-| `sync.js` / `sync-ui.js` | opt-in per-board sync client, plus its dialog and status pill |
-| `share.js` / `share-ui.js` | service sharing API client and the board or card share panel |
 | `command-palette.js` | Ctrl+K command palette with recently used commands |
 | `color-picker.js` / `color-names.js` | HSV colour picker and the named-colour lookup |
 | `image-crop.js` | crop overlay for image cards and link header images |
 | `preview.js` | mini board painter used by home cards and board cards |
 | `limits.js` | upload size cap, blocked-extension policy, and the temporarily disabled tool list |
-| `setup.js` | first-run storage setup after reset: single user, local SQLite, Turso and collaboration choices |
+| `setup.js` | clears the one-shot reset flag before the local database is opened |
 | `documentation.js` | offline Help > Documentation content |
 | `time.js` | absolute comment timestamps |
 | `icons.js` | inline SVG icon set |

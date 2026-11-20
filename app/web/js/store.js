@@ -3,7 +3,6 @@
 import * as bridge from "./bridge.js";
 import { createCard, layoutColumns, migrateLegacyKanban, newBoardDoc, uid, welcomeBoard } from "./model.js";
 import { applyTheme as applyDocumentTheme, readStoredTheme, storeTheme } from "./theme.js";
-import { clearRemoteTemp, writeRemoteTemp } from "./remote-temp.js";
 
 export const state = {
   board: null,
@@ -20,7 +19,6 @@ export const state = {
   conflict: null,
   baseUpdatedAt: null,
   loaded: false,
-  remote: false,
   readOnly: false,
 };
 
@@ -164,7 +162,6 @@ export function clearSelection() {
 // ------------------------------------------------------------------ saving
 
 let saveTimer = 0;
-let remoteFlushPromise = null;
 let retryTimer = 0;
 let retryDelay = 1000;
 let saveInFlight = false;
@@ -173,7 +170,6 @@ let resetInProgress = false;
 // Autosave is intentionally aggressive. Web/localStorage builds persist a board on a short throttle
 // even while the user keeps typing; desktop keeps a small idle window before its SQLite write.
 const IDLE_SAVE_MS = bridge.hasWeb ? 80 : 250;
-const REMOTE_SAVE_MS = 120;
 const MAX_RETRY_DELAY = 30000;
 
 export function markDirty(kind = "board") {
@@ -198,8 +194,8 @@ export function scheduleSave() {
   clearTimeout(saveTimer);
   // Both remote team boards and browser-localStorage boards save on a short throttle even while the
   // user keeps typing. Keep an already scheduled save instead of resetting it on every keystroke.
-  if ((state.remote || bridge.hasWeb) && pending) return;
-  saveTimer = setTimeout(saveNow, state.remote ? REMOTE_SAVE_MS : IDLE_SAVE_MS);
+  if (bridge.hasWeb && pending) return;
+  saveTimer = setTimeout(saveNow, IDLE_SAVE_MS);
 }
 
 function autoSaveEnabled() {
@@ -285,18 +281,6 @@ export async function saveNow() {
   const hadContentChanges = state.dirty;
   state.dirty = false;
   state.viewDirty = false;
-  if (state.remote) {
-    // Remote workspace boards are not mirrored into the local SQLite database. The sync listener
-    // captures the edit into the durable per-operation queue (IndexedDB) before it pushes.
-    // Release the in-flight flag before returning: later edits must be able to schedule a save.
-    saveInFlight = false;
-    state.saveState = "saved";
-    window.dispatchEvent(
-      new CustomEvent("mn:board-saved", { detail: { boardId: state.board.id, board: state.board } })
-    );
-    notify("save");
-    return;
-  }
   const snapshot = JSON.stringify(state.board);
   const boardId = state.board.id;
   const base = Number.isFinite(state.baseUpdatedAt) ? state.baseUpdatedAt : null;
@@ -418,29 +402,6 @@ export function setTheme(theme) {
   applyTheme(theme);
 }
 
-export function openSharedBoard(doc) {
-  if (!doc || !doc.id) throw new Error("The shared board is missing its document");
-  if (!Array.isArray(doc.trash)) doc.trash = [];
-  layoutColumns(doc);
-  state.board = doc;
-  state.remote = false;
-  state.readOnly = true;
-  state.selection = new Set();
-  state.editing = null;
-  state.loaded = true;
-  state.dirty = false;
-  state.viewDirty = false;
-  state.saveState = "saved";
-  state.conflict = null;
-  state.view = { x: 0, y: 0, zoom: 1 };
-  clearTimeout(saveTimer);
-  saveTimer = 0;
-  notify("board");
-  notify("view");
-  notify("history");
-  return doc;
-}
-
 export async function openBoard(id, { flush = true } = {}) {
   if (state.conflict) {
     // A conflict is unresolved; do not abandon the unsaved local version silently.
@@ -449,9 +410,7 @@ export async function openBoard(id, { flush = true } = {}) {
   }
   if (flush && state.board && state.board.id !== id) {
     // Flush pending edits so the board we leave is consistent on disk (and visible to panels).
-    const leavingRemote = state.remote;
     await saveNow();
-    if (leavingRemote) await flushRemoteBoard();
     if (state.conflict) {
       dispatchConflict(state.conflict);
       return null;
@@ -495,7 +454,6 @@ export async function openBoard(id, { flush = true } = {}) {
     doc.updatedAt = Date.now();
   }
   state.board = doc;
-  state.remote = false;
   state.readOnly = false;
   // Legacy builds stored a theme per board. Ignore it: the global preference above wins, so a
   // board saved in the past cannot flip the theme when it is opened.
@@ -523,7 +481,6 @@ export async function openBoard(id, { flush = true } = {}) {
 }
 
 export async function createBoard(title = "Untitled board", { withWelcome = false } = {}) {
-  if (state.remote) await flushRemoteBoard();
   const doc = withWelcome ? welcomeBoard() : newBoardDoc(title);
   if (!withWelcome) doc.title = title;
   if (withWelcome) {
@@ -545,7 +502,6 @@ export async function createBoard(title = "Untitled board", { withWelcome = fals
   }
   await bridge.saveBoard(doc.id, JSON.stringify(doc), null);
   state.board = doc;
-  state.remote = false;
   state.selection = new Set();
   state.editing = null;
   layoutColumns(doc);
@@ -626,124 +582,4 @@ export async function exportCurrentBoard() {
   if (!state.board) return null;
   const json = JSON.stringify(state.board, null, 2);
   return bridge.exportBoard(json);
-}
-
-/// Persist the current remote board to the temporary buffer and push it in the background.
-/// Workspace switches call this before changing `state.board` so pending edits are never dropped.
-export async function flushRemoteBoard() {
-  if (!state.remote || !state.board) return { status: "noop" };
-  const board = state.board;
-  if (remoteFlushPromise) return remoteFlushPromise;
-  remoteFlushPromise = (async () => {
-    try {
-      const sync = await import("./sync.js");
-      if (!sync.syncEnabled(board)) return { status: "temp" };
-      const result = await sync.pushLiveChanges(board);
-      // Legacy temporary copies are cleared once the durable queue has accepted the changes.
-      if (result.status === "pushed" || result.status === "noop") clearRemoteTemp(board.id);
-      return result;
-    } catch (error) {
-      // The durable record keeps the edits; the next open or online event retries them.
-      return { status: "pending", error };
-    }
-  })().finally(() => {
-    remoteFlushPromise = null;
-  });
-  return remoteFlushPromise;
-}
-
-/// Open a board hosted by a remote workspace without mirroring it into the local database.
-export async function openRemoteBoard(doc, syncInfo) {
-  if (!doc || !doc.id) throw new Error("Remote board document is missing");
-  if (state.remote && state.board?.id && state.board.id !== doc.id) await flushRemoteBoard();
-  state.board = doc;
-  state.board.sync = { ...syncInfo };
-  state.readOnly = false;
-  layoutColumns(doc);
-  state.view = readStoredView(doc.id) || doc.view || { x: 0, y: 0, zoom: 1 };
-  state.selection = new Set();
-  state.editing = null;
-  state.loaded = true;
-  state.remote = true;
-  state.dirty = false;
-  state.viewDirty = false;
-  state.conflict = null;
-  state.saveState = "saved";
-  state.baseUpdatedAt = null;
-  clearRetry();
-  clearTimeout(saveTimer);
-  saveTimer = 0;
-  notify("board");
-  notify("view");
-  notify("history");
-  state.viewDirty = false;
-  return doc;
-}
-
-/// Adopt a server document after an explicit pull or conflict choice.
-export async function adoptRemoteBoard(doc) {
-  if (!doc || !state.board || doc.id !== state.board.id) return;
-  if (state.remote) {
-    state.board = doc;
-    layoutColumns(doc);
-    state.selection = new Set();
-    state.editing = null;
-    state.conflict = null;
-    state.dirty = false;
-    state.saveState = "saved";
-    notify("board");
-    notify("view");
-    notify("history");
-    return;
-  }
-  const previousBase = state.baseUpdatedAt;
-  state.board = doc;
-  layoutColumns(doc);
-  state.selection = new Set();
-  state.editing = null;
-  state.conflict = null;
-  state.dirty = false;
-  state.baseUpdatedAt = previousBase;
-  const updatedAt = await bridge.saveBoard(doc.id, JSON.stringify(doc), previousBase);
-  state.baseUpdatedAt = typeof updatedAt === "number" && Number.isFinite(updatedAt) ? updatedAt : Date.now();
-  notify("board");
-  notify("view");
-  notify("history");
-}
-
-/// Persist sync metadata without marking the document dirty.
-export async function persistBoardSnapshot() {
-  if (state.remote) return true;
-  if (!state.board) return false;
-  const snapshot = JSON.stringify(state.board);
-  try {
-    const updatedAt = await bridge.saveBoard(state.board.id, snapshot, state.baseUpdatedAt);
-    if (typeof updatedAt === "number" && Number.isFinite(updatedAt)) state.baseUpdatedAt = updatedAt;
-    return true;
-  } catch (error) {
-    console.error("[store] could not persist sync metadata", error);
-    return false;
-  }
-}
-
-function persistRemoteOnExit() {
-  if (!state.remote || !state.board) return;
-  // IndexedDB writes started during unload are usually aborted, so keep the synchronous localStorage
-  // copy as a fallback; opening the board again imports it into the durable queue.
-  const board = state.board;
-  try {
-    writeRemoteTemp(board);
-  } catch {
-    /* storage may be unavailable */
-  }
-  void import("./sync.js")
-    .then((sync) => sync.captureBoardChanges(board))
-    .catch(() => {});
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("pagehide", persistRemoteOnExit);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") persistRemoteOnExit();
-  });
 }

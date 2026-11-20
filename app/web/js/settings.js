@@ -23,7 +23,6 @@ import {
 } from "./external-links.js";
 import { toolDisabledReason } from "./limits.js";
 import { exportCurrentBoard, history, notify, setTheme, state, prepareForReset } from "./store.js";
-import { checkConnection, describeConnection, loadSyncConfig, saveSyncConfig } from "./sync.js";
 import { currentVersion, initCurrentVersion, releaseSummary } from "./update.js";
 import {
   canDeleteTemplate,
@@ -88,19 +87,6 @@ const FONT_CHOICES = [
 
 const HEADING_FONT_CHOICES = [["Georgia", "Georgia (system serif)"], ...FONT_CHOICES];
 
-const NAV = [
-  { id: "server", label: "Server" },
-  { divider: true },
-  { id: "general", label: "General" },
-  { id: "backup", label: "Backup" },
-  { id: "appearance", label: "Appearance" },
-  { id: "tools", label: "Tools" },
-  { id: "templates", label: "Board templates" },
-  { id: "performance", label: "Performance" },
-  { divider: true },
-  { id: "mcp", label: "MCP" },
-  { id: "about", label: "About" },
-];
 
 const TOOL_LABELS = [
   ["note", "Note"],
@@ -128,7 +114,7 @@ let settings = { ...DEFAULT_SETTINGS };
 let systemGraphics = null;
 let storageStats = null;
 let overlay = null;
-let activePage = "server";
+let activePage = "general";
 let accountTab = "information";
 let query = "";
 let searchTimer = 0;
@@ -155,7 +141,7 @@ function formatBytes(value) {
 async function loadStorageStats() {
   try {
     storageStats = await bridge.storageStats();
-    if (overlay && (activePage === "about" || activePage === "server")) renderContent();
+    if (overlay && (activePage === "about")) renderContent();
   } catch {
     storageStats = null;
   }
@@ -394,18 +380,6 @@ function webviewLabel() {
 
 function pages() {
   return [
-    {
-      id: "server",
-      title: t("nav.server"),
-      divider: false,
-      rows: () => [
-        {
-          type: "note",
-          text: "Local runtime details and the optional self-hosted service connection.",
-        },
-      ],
-    },
-    { divider: true },
     {
       id: "general",
       title: t("nav.general"),
@@ -714,7 +688,7 @@ function pages() {
         info(t("stats.total"), formatBytes(storageStats?.totalBytes)),
         info("Projects", String(state.boards.filter((board) => !board.parentId).length)),
         info("Nested boards", String(state.boards.filter((board) => board.parentId).length)),
-        note("Local-first visual boards. Accounts and server sync are optional."),
+        note("Local-first visual boards. Boards stay in the local SQLite database."),
         {
           type: "action",
           label: t("about.feedback"),
@@ -751,7 +725,7 @@ function pages() {
           },
         },
         note(
-          "Reset everything wipes the local database and preferences. GitHub releases and the separate self-hosted service are not affected."
+          "Reset everything wipes the local database and preferences. GitHub releases are not affected."
         ),
       ],
     },
@@ -908,9 +882,7 @@ function renderContent() {
   }
 
   const page = pages().find((entry) => !entry.divider && entry.id === activePage);
-  if (activePage === "server") {
-    renderServerPage(content);
-  } else if (activePage === "backup") {
+  if (activePage === "backup") {
     renderBackupPage(content);
   } else if (activePage === "tools") {
     content.append(heading("Tools"));
@@ -943,51 +915,6 @@ function renderContent() {
 
   const statusEl = overlay.querySelector('[data-role="status"]');
   if (statusEl) statusEl.textContent = statusText;
-}
-
-function serviceBase() {
-  const config = loadSyncConfig();
-  return (config.url || "http://127.0.0.1:8080").replace(/\/+$/, "");
-}
-
-function serviceButton(label, path) {
-  return {
-    label,
-    onClick: () => bridge.openExternal(serviceBase() + path),
-  };
-}
-
-function renderServerRuntime(content) {
-  const box = document.createElement("div");
-  box.className = "mn-account-status mn-server-runtime";
-  const title = document.createElement("div");
-  title.className = "mn-account-server";
-  title.textContent = "This computer";
-  box.append(title);
-  const mode = bridge.webInfo
-    ? "Web host"
-    : bridge.hasTauri
-      ? "Desktop app"
-      : "Browser preview";
-  const rows = [
-    ["Mode", mode],
-    ["Version", currentVersion() || "unknown"],
-    ["Database", awaitPath()],
-  ];
-  if (bridge.webInfo) {
-    rows.push(["Host", `${bridge.webInfo.host}:${bridge.webInfo.port}`]);
-    rows.push(["URL", bridge.webInfo.url]);
-    if (Array.isArray(bridge.webInfo.urls) && bridge.webInfo.urls.length) {
-      rows.push(["Share URLs", bridge.webInfo.urls.join(", ")]);
-    }
-  }
-  for (const [label, value] of rows) {
-    const line = document.createElement("div");
-    line.className = "mn-account-server";
-    line.textContent = `${label}: ${value}`;
-    box.append(line);
-  }
-  content.append(box);
 }
 
 function resizeAvatarImage(file) {
@@ -1256,7 +1183,7 @@ function accountDeleteTab(pane) {
   const note = document.createElement("p");
   note.className = "mn-prefs-note";
   note.textContent =
-    "GitHub releases and the separate self-hosted service are not affected; this only resets the local database.";
+    "GitHub releases are not affected; this only resets the local database.";
 
   const form = document.createElement("form");
   form.className = "mn-account-danger-form";
@@ -1700,225 +1627,6 @@ function renderAccountSettingsTab(container) {
   container.append(page);
 }
 
-function renderPublicShareSetting(content, config) {
-  const box = document.createElement("div");
-  box.className = "mn-account-status mn-public-share";
-  const title = document.createElement("div");
-  title.className = "mn-account-server";
-  title.textContent = "Public share links";
-  const note = document.createElement("p");
-  note.className = "mn-prefs-note";
-  note.textContent =
-    "Optional public origin used in share links and board links (for example a domain, tunnel, or public IP). The host still needs port forwarding, a tunnel or a reverse proxy so the address reaches this service; HTTPS is recommended.";
-  const row = document.createElement("div");
-  row.className = "mn-share-copy-row";
-  const input = document.createElement("input");
-  input.className = "ky-input";
-  input.type = "url";
-  input.placeholder = "https://notes.example.com or http://203.0.113.10:8080";
-  input.value = config.publicShareUrl || "";
-  const save = document.createElement("button");
-  save.type = "button";
-  save.className = "mn-btn";
-  save.textContent = "Save public URL";
-  const savePublicUrl = () => {
-    const current = loadSyncConfig();
-    try {
-      const saved = saveSyncConfig({
-        url: current.url,
-        email: current.email,
-        token: current.token,
-        publicShareUrl: input.value.trim(),
-      });
-      input.value = saved.publicShareUrl;
-      setStatus(
-        saved.publicShareUrl
-          ? `Share links will use ${saved.publicShareUrl}`
-          : "Share links will use the sync server URL"
-      );
-    } catch (error) {
-      setStatus(error.message || "Enter a valid public URL");
-    }
-  };
-  save.addEventListener("click", savePublicUrl);
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      savePublicUrl();
-    }
-  });
-  row.append(input, save);
-  box.append(title, note, row);
-  content.append(box);
-}
-
-function storedServerProfile(url) {
-  try {
-    const entries = JSON.parse(localStorage.getItem("ky.servers") || "[]");
-    return entries.find((entry) => entry.url === url)?.profile || null;
-  } catch {
-    return null;
-  }
-}
-
-function renderServerPage(content) {
-  content.append(heading("Server"));
-  const config = loadSyncConfig();
-  const intro = document.createElement("p");
-  intro.className = "mn-prefs-note";
-  intro.textContent =
-    "Connection details for this computer and the optional self-hosted service.";
-  content.append(intro);
-  renderServerRuntime(content);
-  if (!state.remote) {
-    const localStatus = document.createElement("div");
-    localStatus.className = "mn-account-status";
-    for (const line of [
-      "Mode: Local storage",
-      "Server: not connected for this board",
-      "Account: no server account active in this workspace",
-    ]) {
-      const row = document.createElement("div");
-      row.className = "mn-account-server";
-      row.textContent = line;
-      localStatus.append(row);
-    }
-    content.append(localStatus);
-    const localNote = document.createElement("p");
-    localNote.className = "mn-prefs-note";
-    localNote.textContent =
-      "This board is stored in the local SQLite database. Open a server board from the Workspace menu to see its account and connection details here.";
-    content.append(localNote);
-    const docs = document.createElement("button");
-    docs.type = "button";
-    docs.className = "mn-btn mn-btn-quiet";
-    docs.textContent = "Open documentation";
-    docs.addEventListener("click", () => {
-      closeSettingsPage();
-      window.dispatchEvent(new CustomEvent("mn:open-docs"));
-    });
-    content.append(docs);
-    return;
-  }
-  const status = document.createElement("div");
-  status.className = "mn-account-status";
-  const server = document.createElement("div");
-  server.className = "mn-account-server";
-  server.textContent = config.url ? `Server: ${config.url}` : "Server: not connected";
-  const token = document.createElement("div");
-  token.className = "mn-account-server";
-  token.textContent = config.token
-    ? `Account: ${config.email || "signed in"}`
-    : "Account: not signed in";
-  const connection = document.createElement("div");
-  connection.className = "mn-account-server mn-account-connection";
-  connection.dataset.role = "account-connection";
-  connection.dataset.status = "checking";
-  connection.textContent = "Status: checking...";
-  status.append(server, token, connection);
-  content.append(status);
-
-  const profile = storedServerProfile(config.url);
-  if (config.token) {
-    const accountBox = document.createElement("div");
-    accountBox.className = "mn-account-status mn-account-profile";
-    const accountTitle = document.createElement("div");
-    accountTitle.className = "mn-account-server";
-    accountTitle.textContent = "Signed-in account";
-    accountBox.append(accountTitle);
-    const fields = profile
-      ? [
-          ["Username", profile.username],
-          ["Display name", profile.displayName],
-          ["First name", profile.firstName],
-          ["Last name", profile.lastName],
-          ["Email", profile.email || config.email],
-          ["Role", profile.role],
-        ]
-      : [["Email", config.email || "signed in"]];
-    for (const [label, value] of fields) {
-      if (value === undefined || value === null || value === "") continue;
-      const row = document.createElement("div");
-      row.className = "mn-account-server";
-      row.textContent = `${label}: ${value}`;
-      accountBox.append(row);
-    }
-    content.append(accountBox);
-  }
-  void refreshAccountConnection(connection);
-
-  const grid = document.createElement("div");
-  grid.className = "mn-account-grid";
-  const addActionCard = (title, description, path, role = "") => {
-    const card = document.createElement("div");
-    card.className = "mn-account-card";
-    if (role) card.dataset.action = role;
-    const headingEl = document.createElement("strong");
-    headingEl.textContent = title;
-    const text = document.createElement("p");
-    text.className = "mn-prefs-note";
-    text.textContent = description;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "mn-btn";
-    button.textContent = "Open";
-    button.addEventListener("click", () => bridge.openExternal(serviceBase() + path));
-    card.append(headingEl, text, button);
-    return card;
-  };
-  grid.classList.add("is-single");
-  grid.append(
-    addActionCard(
-      "Open account",
-      "Create or sign in, reset password, manage sessions and API tokens.",
-      "/admin"
-    )
-  );
-  content.append(grid);
-
-  // Passkeys can be switched off by the service operator; hide the entry instead of opening a 404.
-  // Without a connected service the account/passkey actions are not usable, so keep them hidden.
-  void (async () => {
-    if (!config.url || !config.token) return;
-    try {
-      const response = await fetch(`${serviceBase()}/api/v1/auth/features`, {
-        signal: AbortSignal.timeout(2500),
-      });
-      if (!response.ok) return;
-      const features = await response.json();
-      if (!features.passkeysEnabled) return;
-      grid.append(
-        addActionCard("Passkeys", "Register or use a WebAuthn passkey.", "/passkeys", "passkeys")
-      );
-    } catch {
-      /* feature endpoint unreachable: keep passkeys hidden */
-    }
-  })();
-
-  const recheck = document.createElement("button");
-  recheck.type = "button";
-  recheck.className = "mn-btn mn-btn-quiet";
-  recheck.textContent = "Check connection";
-  recheck.addEventListener("click", async () => {
-    const line = content.querySelector('[data-role="account-connection"]');
-    if (!line) return;
-    const result = await refreshAccountConnection(line);
-    setStatus(result ? describeConnection(result) : "Connection not configured");
-  });
-  content.append(recheck);
-
-
-  const docs = document.createElement("button");
-  docs.type = "button";
-  docs.className = "mn-btn mn-btn-quiet";
-  docs.textContent = "Open documentation";
-  docs.addEventListener("click", () => {
-    closeSettingsPage();
-    window.dispatchEvent(new CustomEvent("mn:open-docs"));
-  });
-  content.append(docs);
-}
-
 function renderTemplatesPage(content) {
   const intro = document.createElement("p");
   intro.className = "mn-prefs-note";
@@ -1996,22 +1704,6 @@ function renderTemplatesPage(content) {
     grid.append(card);
   }
   content.append(grid);
-}
-
-async function refreshAccountConnection(element) {
-  const config = loadSyncConfig();
-  if (!config.url || !config.token) {
-    element.dataset.status = "unconfigured";
-    element.textContent = "Status: not configured";
-    return null;
-  }
-  element.dataset.status = "checking";
-  element.textContent = "Status: checking...";
-  const result = await checkConnection();
-  if (!element.isConnected) return result;
-  element.dataset.status = result.state;
-  element.textContent = `Status: ${describeConnection(result)}`;
-  return result;
 }
 
 function renderBackupPage(content) {
