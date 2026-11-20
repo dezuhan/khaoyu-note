@@ -1054,8 +1054,28 @@ export function beginViewGesture() {
 function endViewGesture() {
   viewSettleTimer = 0;
   if (!viewGestureActive) return;
-  viewGestureActive = false;
-  renderView();
+  // Settling swaps the composited transform for the exact CSS zoom, which re-rasterises the board.
+  // Chromium can show one frame with the old raster and the new zoom together, which reads as a
+  // flicker; a short view transition crossfades the old and new paint instead. Browsers without the
+  // API (WebKitGTK always paints with the transform) simply swap.
+  const apply = () => {
+    viewGestureActive = false;
+    const root = document.documentElement;
+    root.classList.add("is-view-settling");
+    renderView();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => root.classList.remove("is-view-settling"));
+    });
+  };
+  if (typeof document.startViewTransition === "function") {
+    try {
+      document.startViewTransition(apply);
+      return;
+    } catch {
+      /* fall through to a direct swap */
+    }
+  }
+  apply();
 }
 
 export function renderView() {

@@ -5799,9 +5799,9 @@ html[data-performance="true"] * {
   transition-duration: 0.001ms !important;
 }
 
-html[data-performance="true"] .mn-viewport {
-  background-image: none;
-}
+/* The dotted grid stays in performance mode: it is the board's spatial reference, and the viewport
+   keeps it aligned through background-position, which is painted once per frame like any other
+   background. Removing it changed what the board looked like, not only how fast it ran. */
 
 html[data-performance="true"] .mn-card {
   box-shadow: var(--ky-hairline);
@@ -5813,6 +5813,20 @@ html[data-performance="true"] *::before,
 html[data-performance="true"] *::after {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+
+/* One settle swap of transform -> CSS zoom, during which nothing may animate. */
+html.is-view-settling .mn-world,
+html.is-view-settling .mn-world * {
+  transition: none !important;
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+}
+
+/* Keep the settle crossfade short: it covers the raster swap, it is not a scene transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 110ms;
 }
 
 /* Pressed feedback for compact controls that do not define their own active state. */

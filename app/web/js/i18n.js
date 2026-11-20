@@ -68,7 +68,7 @@ const en = {
   "templates.apply": "Apply",
   "performance.gpu": "GPU acceleration",
   "performance.currentMode": "Current mode",
-  "performance.reducedEffects": "Reduced effects (blur, shadows, grid, animations)",
+  "performance.reducedEffects": "Reduced effects (blur, shadows, animations)",
   "performance.apply": "Apply GPU change",
   "performance.restart": "Restart app",
 };
@@ -126,7 +126,7 @@ const ptBR = {
   "templates.apply": "Aplicar",
   "performance.gpu": "Aceleração de GPU",
   "performance.currentMode": "Modo atual",
-  "performance.reducedEffects": "Efeitos reduzidos (desfoque, sombras, grade, animações)",
+  "performance.reducedEffects": "Efeitos reduzidos (desfoque, sombras, animações)",
   "performance.apply": "Aplicar alteração de GPU",
   "performance.restart": "Reiniciar app",
 };
@@ -184,7 +184,7 @@ const id = {
   "templates.apply": "Terapkan",
   "performance.gpu": "Akselerasi GPU",
   "performance.currentMode": "Mode saat ini",
-  "performance.reducedEffects": "Efek dikurangi (blur, bayangan, grid, animasi)",
+  "performance.reducedEffects": "Efek dikurangi (blur, bayangan, animasi)",
   "performance.apply": "Terapkan perubahan GPU",
   "performance.restart": "Mulai ulang aplikasi",
 };
@@ -242,7 +242,7 @@ const es = {
   "templates.apply": "Aplicar",
   "performance.gpu": "Aceleración de GPU",
   "performance.currentMode": "Modo actual",
-  "performance.reducedEffects": "Efectos reducidos (desenfoque, sombras, cuadrícula, animaciones)",
+  "performance.reducedEffects": "Efectos reducidos (desenfoque, sombras, animaciones)",
   "performance.apply": "Aplicar cambio de GPU",
   "performance.restart": "Reiniciar aplicación",
 };
@@ -300,7 +300,7 @@ const fr = {
   "templates.apply": "Appliquer",
   "performance.gpu": "Accélération GPU",
   "performance.currentMode": "Mode actuel",
-  "performance.reducedEffects": "Effets réduits (flou, ombres, grille, animations)",
+  "performance.reducedEffects": "Effets réduits (flou, ombres, animations)",
   "performance.apply": "Appliquer le changement GPU",
   "performance.restart": "Redémarrer l'application",
 };
@@ -358,7 +358,7 @@ const de = {
   "templates.apply": "Anwenden",
   "performance.gpu": "GPU-Beschleunigung",
   "performance.currentMode": "Aktueller Modus",
-  "performance.reducedEffects": "Reduzierte Effekte (Unschärfe, Schatten, Raster, Animationen)",
+  "performance.reducedEffects": "Reduzierte Effekte (Unschärfe, Schatten, Animationen)",
   "performance.apply": "GPU-Änderung anwenden",
   "performance.restart": "App neu starten",
 };
@@ -416,7 +416,7 @@ const ja = {
   "templates.apply": "適用",
   "performance.gpu": "GPUアクセラレーション",
   "performance.currentMode": "現在のモード",
-  "performance.reducedEffects": "エフェクトを減らす（ぼかし、影、グリッド、アニメーション）",
+  "performance.reducedEffects": "エフェクトを減らす（ぼかし、影、アニメーション）",
   "performance.apply": "GPU変更を適用",
   "performance.restart": "アプリを再起動",
 };
@@ -474,7 +474,7 @@ const ko = {
   "templates.apply": "적용",
   "performance.gpu": "GPU 가속",
   "performance.currentMode": "현재 모드",
-  "performance.reducedEffects": "효과 줄이기(흐림, 그림자, 그리드, 애니메이션)",
+  "performance.reducedEffects": "효과 줄이기(흐림, 그림자, 애니메이션)",
   "performance.apply": "GPU 변경 적용",
   "performance.restart": "앱 다시 시작",
 };
@@ -532,7 +532,7 @@ const zhCN = {
   "templates.apply": "应用",
   "performance.gpu": "GPU 加速",
   "performance.currentMode": "当前模式",
-  "performance.reducedEffects": "减少效果（模糊、阴影、网格、动画）",
+  "performance.reducedEffects": "减少效果（模糊、阴影、动画）",
   "performance.apply": "应用 GPU 更改",
   "performance.restart": "重启应用",
 };
@@ -590,7 +590,7 @@ const ru = {
   "templates.apply": "Применить",
   "performance.gpu": "Ускорение GPU",
   "performance.currentMode": "Текущий режим",
-  "performance.reducedEffects": "Меньше эффектов (размытие, тени, сетка, анимация)",
+  "performance.reducedEffects": "Меньше эффектов (размытие, тени, анимация)",
   "performance.apply": "Применить изменение GPU",
   "performance.restart": "Перезапустить приложение",
 };

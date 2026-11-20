@@ -236,7 +236,9 @@ export function initUI(elements) {
   initContextToolbar();
   initCommandPalette(() => buildCommands().filter((command) => !command.disabled));
   wireMenuBar();
-  applyPerformanceMode(localStorage.getItem("ky.performance") === "1");
+  // Reduced effects are on unless the user turned them off: the board keeps the dotted grid and its
+  // normal type, while blur, heavy shadows and the long animations that cost the most stay off.
+  applyPerformanceMode(localStorage.getItem("ky.performance") !== "0");
   window.addEventListener("mn:language-changed", () => {
     buildToolRail();
     buildMenuBar();
