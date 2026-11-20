@@ -421,8 +421,8 @@ function beginDrag(card, event) {
     if (!el) continue;
     const target = getCard(state.board, id);
     el.classList.add("is-dragging");
-    // Drop any leftover settle transition so the first pointermove is not animated.
-    el.style.transition = "none";
+    // `.mn-card.is-dragging` disables transitions while the gesture lasts, so a leftover settle
+    // transition cannot animate the first pointermove.
     // A Section is a background wrapper even while selected or moved.
     el.style.zIndex = String(
       target?.type === "section" ? zIndexFor(target) : DRAG_Z_INDEX
