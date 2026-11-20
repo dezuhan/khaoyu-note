@@ -2,6 +2,10 @@
 
 Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
 
+> The optional self-hosted service was removed after 0.36.5. References to the service suite, server
+> workspace, sync and sharing below are historical; the supported product is the local app, the local
+> web host and the MCP server.
+
 > Status at 0.34.0, which supersedes the numbers below where they disagree:
 >
 > - Backup has its own Settings pane with Back up now and Export ZIP. At 0.34.0 the restore command
@@ -10,7 +14,7 @@ Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
 > - Schema versioning now has unit tests for idempotence and for rejecting a newer database.
 > - Automated checks: 263 UI checks, 17 MCP checks, 13 Rust library tests, 2 MCP unit tests, and the
 >   service suite.
-> - A threat model exists in `docs/threat-model.md`, so the "no threat model" gap below is outdated.
+> - A threat model existed for the removed service; the gap below is historical.
 > - Test counts, source sizes and artifact sizes below are the 0.32.0 snapshot; they are kept as
 >   history rather than restated every release.
 
@@ -28,7 +32,7 @@ Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
   smoke suite passes 15/15. The service image builds with Podman and Trivy reports no CRITICAL
   findings; Docker is unavailable here.
 - Roadmap checkboxes were reconciled with this evidence; see the verification note in `ROADMAP.md`.
-  The 0.32.0 numbers below are historical and superseded by `docs/production-readiness.md`.
+  The 0.32.0 numbers below are historical.
 
 ## 0.36.0 release preparation (2026-11-12)
 
@@ -152,7 +156,7 @@ Overall: **moderate for a single-user local app, low for multi-user or self-host
 - MCP over stdio has no authentication. Any local process that can start it could reach the database.
 - External video and map embeds are remote content.
 - No audit trail, crash reporting or tamper detection.
-- No external penetration test. The local threat model is documented in `docs/threat-model.md`.
+- No external penetration test. The service threat model was removed with the service.
 
 Recommended security work before staging: set a CSP, cap upload size, validate MIME and extension, sign installers, add a signed updater, document the local threat model, and add a database backup with integrity check. The full self-hosted security plan is in `ROADMAP.md` and must be implemented before any account or sharing feature ships.
 
@@ -281,7 +285,7 @@ Still blocked by the environment or missing credentials:
 - Malformed request targets such as `//` return a 400 response instead of throwing and terminating the service.
 - Registration creates a verified account immediately; email verification is disabled, its endpoint returns 410 and its form is hidden from `/account`.
 - External video and map iframes now run in a sandbox with a strict referrer policy.
-- The Milestones 1 to 3 audit is recorded in `docs/security-audit.md`; the largest open risks are desktop sync, SMTP delivery, service asset authorization and a global sharing kill switch.
+- The Milestones 1 to 3 audit was recorded in the removed service documentation; the largest open risks were desktop sync, SMTP delivery, service asset authorization and a global sharing kill switch.
 - Sharing, SMTP delivery, SSO, passkeys, scoped API tokens, a browser login UI and desktop sync remain pending.
 - Deleting a board tree now runs in one transaction and terminates on a parent cycle.
 - Corrupt card or connection JSON is reported on stderr instead of disappearing silently, and `boards.parent_id` has an index.

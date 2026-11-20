@@ -3,6 +3,10 @@
 Snapshot date: 2026-11-07; updated 2026-11-11 after the 0.35.0 verification pass. This records why
 the roadmap is not complete on this machine and what can still be implemented later.
 
+> The self-hosted service was removed after 0.36.5, so blockers that only concerned its account,
+> workspace, sync, sharing and admin surfaces are closed by removal. The local app, the local web host
+> and the MCP server are the supported product.
+
 ## Implementable in a future session
 
 | Item | Why it remains | Next step |

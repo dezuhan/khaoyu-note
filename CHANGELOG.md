@@ -11,52 +11,13 @@ from it without copying a commit list.
 
 ## [Unreleased]
 
-Backend, sync, sharing and service-account work is deferred from the local-first 0.36.0 build. It
-stays in the source tree behind `window.KY_BACKEND_ENABLED = true` for a later release.
+### Removed
 
-### Backend and service
-
-- Two-step service login: email/password first, then an authenticator code or a dedicated backup-code
-  page with a "Use a backup code instead" link. Signed five-minute challenges; legacy `/auth/login`
-  kept for compatibility.
-- Add Server handles 2FA accounts with `/auth/sync-token/begin`, `/totp` and `/backup`, and OIDC
-  desktop sign-in opens the default browser through a one-shot loopback listener instead of an
-  embedded webview.
-- Unique case-insensitive usernames, invite by username or email, workspace member/role management,
-  workspace access policies and the PostgreSQL workspace-creation fix.
-- Google OpenID Connect and GitHub OAuth with PKCE, state cookies, verified-email linking,
-  allowed-domain filters, passkeys, backup codes, account approval and service account settings.
-- Service admin dashboard: role-aware account management, boards, sharing, activity, security,
-  sessions and the shared app chrome.
-- Team deployment: PostgreSQL + Redis stack, setup scripts, reverse-proxy/public-URL configuration,
-  object encryption at rest, operation compaction, rate limits, CSRF enforcement and hardening.
-- Desktop Add Server now stores the signed-in profile in local JSON and updates the sync/share token;
-  Settings > Server shows that profile when a server board is active.
-- Generated share links use `SHARE_PUBLIC_URL` for the viewer and `PUBLIC_URL` for the API, with CORS
-  for the board origin; the service also fixes the implicit share origin on random ports.
-- Sharing UI is temporarily disabled: the board Share button and admin Enable/Create sharing actions
-  are disabled while existing links remain reviewable and revocable.
-
-### Sync and collaboration
-
-- Durable per-board/per-tab IndexedDB sync queue with granular operations, idempotent replay,
-  sequence conflicts, base/revision tracking and offline reload.
-- Operation log, causal clocks and field versions; concurrent field writes are reported as field
-  conflicts, disjoint text edits merge three-way, and hard per-card locks prevent conflicting edits.
-- SSE tickets, global presence, remote cursors and live refresh; a remote board reopens from its
-  cached mirror offline.
-- Remote workspaces fall back to Local storage with a Connection lost dialog when the server is
-  unreachable; queued changes remain for reconnect.
-- Sync requests have a hard deadline and stale in-flight requests are cleared so a queue cannot stay
-  on "Syncing N changes..." forever.
-- Full-page read-only public share viewer using the normal board chrome with editing, tools and
-  shortcuts disabled.
-
-### Deferred fixes
-
-- Settings > Server keeps one connection entry and no Change connection button; saved account details
-  are shown only for an active server board.
-- Sharing origin/CORS fixes for `note.dezuhan.my.id` and `app.dezuhan.my.id`.
+- The self-hosted server component is gone: `service/` (Node 24 server, PostgreSQL/Redis storage,
+  account and admin pages, Docker images, deploy scripts), `contracts/` (sync API schemas and
+  fixtures), the service CI job, the service-only test tools and the service documentation. The local
+  app, the local web host and the MCP server are the whole product; boards still live in the local
+  SQLite database and no request leaves the machine.
 
 ## [0.36.5] - 2026-11-21
 
