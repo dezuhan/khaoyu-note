@@ -11,6 +11,23 @@ from it without copying a commit list.
 
 ## [Unreleased]
 
+## [0.37.1] - 2026-11-21
+
+Cleanup release after the local-first 0.37.0: no behaviour change for boards, only dead service
+references leave the repository.
+
+### Fixes
+
+- The local web host no longer serves the unused `/api/share-info` route; its startup log reports the
+  reachable addresses as LAN URLs.
+- Shared theme and the architecture/project-status documents drop the last self-hosted service
+  references.
+
+### Added
+
+- `docs/change-request-0.37.0.md` records the 0.36.5 performance work and the 0.37.0 service removal,
+  with verification evidence, risk/rollback and follow-ups.
+
 ## [0.37.0] - 2026-11-21
 
 Khaoyu Note is local-first only. The optional self-hosted service and every collaboration screen that

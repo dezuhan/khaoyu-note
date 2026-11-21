@@ -667,7 +667,7 @@ dependencies = [
 
 [[package]]
 name = "cssparser"
-version = "0.37.0"
+version = "0.37.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c9cdaae01d5ed7882b04d795e7f752f46ff52d2fa3b50a20d28c464510bba98"
 dependencies = [
@@ -2044,7 +2044,7 @@ dependencies = [
 
 [[package]]
 name = "khaoyu-note"
-version = "0.37.0"
+version = "0.37.1"
 dependencies = [
  "base64 0.22.1",
  "reqwest 0.12.28",
