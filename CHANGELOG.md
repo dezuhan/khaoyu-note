@@ -11,6 +11,13 @@ from it without copying a commit list.
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Changed
+
+- The landing page uses Iconoir (MIT) as its single icon pack instead of hand-drawn inline SVGs;
+  the icons are masked glyphs sized from the component font sizes.
+
 ## [0.37.1] - 2026-11-21
 
 Cleanup release after the local-first 0.37.0: no behaviour change for boards, only dead service

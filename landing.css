@@ -184,20 +184,40 @@ body.lp {
   padding: 0;
 }
 
+/* Iconoir is the only icon pack (https://iconoir.com, MIT); icons are masked glyphs sized by
+   font-size. */
+.lp-social-icon,
+.lp-theme-icon,
+.lp-feature-icon-glyph,
+.lp-roadmap-icon-glyph,
+.lp-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  line-height: 1;
+}
+
 .lp-social-icon {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
+  font-size: 15px;
 }
 
 .lp-theme-icon {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  font-size: 14px;
+}
+
+.lp-feature-icon .lp-feature-icon-glyph,
+.lp-feature-icon [class*="iconoir-"] {
+  font-size: 15px;
+}
+
+.lp-roadmap-icon .lp-roadmap-icon-glyph,
+.lp-roadmap-icon [class*="iconoir-"] {
+  font-size: 16px;
+}
+
+.lp-menu-icon {
+  font-size: 16px;
 }
 
 html[data-ky-theme="dark"] .lp-theme-moon,
@@ -547,6 +567,10 @@ html[data-ky-theme="light"] .lp-theme-sun {
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-control);
   color: var(--ky-text);
+}
+
+.lp-feature-icon .lp-feature-icon-glyph {
+  color: inherit;
 }
 
 .lp-feature-icon svg {
@@ -914,6 +938,10 @@ html[data-ky-theme="light"] .lp-theme-sun {
   border-radius: var(--lp-control);
   background: var(--ky-control);
   color: var(--ky-text);
+}
+
+.lp-roadmap-icon .lp-roadmap-icon-glyph {
+  color: inherit;
 }
 
 .lp-roadmap-icon svg {
