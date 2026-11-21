@@ -1,16 +1,13 @@
-// Shared theme runtime for the Khaoyu Note desktop/web app and the self-hosted service pages.
+// Shared theme runtime for the Khaoyu Note desktop and web app.
 // The token vocabulary lives in ky.css; this module only resolves and persists the active skin.
 //
-// Storage keys are per origin, so every deployment (Tauri webview, local web host, self-hosted
-// service) stores its own choice. Service pages share one `khaoyu.theme` key; the app stores the
-// choice under `ky.theme`, after the historical `mn.theme` key is migrated by storage-keys.js.
+// Storage keys are per origin, so the desktop webview and the local web host store their own choice.
+// The app stores the choice under `ky.theme`, after the historical `mn.theme` key is migrated by
+// storage-keys.js.
 
 export const SKINS = ["light", "softLight", "softDark", "dark"];
 export const DEFAULT_THEME = "light";
 export const THEME_KEY = "khaoyu.theme";
-// Service pages keep one preference across admin, auth and share pages; these are the old per-page
-// keys that are migrated on the first visit.
-export const SERVICE_LEGACY_KEYS = ["khaoyu.admin.theme", "khaoyu.auth.theme"];
 
 export function isTheme(value) {
   return SKINS.includes(value);

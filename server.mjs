@@ -180,7 +180,7 @@ function lanUrls(port) {
 }
 
 const LOCAL_URL = `http://${DISPLAY_HOST}:${PORT}`;
-const SHARE_URLS = [
+const REACHABLE_URLS = [
   ...(PUBLIC_URL ? [PUBLIC_URL] : []),
   ...lanUrls(PORT),
   LOCAL_URL,
@@ -192,7 +192,7 @@ const webInfo = {
   bind: BIND_HOST,
   port: PORT,
   url: LOCAL_URL,
-  urls: SHARE_URLS,
+  urls: REACHABLE_URLS,
   publicUrl: PUBLIC_URL,
   database: DB_PATH,
   assets: ASSETS_DIR,
@@ -1736,16 +1736,6 @@ const server = http.createServer(async (request, response) => {
       await handleAuth(request, response, url);
       return;
     }
-    if (request.method === "GET" && url.pathname === "/api/share-info") {
-      sendJson(response, 200, {
-        urls: SHARE_URLS,
-        localUrl: LOCAL_URL,
-        bind: BIND_HOST,
-        publicUrl: PUBLIC_URL,
-        boardPath: "/?board=",
-      });
-      return;
-    }
     if (request.method === "GET" && url.pathname === "/api/events") {
       const session = currentSession(request);
       if (!session) {
@@ -1817,8 +1807,8 @@ const boardWatcher = watchBoards();
 
 server.listen(PORT, BIND_HOST, () => {
   console.log(`Khaoyu Note web: ${LOCAL_URL}`);
-  for (const url of SHARE_URLS) {
-    if (url !== LOCAL_URL) console.log(`share URL:       ${url}`);
+  for (const url of REACHABLE_URLS) {
+    if (url !== LOCAL_URL) console.log(`LAN URL:         ${url}`);
   }
   console.log(`database: ${DB_PATH}`);
   console.log(`status:   ${LOCAL_URL}/status`);

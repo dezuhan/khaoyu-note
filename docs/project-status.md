@@ -53,7 +53,6 @@ Snapshot date: 2026-11-07. Version at the first snapshot: 0.32.0.
 | Styling | Vendored Khaoyu design-system CSS plus the app stylesheet |
 | Storage | SQLite through rusqlite 0.40.2 and bundled libsqlite3-sys 0.38.2, WAL mode |
 | Native bridge | Tauri IPC commands for boards, assets, file open/download, settings and MCP path |
-| Self-hosted service | Node 24, built-in `node:sqlite`, one HTTP port, Docker Compose, reversible migrations |
 | Agent integration | `khaoyu-note-mcp`, a local stdio JSON-RPC 2.0 server with 14 tools |
 | File assets | Local assets directory with an `assets` table for original filenames |
 | Tests | Playwright UI suite, MCP smoke suite, service foundation tests and authentication tests |
